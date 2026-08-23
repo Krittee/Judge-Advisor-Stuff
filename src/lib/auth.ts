@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
-import { findPanelByCode } from "./store";
+import { store } from "./db";
 
 export const ROLES = ["admin", "judge", "queuer"] as const;
 export type Role = (typeof ROLES)[number];
@@ -105,9 +105,28 @@ const warnedAboutCode = new Set<string>();
  * the README is not an access code, and silently accepting it would hand
  * out Judge Advisor rights to the whole internet.
  */
+/**
+ * Codes printed in this repo's own documentation. Anyone can read them,
+ * so in production they are not access codes at all — setting one
+ * explicitly is refused just as firmly as leaving it unset.
+ */
+const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "ALPHA1", "BRAVO2", "CHARLIE3"]);
+
 function roleCode(envVar: string, devDefault: string): string {
-  const configured = (process.env[envVar] ?? "").trim();
-  if (configured) return configured.toUpperCase();
+  const configured = (process.env[envVar] ?? "").trim().toUpperCase();
+
+  if (configured && process.env.NODE_ENV === "production" && PUBLISHED_CODES.has(configured)) {
+    if (!warnedAboutCode.has(envVar)) {
+      warnedAboutCode.add(envVar);
+      console.error(
+        `[auth] ${envVar} is set to "${configured}", which is published in this project's\n` +
+          `       documentation and therefore public. Choose a different code and redeploy.`,
+      );
+    }
+    return "";
+  }
+
+  if (configured) return configured;
 
   if (process.env.NODE_ENV === "production") {
     if (!warnedAboutCode.has(envVar)) {
@@ -149,7 +168,7 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
 
   // Judge codes live in the store, so a panel can be added mid-event
   // without touching environment variables or restarting anything.
-  const panel = findPanelByCode(code);
+  const panel = await store().findPanelByCode(code);
   if (panel && sameCode(panel.code.toUpperCase(), code)) {
     return {
       role: "judge",

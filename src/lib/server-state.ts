@@ -1,4 +1,4 @@
-import { listPanels, listRequests, listTeams } from "./store";
+import { store } from "./db";
 import { stripCode } from "./data";
 import type { AppState } from "./types";
 
@@ -10,12 +10,17 @@ import type { AppState } from "./types";
  * for its judges is free text, and it has no business being readable by
  * the other 119 teams polling the same endpoint.
  */
-export function loadState(includeMessages = false): AppState {
-  const rows = listRequests();
+export async function loadState(includeMessages = false): Promise<AppState> {
+  const db = store();
+  const [panels, teams, rows] = await Promise.all([
+    db.listPanels(),
+    db.listTeams(),
+    db.listRequests(),
+  ]);
 
   return {
-    panels: listPanels().map(stripCode),
-    teams: listTeams(),
+    panels: panels.map(stripCode),
+    teams,
     requests: includeMessages ? rows : rows.map((r) => ({ ...r, message: null })),
     serverTime: new Date().toISOString(),
   };

@@ -427,7 +427,61 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
         </p>
       ) : null}
 
+      <StorageHealth />
+
       <DangerZone refresh={refresh} onError={onError} />
+    </div>
+  );
+}
+
+/**
+ * Where the data is actually going.
+ *
+ * Someone who deployed from a browser has no server log to read, so this
+ * is how they confirm their database is connected — and a loud warning
+ * if it is not, because a serverless host with no database silently
+ * forgets everything between requests.
+ */
+function StorageHealth() {
+  const [health, setHealth] = useState<{
+    ok: boolean;
+    storage?: string;
+    location?: string;
+    persistent?: boolean;
+    error?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    call<typeof health>("/api/health", { method: "GET" })
+      .then(setHealth)
+      .catch((e) => setHealth({ ok: false, error: (e as Error).message }));
+  }, []);
+
+  if (!health) return null;
+
+  if (!health.ok) {
+    return (
+      <div className="mt-8">
+        <Banner kind="error">
+          <strong>Storage is not reachable.</strong>{" "}
+          {health.error ?? "The app cannot reach its database."}
+        </Banner>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-8 space-y-3">
+      <p className="text-xs text-zinc-500">
+        Storing into <span className="text-zinc-300">{health.location}</span>
+      </p>
+      {health.persistent === false ? (
+        <Banner kind="info">
+          This is running on a local file. That is fine on your own computer, but if you deployed
+          this to a hosting service, add a database and set <code>DATABASE_URL</code> — otherwise
+          your data can vanish between requests.
+        </Banner>
+      ) : null}
     </div>
   );
 }

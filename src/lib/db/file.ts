@@ -8,8 +8,17 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { ActivityRow, Note, Panel, RequestRow, Team } from "./types";
-import type { Status } from "./status";
+import type { ActivityRow, Note, Panel, RequestRow, Team } from "../types";
+import type { Status } from "../status";
+import {
+  randomPanelCode,
+  StoreError,
+  type ImportedTeam,
+  type NewActivity,
+  type NewNote,
+  type NewRequest,
+  type Store,
+} from "./types";
 
 /**
  * The whole data layer: everything lives in memory and is mirrored to one
@@ -41,22 +50,29 @@ type Data = {
 const FILE = resolve(process.env.DATA_FILE ?? ".data/state.json");
 const LIVE: Status[] = ["requested", "acknowledged", "interviewing"];
 
-/** Thrown for rule violations we want to show the user verbatim. */
-export class StoreError extends Error {
-  constructor(
-    message: string,
-    readonly status = 400,
-  ) {
-    super(message);
-  }
-}
-
 /* ------------------------------------------------------------------ *
  * Loading and saving
  * ------------------------------------------------------------------ */
 
-let data: Data = load();
+let loaded: Data | null = null;
 let pendingWrite: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * The in-memory copy, loaded on first use rather than at import.
+ *
+ * That laziness matters on a serverless host: index.ts imports both
+ * backends so it can pick one, and a read-only filesystem would make an
+ * eager load throw on every cold start even when Postgres is the backend
+ * actually in use.
+ */
+function state(): Data {
+  if (!loaded) {
+    loaded = load();
+    claimLock();
+    installShutdownFlush();
+  }
+  return loaded;
+}
 
 function empty(): Data {
   return { panels: [], teams: [], requests: [], notes: [], activity: [] };
@@ -64,8 +80,21 @@ function empty(): Data {
 
 function load(): Data {
   if (!existsSync(FILE)) {
-    const seeded = process.env.SEED_DEMO === "false" ? empty() : demoData();
-    persist(seeded);
+    // Demo teams are a convenience for a fresh checkout, never something
+    // a real deployment should invent for itself. Production starts empty
+    // unless you deliberately ask for the demo roster.
+    const wantsDemo =
+      process.env.SEED_DEMO === "true" ||
+      (process.env.SEED_DEMO !== "false" && process.env.NODE_ENV !== "production");
+    const seeded = wantsDemo ? demoData() : empty();
+    try {
+      persist(seeded);
+    } catch (e) {
+      console.error(
+        `[store] cannot write ${FILE}: ${(e as Error).message}\n` +
+          "        Data will be kept in memory only and lost on restart.",
+      );
+    }
     return seeded;
   }
   try {
@@ -95,7 +124,7 @@ function load(): Data {
 }
 
 /** Atomic: write a temp file, then rename over the real one. */
-function persist(snapshot: Data = data): void {
+function persist(snapshot: Data = state()): void {
   mkdirSync(dirname(FILE), { recursive: true });
   const tmp = `${FILE}.tmp`;
   writeFileSync(tmp, JSON.stringify(snapshot, null, 2), "utf8");
@@ -120,21 +149,20 @@ function save(): void {
 }
 
 /** Flush before the process dies so the last few seconds are not lost. */
-for (const signal of ["exit", "SIGINT", "SIGTERM"] as const) {
-  process.once(signal, () => {
-    try {
-      persist();
-    } catch {
-      /* shutting down anyway */
-    }
-    releaseLock();
-    if (signal !== "exit") process.exit(0);
-  });
+function installShutdownFlush(): void {
+  for (const signal of ["exit", "SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+      try {
+        persist();
+      } catch {
+        /* shutting down anyway */
+      }
+      releaseLock();
+      if (signal !== "exit") process.exit(0);
+    });
+  }
 }
 
-export function storageLocation(): string {
-  return FILE;
-}
 
 /* ------------------------------------------------------------------ *
  * Second-instance guard
@@ -163,7 +191,7 @@ function claimLock(): void {
           `\n${"!".repeat(72)}\n` +
             `[store] ANOTHER COPY OF THIS APP IS ALREADY RUNNING (process ${held.pid}).\n\n` +
             `        Both are using ${FILE}\n` +
-            `        and they WILL overwrite each other's data.\n\n` +
+            `        and they WILL overwrite each other's state().\n\n` +
             `        Stop this one with Ctrl+C and use the copy that is already\n` +
             `        running. If you meant to restart, stop the other one first.\n` +
             `${"!".repeat(72)}\n`,
@@ -196,76 +224,67 @@ function releaseLock(): void {
   }
 }
 
-claimLock();
 
 /* ------------------------------------------------------------------ *
  * Reads
  * ------------------------------------------------------------------ */
 
-export function listPanels(): Panel[] {
-  return [...data.panels].sort(
+function listPanels(): Panel[] {
+  return [...state().panels].sort(
     (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name),
   );
 }
 
-export function listTeams(): Team[] {
-  return [...data.teams].sort((a, b) => a.number - b.number);
+function listTeams(): Team[] {
+  return [...state().teams].sort((a, b) => a.number - b.number);
 }
 
-export function listRequests(): RequestRow[] {
-  return [...data.requests].sort((a, b) => b.requested_at.localeCompare(a.requested_at));
+function listRequests(): RequestRow[] {
+  return [...state().requests].sort((a, b) => b.requested_at.localeCompare(a.requested_at));
 }
 
-export function listNotes(teamId?: string): Note[] {
-  return data.notes
+function listNotes(teamId?: string): Note[] {
+  return state().notes
     .filter((n) => !teamId || n.team_id === teamId)
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, 400);
 }
 
-export function listActivity(limit = 150): ActivityRow[] {
-  return [...data.activity]
+function listActivity(limit = 150): ActivityRow[] {
+  return [...state().activity]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, limit);
 }
 
-export function findPanelByCode(code: string): Panel | null {
+function findPanelByCode(code: string): Panel | null {
   const wanted = code.trim().toUpperCase();
-  return data.panels.find((p) => p.code.toUpperCase() === wanted) ?? null;
+  return state().panels.find((p) => p.code.toUpperCase() === wanted) ?? null;
 }
 
-export function findTeamByNumber(number: number): Team | null {
-  return data.teams.find((t) => t.number === number) ?? null;
+function findTeamByNumber(number: number): Team | null {
+  return state().teams.find((t) => t.number === number) ?? null;
 }
 
-export function findRequest(id: string): RequestRow | null {
-  return data.requests.find((r) => r.id === id) ?? null;
+function findRequest(id: string): RequestRow | null {
+  return state().requests.find((r) => r.id === id) ?? null;
 }
 
 /* ------------------------------------------------------------------ *
  * Requests
  * ------------------------------------------------------------------ */
 
-export function createRequest(input: {
-  teamId: string;
-  panelId: string;
-  kind: "queue" | "slot";
-  message?: string | null;
-  createdBy: string;
-  slotStart?: string | null;
-  slotEnd?: string | null;
-}): RequestRow {
+function createRequest(input: NewRequest): RequestRow {
   const now = new Date().toISOString();
 
   // Invariant 1: a team can only be live in the queue once.
-  if (data.requests.some((r) => r.team_id === input.teamId && LIVE.includes(r.status))) {
-    const team = data.teams.find((t) => t.id === input.teamId);
+  if (state().requests.some((r) => r.team_id === input.teamId && LIVE.includes(r.status))) {
+    const team = state().teams.find((t) => t.id === input.teamId);
     throw new StoreError(`Team ${team?.number ?? ""} is already in the queue.`.trim(), 409);
   }
 
   // Invariant 2: one team per panel slot.
   if (input.kind === "slot") {
-    const clash = data.requests.some(
+    const clash = state().requests.some(
       (r) =>
         r.kind === "slot" &&
         r.panel_id === input.panelId &&
@@ -296,18 +315,18 @@ export function createRequest(input: {
     updated_at: now,
   };
 
-  data.requests.push(row);
+  state().requests.push(row);
   save();
   return row;
 }
 
-export function updateRequest(id: string, patch: Partial<RequestRow>): RequestRow {
-  const row = data.requests.find((r) => r.id === id);
+function updateRequest(id: string, patch: Partial<RequestRow>): RequestRow {
+  const row = state().requests.find((r) => r.id === id);
   if (!row) throw new StoreError("That request no longer exists.", 404);
 
   // Re-opening must not create a second live request for the same team.
   if (patch.status && LIVE.includes(patch.status) && !LIVE.includes(row.status)) {
-    const other = data.requests.some(
+    const other = state().requests.some(
       (r) => r.id !== id && r.team_id === row.team_id && LIVE.includes(r.status),
     );
     if (other) throw new StoreError("That team already has a live request.", 409);
@@ -322,15 +341,15 @@ export function updateRequest(id: string, patch: Partial<RequestRow>): RequestRo
  * Teams
  * ------------------------------------------------------------------ */
 
-export function upsertTeams(rows: { number: number; name: string; pit: string | null }[]): number {
+function upsertTeams(rows: ImportedTeam[]): number {
   const now = new Date().toISOString();
   for (const row of rows) {
-    const existing = data.teams.find((t) => t.number === row.number);
+    const existing = state().teams.find((t) => t.number === row.number);
     if (existing) {
       existing.name = row.name;
       existing.pit = row.pit;
     } else {
-      data.teams.push({
+      state().teams.push({
         id: randomUUID(),
         number: row.number,
         name: row.name,
@@ -344,18 +363,18 @@ export function upsertTeams(rows: { number: number; name: string; pit: string | 
   return rows.length;
 }
 
-export function updateTeam(id: string, patch: Partial<Team>): Team {
-  const team = data.teams.find((t) => t.id === id);
+function updateTeam(id: string, patch: Partial<Team>): Team {
+  const team = state().teams.find((t) => t.id === id);
   if (!team) throw new StoreError("That team no longer exists.", 404);
   Object.assign(team, patch);
   save();
   return team;
 }
 
-export function deleteTeam(id: string): void {
-  data.teams = data.teams.filter((t) => t.id !== id);
-  data.requests = data.requests.filter((r) => r.team_id !== id);
-  data.notes = data.notes.filter((n) => n.team_id !== id);
+function deleteTeam(id: string): void {
+  state().teams = state().teams.filter((t) => t.id !== id);
+  state().requests = state().requests.filter((r) => r.team_id !== id);
+  state().notes = state().notes.filter((n) => n.team_id !== id);
   save();
 }
 
@@ -364,7 +383,7 @@ export function deleteTeam(id: string): void {
  * and never exceeding perPanel. Existing assignments are counted so a
  * mid-event top-up stays balanced.
  */
-export function autoAssignTeams(perPanel: number, includeAssigned = false): number {
+function autoAssignTeams(perPanel: number, includeAssigned = false): number {
   const panels = listPanels();
   if (!panels.length) throw new StoreError("Add at least one judge panel first.", 400);
 
@@ -373,7 +392,7 @@ export function autoAssignTeams(perPanel: number, includeAssigned = false): numb
 
   const load = new Map<string, number>(panels.map((p) => [p.id, 0]));
   if (!includeAssigned) {
-    for (const t of data.teams) {
+    for (const t of state().teams) {
       if (t.panel_id && load.has(t.panel_id)) load.set(t.panel_id, load.get(t.panel_id)! + 1);
     }
   }
@@ -387,7 +406,7 @@ export function autoAssignTeams(perPanel: number, includeAssigned = false): numb
     if (!target) break; // every panel is full
 
     load.set(target.id, target.count + 1);
-    const row = data.teams.find((t) => t.id === team.id)!;
+    const row = state().teams.find((t) => t.id === team.id)!;
     row.panel_id = target.id;
     assigned++;
   }
@@ -400,21 +419,21 @@ export function autoAssignTeams(perPanel: number, includeAssigned = false): numb
  * Panels
  * ------------------------------------------------------------------ */
 
-export function createPanel(input: Omit<Panel, "id" | "created_at">): Panel {
-  if (data.panels.some((p) => p.code.toUpperCase() === input.code.toUpperCase())) {
+function createPanel(input: Omit<Panel, "id" | "created_at">): Panel {
+  if (state().panels.some((p) => p.code.toUpperCase() === input.code.toUpperCase())) {
     throw new StoreError("That panel code is already in use.", 409);
   }
   const panel: Panel = { ...input, id: randomUUID(), created_at: new Date().toISOString() };
-  data.panels.push(panel);
+  state().panels.push(panel);
   save();
   return panel;
 }
 
-export function updatePanel(id: string, patch: Partial<Panel>): Panel {
-  const panel = data.panels.find((p) => p.id === id);
+function updatePanel(id: string, patch: Partial<Panel>): Panel {
+  const panel = state().panels.find((p) => p.id === id);
   if (!panel) throw new StoreError("That panel no longer exists.", 404);
 
-  if (patch.code && data.panels.some((p) => p.id !== id && p.code.toUpperCase() === patch.code!.toUpperCase())) {
+  if (patch.code && state().panels.some((p) => p.id !== id && p.code.toUpperCase() === patch.code!.toUpperCase())) {
     throw new StoreError("That panel code is already in use.", 409);
   }
 
@@ -424,22 +443,17 @@ export function updatePanel(id: string, patch: Partial<Panel>): Panel {
 }
 
 /** Deleting a panel orphans its teams and requests rather than losing them. */
-export function deletePanel(id: string): void {
-  data.panels = data.panels.filter((p) => p.id !== id);
-  for (const t of data.teams) if (t.panel_id === id) t.panel_id = null;
-  for (const r of data.requests) if (r.panel_id === id) r.panel_id = null;
+function deletePanel(id: string): void {
+  state().panels = state().panels.filter((p) => p.id !== id);
+  for (const t of state().teams) if (t.panel_id === id) t.panel_id = null;
+  for (const r of state().requests) if (r.panel_id === id) r.panel_id = null;
   save();
 }
 
-export function generatePanelCode(): string {
-  // No 0/O/1/I — these get read aloud across a noisy room.
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function generatePanelCode(): string {
   for (let attempt = 0; attempt < 50; attempt++) {
-    const code = Array.from(
-      { length: 6 },
-      () => alphabet[Math.floor(Math.random() * alphabet.length)],
-    ).join("");
-    if (!data.panels.some((p) => p.code === code)) return code;
+    const code = randomPanelCode();
+    if (!state().panels.some((p) => p.code === code)) return code;
   }
   return `P${Date.now().toString(36).toUpperCase()}`;
 }
@@ -448,13 +462,7 @@ export function generatePanelCode(): string {
  * Notes and activity
  * ------------------------------------------------------------------ */
 
-export function createNote(input: {
-  teamId: string;
-  requestId: string | null;
-  panelId: string | null;
-  author: string;
-  body: string;
-}): Note {
+function createNote(input: NewNote): Note {
   const note: Note = {
     id: randomUUID(),
     team_id: input.teamId,
@@ -464,19 +472,13 @@ export function createNote(input: {
     body: input.body,
     created_at: new Date().toISOString(),
   };
-  data.notes.push(note);
+  state().notes.push(note);
   save();
   return note;
 }
 
-export function logActivity(entry: {
-  requestId?: string | null;
-  teamId?: string | null;
-  actor: string;
-  action: string;
-  detail?: string | null;
-}): void {
-  data.activity.push({
+function logActivity(entry: NewActivity): void {
+  state().activity.push({
     id: randomUUID(),
     request_id: entry.requestId ?? null,
     team_id: entry.teamId ?? null,
@@ -488,7 +490,7 @@ export function logActivity(entry: {
 
   // The log is a convenience, not a record of account. Cap it so a long
   // event cannot grow the state file without bound.
-  if (data.activity.length > 2000) data.activity = data.activity.slice(-1500);
+  if (state().activity.length > 2000) state().activity = state().activity.slice(-1500);
   save();
 }
 
@@ -497,32 +499,20 @@ export function logActivity(entry: {
  * ------------------------------------------------------------------ */
 
 /** Clears requests, notes and the log. Teams and panels survive. */
-export function resetDay(): void {
-  data.requests = [];
-  data.notes = [];
-  data.activity = [];
+function resetDay(): void {
+  state().requests = [];
+  state().notes = [];
+  state().activity = [];
   save();
 }
 
 /** Wipes everything, including the roster and panels. */
-export function resetAll(): void {
-  data = empty();
+function resetAll(): void {
+  loaded = empty();
   save();
 }
 
-export function exportAll(): Data {
-  return structuredClone(data);
-}
 
-export function stats() {
-  return {
-    panels: data.panels.length,
-    teams: data.teams.length,
-    requests: data.requests.length,
-    notes: data.notes.length,
-    file: FILE,
-  };
-}
 
 /* ------------------------------------------------------------------ *
  * Demo data, so a fresh checkout is clickable straight away
@@ -627,3 +617,47 @@ function demoData(): Data {
 
   return { panels, teams, requests, notes: [], activity: [] };
 }
+
+/* ------------------------------------------------------------------ *
+ * The Store facade
+ *
+ * The functions above are synchronous, which is what makes the two
+ * invariants genuinely atomic here — Node runs one piece of JavaScript
+ * at a time, so no await can interleave between a check and its write.
+ * They are wrapped as async only to match the shared Store interface.
+ * ------------------------------------------------------------------ */
+
+export const fileStore: Store = {
+  kind: "file",
+  describe: () => `JSON file at ${FILE}`,
+
+  listPanels: async () => listPanels(),
+  listTeams: async () => listTeams(),
+  listRequests: async () => listRequests(),
+  listNotes: async (teamId) => listNotes(teamId),
+  listActivity: async (limit) => listActivity(limit),
+
+  findPanelByCode: async (code) => findPanelByCode(code),
+  findTeamByNumber: async (number) => findTeamByNumber(number),
+  findRequest: async (id) => findRequest(id),
+
+  createRequest: async (input) => createRequest(input),
+  updateRequest: async (id, patch) => updateRequest(id, patch),
+
+  upsertTeams: async (rows) => upsertTeams(rows),
+  updateTeam: async (id, patch) => updateTeam(id, patch),
+  deleteTeam: async (id) => deleteTeam(id),
+  autoAssignTeams: async (perPanel, includeAssigned) =>
+    autoAssignTeams(perPanel, includeAssigned),
+
+  createPanel: async (input) => createPanel(input),
+  updatePanel: async (id, patch) => updatePanel(id, patch),
+  deletePanel: async (id) => deletePanel(id),
+  generatePanelCode: async () => generatePanelCode(),
+
+  createNote: async (input) => createNote(input),
+  logActivity: async (entry) => logActivity(entry),
+
+  resetDay: async () => resetDay(),
+  resetAll: async () => resetAll(),
+};

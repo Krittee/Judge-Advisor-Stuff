@@ -4,9 +4,21 @@ A judging queue and interview tracker for a robotics-style event. Teams request
 a judge from their phone; judges work the queue; a colour-coded board shows the
 whole floor at a glance.
 
-**No database.** All data lives in one JSON file (`.data/state.json`). There is
-nothing to sign up for and nothing to configure — clone, `npm install`,
-`npm run dev`, and it works, pre-loaded with demo teams you can click around.
+## Two ways to run it
+
+| | What you do | Needs a terminal | Needs accounts |
+|---|---|:---:|:---:|
+| **[Put it on the web](DEPLOY.md)** | Click through Vercel + a free database | No | Two, both free |
+| **[Run it on a laptop](RUNNING.md)** | `npm install && npm run dev` | Yes | None |
+
+The web version gives you a permanent address any phone can reach from
+anywhere. The laptop version needs no accounts and no internet, but everyone
+must be on your wifi and the laptop must stay awake.
+
+**Storage follows from that choice and needs no thought:** set `DATABASE_URL`
+and it uses Postgres, creating its own tables on first run; leave it unset and
+it keeps everything in one JSON file (`.data/state.json`). Nothing outside
+`src/lib/db/` knows the difference.
 
 ---
 
@@ -17,9 +29,11 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-That is the whole setup. **Never used a terminal before?** Follow
-[RUNNING.md](RUNNING.md) instead — same thing, explained from scratch. Sign in at `/login` with `JA2026` to reach the Judge
-Advisor console.
+That is the whole setup — it boots with demo data so there is something to look
+at. Sign in at `/login` with `JA2026` to reach the Judge Advisor console.
+
+**Never used a terminal before?** [RUNNING.md](RUNNING.md) explains this from
+scratch, or [DEPLOY.md](DEPLOY.md) skips the terminal entirely.
 
 ### Before anyone else can reach it
 
@@ -32,15 +46,17 @@ cp .env.example .env.local     # then edit the codes
 | `ADMIN_CODE` | `JA2026` | Judge Advisor. Full control. Keep it to yourself. |
 | `QUEUER_CODE` | `DESK01` | Queue desk. Can only add teams to the queue. |
 | `SESSION_SECRET` | insecure key | Signs the login cookie. `openssl rand -base64 32` |
-| `DATA_FILE` | `.data/state.json` | Where the data lives. |
-| `SEED_DEMO` | on | Set to `false` to start with an empty roster. |
+| `DATABASE_URL` | unset | Set it to use Postgres; unset uses the JSON file. |
+| `DATA_FILE` | `.data/state.json` | Where the file store keeps its data. |
+| `SEED_DEMO` | on in dev, off in production | `true`/`false` to force it either way. |
 
 **Those defaults are development-only and cannot be used in production.** A
-production build refuses to sign anyone in with an unset code, and refuses to
+production build refuses to sign anyone in with an unset code, refuses the codes
+published in these docs even when you set them deliberately, and refuses to
 start at all without a real `SESSION_SECRET` — a code printed in a README is not
 an access code, and a known signing key would let anyone mint themselves a Judge
-Advisor cookie. In development it warns on the console instead, so a fresh clone
-still just runs.
+Advisor cookie. Production also never seeds demo teams. In development it warns
+on the console instead, so a fresh clone still just runs.
 
 Judge panel codes are **not** environment variables. Each panel gets its own,
 generated in the admin console under **Panels** — so you can add a panel
@@ -48,34 +64,24 @@ mid-event without restarting anything.
 
 ---
 
-## The one thing to know before you deploy
+## Where it can run
 
-Teams and judges have to see each other's updates, so this needs **one
-long-running Node process**. It is not a database, but it is still a shared
-server.
+| Where | Storage | Works |
+|---|---|---|
+| Vercel / Netlify serverless | Postgres via `DATABASE_URL` | ✅ [DEPLOY.md](DEPLOY.md) |
+| Railway / Render / Fly.io | Either | ✅ |
+| Your laptop at the venue | JSON file | ✅ [RUNNING.md](RUNNING.md) |
+| Serverless with **no** database | — | ❌ every request may hit a different machine with an empty disk |
 
-| Where | Works? | |
-|---|:---:|---|
-| Your laptop at the venue | ✅ | `npm run build && npm start`, everyone joins your wifi |
-| Railway / Render / Fly.io | ✅ | Node host with a persistent disk. Mount a volume and point `DATA_FILE` at it. |
-| **Vercel / Netlify serverless** | ❌ | Each request can land on a different machine with its own empty disk. The board would disagree with itself. |
+The file store needs one long-running process with a disk; Postgres does not
+care how many instances there are. The admin console's Teams tab shows which
+one is live, and warns if a deployment is running on a file.
 
-Running on a laptop is a genuinely good option for an event: no internet
-dependency at all, everything over venue wifi. The tradeoff is that everyone
-must be on that network, and the board dies if the laptop sleeps. Disable sleep.
+### Swapping storage
 
-To find your address for other devices:
-
-```bash
-npm run build && npm start
-# then share http://<your-lan-ip>:3000  (macOS: ipconfig getifaddr en0)
-```
-
-### When you outgrow the file
-
-`supabase/schema.sql` is the same data model as Postgres tables, kept for when
-you want a real database. Every read and write goes through `src/lib/store.ts`
-and nothing else — that file is the only thing that would need rewriting.
+`src/lib/db/` holds both backends behind one interface: `file.ts`, `postgres.ts`
+and an `index.ts` that picks between them on `DATABASE_URL`. Nothing else in the
+app knows which is in use.
 
 ---
 
@@ -170,10 +176,11 @@ venue wifi drops and a poll reconnects by itself.
 - one live request per team
 - one team per panel slot
 
-With no database to enforce these, they are checked in `store.ts` instead. Node
-runs one piece of JavaScript at a time and each check-then-write is synchronous,
-so these really are atomic — two teams tapping the same slot in the same
-millisecond cannot both get it. The second gets a readable error.
+On Postgres these are partial unique indexes, so they hold across any number of
+server instances. On the file store they are synchronous checks, which is enough
+because Node runs one piece of JavaScript at a time. Either way, two teams
+tapping the same slot in the same millisecond cannot both get it — the second
+gets a readable error, not a corrupted board.
 
 **Durability.** Writes are batched into one disk hit every 200ms, written to a
 temp file and renamed over the real one so a crash mid-write cannot truncate

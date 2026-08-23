@@ -1,14 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAdminister, getSession } from "@/lib/auth";
-import {
-  autoAssignTeams,
-  deleteTeam,
-  resetAll,
-  resetDay,
-  StoreError,
-  updateTeam,
-  upsertTeams,
-} from "@/lib/store";
+import { store, StoreError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -40,8 +32,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    upsertTeams(teams);
-    const assigned = autoAssign ? autoAssignTeams(perPanel) : 0;
+    await store().upsertTeams(teams);
+    const assigned = autoAssign ? await store().autoAssignTeams(perPanel) : 0;
     return NextResponse.json({ imported: teams.length, skipped, assigned });
   } catch (e) {
     if (e instanceof StoreError) {
@@ -62,19 +54,19 @@ export async function PATCH(request: Request) {
 
   try {
     if (body.action === "autoAssign") {
-      const assigned = autoAssignTeams(clampPerPanel(body.perPanel), Boolean(body.includeAssigned));
+      const assigned = await store().autoAssignTeams(clampPerPanel(body.perPanel), Boolean(body.includeAssigned));
       return NextResponse.json({ assigned });
     }
 
     // Clears the day's requests, notes and log but keeps teams and panels.
     if (body.action === "resetDay") {
-      resetDay();
+      await store().resetDay();
       return NextResponse.json({ ok: true });
     }
 
     // Wipes everything, including the roster. Used to clear the demo data.
     if (body.action === "resetAll") {
-      resetAll();
+      await store().resetAll();
       return NextResponse.json({ ok: true });
     }
 
@@ -86,7 +78,7 @@ export async function PATCH(request: Request) {
     if ("pit" in body) patch.pit = body.pit ? String(body.pit).slice(0, 60) : null;
     if ("name" in body) patch.name = String(body.name).slice(0, 120);
 
-    return NextResponse.json({ team: updateTeam(teamId, patch) });
+    return NextResponse.json({ team: await store().updateTeam(teamId, patch) });
   } catch (e) {
     if (e instanceof StoreError) {
       return NextResponse.json({ error: e.message }, { status: e.status });
@@ -104,7 +96,7 @@ export async function DELETE(request: Request) {
   const teamId = new URL(request.url).searchParams.get("teamId");
   if (!teamId) return NextResponse.json({ error: "teamId required." }, { status: 400 });
 
-  deleteTeam(teamId);
+  await store().deleteTeam(teamId);
   return NextResponse.json({ ok: true });
 }
 

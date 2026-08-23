@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { actorLabel, getSession } from "@/lib/auth";
-import { createRequest, findTeamByNumber, logActivity, StoreError } from "@/lib/store";
+import { store, StoreError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter a valid team number." }, { status: 400 });
   }
 
-  const team = findTeamByNumber(teamNumber);
+  const team = await store().findTeamByNumber(teamNumber);
   if (!team) {
     return NextResponse.json(
       { error: `Team ${teamNumber} is not on the list. Check with the Judge Advisor.` },
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const created = createRequest({
+    const created = await store().createRequest({
       teamId: team.id,
       panelId: team.panel_id,
       kind,
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       slotEnd,
     });
 
-    logActivity({
+    await store().logActivity({
       requestId: created.id,
       teamId: team.id,
       actor: session ? actorLabel(session) : "team",

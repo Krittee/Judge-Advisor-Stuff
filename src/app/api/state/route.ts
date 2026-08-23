@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   try {
     // Signed-in staff see the notes teams leave; the public payload omits them.
     const session = await getSession();
-    const state = loadState(session !== null);
+    const state = await loadState(session !== null);
 
     // serverTime changes every call, so hash everything else.
     const { serverTime: _t, ...stable } = state;

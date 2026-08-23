@@ -2,6 +2,11 @@
 
 Written for someone who has never used a terminal. Follow it top to bottom.
 
+> **Would you rather not use a terminal at all?** [DEPLOY.md](DEPLOY.md) puts
+> the app on the web entirely through your browser — no downloads, no commands,
+> and a permanent address any phone can reach from anywhere. Come back here if
+> you would prefer to run it on your own laptop instead.
+
 You will do this **four times total**: once now to try it, once to set up your
 event, once for a practice run, once on the day. It gets faster each time.
 

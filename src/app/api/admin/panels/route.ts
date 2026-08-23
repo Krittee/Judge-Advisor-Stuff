@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAdminister, getSession } from "@/lib/auth";
-import {
-  createPanel,
-  deletePanel,
-  generatePanelCode,
-  listPanels,
-  StoreError,
-  updatePanel,
-} from "@/lib/store";
+import { store, StoreError } from "@/lib/db";
 import type { Panel } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +12,7 @@ export async function GET() {
     return NextResponse.json({ error: "Judge Advisor access required." }, { status: 403 });
   }
 
-  return NextResponse.json({ panels: listPanels() });
+  return NextResponse.json({ panels: await store().listPanels() });
 }
 
 export async function POST(request: Request) {
@@ -33,9 +26,9 @@ export async function POST(request: Request) {
   if (!name) return NextResponse.json({ error: "Give the panel a name." }, { status: 400 });
 
   try {
-    const panel = createPanel({
+    const panel = await store().createPanel({
       name,
-      code: String(body.code ?? "").trim().toUpperCase() || generatePanelCode(),
+      code: String(body.code ?? "").trim().toUpperCase() || await store().generatePanelCode(),
       room: String(body.room ?? "").trim().slice(0, 60) || null,
       judges: parseJudges(body.judges),
       sort_order: Number(body.sortOrder) || 0,
@@ -77,7 +70,7 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    return NextResponse.json({ panel: updatePanel(id, patch) });
+    return NextResponse.json({ panel: await store().updatePanel(id, patch) });
   } catch (e) {
     if (e instanceof StoreError) {
       return NextResponse.json({ error: e.message }, { status: e.status });
@@ -96,7 +89,7 @@ export async function DELETE(request: Request) {
   if (!id) return NextResponse.json({ error: "id required." }, { status: 400 });
 
   // Teams and requests fall back to no panel rather than vanishing.
-  deletePanel(id);
+  await store().deletePanel(id);
   return NextResponse.json({ ok: true });
 }
 

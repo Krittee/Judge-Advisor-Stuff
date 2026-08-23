@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { canReadNotes, getSession } from "@/lib/auth";
-import { createNote, listNotes } from "@/lib/store";
+import { store, StoreError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   }
 
   const teamId = new URL(request.url).searchParams.get("teamId") ?? undefined;
-  return NextResponse.json({ notes: listNotes(teamId) });
+  return NextResponse.json({ notes: await store().listNotes(teamId) });
 }
 
 export async function POST(request: Request) {
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A team and some text are required." }, { status: 400 });
   }
 
-  const note = createNote({
+  const note = await store().createNote({
     teamId,
     requestId: body.requestId ? String(body.requestId) : null,
     panelId: session!.role === "judge" ? session!.panelId : (body.panelId ?? null),

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { actorLabel, canAdvance, canCancel, getSession } from "@/lib/auth";
-import { findRequest, logActivity, StoreError, updateRequest } from "@/lib/store";
+import { store, StoreError } from "@/lib/db";
 import { NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
 import type { RequestRow } from "@/lib/types";
 
@@ -15,7 +15,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const body = await request.json().catch(() => ({}));
   const action = String(body.action ?? "advance") as Action;
 
-  const current = findRequest(id);
+  const current = await store().findRequest(id);
   if (!current) {
     return NextResponse.json({ error: "That request no longer exists." }, { status: 404 });
   }
@@ -107,9 +107,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   try {
-    const updated = updateRequest(id, patch);
+    const updated = await store().updateRequest(id, patch);
 
-    logActivity({
+    await store().logActivity({
       requestId: id,
       teamId: current.team_id,
       actor,
