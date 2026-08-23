@@ -45,6 +45,10 @@ You should see something like `v22.22.2`. If you see "command not found",
 close the terminal, open a new one, and try again. If it still fails, redo
 Step 1.
 
+> **Stuck at any point below?** Run `npm run check` from the project folder.
+> It tests everything that commonly goes wrong and tells you exactly what to
+> fix, in plain language.
+
 ---
 
 ## Step 3 — Get the code onto your computer
@@ -248,6 +252,11 @@ then launches it, and prints the same Network address for phones.
 ---
 
 ## If something goes wrong
+
+**Start here:** run `npm run check`. It checks your Node version, whether
+dependencies are installed, whether you are in the right folder, whether the
+config file is valid, whether the port is free, and whether the app can save
+its data — then prints the fix for anything it finds.
 
 **"npm: command not found"**
 Node.js is not installed, or the terminal was open before you installed it.

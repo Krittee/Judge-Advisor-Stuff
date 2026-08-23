@@ -235,7 +235,8 @@ rather than demo data, so a real event never finds itself with invented teams.
 ## Development
 
 ```bash
-npm test          # 20 tests: store invariants, slot maths, roster parsing
+npm run check     # diagnose why it will not start, in plain language
+npm test          # 40 tests: permissions, division wall, store invariants
 npm run typecheck
 npm run build
 ```

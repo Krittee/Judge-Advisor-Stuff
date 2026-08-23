@@ -5,14 +5,15 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/doctor.mjs --for-start && next start",
+    "check": "node scripts/doctor.mjs",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"tests/*.test.mjs\""
   },
   "dependencies": {
     "jose": "^5.9.6",
-    "next": "15.5.4",
+    "next": "^15.5.23",
     "pg": "^8.23.0",
     "react": "19.1.0",
     "react-dom": "19.1.0"
@@ -25,5 +26,8 @@
     "@types/react-dom": "^19.1.6",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18.18"
   }
 }
