@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { ActivityRow, Note, Panel, RequestRow, Team } from "./types";
 import type { Status } from "./status";
@@ -120,6 +127,7 @@ for (const signal of ["exit", "SIGINT", "SIGTERM"] as const) {
     } catch {
       /* shutting down anyway */
     }
+    releaseLock();
     if (signal !== "exit") process.exit(0);
   });
 }
@@ -127,6 +135,68 @@ for (const signal of ["exit", "SIGINT", "SIGTERM"] as const) {
 export function storageLocation(): string {
   return FILE;
 }
+
+/* ------------------------------------------------------------------ *
+ * Second-instance guard
+ *
+ * `next dev` does not fail when port 3000 is busy — it quietly starts on
+ * 3001 instead. Two servers then share one data file, each with its own
+ * copy in memory, and whichever saves last silently erases the other's
+ * work. That is a horrible way to lose an event.
+ *
+ * The lock heartbeats every 5s and is treated as stale after 15s, so a
+ * crashed process can never block the next start. It warns rather than
+ * refuses: an inexperienced operator on event day is far better served
+ * by an app that runs than by one that will not.
+ * ------------------------------------------------------------------ */
+
+const LOCK = `${FILE}.lock`;
+const STALE_AFTER_MS = 15_000;
+
+function claimLock(): void {
+  try {
+    if (existsSync(LOCK)) {
+      const held = JSON.parse(readFileSync(LOCK, "utf8")) as { pid: number; heartbeat: number };
+      const age = Date.now() - held.heartbeat;
+      if (held.pid !== process.pid && age < STALE_AFTER_MS) {
+        console.warn(
+          `\n${"!".repeat(72)}\n` +
+            `[store] ANOTHER COPY OF THIS APP IS ALREADY RUNNING (process ${held.pid}).\n\n` +
+            `        Both are using ${FILE}\n` +
+            `        and they WILL overwrite each other's data.\n\n` +
+            `        Stop this one with Ctrl+C and use the copy that is already\n` +
+            `        running. If you meant to restart, stop the other one first.\n` +
+            `${"!".repeat(72)}\n`,
+        );
+      }
+    }
+  } catch {
+    // An unreadable lock is not worth failing over.
+  }
+
+  const beat = () => {
+    try {
+      mkdirSync(dirname(LOCK), { recursive: true });
+      writeFileSync(LOCK, JSON.stringify({ pid: process.pid, heartbeat: Date.now() }), "utf8");
+    } catch {
+      /* read-only disk: carry on without a lock */
+    }
+  };
+
+  beat();
+  setInterval(beat, 5_000).unref?.();
+}
+
+function releaseLock(): void {
+  try {
+    const held = JSON.parse(readFileSync(LOCK, "utf8")) as { pid: number };
+    if (held.pid === process.pid) rmSync(LOCK, { force: true });
+  } catch {
+    /* someone else owns it, or it is already gone */
+  }
+}
+
+claimLock();
 
 /* ------------------------------------------------------------------ *
  * Reads

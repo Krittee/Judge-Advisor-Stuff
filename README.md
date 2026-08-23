@@ -17,7 +17,8 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-That is the whole setup. Sign in at `/login` with `JA2026` to reach the Judge
+That is the whole setup. **Never used a terminal before?** Follow
+[RUNNING.md](RUNNING.md) instead — same thing, explained from scratch. Sign in at `/login` with `JA2026` to reach the Judge
 Advisor console.
 
 ### Before anyone else can reach it
