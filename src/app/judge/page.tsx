@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { buildSlots, liveRequestFor } from "@/lib/data";
 import { NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
 import { call, useAppState } from "@/components/useAppState";
+import { compareTeamNumbers } from "@/lib/teamNumber";
 import {
   Banner,
   Button,
@@ -59,7 +60,7 @@ export default function JudgePage() {
         // Within a status, longest wait first — nobody gets forgotten.
         const ta = a.request?.requested_at ?? "";
         const tb = b.request?.requested_at ?? "";
-        return ta.localeCompare(tb) || a.team.number - b.team.number;
+        return ta.localeCompare(tb) || compareTeamNumbers(a.team.number, b.team.number);
       });
   }, [myTeams, state.requests]);
 

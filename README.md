@@ -95,8 +95,10 @@ app knows which is in use.
 4. **Import tab** — paste your roster, one team per line:
    ```
    1234, Iron Hawks, Pit 12
-   1235, Circuit Breakers, Pit 13
+   9882K, Kilo Kestrels, Pit 13
    ```
+   Team numbers may contain letters (`9882K`), and are matched
+   case-insensitively so a team typing `9882k` still finds itself.
    Pasting straight from a spreadsheet works (tabs are handled), a header row is
    skipped, and quoted names with commas survive. Tick **spread across panels**
    to deal teams out evenly.

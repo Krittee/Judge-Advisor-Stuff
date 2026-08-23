@@ -15,7 +15,8 @@ export type Panel = {
 
 export type Team = {
   id: string;
-  number: number;
+  /** Text, not a number: identifiers like "9882K" are common. */
+  number: string;
   name: string;
   panel_id: string | null;
   pit: string | null;
@@ -78,5 +79,5 @@ export type Slot = {
   panelId: string;
   start: string;
   end: string;
-  takenBy: { teamId: string; teamNumber: number; status: Status } | null;
+  takenBy: { teamId: string; teamNumber: string; status: Status } | null;
 };

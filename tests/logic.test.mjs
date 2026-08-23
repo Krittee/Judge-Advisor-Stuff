@@ -61,6 +61,9 @@ function splitRow(line) {
   return cells;
 }
 
+const VALID_NUMBER = /^[A-Z0-9][A-Z0-9-]*$/;
+const normalize = (v) => String(v ?? "").replace(/\s+/g, "").toUpperCase().slice(0, 12);
+
 function parseTeams(text) {
   const seen = new Map();
   let skipped = 0;
@@ -68,8 +71,10 @@ function parseTeams(text) {
     const line = rawLine.trim();
     if (!line) continue;
     const cells = splitRow(line);
-    const number = Number(cells[0]);
-    if (!Number.isInteger(number) || number <= 0) {
+    const number = normalize(cells[0]);
+    // A header row cannot be caught by failing to parse as a number any
+    // more, so it is caught by requiring at least one digit.
+    if (!number || !VALID_NUMBER.test(number) || !/\d/.test(number)) {
       skipped++;
       continue;
     }
@@ -106,13 +111,13 @@ test("slots are off when count is zero or no start time is set", () => {
 });
 
 test("a booked slot shows its team; a cancelled booking frees the slot", () => {
-  const teams = [{ id: "t1", number: 1234 }];
+  const teams = [{ id: "t1", number: "1234" }];
   const booked = buildSlots(
     PANEL,
     [{ kind: "slot", panel_id: "p1", slot_start: "2026-09-01T14:12:00.000Z", status: "scheduled", team_id: "t1" }],
     teams,
   );
-  assert.equal(booked[1].takenBy.teamNumber, 1234);
+  assert.equal(booked[1].takenBy.teamNumber, "1234");
   assert.equal(booked[0].takenBy, null);
 
   const cancelled = buildSlots(
@@ -127,7 +132,7 @@ test("another panel's bookings never appear on this panel's grid", () => {
   const slots = buildSlots(
     PANEL,
     [{ kind: "slot", panel_id: "OTHER", slot_start: "2026-09-01T14:00:00.000Z", status: "scheduled", team_id: "t1" }],
-    [{ id: "t1", number: 9 }],
+    [{ id: "t1", number: "9" }],
   );
   assert.equal(slots[0].takenBy, null);
 });
@@ -150,20 +155,31 @@ test("roster import handles headers, tabs, quotes, blanks and duplicates", () =>
   assert.equal(teams.length, 4, "1234 appears once");
 
   const byNumber = Object.fromEntries(teams.map((t) => [t.number, t]));
-  assert.equal(byNumber[1234].name, "Iron Hawks Renamed", "last duplicate wins");
-  assert.equal(byNumber[1234].pit, "Pit 99");
-  assert.equal(byNumber[1235].name, "Circuit, Breakers", "a quoted comma stays inside the name");
-  assert.equal(byNumber[1236].name, "Gear Grinders", "tab separated works");
-  assert.equal(byNumber[1236].pit, "Pit 3");
-  assert.equal(byNumber[1237].name, "Team 1237", "missing name gets a fallback");
-  assert.equal(byNumber[1237].pit, null);
+  assert.equal(byNumber["1234"].name, "Iron Hawks Renamed", "last duplicate wins");
+  assert.equal(byNumber["1234"].pit, "Pit 99");
+  assert.equal(byNumber["1235"].name, "Circuit, Breakers", "a quoted comma stays inside the name");
+  assert.equal(byNumber["1236"].name, "Gear Grinders", "tab separated works");
+  assert.equal(byNumber["1236"].pit, "Pit 3");
+  assert.equal(byNumber["1237"].name, "Team 1237", "missing name gets a fallback");
+  assert.equal(byNumber["1237"].pit, null);
 });
 
-test("import rejects negative and non-integer team numbers", () => {
-  const { teams, skipped } = parseTeams("-5, Bad\n1.5, Also bad\n0, Zero\n42, Fine");
-  assert.equal(teams.length, 1);
-  assert.equal(teams[0].number, 42);
+test("import rejects malformed team numbers but keeps letter suffixes", () => {
+  const { teams, skipped } = parseTeams(
+    "-5, Bad\n1.5, Also bad\nTEAM, No digits\n42, Fine\n9882K, Also fine",
+  );
+  assert.deepEqual(
+    teams.map((t) => t.number),
+    ["42", "9882K"],
+  );
   assert.equal(skipped, 3);
+});
+
+test("a lowercase letter suffix imports as the same team as uppercase", () => {
+  const { teams } = parseTeams("9882k, Iron Hawks\n9882K, Iron Hawks Renamed");
+  assert.equal(teams.length, 1, "9882k and 9882K are one team, not two");
+  assert.equal(teams[0].number, "9882K");
+  assert.equal(teams[0].name, "Iron Hawks Renamed");
 });
 
 test("board shows the most urgent request when a team has several", () => {
@@ -186,8 +202,8 @@ test("quoted fields survive commas, doubled quotes and tab rows", () => {
     ].join("\n"),
   );
   const byNumber = Object.fromEntries(teams.map((t) => [t.number, t]));
-  assert.equal(byNumber[10].name, "Robotics, Inc.");
-  assert.equal(byNumber[10].pit, "Pit 1");
-  assert.equal(byNumber[11].name, 'The "Bots"');
-  assert.equal(byNumber[12].name, "Heavy, Metal", "tabs split first, so commas are safe");
+  assert.equal(byNumber["10"].name, "Robotics, Inc.");
+  assert.equal(byNumber["10"].pit, "Pit 1");
+  assert.equal(byNumber["11"].name, 'The "Bots"');
+  assert.equal(byNumber["12"].name, "Heavy, Metal", "tabs split first, so commas are safe");
 });

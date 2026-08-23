@@ -5,6 +5,7 @@ import { use, useMemo, useState } from "react";
 import { buildSlots, liveRequestFor } from "@/lib/data";
 import { STATUS_META } from "@/lib/status";
 import { call, useAppState } from "@/components/useAppState";
+import { normalizeTeamNumber } from "@/lib/teamNumber";
 import {
   Banner,
   Button,
@@ -17,7 +18,8 @@ import {
 
 export default function TeamPage({ params }: { params: Promise<{ number: string }> }) {
   const { number } = use(params);
-  const teamNumber = Number(number);
+  // The URL may carry any casing; the roster stores one canonical form.
+  const teamNumber = normalizeTeamNumber(decodeURIComponent(number));
   const { state, loaded, online, refresh } = useAppState(4000);
 
   const [busy, setBusy] = useState(false);
@@ -78,7 +80,7 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
   if (!team) {
     return (
       <CenteredNote>
-        <p className="mb-2 text-lg font-semibold">Team {number} is not on the list.</p>
+        <p className="mb-2 text-lg font-semibold">Team {teamNumber} is not on the list.</p>
         <p className="text-zinc-400">Check the number, or ask the Judge Advisor to add you.</p>
         <Link href="/" className="mt-6 inline-block text-indigo-400 hover:text-indigo-300">
           ← Try another number

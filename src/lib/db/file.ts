@@ -10,6 +10,7 @@ import {
 import { dirname, resolve } from "node:path";
 import type { ActivityRow, Note, Panel, RequestRow, Team } from "../types";
 import type { Status } from "../status";
+import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import {
   randomPanelCode,
   StoreError,
@@ -99,7 +100,7 @@ function load(): Data {
   }
   try {
     const parsed = JSON.parse(readFileSync(FILE, "utf8")) as Partial<Data>;
-    return { ...empty(), ...parsed };
+    return migrate({ ...empty(), ...parsed });
   } catch {
     // A corrupt file should not stop the event. Keep the bad copy for
     // forensics and carry on with a clean slate.
@@ -121,6 +122,20 @@ function load(): Data {
     }
     return fresh;
   }
+}
+
+/**
+ * Bring an older state file up to date.
+ *
+ * Team numbers used to be stored as JSON numbers, before identifiers
+ * like "9882K" needed to work. Reading one of those files must not lose
+ * the roster, so coerce on the way in.
+ */
+function migrate(data: Data): Data {
+  for (const team of data.teams) {
+    if (typeof team.number !== "string") team.number = normalizeTeamNumber(team.number);
+  }
+  return data;
 }
 
 /** Atomic: write a temp file, then rename over the real one. */
@@ -236,7 +251,7 @@ function listPanels(): Panel[] {
 }
 
 function listTeams(): Team[] {
-  return [...state().teams].sort((a, b) => a.number - b.number);
+  return [...state().teams].sort((a, b) => compareTeamNumbers(a.number, b.number));
 }
 
 function listRequests(): RequestRow[] {
@@ -261,8 +276,9 @@ function findPanelByCode(code: string): Panel | null {
   return state().panels.find((p) => p.code.toUpperCase() === wanted) ?? null;
 }
 
-function findTeamByNumber(number: number): Team | null {
-  return state().teams.find((t) => t.number === number) ?? null;
+function findTeamByNumber(number: string): Team | null {
+  const wanted = normalizeTeamNumber(number);
+  return state().teams.find((t) => t.number === wanted) ?? null;
 }
 
 function findRequest(id: string): RequestRow | null {
@@ -550,9 +566,13 @@ function demoData(): Data {
     "Orbit Otters", "Prism Panthers", "Rogue Ravens", "Solar Storks",
   ];
 
+  // A couple of letter-suffixed numbers, so the demo exercises the case
+  // that pure-numeric rosters would quietly hide.
+  const suffixes = ["", "", "", "A", "", "", "B", "", "", "K"];
+
   const teams: Team[] = names.map((name, i) => ({
     id: randomUUID(),
-    number: 1101 + i * 7,
+    number: `${1101 + i * 7}${suffixes[i % suffixes.length]}`,
     name,
     panel_id: panels[i % panels.length].id,
     pit: `Pit ${i + 1}`,

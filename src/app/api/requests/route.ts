@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { actorLabel, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
+import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +16,11 @@ export async function POST(request: Request) {
   const session = await getSession();
   const body = await request.json().catch(() => ({}));
 
-  const teamNumber = Number(body.teamNumber);
+  const teamNumber = normalizeTeamNumber(body.teamNumber);
   const kind = body.kind === "slot" ? "slot" : "queue";
   const message = String(body.message ?? "").trim().slice(0, 280) || null;
 
-  if (!Number.isInteger(teamNumber)) {
+  if (!isValidTeamNumber(teamNumber)) {
     return NextResponse.json({ error: "Enter a valid team number." }, { status: 400 });
   }
 

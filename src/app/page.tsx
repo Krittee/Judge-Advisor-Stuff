@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Banner, Button, inputClass, StatusLegend } from "@/components/ui";
+import { filterTeamNumberInput, isValidTeamNumber } from "@/lib/teamNumber";
 
 /**
  * The front door. A team member with a phone, standing in a loud pit,
@@ -16,12 +17,11 @@ export default function Home() {
 
   function go(e: React.FormEvent) {
     e.preventDefault();
-    const n = number.trim();
-    if (!/^\d+$/.test(n)) {
-      setError("Enter your team number, digits only.");
+    if (!isValidTeamNumber(number)) {
+      setError("Enter your team number, for example 1234 or 9882K.");
       return;
     }
-    router.push(`/team/${n}`);
+    router.push(`/team/${encodeURIComponent(number)}`);
   }
 
   return (
@@ -37,11 +37,12 @@ export default function Home() {
         <input
           value={number}
           onChange={(e) => {
-            setNumber(e.target.value.replace(/\D/g, ""));
+            setNumber(filterTeamNumberInput(e.target.value));
             setError(null);
           }}
-          inputMode="numeric"
-          pattern="[0-9]*"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          autoComplete="off"
           autoFocus
           placeholder="Team number"
           aria-label="Team number"

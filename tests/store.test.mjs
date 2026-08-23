@@ -47,7 +47,12 @@ function makeStore(file) {
       return panel;
     },
     addTeam(number, panelId = null) {
-      const team = { id: `t-${number}`, number, name: `Team ${number}`, panel_id: panelId };
+      const team = {
+        id: `t-${number}`,
+        number: String(number),
+        name: `Team ${number}`,
+        panel_id: panelId,
+      };
       data.teams.push(team);
       save();
       return team;

@@ -825,8 +825,10 @@ function ImportTab({
         <h2 className="text-lg font-semibold">Import your team list</h2>
         <p className="mt-1 text-sm text-zinc-400">
           One team per line: <code className="text-zinc-300">number, name, pit</code>. Pit is
-          optional. Paste straight from a spreadsheet — tabs work too, and a header row is skipped
-          automatically. Re-importing updates existing teams instead of duplicating them.
+          optional. Team numbers may include letters — <code className="text-zinc-300">9882K</code>{" "}
+          works as well as <code className="text-zinc-300">1234</code>. Paste straight from a
+          spreadsheet — tabs work too, and a header row is skipped automatically. Re-importing
+          updates existing teams instead of duplicating them.
         </p>
       </div>
 
@@ -835,7 +837,7 @@ function ImportTab({
         onChange={(e) => setText(e.target.value)}
         rows={12}
         spellCheck={false}
-        placeholder={"1234, Iron Hawks, Pit 12\n1235, Circuit Breakers, Pit 13\n1236, Gear Grinders"}
+        placeholder={"1234, Iron Hawks, Pit 12\n9882K, Kilo Kestrels, Pit 13\n9882A, Alpha Antelopes"}
         className={`${inputClass} font-mono text-sm`}
       />
 

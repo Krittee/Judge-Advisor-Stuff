@@ -129,8 +129,9 @@ All in the browser, at `your-address.vercel.app/admin`:
 2. **Import tab** — paste your team list, one per line:
    ```
    1234, Iron Hawks, Pit 12
-   1235, Circuit Breakers, Pit 13
+   9882K, Kilo Kestrels, Pit 13
    ```
+   Team numbers can include letters, like `9882K`.
    Copy straight out of Excel or Google Sheets. Tick **spread across panels**
    to share teams out evenly.
 3. **Teams tab** — check it, fix anything by hand.

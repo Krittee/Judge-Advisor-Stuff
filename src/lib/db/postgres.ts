@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import type { ActivityRow, Note, Panel, RequestRow, Team } from "../types";
+import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import {
   randomPanelCode,
   StoreError,
@@ -105,7 +106,7 @@ async function migrate(): Promise<void> {
 
     create table if not exists teams (
       id         uuid primary key default gen_random_uuid(),
-      number     int not null unique,
+      number     text not null unique,
       name       text not null,
       panel_id   uuid references panels(id) on delete set null,
       pit        text,
@@ -169,6 +170,23 @@ async function migrate(): Promise<void> {
       on requests (panel_id, slot_start)
       where kind = 'slot' and status <> 'cancelled';
   `);
+
+  // Team numbers were an int column before identifiers like "9882K" had
+  // to work. Widening in place keeps an already-deployed roster intact.
+  await db().query(`
+    do $$
+    begin
+      if exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public'
+          and table_name = 'teams'
+          and column_name = 'number'
+          and data_type <> 'text'
+      ) then
+        alter table teams alter column number type text using number::text;
+      end if;
+    end $$;
+  `);
 }
 
 /** Turn a unique-violation into the message the user should read. */
@@ -227,7 +245,11 @@ export const postgresStore: Store = {
   },
 
   async listTeams() {
-    return rows(await query<Team>("select * from teams order by number"));
+    // Sorted here, not in SQL: Postgres would order text lexicographically
+    // and put "100" before "20".
+    return rows(await query<Team>("select * from teams")).sort((a, b) =>
+      compareTeamNumbers(a.number, b.number),
+    );
   },
 
   async listRequests() {
@@ -265,7 +287,9 @@ export const postgresStore: Store = {
   },
 
   async findTeamByNumber(number) {
-    return one(await query<Team>("select * from teams where number = $1", [number]));
+    return one(
+      await query<Team>("select * from teams where number = $1", [normalizeTeamNumber(number)]),
+    );
   },
 
   async findRequest(id) {
@@ -325,7 +349,7 @@ export const postgresStore: Store = {
     if (!list.length) return 0;
     await query(
       `insert into teams (number, name, pit)
-       select * from unnest($1::int[], $2::text[], $3::text[])
+       select * from unnest($1::text[], $2::text[], $3::text[])
        on conflict (number) do update set name = excluded.name, pit = excluded.pit`,
       [list.map((t) => t.number), list.map((t) => t.name), list.map((t) => t.pit)],
     );

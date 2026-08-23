@@ -36,7 +36,7 @@ export type NewActivity = {
   detail?: string | null;
 };
 
-export type ImportedTeam = { number: number; name: string; pit: string | null };
+export type ImportedTeam = { number: string; name: string; pit: string | null };
 
 /**
  * Everything the app can do to its data.
@@ -57,7 +57,7 @@ export type Store = {
   listActivity(limit?: number): Promise<ActivityRow[]>;
 
   findPanelByCode(code: string): Promise<Panel | null>;
-  findTeamByNumber(number: number): Promise<Team | null>;
+  findTeamByNumber(number: string): Promise<Team | null>;
   findRequest(id: string): Promise<RequestRow | null>;
 
   createRequest(input: NewRequest): Promise<RequestRow>;

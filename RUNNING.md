@@ -193,8 +193,10 @@ Sign in at `/login` with `JA2026`.
 3. **Import tab** — paste your team list, one team per line:
    ```
    1234, Iron Hawks, Pit 12
-   1235, Circuit Breakers, Pit 13
+   9882K, Kilo Kestrels, Pit 13
    ```
+   Team numbers can have letters in them, like `9882K` — and it does not matter
+   whether anyone types the letter as a capital.
    You can copy straight out of Excel or Google Sheets and paste it in. Tick
    **spread across panels** to share the teams out evenly.
 4. **Teams tab** — check it looks right, fix anything by hand.

@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { canAdminister, getSession } from "@/lib/auth";
+import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
 import { store, StoreError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-type ParsedTeam = { number: number; name: string; pit: string | null };
+type ParsedTeam = { number: string; name: string; pit: string | null };
 
 /**
  * Bulk import. Accepts pasted CSV or TSV, with or without a header row:
  *   1234, Iron Hawks, Pit 12
- *   1234<TAB>Iron Hawks
+ *   9882K<TAB>Iron Hawks
  * Existing team numbers are updated rather than duplicated.
  */
 export async function POST(request: Request) {
@@ -105,7 +106,7 @@ function clampPerPanel(value: unknown): number {
 }
 
 function parseTeams(text: string): { teams: ParsedTeam[]; skipped: number } {
-  const seen = new Map<number, ParsedTeam>();
+  const seen = new Map<string, ParsedTeam>();
   let skipped = 0;
 
   for (const rawLine of text.split(/\r?\n/)) {
@@ -113,9 +114,13 @@ function parseTeams(text: string): { teams: ParsedTeam[]; skipped: number } {
     if (!line) continue;
 
     const cells = splitRow(line);
-    const number = Number(cells[0]);
-    if (!Number.isInteger(number) || number <= 0) {
-      skipped++; // header rows and junk land here
+    const number = normalizeTeamNumber(cells[0]);
+
+    // Team numbers are text, so a header row cannot be spotted by failing
+    // to parse as a number. It is caught by requiring at least one digit:
+    // "Team Number" has none, "9882K" does.
+    if (!isValidTeamNumber(number) || !/\d/.test(number)) {
+      skipped++;
       continue;
     }
 

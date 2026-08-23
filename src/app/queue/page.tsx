@@ -13,6 +13,7 @@ import {
   TopBar,
 } from "@/components/ui";
 import { SignOutButton } from "@/components/judging";
+import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
 import type { Session } from "@/lib/auth";
 
 /**
@@ -48,7 +49,7 @@ export default function QueuePage() {
   );
   const panelById = useMemo(() => new Map(state.panels.map((p) => [p.id, p])), [state.panels]);
 
-  const preview = teamByNumber.get(Number(number));
+  const preview = teamByNumber.get(normalizeTeamNumber(number));
 
   const live = useMemo(
     () =>
@@ -65,7 +66,7 @@ export default function QueuePage() {
     setOk(null);
     try {
       await call("/api/requests", {
-        body: { teamNumber: Number(number), kind: "queue", message: message.trim() || undefined },
+        body: { teamNumber: number, kind: "queue", message: message.trim() || undefined },
       });
       setOk(`Team ${number} added to the queue.`);
       setNumber("");
@@ -109,11 +110,13 @@ export default function QueuePage() {
           <input
             value={number}
             onChange={(e) => {
-              setNumber(e.target.value.replace(/\D/g, ""));
+              setNumber(filterTeamNumberInput(e.target.value));
               setError(null);
               setOk(null);
             }}
-            inputMode="numeric"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            autoComplete="off"
             autoFocus
             placeholder="0000"
             className={`${inputClass} py-5 text-center text-4xl font-bold tracking-widest`}

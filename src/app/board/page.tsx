@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { STATUS_META, type Status } from "@/lib/status";
 import { useAppState } from "@/components/useAppState";
+import { compareTeamNumbers } from "@/lib/teamNumber";
 import { ConnectionDot, Elapsed, StatusLegend } from "@/components/ui";
 import type { PublicPanel, RequestRow, Team } from "@/lib/types";
 
@@ -158,7 +159,7 @@ function groupByPanel(panels: PublicPanel[], teams: Team[], requests: RequestRow
   const sortTiles = (a: TileData, b: TileData) => {
     const ra = a.status ? STATUS_META[a.status].order : 99;
     const rb = b.status ? STATUS_META[b.status].order : 99;
-    return ra - rb || a.team.number - b.team.number;
+    return ra - rb || compareTeamNumbers(a.team.number, b.team.number);
   };
 
   const groups = panels.map((panel) => ({
