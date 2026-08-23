@@ -1,30 +1,21 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/supabase";
 import { actorLabel, canAdvance, canCancel, getSession } from "@/lib/auth";
-import { logActivity } from "@/lib/data";
+import { findRequest, logActivity, StoreError, updateRequest } from "@/lib/store";
 import { NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
+import type { RequestRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 type Action = "advance" | "cancel" | "reopen" | "set-status" | "reassign";
 
 /** Move a request along, cancel it, or hand it to a different panel. */
-export async function PATCH(
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const session = await getSession();
   const body = await request.json().catch(() => ({}));
   const action = String(body.action ?? "advance") as Action;
 
-  const client = db();
-  const { data: current } = await client
-    .from("requests")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-
+  const current = findRequest(id);
   if (!current) {
     return NextResponse.json({ error: "That request no longer exists." }, { status: 404 });
   }
@@ -61,7 +52,7 @@ export async function PATCH(
 
   const now = new Date().toISOString();
   const actor = actorLabel(session);
-  const patch: Record<string, unknown> = {};
+  const patch: Partial<RequestRow> = {};
   let logLine: string = action;
 
   if (action === "reassign") {
@@ -115,30 +106,22 @@ export async function PATCH(
     logLine = `→ ${STATUS_META[target].label}`;
   }
 
-  const { data: updated, error } = await client
-    .from("requests")
-    .update(patch)
-    .eq("id", id)
-    .select()
-    .single();
+  try {
+    const updated = updateRequest(id, patch);
 
-  if (error) {
-    if (error.code === "23505") {
-      return NextResponse.json(
-        { error: "That team already has a live request." },
-        { status: 409 },
-      );
+    logActivity({
+      requestId: id,
+      teamId: current.team_id,
+      actor,
+      action: logLine,
+      detail: body.detail ? String(body.detail).slice(0, 200) : null,
+    });
+
+    return NextResponse.json({ request: updated });
+  } catch (e) {
+    if (e instanceof StoreError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    throw e;
   }
-
-  await logActivity({
-    requestId: id,
-    teamId: current.team_id,
-    actor,
-    action: logLine,
-    detail: body.detail ? String(body.detail).slice(0, 200) : null,
-  });
-
-  return NextResponse.json({ request: updated });
 }

@@ -1,38 +1,13 @@
-import { db } from "./supabase";
-import type { AppState, Panel, PublicPanel, RequestRow, Slot, Team } from "./types";
+import type { Panel, PublicPanel, RequestRow, Slot, Team } from "./types";
 import type { Status } from "./status";
 
 /**
- * Everything every screen needs, in one round trip.
+ * Pure helpers shared by the browser and the server.
  *
- * `includeMessages` is off for anyone not on staff: the note a team types
- * for its judges is free text, and it has no business being readable by
- * the other 119 teams polling the same endpoint.
+ * Nothing here may import the store: these functions are bundled into
+ * client components, and the store reaches for node:fs. Server-only
+ * reads live in server-state.ts instead.
  */
-export async function loadState(includeMessages = false): Promise<AppState> {
-  const client = db();
-  const [panels, teams, requests] = await Promise.all([
-    client.from("panels").select("*").order("sort_order").order("name"),
-    client.from("teams").select("*").order("number"),
-    client
-      .from("requests")
-      .select("*")
-      .order("requested_at", { ascending: false })
-      .limit(1500),
-  ]);
-
-  const err = panels.error || teams.error || requests.error;
-  if (err) throw new Error(err.message);
-
-  const rows = (requests.data ?? []) as RequestRow[];
-
-  return {
-    panels: ((panels.data ?? []) as Panel[]).map(stripCode),
-    teams: (teams.data ?? []) as Team[],
-    requests: includeMessages ? rows : rows.map((r) => ({ ...r, message: null })),
-    serverTime: new Date().toISOString(),
-  };
-}
 
 /** Judge codes must never reach a browser that has not earned them. */
 export function stripCode(panel: Panel): PublicPanel {
@@ -40,35 +15,12 @@ export function stripCode(panel: Panel): PublicPanel {
   return rest;
 }
 
-export async function logActivity(entry: {
-  requestId?: string | null;
-  teamId?: string | null;
-  actor: string;
-  action: string;
-  detail?: string | null;
-}): Promise<void> {
-  // Never let a failed audit write break the thing the user actually asked for.
-  await db()
-    .from("activity")
-    .insert({
-      request_id: entry.requestId ?? null,
-      team_id: entry.teamId ?? null,
-      actor: entry.actor,
-      action: entry.action,
-      detail: entry.detail ?? null,
-    })
-    .then(
-      () => undefined,
-      () => undefined,
-    );
-}
-
 /**
  * Build a panel's booking grid.
  *
- * Slots are not rows in the database — they are computed from the panel's
- * start time, length and count, then matched against any request holding
- * that start time. That way you can re-time a whole panel by editing two
+ * Slots are not stored rows — they are computed from the panel's start
+ * time, length and count, then matched against any request holding that
+ * start time. That way you can re-time a whole panel by editing two
  * numbers instead of migrating rows.
  */
 export function buildSlots(

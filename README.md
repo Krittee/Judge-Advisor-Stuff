@@ -4,66 +4,88 @@ A judging queue and interview tracker for a robotics-style event. Teams request
 a judge from their phone; judges work the queue; a colour-coded board shows the
 whole floor at a glance.
 
-Built for ~120 teams across a dozen judge panels, but it runs fine with three.
+**No database.** All data lives in one JSON file (`.data/state.json`). There is
+nothing to sign up for and nothing to configure — clone, `npm install`,
+`npm run dev`, and it works, pre-loaded with demo teams you can click around.
 
 ---
 
-## What you need to set up
+## Start it
 
-Two free accounts, about fifteen minutes. Nothing to install locally unless you
-want to develop.
+```bash
+npm install
+npm run dev          # http://localhost:3000
+```
 
-### 1. Supabase (the database)
+That is the whole setup. Sign in at `/login` with `JA2026` to reach the Judge
+Advisor console.
 
-1. Create a free project at [supabase.com](https://supabase.com). Pick a region
-   near your venue. Save the database password somewhere — you will not need it
-   for this app, but losing it is annoying.
-2. Open **SQL Editor → New query**, paste all of [`supabase/schema.sql`](supabase/schema.sql),
-   and run it.
-3. Optional: run [`supabase/seed.sql`](supabase/seed.sql) too. That gives you
-   3 panels and 24 fake teams so you can click around before your real roster
-   exists. Clear it later with `truncate panels, teams cascade;`.
-4. Go to **Project Settings → API** and copy two values:
-   - the **Project URL**
-   - the **`service_role`** key (under Project API keys — reveal it first)
+### Before anyone else can reach it
 
-> The `service_role` key bypasses all database rules. It is only ever used
-> server-side in this app. Never put it in a variable starting with
-> `NEXT_PUBLIC_`, and never paste it into a browser console.
+```bash
+cp .env.example .env.local     # then edit the codes
+```
 
-### 2. Vercel (the hosting)
+| Variable | Dev default | What it is |
+|---|---|---|
+| `ADMIN_CODE` | `JA2026` | Judge Advisor. Full control. Keep it to yourself. |
+| `QUEUER_CODE` | `DESK01` | Queue desk. Can only add teams to the queue. |
+| `SESSION_SECRET` | insecure key | Signs the login cookie. `openssl rand -base64 32` |
+| `DATA_FILE` | `.data/state.json` | Where the data lives. |
+| `SEED_DEMO` | on | Set to `false` to start with an empty roster. |
 
-1. Push this repo to GitHub, then **Add New → Project** at
-   [vercel.com](https://vercel.com) and import it. Framework detection handles
-   the rest — no build settings to change.
-2. Before the first deploy, add these under **Settings → Environment Variables**:
+**Those defaults are development-only and cannot be used in production.** A
+production build refuses to sign anyone in with an unset code, and refuses to
+start at all without a real `SESSION_SECRET` — a code printed in a README is not
+an access code, and a known signing key would let anyone mint themselves a Judge
+Advisor cookie. In development it warns on the console instead, so a fresh clone
+still just runs.
 
-   | Name | Value |
-   |---|---|
-   | `SUPABASE_URL` | your Project URL from step 1 |
-   | `SUPABASE_SERVICE_ROLE_KEY` | your `service_role` key from step 1 |
-   | `SESSION_SECRET` | any long random string — `openssl rand -base64 32` |
-   | `ADMIN_CODE` | the code **you** will use. Keep it private. |
-   | `QUEUER_CODE` | the code the queue desk will use |
+Judge panel codes are **not** environment variables. Each panel gets its own,
+generated in the admin console under **Panels** — so you can add a panel
+mid-event without restarting anything.
 
-3. Deploy. You will get a URL like `judge-queue.vercel.app`.
+---
 
-### 3. Decide your codes
+## The one thing to know before you deploy
 
-- `ADMIN_CODE` — you, the Judge Advisor. Full control.
-- `QUEUER_CODE` — the queue desk. Can only add teams to the queue.
-- **Judge panel codes** are not env vars. Each panel gets its own, created and
-  shown in the admin console under **Panels**. Hand each judge group their code
-  on a card.
+Teams and judges have to see each other's updates, so this needs **one
+long-running Node process**. It is not a database, but it is still a shared
+server.
 
-Codes are case-insensitive and read aloud across a noisy room, so avoid `0`/`O`
-and `1`/`I`. Auto-generated panel codes already skip those.
+| Where | Works? | |
+|---|:---:|---|
+| Your laptop at the venue | ✅ | `npm run build && npm start`, everyone joins your wifi |
+| Railway / Render / Fly.io | ✅ | Node host with a persistent disk. Mount a volume and point `DATA_FILE` at it. |
+| **Vercel / Netlify serverless** | ❌ | Each request can land on a different machine with its own empty disk. The board would disagree with itself. |
 
-### 4. Before the event
+Running on a laptop is a genuinely good option for an event: no internet
+dependency at all, everything over venue wifi. The tradeoff is that everyone
+must be on that network, and the board dies if the laptop sleeps. Disable sleep.
+
+To find your address for other devices:
+
+```bash
+npm run build && npm start
+# then share http://<your-lan-ip>:3000  (macOS: ipconfig getifaddr en0)
+```
+
+### When you outgrow the file
+
+`supabase/schema.sql` is the same data model as Postgres tables, kept for when
+you want a real database. Every read and write goes through `src/lib/store.ts`
+and nothing else — that file is the only thing that would need rewriting.
+
+---
+
+## Before the event
 
 1. Sign in at `/login` with your `ADMIN_CODE`.
-2. **Panels tab** — add each judge group: name, room, judge names.
-3. **Import tab** — paste your roster, one team per line:
+2. **Teams tab → Reset → Wipe everything.** This clears the demo roster. Do
+   this first, or you will be judging the Quantum Quokkas.
+3. **Panels tab** — add each judge group: name, room, judge names. Write down
+   each panel's code and hand it to that group.
+4. **Import tab** — paste your roster, one team per line:
    ```
    1234, Iron Hawks, Pit 12
    1235, Circuit Breakers, Pit 13
@@ -71,9 +93,12 @@ and `1`/`I`. Auto-generated panel codes already skip those.
    Pasting straight from a spreadsheet works (tabs are handled), a header row is
    skipped, and quoted names with commas survive. Tick **spread across panels**
    to deal teams out evenly.
-4. **Teams tab** — fix any assignment by hand.
-5. Optional: give each panel a slot grid (Panels → Booking slots). Set the count
+5. **Teams tab** — fix any assignment by hand.
+6. Optional: give each panel a slot grid (Panels → Booking slots). Set the count
    to `0` for walk-up queue only.
+
+Between a practice run and the real thing, **Reset → Clear today's requests**
+empties the queue but keeps your roster and panels.
 
 ---
 
@@ -91,9 +116,8 @@ request is still orange — once judges acknowledge it, it is out of their hands
 To make the role strictly create-only, delete the `queuer` branch in
 `canCancel()` in [`src/lib/auth.ts`](src/lib/auth.ts).
 
-Judges can only touch requests belonging to their own panel. That check is in
-[`src/app/api/requests/[id]/route.ts`](src/app/api/requests/%5Bid%5D/route.ts),
-enforced server-side — not just hidden in the UI.
+Judges can only touch requests belonging to their own panel. Every one of these
+rules is enforced server-side in the API routes, not just hidden in the UI.
 
 ---
 
@@ -110,7 +134,7 @@ enforced server-side — not just hidden in the UI.
 
 Orange is the only status that animates. If something is orange, it needs a
 human. Change any of this in [`src/lib/status.ts`](src/lib/status.ts) — colours,
-labels and the ordering all live in one table.
+labels and ordering all live in one table.
 
 ---
 
@@ -133,44 +157,42 @@ you want it to feel like an app, teams can use **Add to Home Screen**.
 
 ---
 
-## How it stays in sync
+## How it holds together
 
-Every screen polls `/api/state` — 4 seconds for consoles, 6 for the board — and
-an unchanged board returns a `304` with no payload. Tabs that are not visible
-stop polling entirely.
+**Syncing.** Every screen polls `/api/state` — 4 seconds for consoles, 6 for the
+board — and an unchanged board returns a `304` with no payload. Tabs that are
+not visible stop polling entirely. Polling rather than websockets is deliberate:
+venue wifi drops and a poll reconnects by itself.
 
-Polling rather than websockets is deliberate: venue wifi drops constantly and a
-poll reconnects by itself with no special handling. If you expect a lot of
-simultaneous viewers, raise the interval in the `useAppState(...)` call at the
-top of each page.
-
-Two database rules do the load-bearing work, so a double-tap cannot corrupt the
-board no matter what the UI does:
+**Two rules cannot be broken**, no matter what the UI does:
 
 - one live request per team
 - one team per panel slot
 
-Both are partial unique indexes in `schema.sql`. The API turns their violation
-into a readable message rather than an error.
+With no database to enforce these, they are checked in `store.ts` instead. Node
+runs one piece of JavaScript at a time and each check-then-write is synchronous,
+so these really are atomic — two teams tapping the same slot in the same
+millisecond cannot both get it. The second gets a readable error.
+
+**Durability.** Writes are batched into one disk hit every 200ms, written to a
+temp file and renamed over the real one so a crash mid-write cannot truncate
+your data, and flushed on shutdown. If the file is ever unreadable, the app
+keeps the bad copy as `state.json.corrupt-<timestamp>` and starts empty — empty
+rather than demo data, so a real event never finds itself with invented teams.
+
+**Back it up** by copying `.data/state.json`. That is the entire database.
 
 ---
 
-## Running locally
+## Development
 
 ```bash
-npm install
-cp .env.example .env.local     # then fill it in
-npm run dev                    # http://localhost:3000
-```
-
-```bash
-npm test          # logic tests — slot maths, roster parsing, board ranking
+npm test          # 20 tests: store invariants, slot maths, roster parsing
 npm run typecheck
 npm run build
 ```
 
-The app degrades honestly without Supabase configured: pages render, and
-`/api/state` returns `503 not_configured` instead of crashing.
+Four runtime dependencies: `next`, `react`, `react-dom`, `jose`.
 
 ---
 
@@ -183,8 +205,4 @@ The app degrades honestly without Supabase configured: pages render, and
 - **A judge lost their code.** Admin → Panels shows every code.
 - **You need to know what happened.** Admin → Activity logs every status change
   with who did it.
-- **Adding a panel mid-event** works without redeploying — judge codes live in
-  the database, not in environment variables.
-
-Everything is stored in Supabase, so closing a laptop or losing a phone loses
-nothing.
+- **The server restarted.** Nothing is lost — it reloads from the file.

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/supabase";
 import { canReadNotes, getSession } from "@/lib/auth";
+import { createNote, listNotes } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -11,14 +11,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Not authorised." }, { status: 403 });
   }
 
-  const teamId = new URL(request.url).searchParams.get("teamId");
-  let query = db().from("notes").select("*").order("created_at", { ascending: false }).limit(400);
-  if (teamId) query = query.eq("team_id", teamId);
-
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  return NextResponse.json({ notes: data ?? [] });
+  const teamId = new URL(request.url).searchParams.get("teamId") ?? undefined;
+  return NextResponse.json({ notes: listNotes(teamId) });
 }
 
 export async function POST(request: Request) {
@@ -35,18 +29,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A team and some text are required." }, { status: 400 });
   }
 
-  const { data, error } = await db()
-    .from("notes")
-    .insert({
-      team_id: teamId,
-      request_id: body.requestId ? String(body.requestId) : null,
-      panel_id: session?.role === "judge" ? session.panelId : (body.panelId ?? null),
-      author: session!.name,
-      body: text,
-    })
-    .select()
-    .single();
+  const note = createNote({
+    teamId,
+    requestId: body.requestId ? String(body.requestId) : null,
+    panelId: session!.role === "judge" ? session!.panelId : (body.panelId ?? null),
+    author: session!.name,
+    body: text,
+  });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ note: data });
+  return NextResponse.json({ note });
 }

@@ -1,24 +1,19 @@
 import { NextResponse } from "next/server";
-import { loadState } from "@/lib/data";
-import { isConfigured } from "@/lib/supabase";
+import { loadState } from "@/lib/server-state";
 import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 /**
  * The polling endpoint every screen hits. Kept deliberately boring: no
- * secrets, no notes, one query burst, and an ETag so an unchanged board
- * costs a 304 instead of a payload.
+ * secrets, no notes, and an ETag so an unchanged board costs a 304
+ * instead of a payload.
  */
 export async function GET(request: Request) {
-  if (!isConfigured()) {
-    return NextResponse.json({ error: "not_configured" }, { status: 503 });
-  }
-
   try {
     // Signed-in staff see the notes teams leave; the public payload omits them.
     const session = await getSession();
-    const state = await loadState(session !== null);
+    const state = loadState(session !== null);
 
     // serverTime changes every call, so hash everything else.
     const { serverTime: _t, ...stable } = state;

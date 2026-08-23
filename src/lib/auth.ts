@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
-import { db, isConfigured } from "./supabase";
+import { findPanelByCode } from "./store";
 
 export const ROLES = ["admin", "judge", "queuer"] as const;
 export type Role = (typeof ROLES)[number];
@@ -14,11 +14,33 @@ export type Session =
 const COOKIE = "jq_session";
 const MAX_AGE = 60 * 60 * 16; // one long event day
 
+/** Warn once per process rather than on every single request. */
+let warnedAboutSecret = false;
+
 function secret(): Uint8Array {
   const value = process.env.SESSION_SECRET;
+
   if (!value || value.length < 16) {
-    throw new Error("SESSION_SECRET must be set to a random string of 16+ characters.");
+    // Zero-setup has to mean zero setup, so development gets a working
+    // fallback. Production does not: a known signing key would let anyone
+    // mint themselves a Judge Advisor cookie.
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "SESSION_SECRET must be set to a random string of 16+ characters before deploying. " +
+          "Generate one with: openssl rand -base64 32",
+      );
+    }
+    if (!warnedAboutSecret) {
+      warnedAboutSecret = true;
+      console.warn(
+        "\n[auth] SESSION_SECRET is not set — using an insecure development key.\n" +
+          "       Set one in .env.local before anyone else can reach this app:\n" +
+          "       SESSION_SECRET=$(openssl rand -base64 32)\n",
+      );
+    }
+    return new TextEncoder().encode("judge-queue-insecure-development-key");
   }
+
   return new TextEncoder().encode(value);
 }
 
@@ -73,6 +95,37 @@ function sameCode(a: string, b: string): boolean {
   return diff === 0;
 }
 
+const warnedAboutCode = new Set<string>();
+
+/**
+ * Read a staff access code.
+ *
+ * Development falls back to a published default so a fresh clone is
+ * usable immediately. Production refuses to: a code anyone can read in
+ * the README is not an access code, and silently accepting it would hand
+ * out Judge Advisor rights to the whole internet.
+ */
+function roleCode(envVar: string, devDefault: string): string {
+  const configured = (process.env[envVar] ?? "").trim();
+  if (configured) return configured.toUpperCase();
+
+  if (process.env.NODE_ENV === "production") {
+    if (!warnedAboutCode.has(envVar)) {
+      warnedAboutCode.add(envVar);
+      console.error(
+        `[auth] ${envVar} is not set. That role cannot sign in until you set it.`,
+      );
+    }
+    return "";
+  }
+
+  if (!warnedAboutCode.has(envVar)) {
+    warnedAboutCode.add(envVar);
+    console.warn(`[auth] ${envVar} is not set — using the development default "${devDefault}".`);
+  }
+  return devDefault.toUpperCase();
+}
+
 /**
  * Turn a typed-in code into a session.
  *
@@ -83,8 +136,8 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
   const code = rawCode.trim().toUpperCase();
   if (!code) return null;
 
-  const adminCode = (process.env.ADMIN_CODE ?? "").trim().toUpperCase();
-  const queuerCode = (process.env.QUEUER_CODE ?? "").trim().toUpperCase();
+  const adminCode = roleCode("ADMIN_CODE", "JA2026");
+  const queuerCode = roleCode("QUEUER_CODE", "DESK01");
   const cleanName = name.trim().slice(0, 60);
 
   if (adminCode && sameCode(code, adminCode)) {
@@ -94,27 +147,16 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
     return { role: "queuer", name: cleanName || "Queue" };
   }
 
-  // Judge codes live in the database. If it is unreachable we still want a
-  // clean "not recognised" rather than a 500 with a stack trace in it.
-  if (!isConfigured()) return null;
-
-  try {
-    const { data } = await db()
-      .from("panels")
-      .select("id, name, code")
-      .ilike("code", code)
-      .maybeSingle();
-
-    if (data && sameCode(String(data.code).toUpperCase(), code)) {
-      return {
-        role: "judge",
-        name: cleanName || "Judge",
-        panelId: data.id,
-        panelName: data.name,
-      };
-    }
-  } catch {
-    return null;
+  // Judge codes live in the store, so a panel can be added mid-event
+  // without touching environment variables or restarting anything.
+  const panel = findPanelByCode(code);
+  if (panel && sameCode(panel.code.toUpperCase(), code)) {
+    return {
+      role: "judge",
+      name: cleanName || "Judge",
+      panelId: panel.id,
+      panelName: panel.name,
+    };
   }
   return null;
 }

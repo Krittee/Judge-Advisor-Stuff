@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/supabase";
 import { canAdminister, getSession } from "@/lib/auth";
+import {
+  createPanel,
+  deletePanel,
+  generatePanelCode,
+  listPanels,
+  StoreError,
+  updatePanel,
+} from "@/lib/store";
+import type { Panel } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -11,14 +19,7 @@ export async function GET() {
     return NextResponse.json({ error: "Judge Advisor access required." }, { status: 403 });
   }
 
-  const { data, error } = await db()
-    .from("panels")
-    .select("*")
-    .order("sort_order")
-    .order("name");
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ panels: data ?? [] });
+  return NextResponse.json({ panels: listPanels() });
 }
 
 export async function POST(request: Request) {
@@ -31,30 +32,24 @@ export async function POST(request: Request) {
   const name = String(body.name ?? "").trim().slice(0, 80);
   if (!name) return NextResponse.json({ error: "Give the panel a name." }, { status: 400 });
 
-  const code = String(body.code ?? "").trim().toUpperCase() || randomCode();
-
-  const { data, error } = await db()
-    .from("panels")
-    .insert({
+  try {
+    const panel = createPanel({
       name,
-      code,
+      code: String(body.code ?? "").trim().toUpperCase() || generatePanelCode(),
       room: String(body.room ?? "").trim().slice(0, 60) || null,
       judges: parseJudges(body.judges),
       sort_order: Number(body.sortOrder) || 0,
-      slot_minutes: Math.max(3, Math.min(120, Number(body.slotMinutes) || 12)),
-      slot_count: Math.max(0, Math.min(60, Number(body.slotCount) || 0)),
+      slot_minutes: clamp(body.slotMinutes, 3, 120, 12),
+      slot_count: clamp(body.slotCount, 0, 60, 0),
       slot_start_at: body.slotStartAt ? new Date(String(body.slotStartAt)).toISOString() : null,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    if (error.code === "23505") {
-      return NextResponse.json({ error: "That panel code is already in use." }, { status: 409 });
+    });
+    return NextResponse.json({ panel });
+  } catch (e) {
+    if (e instanceof StoreError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    throw e;
   }
-  return NextResponse.json({ panel: data });
 }
 
 export async function PATCH(request: Request) {
@@ -67,33 +62,28 @@ export async function PATCH(request: Request) {
   const id = String(body.id ?? "");
   if (!id) return NextResponse.json({ error: "id required." }, { status: 400 });
 
-  const patch: Record<string, unknown> = {};
+  const patch: Partial<Panel> = {};
   if ("name" in body) patch.name = String(body.name).trim().slice(0, 80);
   if ("code" in body) patch.code = String(body.code).trim().toUpperCase();
   if ("room" in body) patch.room = String(body.room ?? "").trim().slice(0, 60) || null;
   if ("judges" in body) patch.judges = parseJudges(body.judges);
   if ("sortOrder" in body) patch.sort_order = Number(body.sortOrder) || 0;
-  if ("slotMinutes" in body) {
-    patch.slot_minutes = Math.max(3, Math.min(120, Number(body.slotMinutes) || 12));
-  }
-  if ("slotCount" in body) {
-    patch.slot_count = Math.max(0, Math.min(60, Number(body.slotCount) || 0));
-  }
+  if ("slotMinutes" in body) patch.slot_minutes = clamp(body.slotMinutes, 3, 120, 12);
+  if ("slotCount" in body) patch.slot_count = clamp(body.slotCount, 0, 60, 0);
   if ("slotStartAt" in body) {
     patch.slot_start_at = body.slotStartAt
       ? new Date(String(body.slotStartAt)).toISOString()
       : null;
   }
 
-  const { data, error } = await db().from("panels").update(patch).eq("id", id).select().single();
-
-  if (error) {
-    if (error.code === "23505") {
-      return NextResponse.json({ error: "That panel code is already in use." }, { status: 409 });
+  try {
+    return NextResponse.json({ panel: updatePanel(id, patch) });
+  } catch (e) {
+    if (e instanceof StoreError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    throw e;
   }
-  return NextResponse.json({ panel: data });
 }
 
 export async function DELETE(request: Request) {
@@ -105,9 +95,8 @@ export async function DELETE(request: Request) {
   const id = new URL(request.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required." }, { status: 400 });
 
-  // Teams and requests fall back to panel_id = null rather than vanishing.
-  const { error } = await db().from("panels").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Teams and requests fall back to no panel rather than vanishing.
+  deletePanel(id);
   return NextResponse.json({ ok: true });
 }
 
@@ -120,10 +109,6 @@ function parseJudges(input: unknown): string[] {
     .slice(0, 12);
 }
 
-function randomCode(): string {
-  // No 0/O/1/I — these get read aloud across a noisy room.
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  return Array.from({ length: 6 }, () =>
-    alphabet[Math.floor(Math.random() * alphabet.length)],
-  ).join("");
+function clamp(value: unknown, min: number, max: number, fallback: number): number {
+  return Math.max(min, Math.min(max, Number(value) || fallback));
 }

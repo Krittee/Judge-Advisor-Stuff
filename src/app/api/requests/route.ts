@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/supabase";
 import { actorLabel, getSession } from "@/lib/auth";
-import { logActivity } from "@/lib/data";
+import { createRequest, findTeamByNumber, logActivity, StoreError } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter a valid team number." }, { status: 400 });
   }
 
-  const client = db();
-  const { data: team } = await client
-    .from("teams")
-    .select("id, number, name, panel_id")
-    .eq("number", teamNumber)
-    .maybeSingle();
-
+  const team = findTeamByNumber(teamNumber);
   if (!team) {
     return NextResponse.json(
       { error: `Team ${teamNumber} is not on the list. Check with the Judge Advisor.` },
@@ -44,13 +37,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const row: Record<string, unknown> = {
-    team_id: team.id,
-    panel_id: team.panel_id,
-    kind,
-    message,
-    created_by: session ? actorLabel(session) : "team",
-  };
+  let slotStart: string | null = null;
+  let slotEnd: string | null = null;
 
   if (kind === "slot") {
     const start = new Date(String(body.slotStart ?? ""));
@@ -58,34 +46,34 @@ export async function POST(request: Request) {
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       return NextResponse.json({ error: "That time slot is not valid." }, { status: 400 });
     }
-    row.status = "scheduled";
-    row.slot_start = start.toISOString();
-    row.slot_end = end.toISOString();
-  } else {
-    row.status = "requested";
+    slotStart = start.toISOString();
+    slotEnd = end.toISOString();
   }
 
-  const { data: created, error } = await client.from("requests").insert(row).select().single();
+  try {
+    const created = createRequest({
+      teamId: team.id,
+      panelId: team.panel_id,
+      kind,
+      message,
+      createdBy: session ? actorLabel(session) : "team",
+      slotStart,
+      slotEnd,
+    });
 
-  if (error) {
-    // Both of these come from the partial unique indexes in schema.sql.
-    if (error.code === "23505") {
-      const msg =
-        kind === "slot"
-          ? "Someone just took that slot. Pick another one."
-          : `Team ${teamNumber} is already in the queue.`;
-      return NextResponse.json({ error: msg }, { status: 409 });
+    logActivity({
+      requestId: created.id,
+      teamId: team.id,
+      actor: session ? actorLabel(session) : "team",
+      action: kind === "slot" ? "booked slot" : "joined queue",
+      detail: `Team ${team.number}`,
+    });
+
+    return NextResponse.json({ request: created });
+  } catch (e) {
+    if (e instanceof StoreError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    throw e;
   }
-
-  await logActivity({
-    requestId: created.id,
-    teamId: team.id,
-    actor: session ? actorLabel(session) : "team",
-    action: kind === "slot" ? "booked slot" : "joined queue",
-    detail: `Team ${team.number}`,
-  });
-
-  return NextResponse.json({ request: created });
 }

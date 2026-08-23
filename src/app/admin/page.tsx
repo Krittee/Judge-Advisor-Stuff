@@ -426,7 +426,77 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
           No teams match. Use the Import tab to add your roster.
         </p>
       ) : null}
+
+      <DangerZone refresh={refresh} onError={onError} />
     </div>
+  );
+}
+
+/**
+ * Two resets, because they answer different questions. "Clear today"
+ * is what you want between practice and the real thing; "wipe
+ * everything" is what you want once, to get rid of the demo teams.
+ */
+function DangerZone({
+  refresh,
+  onError,
+}: {
+  refresh: () => Promise<void>;
+  onError: (m: string | null) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  async function reset(action: "resetDay" | "resetAll", confirmText: string) {
+    if (!confirm(confirmText)) return;
+    setBusy(true);
+    onError(null);
+    try {
+      await call("/api/admin/teams", { method: "PATCH", body: { action } });
+      await refresh();
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <details className="mt-8 rounded-xl bg-white/[0.02] p-4 ring-1 ring-inset ring-white/[0.07]">
+      <summary className="cursor-pointer text-sm text-zinc-500 hover:text-zinc-300">
+        Reset
+      </summary>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={busy}
+          onClick={() =>
+            reset(
+              "resetDay",
+              "Clear all requests, notes and activity?\n\nTeams and panels are kept.",
+            )
+          }
+        >
+          Clear today&apos;s requests
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          disabled={busy}
+          onClick={() =>
+            reset(
+              "resetAll",
+              "Delete EVERYTHING — teams, panels, requests and notes?\n\nThis cannot be undone.",
+            )
+          }
+        >
+          Wipe everything
+        </Button>
+        <span className="text-xs text-zinc-600">
+          Use &ldquo;wipe everything&rdquo; once to clear the demo teams.
+        </span>
+      </div>
+    </details>
   );
 }
 

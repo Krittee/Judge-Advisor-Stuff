@@ -10,3 +10,6 @@ npm-debug.log*
 .vercel
 *.tsbuildinfo
 next-env.d.ts
+
+# Local data file — this is the whole database
+.data/
