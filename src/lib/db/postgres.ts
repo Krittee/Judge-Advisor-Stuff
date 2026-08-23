@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import type { Pool } from "pg";
 import type { ActivityRow, Note, Panel, RequestRow, Team } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
@@ -28,12 +28,39 @@ import {
 const LIVE = ["requested", "acknowledged", "interviewing"] as const;
 
 let pool: Pool | null = null;
+let connecting: Promise<Pool> | null = null;
 
-function db(): Pool {
+/**
+ * Connect, loading the driver on demand.
+ *
+ * `pg` is imported here rather than at the top of the file so that it is
+ * only ever required when DATABASE_URL is set. Anyone running on the
+ * JSON file — which is the default, and the whole point of the
+ * no-database setup — never needs the package installed at all.
+ * next.config.ts keeps the bundler from trying to resolve it too.
+ */
+async function db(): Promise<Pool> {
   if (pool) return pool;
+  connecting ??= connect().catch((e) => {
+    connecting = null; // let the next request try again
+    throw e;
+  });
+  return connecting;
+}
 
+async function connect(): Promise<Pool> {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL is not set.");
+
+  let Pool: typeof import("pg").Pool;
+  try {
+    ({ Pool } = await import("pg"));
+  } catch {
+    throw new Error(
+      "DATABASE_URL is set, but the 'pg' database driver is not installed. " +
+        "Run `npm install` to add it, or unset DATABASE_URL to use the local file instead.",
+    );
+  }
 
   pool = new Pool({
     connectionString,
@@ -91,7 +118,7 @@ function ready(): Promise<void> {
 }
 
 async function migrate(): Promise<void> {
-  await db().query(`
+  await (await db()).query(`
     create table if not exists panels (
       id            uuid primary key default gen_random_uuid(),
       name          text not null,
@@ -175,7 +202,7 @@ async function migrate(): Promise<void> {
 
   // Schema changes that an already-deployed event may not have yet.
   // Each is guarded so re-running is free and no roster is ever lost.
-  await db().query(`
+  await (await db()).query(`
     do $$
     begin
       -- Team numbers were an int before identifiers like "9882K" had to work.
@@ -216,7 +243,7 @@ function translate(e: unknown, context: "queue" | "slot" | "panel"): never {
 
 async function query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
   await ready();
-  const { rows } = await db().query(sql, params);
+  const { rows } = await (await db()).query(sql, params);
   return rows as T[];
 }
 

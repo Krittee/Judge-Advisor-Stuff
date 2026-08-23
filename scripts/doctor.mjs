@@ -38,12 +38,37 @@ if (major > 18 || (major === 18 && minor >= 18)) {
   );
 }
 
-/* ---- 2. Dependencies ---------------------------------------------- */
-if (existsSync("node_modules/next")) {
-  const v = JSON.parse(readFileSync("node_modules/next/package.json", "utf8")).version;
-  ok(`Dependencies installed (Next.js ${v})`);
-} else {
+/* ---- 2. Dependencies ----------------------------------------------
+ *
+ * Checks every declared dependency, not just that node_modules exists.
+ * Pulling code that added a package leaves an install that looks fine
+ * until the build fails on a module you have never heard of.
+ */
+if (!existsSync("node_modules")) {
   bad("Dependencies are not installed", "Run:  npm install");
+} else {
+  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+  const missing = Object.keys(pkg.dependencies ?? {}).filter(
+    (name) => !existsSync(`node_modules/${name}`),
+  );
+
+  if (missing.length) {
+    bad(
+      `Out of date: ${missing.join(", ")} ${missing.length === 1 ? "is" : "are"} in package.json but not installed`,
+      "Run:  npm install     (this happens after you pull new code)",
+    );
+  } else {
+    const v = JSON.parse(readFileSync("node_modules/next/package.json", "utf8")).version;
+    ok(`Dependencies installed (Next.js ${v})`);
+  }
+
+  // pg is optional on purpose: only the Postgres backend needs it.
+  if (process.env.DATABASE_URL && !existsSync("node_modules/pg")) {
+    bad(
+      "DATABASE_URL is set but the 'pg' database driver is not installed",
+      "Run:  npm install     (or unset DATABASE_URL to use the local file)",
+    );
+  }
 }
 
 /* ---- 3. Are we even in the right folder? -------------------------- */
