@@ -36,7 +36,12 @@ export type NewActivity = {
   detail?: string | null;
 };
 
-export type ImportedTeam = { number: string; name: string; pit: string | null };
+export type ImportedTeam = {
+  number: string;
+  name: string;
+  pit: string | null;
+  division: string;
+};
 
 /**
  * Everything the app can do to its data.
@@ -66,9 +71,12 @@ export type Store = {
   upsertTeams(rows: ImportedTeam[]): Promise<number>;
   updateTeam(id: string, patch: Partial<Team>): Promise<Team>;
   deleteTeam(id: string): Promise<void>;
-  autoAssignTeams(perPanel: number, includeAssigned?: boolean): Promise<number>;
+  /** Only ever assigns a team to a panel in the same division. */
+  autoAssignTeams(perPanel: number, includeAssigned?: boolean, division?: string): Promise<number>;
 
   createPanel(input: Omit<Panel, "id" | "created_at">): Promise<Panel>;
+  /** Create any preset panels that do not exist yet. Returns how many. */
+  seedPresetPanels(): Promise<number>;
   updatePanel(id: string, patch: Partial<Panel>): Promise<Panel>;
   deletePanel(id: string): Promise<void>;
   generatePanelCode(): Promise<string>;
@@ -80,11 +88,3 @@ export type Store = {
   resetAll(): Promise<void>;
 };
 
-/** No 0/O/1/I — these get read aloud across a noisy room. */
-export function randomPanelCode(): string {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  return Array.from(
-    { length: 6 },
-    () => alphabet[Math.floor(Math.random() * alphabet.length)],
-  ).join("");
-}

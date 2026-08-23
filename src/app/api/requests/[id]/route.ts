@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { actorLabel, canAdvance, canCancel, getSession } from "@/lib/auth";
+import { actorLabel, canAdvance, canCancel, getSession, mayActOnPanel } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
 import type { RequestRow } from "@/lib/types";
@@ -43,7 +43,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   // A judge may only touch their own panel's work. Admin may touch anything.
-  if (session?.role === "judge" && current.panel_id !== session.panelId) {
+  // This is the scope check; the role checks above only decided whether
+  // the action is available at all.
+  if (session?.role !== "queuer" && !mayActOnPanel(session, current.panel_id)) {
     return NextResponse.json(
       { error: "That request belongs to another judge panel." },
       { status: 403 },
@@ -60,8 +62,30 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!panelId) {
       return NextResponse.json({ error: "Pick a panel to move this to." }, { status: 400 });
     }
+
+    // Divisions are a hard wall: a team may only be handed to a panel
+    // judging its own division.
+    const db = store();
+    const [panels, teams] = await Promise.all([db.listPanels(), db.listTeams()]);
+    const target = panels.find((p) => p.id === panelId);
+    const team = teams.find((t) => t.id === current.team_id);
+
+    if (!target) {
+      return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
+    }
+    if (team && target.division !== team.division) {
+      return NextResponse.json(
+        {
+          error:
+            `Team ${team.number} is in ${team.division}, but ${target.name} judges ` +
+            `${target.division}. Move the team's division first if that is what you meant.`,
+        },
+        { status: 409 },
+      );
+    }
+
     patch.panel_id = panelId;
-    logLine = "reassigned";
+    logLine = `reassigned to ${target.name}`;
   } else if (action === "cancel") {
     patch.status = "cancelled";
     patch.cancelled_at = now;

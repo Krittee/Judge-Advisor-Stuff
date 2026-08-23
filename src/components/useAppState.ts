@@ -3,7 +3,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppState } from "@/lib/types";
 
-const EMPTY: AppState = { panels: [], teams: [], requests: [], serverTime: "" };
+const EMPTY: AppState = {
+  panels: [],
+  teams: [],
+  requests: [],
+  divisions: [],
+  viewer: {
+    role: "team",
+    name: null,
+    panelId: null,
+    panelName: null,
+    division: null,
+    canAdvance: false,
+    canReadNotes: false,
+    canAdminister: false,
+  },
+  serverTime: "",
+};
 
 /**
  * Poll /api/state and hand the result to whichever screen asked for it.

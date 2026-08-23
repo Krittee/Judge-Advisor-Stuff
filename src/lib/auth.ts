@@ -181,25 +181,51 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
 }
 
 /* ------------------------------------------------------------------ *
- * Permissions. One table, so there is no arguing about who can do what.
+ * Permissions.
  *
- *                     create   advance   cancel        notes   admin
- *   team (no login)     yes       no      own request    no      no
- *   queuer              yes       no      un-seen only   no      no
- *   judge               yes      yes      yes            yes     no
- *   admin               yes      yes      yes            yes     yes
+ * One table, so there is no arguing about who can do what. Everything
+ * here is enforced in the API routes — the UI hides what a role cannot
+ * do, but hiding is not the control.
+ *
+ *                    create   advance     cancel        notes       admin
+ *   team (no login)   own       no       own request     no          no
+ *   queuer            any       no       un-seen only    no          no
+ *   judge             own      own panel own panel      own panel    no
+ *   admin             any       any       any            any         yes
+ *
+ * "own panel" is the load-bearing part: a judge may only advance, cancel,
+ * read or write against teams assigned to the panel whose code they
+ * typed. Divisions sit above that — a panel only ever holds teams from
+ * its own division.
  * ------------------------------------------------------------------ */
 
+/** May move an interview along at all. Scope is checked separately. */
 export function canAdvance(s: Session | null): boolean {
   return s?.role === "admin" || s?.role === "judge";
 }
 
+/** May see judging notes at all. Scope is checked separately. */
 export function canReadNotes(s: Session | null): boolean {
   return s?.role === "admin" || s?.role === "judge";
 }
 
 export function canAdminister(s: Session | null): boolean {
   return s?.role === "admin";
+}
+
+/**
+ * The one scope check the whole judge separation rests on.
+ *
+ * A judge may only touch a team assigned to their own panel. The Judge
+ * Advisor is unrestricted. Anyone else has no business here at all.
+ *
+ * `panelId` is the panel the team or request currently belongs to; null
+ * means unassigned, which only the Judge Advisor may act on.
+ */
+export function mayActOnPanel(s: Session | null, panelId: string | null): boolean {
+  if (s?.role === "admin") return true;
+  if (s?.role === "judge") return panelId !== null && panelId === s.panelId;
+  return false;
 }
 
 /**
@@ -212,6 +238,7 @@ export function canCancel(s: Session | null, status: string): boolean {
   if (s?.role === "queuer") return status === "requested" || status === "scheduled";
   return false;
 }
+
 
 export function actorLabel(s: Session | null): string {
   if (!s) return "team";

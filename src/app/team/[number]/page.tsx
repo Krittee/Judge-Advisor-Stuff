@@ -100,7 +100,7 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
           {panel ? (
             <p className="mt-2 text-sm text-zinc-400">
               Judged by <span className="text-zinc-200">{panel.name}</span>
-              {panel.room ? ` · ${panel.room}` : ""}
+              {` · ${panel.division}`}
               {panel.judges.length ? (
                 <span className="block text-zinc-500">{panel.judges.join(", ")}</span>
               ) : null}

@@ -94,8 +94,12 @@ export default function AdminPage() {
           <FloorTab state={state} refresh={refresh} onError={setError} onNotes={setNotesFor} />
         ) : null}
         {tab === "teams" ? <TeamsTab state={state} refresh={refresh} onError={setError} /> : null}
-        {tab === "panels" ? <PanelsTab refresh={refresh} onError={setError} /> : null}
-        {tab === "import" ? <ImportTab refresh={refresh} onError={setError} /> : null}
+        {tab === "panels" ? (
+          <PanelsTab refresh={refresh} onError={setError} divisions={state.divisions} />
+        ) : null}
+        {tab === "import" ? (
+          <ImportTab refresh={refresh} onError={setError} divisions={state.divisions} />
+        ) : null}
         {tab === "log" ? <ActivityTab /> : null}
       </main>
 
@@ -265,15 +269,17 @@ function FloorTab({
 function TeamsTab({ state, refresh, onError }: TabProps) {
   const [filter, setFilter] = useState("");
   const [perPanel, setPerPanel] = useState(10);
+  const [division, setDivision] = useState<string>("");
   const [busy, setBusy] = useState(false);
 
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (!q) return state.teams;
-    return state.teams.filter(
-      (t) => String(t.number).includes(q) || t.name.toLowerCase().includes(q),
-    );
-  }, [state.teams, filter]);
+    return state.teams.filter((t) => {
+      if (division && t.division !== division) return false;
+      if (!q) return true;
+      return t.number.toLowerCase().includes(q) || t.name.toLowerCase().includes(q);
+    });
+  }, [state.teams, filter, division]);
 
   const perPanelCount = useMemo(() => {
     const c = new Map<string, number>();
@@ -299,7 +305,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
     try {
       const res = await call<{ assigned: number }>("/api/admin/teams", {
         method: "PATCH",
-        body: { action: "autoAssign", perPanel },
+        body: { action: "autoAssign", perPanel, division: division || undefined },
       });
       await refresh();
       if (!res.assigned) onError("Nothing to assign — every team already has a panel.");
@@ -310,7 +316,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
     }
   }
 
-  const unassigned = state.teams.filter((t) => !t.panel_id).length;
+  const unassigned = shown.filter((t) => !t.panel_id).length;
 
   return (
     <div className="space-y-4">
@@ -321,6 +327,21 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
           placeholder="Filter by number or name"
           className={`${inputClass} max-w-xs`}
         />
+        <select
+          value={division}
+          onChange={(e) => setDivision(e.target.value)}
+          className={`${inputClass} max-w-[12rem]`}
+          aria-label="Division"
+        >
+          <option value="" className="bg-zinc-900">
+            All divisions
+          </option>
+          {state.divisions.map((d) => (
+            <option key={d} value={d} className="bg-zinc-900">
+              {d}
+            </option>
+          ))}
+        </select>
         <div className="flex items-end gap-2">
           <label className="text-sm text-zinc-400">
             <span className="mb-1 block text-xs">Max per panel</span>
@@ -343,11 +364,14 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
       </div>
 
       <div className="flex flex-wrap gap-2 text-xs">
-        {state.panels.map((p) => (
-          <span key={p.id} className="rounded-lg bg-white/5 px-3 py-1.5 text-zinc-400">
-            {p.name}: <span className="text-zinc-200">{perPanelCount.get(p.id) ?? 0}</span>
-          </span>
-        ))}
+        {state.panels
+          .filter((p) => !division || p.division === division)
+          .map((p) => (
+            <span key={p.id} className="rounded-lg bg-white/5 px-3 py-1.5 text-zinc-400">
+              {p.name}: <span className="text-zinc-200">{perPanelCount.get(p.id) ?? 0}</span>
+              <span className="ml-2 text-zinc-600">{p.division}</span>
+            </span>
+          ))}
       </div>
 
       <div className="overflow-x-auto rounded-xl ring-1 ring-inset ring-white/10">
@@ -357,6 +381,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
               <th className="px-4 py-3">Team</th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Pit</th>
+              <th className="px-4 py-3">Division</th>
               <th className="px-4 py-3">Judge panel</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3" />
@@ -375,6 +400,20 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                   <td className="px-4 py-2.5 text-zinc-500">{team.pit ?? "—"}</td>
                   <td className="px-4 py-2.5">
                     <select
+                      value={team.division}
+                      onChange={(e) => update(team.id, { division: e.target.value })}
+                      className="rounded-lg bg-white/5 px-2 py-1.5 text-xs ring-1 ring-inset ring-white/10"
+                      title="Changing division unassigns the team from its panel"
+                    >
+                      {state.divisions.map((d) => (
+                        <option key={d} value={d} className="bg-zinc-900">
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <select
                       value={team.panel_id ?? ""}
                       onChange={(e) => update(team.id, { panelId: e.target.value || null })}
                       className="rounded-lg bg-white/5 px-2 py-1.5 text-xs ring-1 ring-inset ring-white/10"
@@ -382,11 +421,14 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                       <option value="" className="bg-zinc-900">
                         — unassigned —
                       </option>
-                      {state.panels.map((p) => (
-                        <option key={p.id} value={p.id} className="bg-zinc-900">
-                          {p.name}
-                        </option>
-                      ))}
+                      {/* Only panels on this team's side of the wall. */}
+                      {state.panels
+                        .filter((p) => p.division === team.division)
+                        .map((p) => (
+                          <option key={p.id} value={p.id} className="bg-zinc-900">
+                            {p.name}
+                          </option>
+                        ))}
                     </select>
                   </td>
                   <td className="px-4 py-2.5">
@@ -561,13 +603,15 @@ function DangerZone({
 function PanelsTab({
   refresh,
   onError,
+  divisions,
 }: {
   refresh: () => Promise<void>;
   onError: (m: string | null) => void;
+  divisions: string[];
 }) {
   const [panels, setPanels] = useState<Panel[]>([]);
   const [busy, setBusy] = useState(false);
-  const [draft, setDraft] = useState({ name: "", room: "", judges: "" });
+  const [draft, setDraft] = useState({ name: "", division: "", judges: "" });
 
   const load = useMemo(
     () => () =>
@@ -587,9 +631,13 @@ function PanelsTab({
     onError(null);
     try {
       await call("/api/admin/panels", {
-        body: { ...draft, sortOrder: panels.length + 1 },
+        body: {
+          ...draft,
+          division: draft.division || divisions[0],
+          sortOrder: panels.length + 1,
+        },
       });
-      setDraft({ name: "", room: "", judges: "" });
+      setDraft({ name: "", division: "", judges: "" });
       await load();
       await refresh();
     } catch (e) {
@@ -625,14 +673,19 @@ function PanelsTab({
             className={`${inputClass} py-2`}
           />
         </label>
-        <label className="min-w-[8rem] flex-1">
-          <span className="mb-1 block text-xs text-zinc-400">Room</span>
-          <input
-            value={draft.room}
-            onChange={(e) => setDraft({ ...draft, room: e.target.value })}
-            placeholder="Room 104"
+        <label className="min-w-[9rem] flex-1">
+          <span className="mb-1 block text-xs text-zinc-400">Division</span>
+          <select
+            value={draft.division || divisions[0] || ""}
+            onChange={(e) => setDraft({ ...draft, division: e.target.value })}
             className={`${inputClass} py-2`}
-          />
+          >
+            {divisions.map((d) => (
+              <option key={d} value={d} className="bg-zinc-900">
+                {d}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="min-w-[14rem] flex-[2]">
           <span className="mb-1 block text-xs text-zinc-400">Judges (comma separated)</span>
@@ -650,13 +703,49 @@ function PanelsTab({
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(340px,1fr))]">
         {panels.map((p) => (
-          <PanelCard key={p.id} panel={p} onPatch={patch} onError={onError} onReload={load} />
+          <PanelCard
+            key={p.id}
+            panel={p}
+            divisions={divisions}
+            onPatch={patch}
+            onError={onError}
+            onReload={load}
+          />
         ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 border-t border-white/5 pt-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            onError(null);
+            try {
+              const res = await call<{ created: number }>("/api/admin/panels", { method: "PUT" });
+              await load();
+              await refresh();
+              if (!res.created) onError("Every preset panel already exists.");
+            } catch (e) {
+              onError((e as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Add preset panels
+        </Button>
+        <span className="text-xs text-zinc-600">
+          Creates anything in <code>config/event.json</code> that is missing. Never overwrites a
+          panel you already have.
+        </span>
       </div>
 
       {!panels.length ? (
         <p className="py-8 text-center text-sm text-zinc-600">
-          No judge panels yet. Add one above — judges sign in with its code.
+          No judge panels yet. Add one above, or load your presets — judges sign in with a panel&apos;s
+          code.
         </p>
       ) : null}
     </div>
@@ -665,11 +754,13 @@ function PanelsTab({
 
 function PanelCard({
   panel,
+  divisions,
   onPatch,
   onError,
   onReload,
 }: {
   panel: Panel;
+  divisions: string[];
   onPatch: (id: string, body: Record<string, unknown>) => Promise<void>;
   onError: (m: string | null) => void;
   onReload: () => Promise<void> | void;
@@ -683,7 +774,7 @@ function PanelCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold">{panel.name}</h3>
-          <p className="text-xs text-zinc-500">{panel.room || "no room set"}</p>
+          <p className="text-xs text-zinc-500">{panel.division}</p>
         </div>
         <div className="text-right">
           <div className="text-xs text-zinc-500">Judge code</div>
@@ -697,6 +788,32 @@ function PanelCard({
         placeholder="Judge names, comma separated"
         className={`${inputClass} py-2 text-sm`}
       />
+
+      <label className="block text-xs text-zinc-400">
+        Division
+        <select
+          value={panel.division}
+          onChange={(e) => {
+            if (
+              !confirm(
+                `Move ${panel.name} to ${e.target.value}?\n\n` +
+                  "Its current teams stay in their own division and become " +
+                  "unassigned, so you will need to give them to another panel.",
+              )
+            ) {
+              return;
+            }
+            onPatch(panel.id, { division: e.target.value });
+          }}
+          className={`${inputClass} mt-1 py-2 text-sm`}
+        >
+          {divisions.map((d) => (
+            <option key={d} value={d} className="bg-zinc-900">
+              {d}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <details className="text-sm">
         <summary className="cursor-pointer text-zinc-400 hover:text-zinc-200">
@@ -786,13 +903,16 @@ function toLocalInput(iso: string | null): string {
 function ImportTab({
   refresh,
   onError,
+  divisions,
 }: {
   refresh: () => Promise<void>;
   onError: (m: string | null) => void;
+  divisions: string[];
 }) {
   const [text, setText] = useState("");
   const [autoAssign, setAutoAssign] = useState(true);
   const [perPanel, setPerPanel] = useState(10);
+  const [division, setDivision] = useState(divisions[0] ?? "");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
@@ -803,7 +923,7 @@ function ImportTab({
     try {
       const res = await call<{ imported: number; skipped: number; assigned: number }>(
         "/api/admin/teams",
-        { body: { text, autoAssign, perPanel } },
+        { body: { text, autoAssign, perPanel, division } },
       );
       setResult(
         `Imported ${res.imported} team${res.imported === 1 ? "" : "s"}` +
@@ -826,9 +946,10 @@ function ImportTab({
         <p className="mt-1 text-sm text-zinc-400">
           One team per line: <code className="text-zinc-300">number, name, pit</code>. Pit is
           optional. Team numbers may include letters — <code className="text-zinc-300">9882K</code>{" "}
-          works as well as <code className="text-zinc-300">1234</code>. Paste straight from a
-          spreadsheet — tabs work too, and a header row is skipped automatically. Re-importing
-          updates existing teams instead of duplicating them.
+          works as well as <code className="text-zinc-300">1234</code>. Everything you paste goes
+          into the division chosen below, unless a row names one in a fourth column. Paste straight
+          from a spreadsheet — tabs work too, and a header row is skipped automatically.
+          Re-importing updates existing teams instead of duplicating them.
         </p>
       </div>
 
@@ -842,6 +963,20 @@ function ImportTab({
       />
 
       <div className="flex flex-wrap items-center gap-4">
+        <label className="text-sm text-zinc-300">
+          <span className="mb-1 block text-xs text-zinc-400">Import into</span>
+          <select
+            value={division}
+            onChange={(e) => setDivision(e.target.value)}
+            className={`${inputClass} py-2`}
+          >
+            {divisions.map((d) => (
+              <option key={d} value={d} className="bg-zinc-900">
+                {d}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
           <input
             type="checkbox"

@@ -64,7 +64,6 @@ export default function BoardPage() {
             <div className="mb-3 flex items-baseline justify-between gap-3">
               <h2 className="text-xl font-semibold">{panel?.name ?? "Unassigned"}</h2>
               <span className="text-sm text-zinc-500">
-                {panel?.room ? `${panel.room} · ` : ""}
                 {teams.length} team{teams.length === 1 ? "" : "s"}
               </span>
             </div>

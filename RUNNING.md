@@ -187,14 +187,17 @@ Sign in at `/login` with `JA2026`.
 
 1. **Teams tab → Reset → Wipe everything.** This deletes the demo teams. Do
    this first or you will spend the day judging the Quantum Quokkas.
-2. **Panels tab** — add each judge group. Give each one a name, room and the
-   judges' names. Each panel gets its own **code** — write it down and give it
-   to that group of judges.
+2. **Panels tab** — click **Add preset panels** to create the ones set up in
+   `config/event.json`, then fill in each group's judge names. Each panel has
+   its own **code** and its own **division** — write the codes down and hand
+   each one to that group of judges.
 3. **Import tab** — paste your team list, one team per line:
    ```
    1234, Iron Hawks, Pit 12
    9882K, Kilo Kestrels, Pit 13
    ```
+   Pick which **division** the paste goes into above the box. Running two
+   divisions? Import each one separately.
    Team numbers can have letters in them, like `9882K` — and it does not matter
    whether anyone types the letter as a capital.
    You can copy straight out of Excel or Google Sheets and paste it in. Tick

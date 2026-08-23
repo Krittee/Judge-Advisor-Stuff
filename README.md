@@ -113,22 +113,60 @@ empties the queue but keeps your roster and panels.
 
 ## Who can do what
 
-| | request a judge | advance status | write notes | manage teams & panels |
-|---|:---:|:---:|:---:|:---:|
-| **Team** (no login) | ✅ own team | — | — | — |
-| **Queue desk** (`QUEUER_CODE`) | ✅ any team | — | — | — |
-| **Judge** (panel code) | ✅ own panel | ✅ own panel | ✅ | — |
-| **Judge Advisor** (`ADMIN_CODE`) | ✅ | ✅ any panel | ✅ | ✅ |
+Everything below is enforced in the API routes. The UI hides what a role cannot
+do, but hiding is not the control — a judge posting straight at the API gets the
+same refusal.
+
+| | request | advance status | cancel | judging notes | manage teams & panels |
+|---|:---:|:---:|:---:|:---:|:---:|
+| **Team** (no login) | own team | — | own request | — | — |
+| **Queue desk** (`QUEUER_CODE`) | any team | — | un-seen only | — | — |
+| **Judge** (panel code) | own panel | **own panel** | own panel | **own panel** | — |
+| **Judge Advisor** (`ADMIN_CODE`) | any | any | any | any | ✅ |
+
+**"Own panel" is the load-bearing part.** A judge may only advance, cancel, read
+or write against teams assigned to the panel whose code they typed. Another
+panel's team returns `403` on every one of those, and a judge's `/api/state` is
+scoped to their own division — they do not receive the other division's teams at
+all. A team nobody is assigned to is Judge Advisor territory only.
+
+Judges *do* drive the colour flow for their own teams — that is what makes the
+board change without you touching it. If you would rather they could not, one
+line in `canAdvance()` in [`src/lib/auth.ts`](src/lib/auth.ts) turns it off.
 
 The queue desk can also **undo** an entry it just made, but only while the
-request is still orange — once judges acknowledge it, it is out of their hands.
-To make the role strictly create-only, delete the `queuer` branch in
-`canCancel()` in [`src/lib/auth.ts`](src/lib/auth.ts).
-
-Judges can only touch requests belonging to their own panel. Every one of these
-rules is enforced server-side in the API routes, not just hidden in the UI.
+request is still orange. Once judges acknowledge it, it is out of their hands.
 
 ---
+
+## Divisions
+
+Two divisions can run at once, and they are a **hard wall**:
+
+- Every team and every panel belongs to exactly one division.
+- Auto-assign never crosses it. A division with no panels leaves its teams
+  unassigned rather than handing them to the wrong judges.
+- Reassigning a team to a panel in the other division is refused — even for you.
+- A judge only ever sees their own division.
+
+**Moving a panel mid-event** is supported: change its division in Admin →
+Panels. Its current teams stay in the division they compete in and become
+unassigned, so another panel on that side can pick them up. The console warns
+you before it does this.
+
+To change a team's division, use the Division column in Admin → Teams. That
+unassigns it from its panel for the same reason.
+
+### Preset panels
+
+[`config/event.json`](config/event.json) holds your divisions and a starting set
+of judge panels with their codes. It seeds the roster the **first time** the app
+runs with no panels — after that the admin console owns them, and editing the
+file again will not overwrite what is there. **Admin → Panels → Add preset
+panels** creates anything from the file that is missing, and never touches a
+panel you already have.
+
+Change the codes in that file before your event: they are public in this repo.
 
 ## The colours
 

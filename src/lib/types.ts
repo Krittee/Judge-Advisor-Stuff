@@ -4,7 +4,8 @@ export type Panel = {
   id: string;
   name: string;
   code: string;
-  room: string | null;
+  /** Divisions are a hard wall: a panel only ever judges its own. */
+  division: string;
   judges: string[];
   sort_order: number;
   slot_start_at: string | null;
@@ -19,6 +20,7 @@ export type Team = {
   number: string;
   name: string;
   panel_id: string | null;
+  division: string;
   pit: string | null;
   created_at: string;
 };
@@ -72,7 +74,24 @@ export type AppState = {
   panels: PublicPanel[];
   teams: Team[];
   requests: RequestRow[];
+  /** Every division in play, so the UI can offer them without guessing. */
+  divisions: string[];
+  /** What this viewer is allowed to do, so the UI never offers more. */
+  viewer: ViewerCapabilities;
   serverTime: string;
+};
+
+export type ViewerCapabilities = {
+  role: "team" | "queuer" | "judge" | "admin";
+  name: string | null;
+  /** Set for a judge: the only panel they may act on. */
+  panelId: string | null;
+  panelName: string | null;
+  /** Set for a judge: the only division they can see. */
+  division: string | null;
+  canAdvance: boolean;
+  canReadNotes: boolean;
+  canAdminister: boolean;
 };
 
 export type Slot = {

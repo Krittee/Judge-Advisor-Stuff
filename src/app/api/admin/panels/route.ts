@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { canAdminister, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import type { Panel } from "@/lib/types";
+import { presetDivisions } from "@/lib/presets";
+import { normalizePanelCode } from "@/lib/panelCode";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +30,8 @@ export async function POST(request: Request) {
   try {
     const panel = await store().createPanel({
       name,
-      code: String(body.code ?? "").trim().toUpperCase() || await store().generatePanelCode(),
-      room: String(body.room ?? "").trim().slice(0, 60) || null,
+      code: normalizePanelCode(body.code) || (await store().generatePanelCode()),
+      division: resolveDivision(body.division),
       judges: parseJudges(body.judges),
       sort_order: Number(body.sortOrder) || 0,
       slot_minutes: clamp(body.slotMinutes, 3, 120, 12),
@@ -57,8 +59,8 @@ export async function PATCH(request: Request) {
 
   const patch: Partial<Panel> = {};
   if ("name" in body) patch.name = String(body.name).trim().slice(0, 80);
-  if ("code" in body) patch.code = String(body.code).trim().toUpperCase();
-  if ("room" in body) patch.room = String(body.room ?? "").trim().slice(0, 60) || null;
+  if ("code" in body) patch.code = normalizePanelCode(body.code);
+  if ("division" in body) patch.division = resolveDivision(body.division);
   if ("judges" in body) patch.judges = parseJudges(body.judges);
   if ("sortOrder" in body) patch.sort_order = Number(body.sortOrder) || 0;
   if ("slotMinutes" in body) patch.slot_minutes = clamp(body.slotMinutes, 3, 120, 12);
@@ -79,6 +81,17 @@ export async function PATCH(request: Request) {
   }
 }
 
+/** Create any preset panel from config/event.json that does not exist yet. */
+export async function PUT() {
+  const session = await getSession();
+  if (!canAdminister(session)) {
+    return NextResponse.json({ error: "Judge Advisor access required." }, { status: 403 });
+  }
+
+  const created = await store().seedPresetPanels();
+  return NextResponse.json({ created, panels: await store().listPanels() });
+}
+
 export async function DELETE(request: Request) {
   const session = await getSession();
   if (!canAdminister(session)) {
@@ -91,6 +104,16 @@ export async function DELETE(request: Request) {
   // Teams and requests fall back to no panel rather than vanishing.
   await store().deletePanel(id);
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * Fall back to the first configured division rather than accepting a
+ * free-text one: a typo would strand the panel where no team can reach it.
+ */
+function resolveDivision(input: unknown): string {
+  const wanted = String(input ?? "").trim();
+  const divisions = presetDivisions();
+  return divisions.includes(wanted) ? wanted : divisions[0];
 }
 
 function parseJudges(input: unknown): string[] {

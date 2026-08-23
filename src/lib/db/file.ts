@@ -11,8 +11,9 @@ import { dirname, resolve } from "node:path";
 import type { ActivityRow, Note, Panel, RequestRow, Team } from "../types";
 import type { Status } from "../status";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
+import { normalizePanelCode, randomPanelCode } from "../panelCode";
+import { DEFAULT_DIVISION, presetPanels } from "../presets";
 import {
-  randomPanelCode,
   StoreError,
   type ImportedTeam,
   type NewActivity,
@@ -132,8 +133,15 @@ function load(): Data {
  * the roster, so coerce on the way in.
  */
 function migrate(data: Data): Data {
+  const fallback = data.panels[0]?.division ?? DEFAULT_DIVISION;
+
   for (const team of data.teams) {
     if (typeof team.number !== "string") team.number = normalizeTeamNumber(team.number);
+    // Divisions arrived after the first rosters did.
+    if (!team.division) team.division = fallback;
+  }
+  for (const panel of data.panels) {
+    if (!panel.division) panel.division = fallback;
   }
   return data;
 }
@@ -364,12 +372,19 @@ function upsertTeams(rows: ImportedTeam[]): number {
     if (existing) {
       existing.name = row.name;
       existing.pit = row.pit;
+      // A team that changes division loses its panel: the old one is on
+      // the far side of the wall.
+      if (row.division && row.division !== existing.division) {
+        existing.division = row.division;
+        existing.panel_id = null;
+      }
     } else {
       state().teams.push({
         id: randomUUID(),
         number: row.number,
         name: row.name,
         panel_id: null,
+        division: row.division,
         pit: row.pit,
         created_at: now,
       });
@@ -399,11 +414,20 @@ function deleteTeam(id: string): void {
  * and never exceeding perPanel. Existing assignments are counted so a
  * mid-event top-up stays balanced.
  */
-function autoAssignTeams(perPanel: number, includeAssigned = false): number {
-  const panels = listPanels();
-  if (!panels.length) throw new StoreError("Add at least one judge panel first.", 400);
+function autoAssignTeams(perPanel: number, includeAssigned = false, division?: string): number {
+  const panels = listPanels().filter((p) => !division || p.division === division);
+  if (!panels.length) {
+    throw new StoreError(
+      division
+        ? `No judge panels in ${division} yet. Add one first.`
+        : "Add at least one judge panel first.",
+      400,
+    );
+  }
 
-  const pending = listTeams().filter((t) => includeAssigned || !t.panel_id);
+  const pending = listTeams().filter(
+    (t) => (includeAssigned || !t.panel_id) && (!division || t.division === division),
+  );
   if (!pending.length) return 0;
 
   const load = new Map<string, number>(panels.map((p) => [p.id, 0]));
@@ -415,11 +439,13 @@ function autoAssignTeams(perPanel: number, includeAssigned = false): number {
 
   let assigned = 0;
   for (const team of pending) {
-    const target = panels
+    // The hard wall: only panels in this team's own division are eligible.
+    const eligible = panels.filter((p) => p.division === team.division);
+    const target = eligible
       .map((p) => ({ id: p.id, count: load.get(p.id) ?? 0 }))
       .filter((p) => p.count < perPanel)
       .sort((a, b) => a.count - b.count)[0];
-    if (!target) break; // every panel is full
+    if (!target) continue; // no room left in this team's division
 
     load.set(target.id, target.count + 1);
     const row = state().teams.find((t) => t.id === team.id)!;
@@ -436,7 +462,7 @@ function autoAssignTeams(perPanel: number, includeAssigned = false): number {
  * ------------------------------------------------------------------ */
 
 function createPanel(input: Omit<Panel, "id" | "created_at">): Panel {
-  if (state().panels.some((p) => p.code.toUpperCase() === input.code.toUpperCase())) {
+  if (state().panels.some((p) => p.code.toUpperCase() === normalizePanelCode(input.code))) {
     throw new StoreError("That panel code is already in use.", 409);
   }
   const panel: Panel = { ...input, id: randomUUID(), created_at: new Date().toISOString() };
@@ -448,6 +474,13 @@ function createPanel(input: Omit<Panel, "id" | "created_at">): Panel {
 function updatePanel(id: string, patch: Partial<Panel>): Panel {
   const panel = state().panels.find((p) => p.id === id);
   if (!panel) throw new StoreError("That panel no longer exists.", 404);
+
+  // Moving a panel across the wall cannot drag its teams with it — those
+  // teams belong to the division they compete in. They are released so
+  // another panel in that division can pick them up.
+  if (patch.division && patch.division !== panel.division) {
+    for (const t of state().teams) if (t.panel_id === id) t.panel_id = null;
+  }
 
   if (patch.code && state().panels.some((p) => p.id !== id && p.code.toUpperCase() === patch.code!.toUpperCase())) {
     throw new StoreError("That panel code is already in use.", 409);
@@ -464,6 +497,29 @@ function deletePanel(id: string): void {
   for (const t of state().teams) if (t.panel_id === id) t.panel_id = null;
   for (const r of state().requests) if (r.panel_id === id) r.panel_id = null;
   save();
+}
+
+/** Create any preset panel whose code is not already taken. */
+function seedPresetPanels(): number {
+  let created = 0;
+  for (const preset of presetPanels()) {
+    if (state().panels.some((p) => p.code.toUpperCase() === preset.code)) continue;
+    state().panels.push({
+      id: randomUUID(),
+      name: preset.name,
+      code: preset.code,
+      division: preset.division,
+      judges: preset.judges,
+      sort_order: state().panels.length + 1,
+      slot_start_at: null,
+      slot_minutes: 12,
+      slot_count: 0,
+      created_at: new Date().toISOString(),
+    });
+    created++;
+  }
+  if (created) save();
+  return created;
 }
 
 function generatePanelCode(): string {
@@ -538,17 +594,18 @@ function demoData(): Data {
   const now = Date.now();
   const iso = (offsetMinutes: number) => new Date(now + offsetMinutes * 60_000).toISOString();
 
+  // Two divisions, so the demo exercises the wall rather than hiding it.
   const panelNames: [string, string, string, string[]][] = [
-    ["Panel A", "ALPHA1", "Room 101", ["Dana Ruiz", "Sam Okafor", "Priya Nair"]],
-    ["Panel B", "BRAVO2", "Room 102", ["Chris Lin", "Morgan Bell"]],
-    ["Panel C", "CHARLIE3", "Room 103", ["Alex Tran", "Jamie Fox", "Rae Mensah"]],
+    ["Panel A", "ALPHA1", "Division 1", ["Dana Ruiz", "Sam Okafor", "Priya Nair"]],
+    ["Panel B", "BRAVO2", "Division 1", ["Chris Lin", "Morgan Bell"]],
+    ["Panel C", "CHARLIE3", "Division 2", ["Alex Tran", "Jamie Fox", "Rae Mensah"]],
   ];
 
-  const panels: Panel[] = panelNames.map(([name, code, room, judges], i) => ({
+  const panels: Panel[] = panelNames.map(([name, code, division, judges], i) => ({
     id: randomUUID(),
     name,
     code,
-    room,
+    division,
     judges,
     sort_order: i + 1,
     slot_start_at: i < 2 ? iso(30) : null,
@@ -575,6 +632,7 @@ function demoData(): Data {
     number: `${1101 + i * 7}${suffixes[i % suffixes.length]}`,
     name,
     panel_id: panels[i % panels.length].id,
+    division: panels[i % panels.length].division,
     pit: `Pit ${i + 1}`,
     created_at: iso(0),
   }));
@@ -667,10 +725,11 @@ export const fileStore: Store = {
   upsertTeams: async (rows) => upsertTeams(rows),
   updateTeam: async (id, patch) => updateTeam(id, patch),
   deleteTeam: async (id) => deleteTeam(id),
-  autoAssignTeams: async (perPanel, includeAssigned) =>
-    autoAssignTeams(perPanel, includeAssigned),
+  autoAssignTeams: async (perPanel, includeAssigned, division) =>
+    autoAssignTeams(perPanel, includeAssigned, division),
 
   createPanel: async (input) => createPanel(input),
+  seedPresetPanels: async () => seedPresetPanels(),
   updatePanel: async (id, patch) => updatePanel(id, patch),
   deletePanel: async (id) => deletePanel(id),
   generatePanelCode: async () => generatePanelCode(),

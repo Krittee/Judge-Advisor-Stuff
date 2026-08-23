@@ -124,13 +124,16 @@ the database did not connect. Go back to Step 3, then redeploy: **Deployments**
 
 All in the browser, at `your-address.vercel.app/admin`:
 
-1. **Panels tab** — add each judge group. Each gets a **code**; write it down
-   and hand it to that group.
+1. **Panels tab** — click **Add preset panels**, then fill in each group's
+   judge names. Each panel has a **code** and a **division**; write the codes
+   down and hand each one to that group.
 2. **Import tab** — paste your team list, one per line:
    ```
    1234, Iron Hawks, Pit 12
    9882K, Kilo Kestrels, Pit 13
    ```
+   Pick which **division** the paste goes into above the box. Running two
+   divisions? Import each one separately.
    Team numbers can include letters, like `9882K`.
    Copy straight out of Excel or Google Sheets. Tick **spread across panels**
    to share teams out evenly.

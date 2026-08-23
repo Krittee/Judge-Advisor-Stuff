@@ -1,0 +1,19 @@
+{
+  "_comment": [
+    "Preset judge panels, used the FIRST time the app starts with an empty roster.",
+    "After that, the admin console is the source of truth — edit panels there, not here.",
+    "Each panel's `code` is what its judges type at /login. Keep them easy to read",
+    "aloud: no 0/O or 1/I. Change these before your event; they are public in this repo."
+  ],
+
+  "divisions": ["Division 1", "Division 2"],
+
+  "panels": [
+    { "name": "Panel A", "division": "Division 1", "code": "REDCAT", "judges": ["", "", ""] },
+    { "name": "Panel B", "division": "Division 1", "code": "BLUEFOX", "judges": ["", "", ""] },
+    { "name": "Panel C", "division": "Division 1", "code": "GOLDELK", "judges": ["", "", ""] },
+    { "name": "Panel D", "division": "Division 2", "code": "GREENOWL", "judges": ["", "", ""] },
+    { "name": "Panel E", "division": "Division 2", "code": "GREYHAWK", "judges": ["", "", ""] },
+    { "name": "Panel F", "division": "Division 2", "code": "TEALWOLF", "judges": ["", "", ""] }
+  ]
+}

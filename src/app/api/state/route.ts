@@ -11,13 +11,16 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request) {
   try {
-    // Signed-in staff see the notes teams leave; the public payload omits them.
+    // What comes back is scoped to the caller: see loadState.
     const session = await getSession();
-    const state = await loadState(session !== null);
+    const state = await loadState(session);
 
     // serverTime changes every call, so hash everything else.
     const { serverTime: _t, ...stable } = state;
-    const etag = `W/"${session ? "s" : "p"}${hash(JSON.stringify(stable))}"`;
+    // Namespaced by audience so two different payload shapes can never
+    // share a cache entry.
+    const audience = session?.role === "judge" ? `j${session.panelId}` : (session?.role ?? "p");
+    const etag = `W/"${audience}${hash(JSON.stringify(stable))}"`;
 
     if (request.headers.get("if-none-match") === etag) {
       return new NextResponse(null, { status: 304, headers: { ETag: etag } });

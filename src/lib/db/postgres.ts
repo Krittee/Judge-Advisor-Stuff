@@ -1,8 +1,9 @@
 import { Pool } from "pg";
 import type { ActivityRow, Note, Panel, RequestRow, Team } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
+import { normalizePanelCode, randomPanelCode } from "../panelCode";
+import { DEFAULT_DIVISION, presetPanels } from "../presets";
 import {
-  randomPanelCode,
   StoreError,
   type ImportedTeam,
   type NewActivity,
@@ -95,7 +96,7 @@ async function migrate(): Promise<void> {
       id            uuid primary key default gen_random_uuid(),
       name          text not null,
       code          text not null unique,
-      room          text,
+      division      text not null default 'Division 1',
       judges        text[] not null default '{}',
       sort_order    int not null default 0,
       slot_start_at timestamptz,
@@ -109,6 +110,7 @@ async function migrate(): Promise<void> {
       number     text not null unique,
       name       text not null,
       panel_id   uuid references panels(id) on delete set null,
+      division   text not null default 'Division 1',
       pit        text,
       created_at timestamptz not null default now()
     );
@@ -171,20 +173,26 @@ async function migrate(): Promise<void> {
       where kind = 'slot' and status <> 'cancelled';
   `);
 
-  // Team numbers were an int column before identifiers like "9882K" had
-  // to work. Widening in place keeps an already-deployed roster intact.
+  // Schema changes that an already-deployed event may not have yet.
+  // Each is guarded so re-running is free and no roster is ever lost.
   await db().query(`
     do $$
     begin
+      -- Team numbers were an int before identifiers like "9882K" had to work.
       if exists (
         select 1 from information_schema.columns
-        where table_schema = 'public'
-          and table_name = 'teams'
-          and column_name = 'number'
-          and data_type <> 'text'
+        where table_schema = 'public' and table_name = 'teams'
+          and column_name = 'number' and data_type <> 'text'
       ) then
         alter table teams alter column number type text using number::text;
       end if;
+
+      -- Divisions arrived after the first rosters did.
+      alter table panels add column if not exists division text not null default 'Division 1';
+      alter table teams  add column if not exists division text not null default 'Division 1';
+
+      -- Panels used to carry a room, which turned out not to be wanted.
+      alter table panels drop column if exists room;
     end $$;
   `);
 }
@@ -286,6 +294,21 @@ export const postgresStore: Store = {
     );
   },
 
+  async seedPresetPanels() {
+    const existing = new Set((await this.listPanels()).map((p) => p.code.toUpperCase()));
+    let created = 0;
+    for (const preset of presetPanels()) {
+      if (existing.has(preset.code)) continue;
+      await query(
+        `insert into panels (name, code, division, judges, sort_order)
+         values ($1, $2, $3, $4, $5)
+         on conflict (code) do nothing`,
+        [preset.name, preset.code, preset.division, preset.judges, ++created],
+      );
+    }
+    return created;
+  },
+
   async findTeamByNumber(number) {
     return one(
       await query<Team>("select * from teams where number = $1", [normalizeTeamNumber(number)]),
@@ -348,10 +371,24 @@ export const postgresStore: Store = {
   async upsertTeams(list: ImportedTeam[]) {
     if (!list.length) return 0;
     await query(
-      `insert into teams (number, name, pit)
-       select * from unnest($1::text[], $2::text[], $3::text[])
-       on conflict (number) do update set name = excluded.name, pit = excluded.pit`,
-      [list.map((t) => t.number), list.map((t) => t.name), list.map((t) => t.pit)],
+      `insert into teams (number, name, pit, division)
+       select * from unnest($1::text[], $2::text[], $3::text[], $4::text[])
+       on conflict (number) do update set
+         name = excluded.name,
+         pit = excluded.pit,
+         division = excluded.division,
+         -- A team that changes division loses its panel: the old one is
+         -- on the far side of the wall.
+         panel_id = case
+           when teams.division is distinct from excluded.division then null
+           else teams.panel_id
+         end`,
+      [
+        list.map((t) => t.number),
+        list.map((t) => t.name),
+        list.map((t) => t.pit),
+        list.map((t) => t.division),
+      ],
     );
     return list.length;
   },
@@ -384,12 +421,21 @@ export const postgresStore: Store = {
    * never exceeding perPanel. Existing assignments are counted so a
    * mid-event top-up stays balanced.
    */
-  async autoAssignTeams(perPanel, includeAssigned = false) {
-    const panels = await this.listPanels();
-    if (!panels.length) throw new StoreError("Add at least one judge panel first.", 400);
+  async autoAssignTeams(perPanel, includeAssigned = false, division?: string) {
+    const panels = (await this.listPanels()).filter((p) => !division || p.division === division);
+    if (!panels.length) {
+      throw new StoreError(
+        division
+          ? `No judge panels in ${division} yet. Add one first.`
+          : "Add at least one judge panel first.",
+        400,
+      );
+    }
 
     const teams = await this.listTeams();
-    const pending = teams.filter((t) => includeAssigned || !t.panel_id);
+    const pending = teams.filter(
+      (t) => (includeAssigned || !t.panel_id) && (!division || t.division === division),
+    );
     if (!pending.length) return 0;
 
     const load = new Map<string, number>(panels.map((p) => [p.id, 0]));
@@ -401,11 +447,13 @@ export const postgresStore: Store = {
 
     const assignments: { teamId: string; panelId: string }[] = [];
     for (const team of pending) {
-      const target = panels
+      // The hard wall: only panels in this team's own division are eligible.
+      const eligible = panels.filter((p) => p.division === team.division);
+      const target = eligible
         .map((p) => ({ id: p.id, count: load.get(p.id) ?? 0 }))
         .filter((p) => p.count < perPanel)
         .sort((a, b) => a.count - b.count)[0];
-      if (!target) break; // every panel is full
+      if (!target) continue; // no room left in this team's division
 
       load.set(target.id, target.count + 1);
       assignments.push({ teamId: team.id, panelId: target.id });
@@ -422,18 +470,19 @@ export const postgresStore: Store = {
     return assignments.length;
   },
 
+
   async createPanel(input) {
     try {
       return one(
         await query<Panel>(
           `insert into panels
-             (name, code, room, judges, sort_order, slot_start_at, slot_minutes, slot_count)
+             (name, code, division, judges, sort_order, slot_start_at, slot_minutes, slot_count)
            values ($1, $2, $3, $4, $5, $6, $7, $8)
            returning *`,
           [
             input.name,
             input.code,
-            input.room,
+            input.division,
             input.judges,
             input.sort_order,
             input.slot_start_at,
@@ -448,6 +497,16 @@ export const postgresStore: Store = {
   },
 
   async updatePanel(id, patch) {
+    // Moving a panel across the wall cannot drag its teams with it — those
+    // teams belong to the division they compete in, so they are released
+    // for another panel in that division to pick up.
+    if (patch.division) {
+      await query(
+        "update teams set panel_id = null where panel_id = $1 and $2 <> (select division from panels where id = $1)",
+        [id, patch.division],
+      );
+    }
+
     const columns = Object.keys(patch);
     if (!columns.length) {
       const current = one(await query<Panel>("select * from panels where id = $1", [id]));

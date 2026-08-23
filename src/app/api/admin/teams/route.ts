@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { canAdminister, getSession } from "@/lib/auth";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
+import { presetDivisions } from "@/lib/presets";
 import { store, StoreError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-type ParsedTeam = { number: string; name: string; pit: string | null };
+type ParsedTeam = { number: string; name: string; pit: string | null; division: string };
 
 /**
  * Bulk import. Accepts pasted CSV or TSV, with or without a header row:
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   const autoAssign = Boolean(body.autoAssign);
   const perPanel = clampPerPanel(body.perPanel);
 
-  const { teams, skipped } = parseTeams(text);
+  const { teams, skipped } = parseTeams(text, resolveDivision(body.division));
   if (!teams.length) {
     return NextResponse.json(
       { error: "No team rows found. Use one team per line: number, name" },
@@ -55,7 +56,11 @@ export async function PATCH(request: Request) {
 
   try {
     if (body.action === "autoAssign") {
-      const assigned = await store().autoAssignTeams(clampPerPanel(body.perPanel), Boolean(body.includeAssigned));
+      const assigned = await store().autoAssignTeams(
+        clampPerPanel(body.perPanel),
+        Boolean(body.includeAssigned),
+        body.division ? resolveDivision(body.division) : undefined,
+      );
       return NextResponse.json({ assigned });
     }
 
@@ -76,6 +81,12 @@ export async function PATCH(request: Request) {
 
     const patch: Record<string, unknown> = {};
     if ("panelId" in body) patch.panel_id = body.panelId ? String(body.panelId) : null;
+    if ("division" in body) {
+      patch.division = resolveDivision(body.division);
+      // Changing division puts the team on the far side of the wall from
+      // whichever panel held it.
+      patch.panel_id = null;
+    }
     if ("pit" in body) patch.pit = body.pit ? String(body.pit).slice(0, 60) : null;
     if ("name" in body) patch.name = String(body.name).slice(0, 120);
 
@@ -105,7 +116,20 @@ function clampPerPanel(value: unknown): number {
   return Math.max(1, Math.min(40, Number(value) || 10));
 }
 
-function parseTeams(text: string): { teams: ParsedTeam[]; skipped: number } {
+function resolveDivision(input: unknown): string {
+  const wanted = String(input ?? "").trim();
+  const divisions = presetDivisions();
+  return divisions.includes(wanted) ? wanted : divisions[0];
+}
+
+/**
+ * @param fallbackDivision used for any row that does not name one in a
+ *        fourth column, so a whole paste can go into one division.
+ */
+function parseTeams(
+  text: string,
+  fallbackDivision: string,
+): { teams: ParsedTeam[]; skipped: number } {
   const seen = new Map<string, ParsedTeam>();
   let skipped = 0;
 
@@ -128,6 +152,7 @@ function parseTeams(text: string): { teams: ParsedTeam[]; skipped: number } {
       number,
       name: cells[1] || `Team ${number}`,
       pit: cells[2] || null,
+      division: cells[3] ? resolveDivision(cells[3]) : fallbackDivision,
     });
   }
 

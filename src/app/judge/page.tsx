@@ -128,7 +128,7 @@ export default function JudgePage() {
     <>
       <TopBar
         title="Judge Queue"
-        subtitle={panel ? `${panel.name}${panel.room ? ` · ${panel.room}` : ""}` : undefined}
+        subtitle={panel ? `${panel.name} · ${panel.division}` : undefined}
         online={online}
         right={<SignOutButton />}
       />
