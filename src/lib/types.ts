@@ -56,6 +56,19 @@ export type Note = {
   created_at: string;
 };
 
+export type ScoreRow = {
+  id: string;
+  team_id: string;
+  rubric_id: string;
+  /** criterion id -> points awarded. Missing means not yet scored. */
+  values: Record<string, number>;
+  /** Denormalised so ranking never has to re-add every row. */
+  total: number;
+  scored_by: string;
+  panel_id: string | null;
+  updated_at: string;
+};
+
 export type ActivityRow = {
   id: string;
   request_id: string | null;

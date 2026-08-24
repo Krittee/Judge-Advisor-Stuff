@@ -1,4 +1,4 @@
-import type { ActivityRow, Note, Panel, RequestRow, Team } from "../types";
+import type { ActivityRow, Note, Panel, RequestRow, ScoreRow, Team } from "../types";
 
 /** Thrown for rule violations we want to show the user verbatim. */
 export class StoreError extends Error {
@@ -26,6 +26,18 @@ export type NewNote = {
   panelId: string | null;
   author: string;
   body: string;
+};
+
+export type SaveScore = {
+  teamId: string;
+  rubricId: string;
+  criterionId: string;
+  /** null clears the criterion back to unscored. */
+  value: number | null;
+  scoredBy: string;
+  panelId: string | null;
+  /** Recomputes the stored total from the merged values. */
+  totalOf: (values: Record<string, number>) => number;
 };
 
 export type NewActivity = {
@@ -84,6 +96,10 @@ export type Store = {
   generatePanelCode(): Promise<string>;
 
   createNote(input: NewNote): Promise<Note>;
+
+  listScores(teamId?: string): Promise<ScoreRow[]>;
+  /** Set one criterion. Creates the row on first score. */
+  saveScore(input: SaveScore): Promise<ScoreRow>;
   logActivity(entry: NewActivity): Promise<void>;
 
   resetDay(): Promise<void>;

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui";
 import type { Session } from "@/lib/auth";
 import { NotesDrawer, SignOutButton } from "@/components/judging";
+import { Rankings } from "@/components/Rankings";
 import type { RequestRow, Team } from "@/lib/types";
 
 /**
@@ -29,6 +30,7 @@ export default function JudgePage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notesFor, setNotesFor] = useState<Team | null>(null);
+  const [view, setView] = useState<"queue" | "scores">("queue");
 
   useEffect(() => {
     call<{ session: Session | null }>("/api/session", { method: "GET" })
@@ -158,20 +160,43 @@ export default function JudgePage() {
           ) : null}
         </div>
 
+        <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/5 p-1">
+          {(
+            [
+              ["queue", "Queue"],
+              ["scores", "Scores"],
+            ] as ["queue" | "scores", string][]
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setView(id)}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                view === id ? "bg-indigo-500 text-white" : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {error ? (
           <Banner kind="error" onDismiss={() => setError(null)}>
             {error}
           </Banner>
         ) : null}
 
-        {!myTeams.length ? (
+        {view === "scores" ? (
+          <Rankings teams={myTeams} onOpenTeam={setNotesFor} />
+        ) : null}
+
+        {view === "queue" && !myTeams.length ? (
           <Banner kind="info">
             No teams are assigned to this panel yet. The Judge Advisor assigns them from the admin
             console.
           </Banner>
         ) : null}
 
-        <ul className="space-y-3">
+        <ul className={`space-y-3 ${view === "queue" ? "" : "hidden"}`}>
           {cards.map(({ team, request }) => (
             <li
               key={team.id}

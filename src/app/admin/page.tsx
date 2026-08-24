@@ -16,11 +16,12 @@ import {
   TopBar,
 } from "@/components/ui";
 import { NotesDrawer, SignOutButton } from "@/components/judging";
+import { Rankings } from "@/components/Rankings";
 import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
 import type { ActivityRow, Panel, RequestRow, Team } from "@/lib/types";
 
-type Tab = "floor" | "teams" | "panels" | "import" | "log";
+type Tab = "floor" | "scores" | "teams" | "panels" | "import" | "log";
 
 /** The Judge Advisor's console: every panel at once, and the tools to unstick it. */
 export default function AdminPage() {
@@ -49,6 +50,7 @@ export default function AdminPage() {
 
   const tabs: [Tab, string][] = [
     ["floor", "Floor"],
+    ["scores", "Scores"],
     ["teams", "Teams"],
     ["panels", "Panels"],
     ["import", "Import"],
@@ -93,6 +95,13 @@ export default function AdminPage() {
 
         {tab === "floor" ? (
           <FloorTab state={state} refresh={refresh} onError={setError} onNotes={setNotesFor} />
+        ) : null}
+        {tab === "scores" ? (
+          <Rankings
+            teams={state.teams}
+            panelName={Object.fromEntries(state.panels.map((p) => [p.id, p.name]))}
+            onOpenTeam={setNotesFor}
+          />
         ) : null}
         {tab === "teams" ? <TeamsTab state={state} refresh={refresh} onError={setError} /> : null}
         {tab === "panels" ? (

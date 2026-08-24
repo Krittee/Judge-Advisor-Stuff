@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { ActivityRow, Note, Panel, RequestRow, Team } from "../types";
+import type { ActivityRow, Note, Panel, RequestRow, ScoreRow, Team } from "../types";
 import type { Status } from "../status";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
@@ -19,6 +19,7 @@ import {
   type NewActivity,
   type NewNote,
   type NewRequest,
+  type SaveScore,
   type Store,
 } from "./types";
 
@@ -46,6 +47,7 @@ type Data = {
   teams: Team[];
   requests: RequestRow[];
   notes: Note[];
+  scores: ScoreRow[];
   activity: ActivityRow[];
 };
 
@@ -77,7 +79,7 @@ function state(): Data {
 }
 
 function empty(): Data {
-  return { panels: [], teams: [], requests: [], notes: [], activity: [] };
+  return { panels: [], teams: [], requests: [], notes: [], scores: [], activity: [] };
 }
 
 function load(): Data {
@@ -133,6 +135,7 @@ function load(): Data {
  * the roster, so coerce on the way in.
  */
 function migrate(data: Data): Data {
+  data.scores ??= [];
   const fallback = data.panels[0]?.division ?? DEFAULT_DIVISION;
 
   for (const team of data.teams) {
@@ -410,6 +413,7 @@ function deleteTeam(id: string): void {
   state().teams = state().teams.filter((t) => t.id !== id);
   state().requests = state().requests.filter((r) => r.team_id !== id);
   state().notes = state().notes.filter((n) => n.team_id !== id);
+  state().scores = state().scores.filter((s) => s.team_id !== id);
   save();
 }
 
@@ -571,6 +575,48 @@ function createNote(input: NewNote): Note {
   return note;
 }
 
+function listScores(teamId?: string): ScoreRow[] {
+  return state().scores.filter((s) => !teamId || s.team_id === teamId);
+}
+
+/**
+ * Record one criterion.
+ *
+ * Scores accumulate criterion by criterion as the judges work down the
+ * sheet, so this merges rather than replaces — two judges filling in
+ * different rows of the same rubric must not overwrite each other.
+ */
+function saveScore(input: SaveScore): ScoreRow {
+  let row = state().scores.find(
+    (s) => s.team_id === input.teamId && s.rubric_id === input.rubricId,
+  );
+
+  if (!row) {
+    row = {
+      id: randomUUID(),
+      team_id: input.teamId,
+      rubric_id: input.rubricId,
+      values: {},
+      total: 0,
+      scored_by: input.scoredBy,
+      panel_id: input.panelId,
+      updated_at: new Date().toISOString(),
+    };
+    state().scores.push(row);
+  }
+
+  if (input.value === null) delete row.values[input.criterionId];
+  else row.values[input.criterionId] = input.value;
+
+  row.total = input.totalOf(row.values);
+  row.scored_by = input.scoredBy;
+  row.panel_id = input.panelId ?? row.panel_id;
+  row.updated_at = new Date().toISOString();
+
+  save();
+  return row;
+}
+
 function logActivity(entry: NewActivity): void {
   state().activity.push({
     id: randomUUID(),
@@ -596,6 +642,7 @@ function logActivity(entry: NewActivity): void {
 function resetDay(): void {
   state().requests = [];
   state().notes = [];
+  state().scores = [];
   state().activity = [];
   save();
 }
@@ -717,7 +764,7 @@ function demoData(): Data {
     ),
   ];
 
-  return { panels, teams, requests, notes: [], activity: [] };
+  return { panels, teams, requests, notes: [], scores: [], activity: [] };
 }
 
 /* ------------------------------------------------------------------ *
@@ -760,6 +807,9 @@ export const fileStore: Store = {
   generatePanelCode: async () => generatePanelCode(),
 
   createNote: async (input) => createNote(input),
+
+  listScores: async (teamId) => listScores(teamId),
+  saveScore: async (input) => saveScore(input),
   logActivity: async (entry) => logActivity(entry),
 
   resetDay: async () => resetDay(),

@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import type { ActivityRow, Note, Panel, RequestRow, Team } from "../types";
+import type { ActivityRow, Note, Panel, RequestRow, ScoreRow, Team } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
 import { DEFAULT_DIVISION, presetPanels } from "../presets";
@@ -9,6 +9,7 @@ import {
   type NewActivity,
   type NewNote,
   type NewRequest,
+  type SaveScore,
   type Store,
 } from "./types";
 
@@ -173,6 +174,18 @@ async function migrate(): Promise<void> {
       created_at timestamptz not null default now()
     );
 
+    create table if not exists scores (
+      id         uuid primary key default gen_random_uuid(),
+      team_id    uuid not null references teams(id) on delete cascade,
+      rubric_id  text not null,
+      values     jsonb not null default '{}'::jsonb,
+      total      int not null default 0,
+      scored_by  text not null,
+      panel_id   uuid references panels(id) on delete set null,
+      updated_at timestamptz not null default now(),
+      unique (team_id, rubric_id)
+    );
+
     create table if not exists activity (
       id         uuid primary key default gen_random_uuid(),
       request_id uuid references requests(id) on delete cascade,
@@ -187,6 +200,7 @@ async function migrate(): Promise<void> {
     create index if not exists requests_team_idx  on requests (team_id);
     create index if not exists requests_panel_idx on requests (panel_id);
     create index if not exists notes_team_idx     on notes (team_id);
+    create index if not exists scores_team_idx    on scores (team_id);
     create index if not exists activity_created_idx on activity (created_at desc);
 
     -- The two rules that keep the board honest. Enforced here so they
@@ -601,6 +615,53 @@ export const postgresStore: Store = {
     )!;
   },
 
+  async listScores(teamId) {
+    return rows(
+      teamId
+        ? await query<ScoreRow>("select * from scores where team_id = $1", [teamId])
+        : await query<ScoreRow>("select * from scores"),
+    );
+  },
+
+  /**
+   * Record one criterion.
+   *
+   * Merging happens inside the statement — scores accumulate row by row
+   * as judges work down the sheet, and two judges filling in different
+   * criteria of the same rubric must not overwrite each other. Doing it
+   * in SQL keeps that true without a read-modify-write race.
+   */
+  async saveScore(input: SaveScore) {
+    const patch =
+      input.value === null ? null : JSON.stringify({ [input.criterionId]: input.value });
+
+    const merged = one(
+      await query<ScoreRow>(
+        `insert into scores (team_id, rubric_id, values, total, scored_by, panel_id)
+         values ($1, $2, coalesce($3::jsonb, '{}'::jsonb), 0, $4, $5)
+         on conflict (team_id, rubric_id) do update set
+           values = case
+             when $3::jsonb is null then scores.values - $6::text
+             else scores.values || $3::jsonb
+           end,
+           scored_by = excluded.scored_by,
+           panel_id = coalesce(excluded.panel_id, scores.panel_id),
+           updated_at = now()
+         returning *`,
+        [input.teamId, input.rubricId, patch, input.scoredBy, input.panelId, input.criterionId],
+      ),
+    )!;
+
+    // The total depends on the rubric's scale, which SQL has no view of.
+    const total = input.totalOf(merged.values ?? {});
+    return one(
+      await query<ScoreRow>("update scores set total = $2 where id = $1 returning *", [
+        merged.id,
+        total,
+      ]),
+    )!;
+  },
+
   async logActivity(entry: NewActivity) {
     // The log is a convenience, not a record of account. Never let a
     // failed audit write break the thing the user actually asked for.
@@ -622,10 +683,10 @@ export const postgresStore: Store = {
   },
 
   async resetDay() {
-    await query("truncate activity, notes, requests");
+    await query("truncate activity, notes, scores, requests");
   },
 
   async resetAll() {
-    await query("truncate activity, notes, requests, teams, panels cascade");
+    await query("truncate activity, notes, scores, requests, teams, panels cascade");
   },
 };

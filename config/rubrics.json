@@ -1,0 +1,87 @@
+{
+  "_comment": [
+    "Scoring rubrics. Topics only — the judges keep the full rubric sheet in front",
+    "of them; this is where the points land.",
+    "",
+    "Team Interview below is taken exactly from the official Team Interview Rubric",
+    "v2.0: six criteria, 0-2 points each, 12 total.",
+    "",
+    "!! ENGINEERING NOTEBOOK IS A PLACEHOLDER !!",
+    "The notebook PDF supplied was the blank Digital Notebook Template teams fill",
+    "in, not a scoring rubric, so these topics are a stand-in. Replace the criteria",
+    "below with the ones on your real notebook rubric and reload the page — nothing",
+    "else needs changing. Delete \"placeholder\": true once you have."
+  ],
+
+  "scale": [
+    { "value": 0, "label": "Not Yet", "short": "0" },
+    { "value": 1, "label": "Yes", "short": "1" },
+    { "value": 2, "label": "Yes, with specifics", "short": "2" }
+  ],
+
+  "bands": [
+    { "id": "top", "label": "Top", "minPercent": 85, "color": "emerald" },
+    { "id": "strong", "label": "Strong", "minPercent": 70, "color": "sky" },
+    { "id": "middle", "label": "Middle", "minPercent": 50, "color": "amber" },
+    { "id": "developing", "label": "Developing", "minPercent": 0, "color": "zinc" }
+  ],
+
+  "rubrics": [
+    {
+      "id": "notebook",
+      "name": "Engineering Notebook",
+      "placeholder": true,
+      "sections": [
+        {
+          "name": "Design Process",
+          "criteria": [
+            "Problem is identified and understood",
+            "Alternatives were considered",
+            "Designs were built and tested",
+            "Results led to changes"
+          ]
+        },
+        {
+          "name": "Record Keeping",
+          "criteria": [
+            "Entries are dated and in order",
+            "Entries are the students' own work",
+            "Drawings and data support the writing"
+          ]
+        },
+        {
+          "name": "Team and Project Management",
+          "criteria": ["Roles and responsibilities are clear", "Time and resources were planned"]
+        }
+      ]
+    },
+
+    {
+      "id": "interview",
+      "name": "Team Interview",
+      "scale": [
+        { "value": 0, "label": "Not Yet Heard", "short": "0" },
+        { "value": 1, "label": "Heard", "short": "1" },
+        { "value": 2, "label": "Heard, with Specifics", "short": "2" }
+      ],
+      "sections": [
+        {
+          "name": "Explain Your Learning",
+          "criteria": [
+            "Students explain their own work",
+            "Students trace how they got there",
+            "Students show how they know it works"
+          ]
+        },
+        {
+          "name": "How You Worked with Others",
+          "criteria": [
+            "Students learned from and with each other",
+            "Decisions were made together",
+            "Outside ideas were made their own"
+          ]
+        }
+      ]
+    }
+  ]
+}

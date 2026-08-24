@@ -172,6 +172,39 @@ A team already in the walk-up queue simply cannot be added twice.
 
 ---
 
+## Scoring
+
+Two rubrics, each a tab on a team's card in the judge and Judge Advisor
+consoles: **Engineering Notebook** and **Team Interview**. Topics only — judges
+keep the printed rubric with its listen-fors in front of them, and this is only
+where the points land. Each tap saves immediately; tapping the chosen value
+again clears it.
+
+Points sum per rubric, then across both, and the combined total falls into a
+colour band shown on the **Scores** tab: ranked highest first, with unscored
+teams at the bottom and no colour at all — not-yet-judged is not the same as
+scoring badly.
+
+**Judges and the Judge Advisor only.** A judge sees and scores their own panel's
+teams; every other role gets `403`, matching the rubric's own line that judging
+materials do not leave the judging room.
+
+### Editing the rubrics
+
+[`config/rubrics.json`](config/rubrics.json) holds both, plus the scale and the
+colour bands. Team Interview is taken exactly from the official Team Interview
+Rubric v2.0: six criteria, 0–2 points each, 12 total.
+
+**The Engineering Notebook criteria are a placeholder.** Replace them with your
+real rubric's topics and reload — nothing else needs changing. The app flags
+them as a stand-in until you delete `"placeholder": true`.
+
+Criterion ids are derived from their text, so reordering the file is safe.
+Renaming a criterion detaches its existing scores, which is the honest outcome:
+it is no longer the same thing being measured.
+
+---
+
 ## Divisions
 
 Two divisions can run at once, and they are a **hard wall**:
