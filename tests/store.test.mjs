@@ -125,6 +125,14 @@ function makeStore(file) {
       for (const r of data.requests) if (r.panel_id === id) r.panel_id = null;
       save();
     },
+    deleteAllPanels() {
+      const removed = data.panels.length;
+      data.panels = [];
+      for (const t of data.teams) t.panel_id = null;
+      for (const r of data.requests) r.panel_id = null;
+      save();
+      return removed;
+    },
   };
 }
 
@@ -287,5 +295,50 @@ test("state survives a restart", () => {
     assert.equal(reopened.data.teams.length, 1);
     assert.equal(reopened.data.requests.length, 1);
     assert.equal(reopened.data.requests[0].status, "requested");
+  });
+});
+
+test("deleting all panels keeps the roster, unassigned", () => {
+  withStore((s) => {
+    const a = s.addPanel("A", "AAA");
+    const b = s.addPanel("B", "BBB");
+    const t1 = s.addTeam(1234, a.id);
+    const t2 = s.addTeam(5678, b.id);
+    s.createRequest({ teamId: t1.id, panelId: a.id });
+
+    const removed = s.deleteAllPanels();
+
+    assert.equal(removed, 2, "reports how many went");
+    assert.equal(s.data.panels.length, 0);
+    assert.equal(s.data.teams.length, 2, "the roster is expensive to rebuild — it must survive");
+    assert.equal(s.data.requests.length, 1, "interview history survives too");
+    assert.deepEqual(
+      s.data.teams.map((t) => t.panel_id),
+      [null, null],
+      "every team is released",
+    );
+    assert.equal(s.data.requests[0].panel_id, null);
+    assert.deepEqual(s.data.teams.map((t) => t.number), [String(t1.number), String(t2.number)]);
+  });
+});
+
+test("deleting all panels twice is harmless", () => {
+  withStore((s) => {
+    s.addPanel("A", "AAA");
+    assert.equal(s.deleteAllPanels(), 1);
+    assert.equal(s.deleteAllPanels(), 0, "nothing left to delete, and no error");
+  });
+});
+
+test("panels can be rebuilt and the surviving teams reassigned", () => {
+  withStore((s) => {
+    const a = s.addPanel("A", "AAA");
+    s.addTeam(1, a.id);
+    s.addTeam(2, a.id);
+    s.deleteAllPanels();
+
+    const fresh = s.addPanel("New", "NEW");
+    assert.equal(s.autoAssign(10), 2, "both released teams pick up the new panel");
+    assert.ok(s.data.teams.every((t) => t.panel_id === fresh.id));
   });
 });

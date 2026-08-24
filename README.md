@@ -157,6 +157,13 @@ you before it does this.
 To change a team's division, use the Division column in Admin → Teams. That
 unassigns it from its panel for the same reason.
 
+### Starting the panel list over
+
+Admin → Panels → **Delete all panels** clears every panel in one go, behind a
+two-step confirm. It takes the panels only: your teams and their interview
+history survive, released to no panel, ready to be re-assigned once you have
+built the list you want. Every judge code stops working the moment you do it.
+
 ### Preset panels
 
 [`config/event.json`](config/event.json) holds your divisions and a starting set

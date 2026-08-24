@@ -526,6 +526,24 @@ function seedPresetPanels(): number {
   return created;
 }
 
+/**
+ * Clear the whole panel list.
+ *
+ * Teams and requests keep existing and fall back to no panel, exactly as
+ * deleting one panel does — the roster is expensive to rebuild and is
+ * never what someone means by "delete all panels".
+ */
+function deleteAllPanels(): number {
+  const removed = state().panels.length;
+  if (!removed) return 0;
+
+  state().panels = [];
+  for (const t of state().teams) t.panel_id = null;
+  for (const r of state().requests) r.panel_id = null;
+  save();
+  return removed;
+}
+
 function generatePanelCode(): string {
   for (let attempt = 0; attempt < 50; attempt++) {
     const code = randomPanelCode();
@@ -736,6 +754,7 @@ export const fileStore: Store = {
   seedPresetPanels: async () => seedPresetPanels(),
   updatePanel: async (id, patch) => updatePanel(id, patch),
   deletePanel: async (id) => deletePanel(id),
+  deleteAllPanels: async () => deleteAllPanels(),
   generatePanelCode: async () => generatePanelCode(),
 
   createNote: async (input) => createNote(input),

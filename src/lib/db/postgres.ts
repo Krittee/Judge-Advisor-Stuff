@@ -562,6 +562,16 @@ export const postgresStore: Store = {
     await query("delete from panels where id = $1", [id]);
   },
 
+  /**
+   * Clear the whole panel list. The foreign keys are ON DELETE SET NULL,
+   * so teams and requests survive with no panel — the roster is expensive
+   * to rebuild and is never what "delete all panels" is meant to take.
+   */
+  async deleteAllPanels() {
+    const rows = await query<{ id: string }>("delete from panels returning id");
+    return rows.length;
+  },
+
   async generatePanelCode() {
     const taken = new Set((await this.listPanels()).map((p) => p.code));
     for (let attempt = 0; attempt < 50; attempt++) {

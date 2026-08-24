@@ -742,12 +742,105 @@ function PanelsTab({
         </span>
       </div>
 
+      {panels.length ? (
+        <DeleteAllPanels
+          panels={panels}
+          busy={busy}
+          setBusy={setBusy}
+          onError={onError}
+          onDone={async () => {
+            await load();
+            await refresh();
+          }}
+        />
+      ) : null}
+
       {!panels.length ? (
         <p className="py-8 text-center text-sm text-zinc-600">
           No judge panels yet. Add one above, or load your presets — judges sign in with a panel&apos;s
           code.
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Delete every panel at once.
+ *
+ * Two clicks, not one: this invalidates every judge's sign-in code in a
+ * single action, and it sits right next to the button people press while
+ * setting up. The second click states exactly what survives — the roster
+ * is expensive to rebuild and is never what this is meant to take.
+ */
+function DeleteAllPanels({
+  panels,
+  busy,
+  setBusy,
+  onError,
+  onDone,
+}: {
+  panels: Panel[];
+  busy: boolean;
+  setBusy: (b: boolean) => void;
+  onError: (m: string | null) => void;
+  onDone: () => Promise<void>;
+}) {
+  const [armed, setArmed] = useState(false);
+
+  // Never leave a live "confirm" button sitting around after a glance.
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 8000);
+    return () => clearTimeout(t);
+  }, [armed]);
+
+  const assigned = panels.length;
+
+  async function run() {
+    setBusy(true);
+    onError(null);
+    try {
+      const res = await call<{ deleted: number }>("/api/admin/panels?all=true", {
+        method: "DELETE",
+      });
+      await onDone();
+      setArmed(false);
+      onError(
+        `Deleted ${res.deleted} panel${res.deleted === 1 ? "" : "s"}. ` +
+          "Teams are still here, now unassigned.",
+      );
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-xl bg-rose-500/[0.06] p-4 ring-1 ring-inset ring-rose-500/20">
+      {armed ? (
+        <>
+          <Button variant="danger" size="sm" disabled={busy} onClick={run}>
+            {busy ? "Deleting…" : `Yes, delete all ${assigned}`}
+          </Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => setArmed(false)}>
+            Cancel
+          </Button>
+          <span className="text-xs text-rose-200">
+            Every judge code stops working immediately. Your teams stay, unassigned.
+          </span>
+        </>
+      ) : (
+        <>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => setArmed(true)}>
+            Delete all panels
+          </Button>
+          <span className="text-xs text-zinc-600">
+            Clears all {assigned} panels so you can start over. Teams are kept.
+          </span>
+        </>
+      )}
     </div>
   );
 }

@@ -79,6 +79,8 @@ export type Store = {
   seedPresetPanels(): Promise<number>;
   updatePanel(id: string, patch: Partial<Panel>): Promise<Panel>;
   deletePanel(id: string): Promise<void>;
+  /** Remove every panel at once. Teams survive, unassigned. Returns how many. */
+  deleteAllPanels(): Promise<number>;
   generatePanelCode(): Promise<string>;
 
   createNote(input: NewNote): Promise<Note>;

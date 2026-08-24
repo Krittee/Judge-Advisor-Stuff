@@ -98,12 +98,20 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Judge Advisor access required." }, { status: 403 });
   }
 
-  const id = new URL(request.url).searchParams.get("id");
+  const params = new URL(request.url).searchParams;
+
+  // Teams and requests fall back to no panel rather than vanishing,
+  // whether one panel goes or all of them do.
+  if (params.get("all") === "true") {
+    const deleted = await store().deleteAllPanels();
+    return NextResponse.json({ ok: true, deleted });
+  }
+
+  const id = params.get("id");
   if (!id) return NextResponse.json({ error: "id required." }, { status: 400 });
 
-  // Teams and requests fall back to no panel rather than vanishing.
   await store().deletePanel(id);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, deleted: 1 });
 }
 
 /**
