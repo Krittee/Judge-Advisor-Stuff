@@ -25,6 +25,7 @@ function buildRubric(entry, sharedScale) {
 
 const built = config.rubrics.map((r) => buildRubric(r, config.scale));
 const interview = built.find((r) => r.id === "interview");
+const notebook = built.find((r) => r.id === "notebook");
 
 function bandFor(total, max, scored) {
   if (!scored || max <= 0) return null;
@@ -32,6 +33,57 @@ function bandFor(total, max, scored) {
   const sorted = [...config.bands].sort((a, b) => b.minPercent - a.minPercent);
   return sorted.find((b) => percent >= b.minPercent) ?? sorted[sorted.length - 1];
 }
+
+/* ---- the shipped rubrics, against the printed sheets --------------- */
+
+test("the Engineering Notebook rubric matches the official sheet: 16 criteria, 64 points", () => {
+  assert.equal(notebook.criteria.length, 16);
+  assert.equal(notebook.max, 64, "sixteen criteria at 4 points each");
+  assert.ok(!notebook.placeholder, "no longer a stand-in");
+});
+
+test("its scale is 1-4 with the sheet's wording, and has no zero", () => {
+  assert.deepEqual(
+    notebook.scale.map((p) => [p.value, p.label]),
+    [
+      [1, "Beginning"],
+      [2, "Developing"],
+      [3, "Proficient"],
+      [4, "Exemplary"],
+    ],
+  );
+  assert.ok(
+    !notebook.scale.some((p) => p.value === 0),
+    "a scored notebook criterion is worth at least 1 point",
+  );
+});
+
+test("every notebook section totals what the sheet prints beside its heading", () => {
+  assert.deepEqual(
+    notebook.sections.map((s) => [s.name, s.criteria.length * 4]),
+    [
+      ["Notebook Organization", 16],
+      ["Design Process — Define", 12],
+      ["Design Process — Develop Solutions", 16],
+      ["Design Process — Optimize", 12],
+      ["Design Process — Reflection and Iteration", 8],
+    ],
+  );
+  assert.equal(
+    notebook.sections.reduce((n, s) => n + s.criteria.length * 4, 0),
+    64,
+    "the section totals must add up to the sheet's TOTAL",
+  );
+});
+
+test("the two rubrics keep their own scales", () => {
+  assert.notDeepEqual(
+    notebook.scale.map((p) => p.value),
+    interview.scale.map((p) => p.value),
+    "notebook is 1-4, interview is 0-2 — one shared scale would misscore both",
+  );
+  assert.equal(notebook.max + interview.max, 76, "combined total a team can earn");
+});
 
 /* ---- the shipped interview rubric --------------------------------- */
 

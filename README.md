@@ -189,19 +189,27 @@ scoring badly.
 teams; every other role gets `403`, matching the rubric's own line that judging
 materials do not leave the judging room.
 
+Both are taken exactly from the official v2.0 sheets:
+
+| Rubric | Criteria | Scale | Total |
+|---|---|---|---|
+| Engineering Notebook | 16, in 5 sections | 1–4 · Beginning → Exemplary | **64** |
+| Team Interview | 6, in 2 sections | 0–2 · Not Yet Heard → Heard, with Specifics | **12** |
+
+A team can earn **76** in all. The two scales differ, so each rubric carries its
+own and the API enforces it per rubric — `0` is refused on the notebook, whose
+scale starts at 1, and accepted on the interview.
+
 ### Editing the rubrics
 
-[`config/rubrics.json`](config/rubrics.json) holds both, plus the scale and the
-colour bands. Team Interview is taken exactly from the official Team Interview
-Rubric v2.0: six criteria, 0–2 points each, 12 total.
-
-**The Engineering Notebook criteria are a placeholder.** Replace them with your
-real rubric's topics and reload — nothing else needs changing. The app flags
-them as a stand-in until you delete `"placeholder": true`.
-
+[`config/rubrics.json`](config/rubrics.json) holds both, plus the colour bands.
 Criterion ids are derived from their text, so reordering the file is safe.
 Renaming a criterion detaches its existing scores, which is the honest outcome:
 it is no longer the same thing being measured.
+
+Tests assert each rubric still matches its printed sheet — criteria counts,
+scale wording, and every section total — so an accidental edit fails the suite
+rather than surfacing on event day.
 
 ---
 

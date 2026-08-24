@@ -1,68 +1,150 @@
 {
   "_comment": [
-    "Scoring rubrics. Topics only — the judges keep the full rubric sheet in front",
+    "Scoring rubrics. Topics only \u2014 the judges keep the full rubric sheet in front",
     "of them; this is where the points land.",
     "",
-    "Team Interview below is taken exactly from the official Team Interview Rubric",
-    "v2.0: six criteria, 0-2 points each, 12 total.",
+    "Both are taken exactly from the official v2.0 sheets:",
+    "  Engineering Notebook \u2014 16 criteria in 5 sections, 1-4 points each, 64 total.",
+    "  Team Interview       \u2014 6 criteria in 2 sections, 0-2 points each, 12 total.",
     "",
-    "!! ENGINEERING NOTEBOOK IS A PLACEHOLDER !!",
-    "The notebook PDF supplied was the blank Digital Notebook Template teams fill",
-    "in, not a scoring rubric, so these topics are a stand-in. Replace the criteria",
-    "below with the ones on your real notebook rubric and reload the page — nothing",
-    "else needs changing. Delete \"placeholder\": true once you have."
+    "The two use different scales, which is why each carries its own. Note the",
+    "notebook has no zero: a scored criterion is worth at least 1 point.",
+    "",
+    "Editing a criterion's wording detaches any scores already recorded against it,",
+    "since its id is derived from the text. Reordering is safe."
   ],
-
   "scale": [
-    { "value": 0, "label": "Not Yet", "short": "0" },
-    { "value": 1, "label": "Yes", "short": "1" },
-    { "value": 2, "label": "Yes, with specifics", "short": "2" }
+    {
+      "value": 0,
+      "label": "Not Yet",
+      "short": "0"
+    },
+    {
+      "value": 1,
+      "label": "Yes",
+      "short": "1"
+    },
+    {
+      "value": 2,
+      "label": "Yes, with specifics",
+      "short": "2"
+    }
   ],
-
   "bands": [
-    { "id": "top", "label": "Top", "minPercent": 85, "color": "emerald" },
-    { "id": "strong", "label": "Strong", "minPercent": 70, "color": "sky" },
-    { "id": "middle", "label": "Middle", "minPercent": 50, "color": "amber" },
-    { "id": "emerging", "label": "Emerging", "minPercent": 0, "color": "zinc" }
+    {
+      "id": "top",
+      "label": "Top",
+      "minPercent": 85,
+      "color": "emerald"
+    },
+    {
+      "id": "strong",
+      "label": "Strong",
+      "minPercent": 70,
+      "color": "sky"
+    },
+    {
+      "id": "middle",
+      "label": "Middle",
+      "minPercent": 50,
+      "color": "amber"
+    },
+    {
+      "id": "emerging",
+      "label": "Emerging",
+      "minPercent": 0,
+      "color": "zinc"
+    }
   ],
-
   "rubrics": [
     {
       "id": "notebook",
       "name": "Engineering Notebook",
-      "placeholder": true,
+      "scale": [
+        {
+          "value": 1,
+          "label": "Beginning",
+          "short": "1"
+        },
+        {
+          "value": 2,
+          "label": "Developing",
+          "short": "2"
+        },
+        {
+          "value": 3,
+          "label": "Proficient",
+          "short": "3"
+        },
+        {
+          "value": 4,
+          "label": "Exemplary",
+          "short": "4"
+        }
+      ],
       "sections": [
         {
-          "name": "Design Process",
+          "name": "Notebook Organization",
           "criteria": [
-            "Problem is identified and understood",
-            "Alternatives were considered",
-            "Designs were built and tested",
-            "Results led to changes"
+            "Information is easy to reference",
+            "Contributors are identifiable",
+            "Record spans the season",
+            "Outside sources are credited"
           ]
         },
         {
-          "name": "Record Keeping",
+          "name": "Design Process \u2014 Define",
           "criteria": [
-            "Entries are dated and in order",
-            "Entries are the students' own work",
-            "Drawings and data support the writing"
+            "Criteria and constraints are defined",
+            "Game strategy is documented",
+            "Brainstorming is documented"
           ]
         },
         {
-          "name": "Team and Project Management",
-          "criteria": ["Roles and responsibilities are clear", "Time and resources were planned"]
+          "name": "Design Process \u2014 Develop Solutions",
+          "criteria": [
+            "Prototypes are documented",
+            "Test procedures are defined",
+            "Data is collected",
+            "Decisions are explained with evidence"
+          ]
+        },
+        {
+          "name": "Design Process \u2014 Optimize",
+          "criteria": [
+            "Mechanisms are documented",
+            "Code is documented",
+            "Changes are traceable to results"
+          ]
+        },
+        {
+          "name": "Design Process \u2014 Reflection and Iteration",
+          "criteria": [
+            "Reflection appears throughout",
+            "Iteration is visible in sequence"
+          ]
         }
       ]
     },
-
     {
       "id": "interview",
       "name": "Team Interview",
       "scale": [
-        { "value": 0, "label": "Not Yet Heard", "short": "0" },
-        { "value": 1, "label": "Heard", "short": "1" },
-        { "value": 2, "label": "Heard, with Specifics", "short": "2" }
+        {
+          "value": 0,
+          "label": "Not Yet Heard",
+          "short": "0"
+        },
+        {
+          "value": 1,
+          "label": "Heard",
+          "short": "1"
+        },
+        {
+          "value": 2,
+          "label": "Heard, with Specifics",
+          "short": "2"
+        }
       ],
       "sections": [
         {
