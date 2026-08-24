@@ -16,6 +16,7 @@ import {
   TopBar,
 } from "@/components/ui";
 import { NotesDrawer, SignOutButton } from "@/components/judging";
+import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
 import type { ActivityRow, Panel, RequestRow, Team } from "@/lib/types";
 
@@ -1006,6 +1007,27 @@ function ImportTab({
   const [autoAssign, setAutoAssign] = useState(true);
   const [perPanel, setPerPanel] = useState(10);
   const [division, setDivision] = useState(divisions[0] ?? "");
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  /** Read a dropped or chosen file straight into the box. */
+  async function takeFile(file: File | undefined | null) {
+    if (!file) return;
+    onError(null);
+    setResult(null);
+    setLoaded(null);
+    try {
+      const sheet = await readSpreadsheet(file);
+      setText(sheet.text);
+      setLoaded(
+        `Loaded ${sheet.rows} row${sheet.rows === 1 ? "" : "s"} from ${file.name}.` +
+          (sheet.warning ? ` ${sheet.warning}` : "") +
+          " Check it below, then Import.",
+      );
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  }
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
@@ -1039,21 +1061,63 @@ function ImportTab({
         <p className="mt-1 text-sm text-zinc-400">
           One team per line: <code className="text-zinc-300">number, name, pit</code>. Pit is
           optional. Team numbers may include letters — <code className="text-zinc-300">9882K</code>{" "}
-          works as well as <code className="text-zinc-300">1234</code>. Everything you paste goes
+          works as well as <code className="text-zinc-300">1234</code>. Everything you load goes
           into the division chosen below, unless a row names one in a fourth column. Paste straight
           from a spreadsheet — tabs work too, and a header row is skipped automatically.
           Re-importing updates existing teams instead of duplicating them.
         </p>
       </div>
 
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={12}
-        spellCheck={false}
-        placeholder={"1234, Iron Hawks, Pit 12\n9882K, Kilo Kestrels, Pit 13\n9882A, Alpha Antelopes"}
-        className={`${inputClass} font-mono text-sm`}
-      />
+      {/* Drop a spreadsheet, or paste — both end up in the same box. */}
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          takeFile(e.dataTransfer.files?.[0]);
+        }}
+        className={`rounded-xl border-2 border-dashed p-4 transition ${
+          dragging ? "border-indigo-400 bg-indigo-500/10" : "border-white/10"
+        }`}
+      >
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
+          <label className="cursor-pointer rounded-lg bg-white/5 px-3 py-2 text-zinc-200 ring-1 ring-inset ring-white/10 hover:bg-white/10">
+            Choose a file
+            <input
+              type="file"
+              accept=".csv,.tsv,.txt,.xlsx"
+              className="hidden"
+              onChange={(e) => {
+                takeFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          <span className="text-zinc-500">
+            or drag one here — <code className="text-zinc-400">.xlsx</code>,{" "}
+            <code className="text-zinc-400">.csv</code>,{" "}
+            <code className="text-zinc-400">.tsv</code>. Or just paste below.
+          </span>
+        </div>
+
+        <textarea
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setLoaded(null);
+          }}
+          rows={12}
+          spellCheck={false}
+          placeholder={"1234, Iron Hawks, Pit 12\n9882K, Kilo Kestrels, Pit 13\n9882A, Alpha Antelopes"}
+          className={`${inputClass} font-mono text-sm`}
+        />
+      </div>
+
+      {loaded ? <Banner kind="info">{loaded}</Banner> : null}
 
       <div className="flex flex-wrap items-center gap-4">
         <label className="text-sm text-zinc-300">

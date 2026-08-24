@@ -220,8 +220,9 @@ Sign in at `/login` with `JA2026`.
    1234, Iron Hawks, Pit 12
    9882K, Kilo Kestrels, Pit 13
    ```
-   Pick which **division** the paste goes into above the box. Running two
-   divisions? Import each one separately.
+   Or drop an Excel (`.xlsx`) or CSV file straight in — it is read on your own
+   computer and never uploaded. Pick which **division** it goes into above the
+   box. Running two divisions? Import each one separately.
    Team numbers can have letters in them, like `9882K` — and it does not matter
    whether anyone types the letter as a capital.
    You can copy straight out of Excel or Google Sheets and paste it in. Tick

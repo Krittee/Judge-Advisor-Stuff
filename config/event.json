@@ -3,10 +3,21 @@
     "Preset judge panels, used the FIRST time the app starts with an empty roster.",
     "After that, the admin console is the source of truth — edit panels there, not here.",
     "Each panel's `code` is what its judges type at /login. Keep them easy to read",
-    "aloud: no 0/O or 1/I. Change these before your event; they are public in this repo."
+    "aloud: no 0/O or 1/I. Change these before your event; they are public in this repo.",
+    "",
+    "`booking` sets the bookable time slots every panel starts with. startTime is a",
+    "24-hour clock time on the day the panels are created; set exact dates later in",
+    "Admin > Panels if you need to. Set slotCount to 0 for a walk-up queue only.",
+    "A panel can override any of these with its own slotMinutes / slotCount / startTime."
   ],
 
   "divisions": ["Division 1", "Division 2"],
+
+  "booking": {
+    "startTime": "09:00",
+    "slotMinutes": 15,
+    "slotCount": 12
+  },
 
   "panels": [
     { "name": "Panel A", "division": "Division 1", "code": "REDCAT", "judges": ["", "", ""] },

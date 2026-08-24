@@ -75,9 +75,13 @@ export function SlotPicker({
 
   if (!slots.length) {
     return (
-      <p className="rounded-xl bg-white/[0.03] px-4 py-3 text-sm text-zinc-500">
-        {panel.name} does not run booked slots — use <strong>Interview now</strong> instead.
-      </p>
+      <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-200 ring-1 ring-inset ring-amber-500/30">
+        <strong>{panel.name} has no bookable times set up yet.</strong>
+        <p className="mt-1 text-amber-200/80">
+          Use <strong>Interview now</strong> instead, or ask the Judge Advisor to add times:
+          Admin → Panels → {panel.name} → Booking slots.
+        </p>
+      </div>
     );
   }
 

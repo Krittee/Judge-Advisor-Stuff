@@ -327,10 +327,20 @@ export const postgresStore: Store = {
     for (const preset of presetPanels()) {
       if (existing.has(preset.code)) continue;
       await query(
-        `insert into panels (name, code, division, judges, sort_order)
-         values ($1, $2, $3, $4, $5)
+        `insert into panels
+           (name, code, division, judges, sort_order, slot_start_at, slot_minutes, slot_count)
+         values ($1, $2, $3, $4, $5, $6, $7, $8)
          on conflict (code) do nothing`,
-        [preset.name, preset.code, preset.division, preset.judges, ++created],
+        [
+          preset.name,
+          preset.code,
+          preset.division,
+          preset.judges,
+          ++created,
+          preset.slotStartAt,
+          preset.slotMinutes,
+          preset.slotCount,
+        ],
       );
     }
     return created;

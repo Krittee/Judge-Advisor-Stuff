@@ -515,9 +515,9 @@ function seedPresetPanels(): number {
       division: preset.division,
       judges: preset.judges,
       sort_order: state().panels.length + 1,
-      slot_start_at: null,
-      slot_minutes: 12,
-      slot_count: 0,
+      slot_start_at: preset.slotStartAt,
+      slot_minutes: preset.slotMinutes,
+      slot_count: preset.slotCount,
       created_at: new Date().toISOString(),
     });
     created++;
@@ -630,9 +630,11 @@ function demoData(): Data {
     division,
     judges,
     sort_order: i + 1,
-    slot_start_at: i < 2 ? iso(30) : null,
+    // Every demo panel runs slots, so "Book a time" has something to show
+    // straight away. Panel C keeps a shorter grid to look less uniform.
+    slot_start_at: iso(20),
     slot_minutes: 12,
-    slot_count: i < 2 ? 8 : 0,
+    slot_count: i === 2 ? 5 : 8,
     created_at: iso(0),
   }));
 

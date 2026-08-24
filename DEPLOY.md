@@ -132,8 +132,9 @@ All in the browser, at `your-address.vercel.app/admin`:
    1234, Iron Hawks, Pit 12
    9882K, Kilo Kestrels, Pit 13
    ```
-   Pick which **division** the paste goes into above the box. Running two
-   divisions? Import each one separately.
+   Or drop an Excel (`.xlsx`) or CSV file straight in — it is read on your own
+   computer and never uploaded. Pick which **division** it goes into above the
+   box. Running two divisions? Import each one separately.
    Team numbers can include letters, like `9882K`.
    Copy straight out of Excel or Google Sheets. Tick **spread across panels**
    to share teams out evenly.

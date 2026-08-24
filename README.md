@@ -92,13 +92,18 @@ app knows which is in use.
    this first, or you will be judging the Quantum Quokkas.
 3. **Panels tab** — add each judge group: name, room, judge names. Write down
    each panel's code and hand it to that group.
-4. **Import tab** — paste your roster, one team per line:
+4. **Import tab** — drop in a `.xlsx`, `.csv` or `.tsv` file, or paste your roster
+   one team per line:
    ```
    1234, Iron Hawks, Pit 12
    9882K, Kilo Kestrels, Pit 13
    ```
    Team numbers may contain letters (`9882K`), and are matched
    case-insensitively so a team typing `9882k` still finds itself.
+
+   Spreadsheets are read in your browser — the file is never uploaded anywhere.
+   Old `.xls` files are not readable; re-save them as `.xlsx` or CSV. Whatever
+   you load lands in the box first, so you can check it before importing.
    Pasting straight from a spreadsheet works (tabs are handled), a header row is
    skipped, and quoted names with commas survive. Tick **spread across panels**
    to deal teams out evenly.
