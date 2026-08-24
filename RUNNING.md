@@ -121,10 +121,30 @@ http://localhost:3000
 
 You should see the Judge Queue page with a box for a team number.
 
-### Important: leave the terminal open
+### When can I close the terminal?
 
-The app runs *inside* that terminal window. If you close it, the app stops.
-Minimise it, don't close it.
+**Not while anyone is using the app.** It runs *inside* that terminal window, so
+closing the window switches the app off for everyone — teams' phones, the
+judges, the board on the TV. Minimise it instead.
+
+Close it when nobody needs the app any more: end of the day, or you have
+finished setting things up.
+
+**Nothing is ever lost by closing it.** Every change is written to
+`.data/state.json` as it happens. Stop and start it a hundred times and your
+teams, panels and interview history all come back exactly as they were.
+
+To stop it properly: click the terminal, press **Ctrl + C** (yes, `Ctrl` even on
+a Mac), then close the window. Closing the window without Ctrl+C is also fine —
+it saves and shuts down cleanly either way.
+
+Also worth knowing:
+
+- **A sleeping laptop is the same as a closed terminal** — the app stops
+  answering. Disable sleep before the event.
+- **Ctrl + C only stops the app**, not your computer or the terminal.
+- To start it again: open a terminal, `cd` back into the folder, `npm run dev`.
+  You never repeat Steps 1–4.
 
 ### Only ever run one copy at a time
 

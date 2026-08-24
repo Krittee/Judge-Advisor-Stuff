@@ -173,7 +173,11 @@ function save(): void {
 
 /** Flush before the process dies so the last few seconds are not lost. */
 function installShutdownFlush(): void {
-  for (const signal of ["exit", "SIGINT", "SIGTERM"] as const) {
+  // SIGHUP is what closing a terminal window sends, and SIGBREAK is its
+  // Windows equivalent. Without them, shutting down by closing the window
+  // rather than pressing Ctrl+C would skip the flush below and leave the
+  // lock file behind.
+  for (const signal of ["exit", "SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"] as const) {
     process.once(signal, () => {
       try {
         persist();
