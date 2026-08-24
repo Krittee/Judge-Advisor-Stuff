@@ -21,6 +21,8 @@ export type Team = {
   name: string;
   panel_id: string | null;
   division: string;
+  /** Which of the two kinds of team this is. See config/event.json. */
+  category: string;
   pit: string | null;
   created_at: string;
 };
@@ -89,6 +91,8 @@ export type AppState = {
   requests: RequestRow[];
   /** Every division in play, so the UI can offer them without guessing. */
   divisions: string[];
+  /** The two team kinds, with their colours, straight from config. */
+  categories: { id: string; label: string; color: string }[];
   /** What this viewer is allowed to do, so the UI never offers more. */
   viewer: ViewerCapabilities;
   serverTime: string;

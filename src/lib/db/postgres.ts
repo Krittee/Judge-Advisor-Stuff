@@ -2,7 +2,7 @@ import type { Pool } from "pg";
 import type { ActivityRow, Note, Panel, RequestRow, ScoreRow, Team } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
-import { DEFAULT_DIVISION, presetPanels } from "../presets";
+import { DEFAULT_DIVISION, defaultCategory, presetPanels } from "../presets";
 import {
   StoreError,
   type ImportedTeam,
@@ -139,6 +139,7 @@ async function migrate(): Promise<void> {
       name       text not null,
       panel_id   uuid references panels(id) on delete set null,
       division   text not null default 'Division 1',
+      category   text not null default 'developing',
       pit        text,
       created_at timestamptz not null default now()
     );
@@ -231,6 +232,7 @@ async function migrate(): Promise<void> {
       -- Divisions arrived after the first rosters did.
       alter table panels add column if not exists division text not null default 'Division 1';
       alter table teams  add column if not exists division text not null default 'Division 1';
+      alter table teams  add column if not exists category text not null default 'developing';
 
       -- Panels used to carry a room, which turned out not to be wanted.
       alter table panels drop column if exists room;
@@ -422,12 +424,13 @@ export const postgresStore: Store = {
   async upsertTeams(list: ImportedTeam[]) {
     if (!list.length) return 0;
     await query(
-      `insert into teams (number, name, pit, division)
-       select * from unnest($1::text[], $2::text[], $3::text[], $4::text[])
+      `insert into teams (number, name, pit, division, category)
+       select * from unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[])
        on conflict (number) do update set
          name = excluded.name,
          pit = excluded.pit,
          division = excluded.division,
+         category = excluded.category,
          -- A team that changes division loses its panel: the old one is
          -- on the far side of the wall.
          panel_id = case
@@ -439,6 +442,7 @@ export const postgresStore: Store = {
         list.map((t) => t.name),
         list.map((t) => t.pit),
         list.map((t) => t.division),
+        list.map((t) => t.category),
       ],
     );
     return list.length;

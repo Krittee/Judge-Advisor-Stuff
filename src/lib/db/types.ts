@@ -53,6 +53,7 @@ export type ImportedTeam = {
   name: string;
   pit: string | null;
   division: string;
+  category: string;
 };
 
 /**

@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { canAdminister, getSession } from "@/lib/auth";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
-import { presetDivisions } from "@/lib/presets";
+import { presetDivisions, resolveCategory } from "@/lib/presets";
 import { store, StoreError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-type ParsedTeam = { number: string; name: string; pit: string | null; division: string };
+type ParsedTeam = {
+  number: string;
+  name: string;
+  pit: string | null;
+  division: string;
+  category: string;
+};
 
 /**
  * Bulk import. Accepts pasted CSV or TSV, with or without a header row:
@@ -25,7 +31,11 @@ export async function POST(request: Request) {
   const autoAssign = Boolean(body.autoAssign);
   const perPanel = clampPerPanel(body.perPanel);
 
-  const { teams, skipped } = parseTeams(text, resolveDivision(body.division));
+  const { teams, skipped } = parseTeams(
+    text,
+    resolveDivision(body.division),
+    resolveCategory(body.category),
+  );
   if (!teams.length) {
     return NextResponse.json(
       { error: "No team rows found. Use one team per line: number, name" },
@@ -81,6 +91,7 @@ export async function PATCH(request: Request) {
 
     const patch: Record<string, unknown> = {};
     if ("panelId" in body) patch.panel_id = body.panelId ? String(body.panelId) : null;
+    if ("category" in body) patch.category = resolveCategory(body.category);
     if ("division" in body) {
       patch.division = resolveDivision(body.division);
       // Changing division puts the team on the far side of the wall from
@@ -125,10 +136,12 @@ function resolveDivision(input: unknown): string {
 /**
  * @param fallbackDivision used for any row that does not name one in a
  *        fourth column, so a whole paste can go into one division.
+ * @param fallbackCategory likewise for a fifth column.
  */
 function parseTeams(
   text: string,
   fallbackDivision: string,
+  fallbackCategory: string,
 ): { teams: ParsedTeam[]; skipped: number } {
   const seen = new Map<string, ParsedTeam>();
   let skipped = 0;
@@ -153,6 +166,7 @@ function parseTeams(
       name: cells[1] || `Team ${number}`,
       pit: cells[2] || null,
       division: cells[3] ? resolveDivision(cells[3]) : fallbackDivision,
+      category: cells[4] ? resolveCategory(cells[4]) : fallbackCategory,
     });
   }
 

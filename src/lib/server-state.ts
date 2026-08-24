@@ -1,6 +1,6 @@
 import { store } from "./db";
 import { stripCode } from "./data";
-import { presetDivisions } from "./presets";
+import { presetDivisions, teamCategories } from "./presets";
 import { canAdminister, canAdvance, canReadNotes, type Session } from "./auth";
 import type { AppState, ViewerCapabilities } from "./types";
 
@@ -62,6 +62,7 @@ export async function loadState(session: Session | null): Promise<AppState> {
       ? visibleRequests
       : visibleRequests.map((r) => ({ ...r, message: null })),
     divisions: division ? [division] : divisions,
+    categories: teamCategories(),
     viewer: describeViewer(session, division),
     serverTime: new Date().toISOString(),
   };

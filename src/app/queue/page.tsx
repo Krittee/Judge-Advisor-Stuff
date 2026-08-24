@@ -8,6 +8,7 @@ import { call, useAppState } from "@/components/useAppState";
 import { Banner, Button, Elapsed, formatClock, inputClass, StatusChip, TopBar } from "@/components/ui";
 import { SignOutButton } from "@/components/judging";
 import { PanelBusyLine, panelLoad, SlotPicker } from "@/components/SlotPicker";
+import { CategoryChip } from "@/components/CategoryChip";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
 import type { Session } from "@/lib/auth";
 import type { Slot } from "@/lib/types";
@@ -206,7 +207,8 @@ export default function QueuePage() {
           <div className="min-h-[2.5rem] text-center text-sm">
             {team ? (
               <>
-                <div className="text-zinc-300">
+                <div className="flex items-center justify-center gap-2 text-zinc-300">
+                  <CategoryChip category={team.category} categories={state.categories} />
                   {team.name}
                   <span className="text-zinc-500">
                     {panel ? ` → ${panel.name} · ${team.division}` : ""}

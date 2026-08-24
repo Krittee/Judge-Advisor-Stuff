@@ -7,6 +7,7 @@ import { STATUS_META } from "@/lib/status";
 import { call, useAppState } from "@/components/useAppState";
 import { normalizeTeamNumber } from "@/lib/teamNumber";
 import { PanelBusyLine, panelLoad, SlotPicker } from "@/components/SlotPicker";
+import { CategoryChip } from "@/components/CategoryChip";
 import {
   Banner,
   Button,
@@ -115,7 +116,10 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
 
       <main className="mx-auto max-w-lg space-y-5 px-5 py-6">
         <div>
-          <div className="text-sm text-zinc-500">Team {team.number}</div>
+          <div className="flex items-center gap-2 text-sm text-zinc-500">
+            Team {team.number}
+            <CategoryChip category={team.category} categories={state.categories} />
+          </div>
           <h1 className="text-3xl font-bold tracking-tight">{team.name}</h1>
           {panel ? (
             <p className="mt-2 text-sm text-zinc-400">

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { call } from "./useAppState";
 import { Banner } from "./ui";
 import { BandChip, BandLegend } from "./BandChip";
+import { CategoryChip } from "./CategoryChip";
 import type { Rubric } from "@/lib/rubrics";
 import type { ScoreRow, Team } from "@/lib/types";
 
@@ -16,10 +17,12 @@ import type { ScoreRow, Team } from "@/lib/types";
  */
 export function Rankings({
   teams,
+  categories,
   panelName,
   onOpenTeam,
 }: {
   teams: Team[];
+  categories: { id: string; label: string; color: string }[];
   panelName?: Record<string, string>;
   onOpenTeam?: (team: Team) => void;
 }) {
@@ -87,6 +90,7 @@ export function Rankings({
             <tr>
               <th className="px-3 py-3 w-10">#</th>
               <th className="px-3 py-3">Team</th>
+              <th className="px-3 py-3">Type</th>
               {panelName ? <th className="px-3 py-3">Panel</th> : null}
               {rubricList.map((r) => (
                 <th key={r.id} className="px-3 py-3 text-right">
@@ -112,6 +116,9 @@ export function Rankings({
                 <td className="px-3 py-2.5">
                   <span className="font-bold tabular-nums">{row.team.number}</span>{" "}
                   <span className="text-zinc-400">{row.team.name}</span>
+                </td>
+                <td className="px-3 py-2.5">
+                  <CategoryChip category={row.team.category} categories={categories} />
                 </td>
                 {panelName ? (
                   <td className="px-3 py-2.5 text-xs text-zinc-500">

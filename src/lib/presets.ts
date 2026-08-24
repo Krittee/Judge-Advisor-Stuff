@@ -23,8 +23,11 @@ export type PresetPanel = {
 
 export const DEFAULT_DIVISION = "Division 1";
 
+export type TeamCategory = { id: string; label: string; color: string };
+
 type RawPreset = {
   divisions?: unknown;
+  teamCategories?: unknown;
   booking?: unknown;
   panels?: unknown;
 };
@@ -41,6 +44,53 @@ export function presetDivisions(): string[] {
     ? raw.divisions.map((d) => String(d).trim()).filter(Boolean)
     : [];
   return list.length ? unique(list) : [DEFAULT_DIVISION];
+}
+
+const CATEGORY_FALLBACK: TeamCategory[] = [
+  { id: "developing", label: "Developing", color: "amber" },
+  { id: "fully-developed", label: "Fully Developed", color: "violet" },
+];
+
+/**
+ * The two kinds of team, kept apart by colour everywhere a team appears.
+ *
+ * Configured rather than hard-coded so the labels can match whatever the
+ * event calls them; the ids are what gets stored, so those should stay
+ * put once teams are assigned.
+ */
+export function teamCategories(): TeamCategory[] {
+  const list = Array.isArray(raw.teamCategories) ? raw.teamCategories : [];
+
+  const parsed = list
+    .map((c) => {
+      const o = (c ?? {}) as Record<string, unknown>;
+      const id = String(o.id ?? "").trim();
+      if (!id) return null;
+      return {
+        id,
+        label: String(o.label ?? id),
+        color: String(o.color ?? "zinc"),
+      };
+    })
+    .filter((c): c is TeamCategory => c !== null);
+
+  return parsed.length ? parsed : CATEGORY_FALLBACK;
+}
+
+/** What a team is until someone says otherwise. */
+export function defaultCategory(): string {
+  return teamCategories()[0].id;
+}
+
+/** Map free text onto a real category, by id or by label. */
+export function resolveCategory(input: unknown): string {
+  const wanted = String(input ?? "").trim().toLowerCase();
+  if (!wanted) return defaultCategory();
+
+  const match = teamCategories().find(
+    (c) => c.id.toLowerCase() === wanted || c.label.toLowerCase() === wanted,
+  );
+  return match ? match.id : defaultCategory();
 }
 
 /** The booking grid every preset panel starts with. */

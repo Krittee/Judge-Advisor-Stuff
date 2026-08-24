@@ -23,7 +23,7 @@
     { "id": "top", "label": "Top", "minPercent": 85, "color": "emerald" },
     { "id": "strong", "label": "Strong", "minPercent": 70, "color": "sky" },
     { "id": "middle", "label": "Middle", "minPercent": 50, "color": "amber" },
-    { "id": "developing", "label": "Developing", "minPercent": 0, "color": "zinc" }
+    { "id": "emerging", "label": "Emerging", "minPercent": 0, "color": "zinc" }
   ],
 
   "rubrics": [

@@ -205,6 +205,25 @@ it is no longer the same thing being measured.
 
 ---
 
+## Team types
+
+Every team is one of two kinds — **Developing** or **Fully Developed** — set from
+a dropdown in Admin → Teams, and colour-coded everywhere a team appears: the big
+board, the judge console, the queue desk, the rankings and the team's own page.
+The colour carries the distinction and the label backs it up, so it still reads
+for anyone who cannot separate amber from violet.
+
+Set it per team, for a whole import at once, or per row with a fifth CSV column
+(which accepts either the label or the id). Admin → Teams filters by type and
+counts each one.
+
+Rename the labels or change the colours in
+[`config/event.json`](config/event.json) under `teamCategories`. The first one
+listed is what a team gets until someone says otherwise; keep the ids stable
+once teams are assigned.
+
+---
+
 ## Divisions
 
 Two divisions can run at once, and they are a **hard wall**:

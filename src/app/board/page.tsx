@@ -5,6 +5,7 @@ import { STATUS_META, type Status } from "@/lib/status";
 import { useAppState } from "@/components/useAppState";
 import { compareTeamNumbers } from "@/lib/teamNumber";
 import { ConnectionDot, Elapsed, StatusLegend } from "@/components/ui";
+import { CategoryLegend, CategoryRail } from "@/components/CategoryChip";
 import type { PublicPanel, RequestRow, Team } from "@/lib/types";
 
 /**
@@ -53,7 +54,10 @@ export default function BoardPage() {
         </div>
       </header>
 
-      <StatusLegend className="mb-6" />
+      <div className="mb-6 flex flex-wrap items-center gap-x-8 gap-y-2">
+        <StatusLegend />
+        <CategoryLegend categories={state.categories} />
+      </div>
 
       <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
         {byPanel.map(({ panel, teams }) => (
@@ -76,7 +80,7 @@ export default function BoardPage() {
               {teams
                 .filter((t) => !hideDone || t.status !== "completed")
                 .map((t) => (
-                  <TeamTile key={t.team.id} {...t} />
+                  <TeamTile key={t.team.id} {...t} categories={state.categories} />
                 ))}
             </div>
           </section>
@@ -96,19 +100,22 @@ function TeamTile({
   team,
   status,
   since,
+  categories,
 }: {
   team: Team;
   status: Status | null;
   since: string | null;
+  categories: { id: string; label: string; color: string }[];
 }) {
   const meta = status ? STATUS_META[status] : null;
 
   return (
     <div
-      className={`rounded-xl px-3 py-2.5 ${
+      className={`relative overflow-hidden rounded-xl py-2.5 pl-4 pr-3 ${
         meta ? meta.tile : "bg-white/[0.04] text-zinc-400 ring-1 ring-white/10"
       } ${status === "requested" ? "pulse-waiting" : ""}`}
     >
+      <CategoryRail category={team.category} categories={categories} />
       <div className="text-2xl font-bold leading-tight tabular-nums">{team.number}</div>
       <div className="truncate text-sm opacity-90" title={team.name}>
         {team.name}

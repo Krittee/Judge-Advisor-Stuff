@@ -101,7 +101,7 @@ test("bands are picked by percentage, highest threshold first", () => {
   assert.equal(bandFor(26, 30, true).label, "Top", "87% clears the 85 threshold");
   assert.equal(bandFor(24, 30, true).label, "Strong", "80%");
   assert.equal(bandFor(18, 30, true).label, "Middle", "60%");
-  assert.equal(bandFor(6, 30, true).label, "Developing", "20%");
+  assert.equal(bandFor(6, 30, true).label, "Emerging", "20%");
 });
 
 test("a threshold is inclusive at its exact boundary", () => {
@@ -112,7 +112,7 @@ test("a threshold is inclusive at its exact boundary", () => {
 
 test("an unscored team gets no band at all", () => {
   assert.equal(bandFor(0, 30, false), null, "not-yet-judged is not the same as scoring badly");
-  assert.equal(bandFor(0, 30, true).label, "Developing", "a real zero does get one");
+  assert.equal(bandFor(0, 30, true).label, "Emerging", "a real zero does get one");
 });
 
 test("a rubric with no points cannot produce a band", () => {
@@ -134,4 +134,59 @@ test("unscored teams rank below every scored team, including a scored zero", () 
   );
 
   assert.deepEqual(rows.map((r) => r.number), ["1003", "1002", "1001"]);
+});
+
+/* ---- team categories ----------------------------------------------
+   The two kinds of team, kept apart by colour. Configured rather than
+   hard-coded, so these check the shipped config and the resolver that
+   maps whatever someone typed onto a real category. */
+
+const event = JSON.parse(readFileSync(new URL("../config/event.json", import.meta.url)));
+const categories = event.teamCategories;
+
+function defaultCategory() {
+  return categories[0].id;
+}
+
+function resolveCategory(input) {
+  const wanted = String(input ?? "").trim().toLowerCase();
+  if (!wanted) return defaultCategory();
+  const match = categories.find(
+    (c) => c.id.toLowerCase() === wanted || c.label.toLowerCase() === wanted,
+  );
+  return match ? match.id : defaultCategory();
+}
+
+test("there are exactly two kinds of team, each with its own colour", () => {
+  assert.equal(categories.length, 2);
+  assert.deepEqual(
+    categories.map((c) => c.label),
+    ["Developing", "Fully Developed"],
+  );
+  const colours = categories.map((c) => c.color);
+  assert.equal(new Set(colours).size, 2, "two types sharing one colour would defeat the point");
+});
+
+test("a category resolves from its id or its label, in any case", () => {
+  assert.equal(resolveCategory("fully-developed"), "fully-developed");
+  assert.equal(resolveCategory("Fully Developed"), "fully-developed");
+  assert.equal(resolveCategory("FULLY DEVELOPED"), "fully-developed");
+  assert.equal(resolveCategory("developing"), "developing");
+  assert.equal(resolveCategory("  Developing  "), "developing");
+});
+
+test("anything unrecognised falls back rather than corrupting the roster", () => {
+  for (const junk of ["", null, undefined, "<script>", "half-developed", 42]) {
+    assert.equal(resolveCategory(junk), defaultCategory(), `${junk} should fall back`);
+  }
+});
+
+test("no scoring band shares a name with a team type", () => {
+  const bandLabels = config.bands.map((b) => b.label.toLowerCase());
+  for (const c of categories) {
+    assert.ok(
+      !bandLabels.includes(c.label.toLowerCase()),
+      `"${c.label}" is both a team type and a scoring band — one of them has to change`,
+    );
+  }
 });

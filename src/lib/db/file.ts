@@ -12,7 +12,7 @@ import type { ActivityRow, Note, Panel, RequestRow, ScoreRow, Team } from "../ty
 import type { Status } from "../status";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
-import { DEFAULT_DIVISION, presetPanels } from "../presets";
+import { DEFAULT_DIVISION, defaultCategory, presetPanels } from "../presets";
 import {
   StoreError,
   type ImportedTeam,
@@ -140,8 +140,9 @@ function migrate(data: Data): Data {
 
   for (const team of data.teams) {
     if (typeof team.number !== "string") team.number = normalizeTeamNumber(team.number);
-    // Divisions arrived after the first rosters did.
+    // Divisions, then categories, arrived after the first rosters did.
     if (!team.division) team.division = fallback;
+    if (!team.category) team.category = defaultCategory();
   }
   for (const panel of data.panels) {
     if (!panel.division) panel.division = fallback;
@@ -379,6 +380,7 @@ function upsertTeams(rows: ImportedTeam[]): number {
     if (existing) {
       existing.name = row.name;
       existing.pit = row.pit;
+      if (row.category) existing.category = row.category;
       // A team that changes division loses its panel: the old one is on
       // the far side of the wall.
       if (row.division && row.division !== existing.division) {
@@ -392,6 +394,7 @@ function upsertTeams(rows: ImportedTeam[]): number {
         name: row.name,
         panel_id: null,
         division: row.division,
+        category: row.category,
         pit: row.pit,
         created_at: now,
       });
@@ -704,6 +707,8 @@ function demoData(): Data {
     name,
     panel_id: panels[i % panels.length].id,
     division: panels[i % panels.length].division,
+    // Alternate the two kinds so the colour split is visible on first run.
+    category: i % 3 === 0 ? "fully-developed" : "developing",
     pit: `Pit ${i + 1}`,
     created_at: iso(0),
   }));

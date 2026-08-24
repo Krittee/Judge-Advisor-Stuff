@@ -17,6 +17,7 @@ import {
 import type { Session } from "@/lib/auth";
 import { NotesDrawer, SignOutButton } from "@/components/judging";
 import { Rankings } from "@/components/Rankings";
+import { CategoryChip } from "@/components/CategoryChip";
 import type { RequestRow, Team } from "@/lib/types";
 
 /**
@@ -186,7 +187,7 @@ export default function JudgePage() {
         ) : null}
 
         {view === "scores" ? (
-          <Rankings teams={myTeams} onOpenTeam={setNotesFor} />
+          <Rankings teams={myTeams} categories={state.categories} onOpenTeam={setNotesFor} />
         ) : null}
 
         {view === "queue" && !myTeams.length ? (
@@ -210,6 +211,7 @@ export default function JudgePage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl font-bold tabular-nums">{team.number}</span>
+                    <CategoryChip category={team.category} categories={state.categories} />
                     {request ? <StatusChip status={request.status} size="sm" /> : null}
                   </div>
                   <div className="truncate text-zinc-300">{team.name}</div>

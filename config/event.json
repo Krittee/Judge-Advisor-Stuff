@@ -8,10 +8,19 @@
     "`booking` sets the bookable time slots every panel starts with. startTime is a",
     "24-hour clock time on the day the panels are created; set exact dates later in",
     "Admin > Panels if you need to. Set slotCount to 0 for a walk-up queue only.",
-    "A panel can override any of these with its own slotMinutes / slotCount / startTime."
+    "A panel can override any of these with its own slotMinutes / slotCount / startTime.",
+    "",
+    "`teamCategories` separates the two kinds of team. The first one listed is what",
+    "a team gets until someone says otherwise. Rename the labels or change the",
+    "colours to suit your event; keep the ids stable once teams are assigned."
   ],
 
   "divisions": ["Division 1", "Division 2"],
+
+  "teamCategories": [
+    { "id": "developing", "label": "Developing", "color": "amber" },
+    { "id": "fully-developed", "label": "Fully Developed", "color": "violet" }
+  ],
 
   "booking": {
     "startTime": "09:00",

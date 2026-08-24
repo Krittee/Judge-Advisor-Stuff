@@ -17,6 +17,7 @@ import {
 } from "@/components/ui";
 import { NotesDrawer, SignOutButton } from "@/components/judging";
 import { Rankings } from "@/components/Rankings";
+import { CategoryChip, CategorySelect } from "@/components/CategoryChip";
 import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
 import type { ActivityRow, Panel, RequestRow, Team } from "@/lib/types";
@@ -99,6 +100,7 @@ export default function AdminPage() {
         {tab === "scores" ? (
           <Rankings
             teams={state.teams}
+            categories={state.categories}
             panelName={Object.fromEntries(state.panels.map((p) => [p.id, p.name]))}
             onOpenTeam={setNotesFor}
           />
@@ -108,7 +110,12 @@ export default function AdminPage() {
           <PanelsTab refresh={refresh} onError={setError} divisions={state.divisions} />
         ) : null}
         {tab === "import" ? (
-          <ImportTab refresh={refresh} onError={setError} divisions={state.divisions} />
+          <ImportTab
+            refresh={refresh}
+            onError={setError}
+            divisions={state.divisions}
+            categories={state.categories}
+          />
         ) : null}
         {tab === "log" ? <ActivityTab /> : null}
       </main>
@@ -280,16 +287,18 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
   const [filter, setFilter] = useState("");
   const [perPanel, setPerPanel] = useState(10);
   const [division, setDivision] = useState<string>("");
+  const [category, setCategory] = useState<string>("");
   const [busy, setBusy] = useState(false);
 
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase();
     return state.teams.filter((t) => {
       if (division && t.division !== division) return false;
+      if (category && t.category !== category) return false;
       if (!q) return true;
       return t.number.toLowerCase().includes(q) || t.name.toLowerCase().includes(q);
     });
-  }, [state.teams, filter, division]);
+  }, [state.teams, filter, division, category]);
 
   const perPanelCount = useMemo(() => {
     const c = new Map<string, number>();
@@ -352,6 +361,21 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
             </option>
           ))}
         </select>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className={`${inputClass} max-w-[13rem]`}
+          aria-label="Team type"
+        >
+          <option value="" className="bg-zinc-900">
+            Both types
+          </option>
+          {state.categories.map((c) => (
+            <option key={c.id} value={c.id} className="bg-zinc-900">
+              {c.label}
+            </option>
+          ))}
+        </select>
         <div className="flex items-end gap-2">
           <label className="text-sm text-zinc-400">
             <span className="mb-1 block text-xs">Max per panel</span>
@@ -373,6 +397,17 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
         </span>
       </div>
 
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        {state.categories.map((c) => (
+          <span key={c.id} className="flex items-center gap-1.5">
+            <CategoryChip category={c.id} categories={state.categories} />
+            <span className="text-zinc-300">
+              {shown.filter((t) => t.category === c.id).length}
+            </span>
+          </span>
+        ))}
+      </div>
+
       <div className="flex flex-wrap gap-2 text-xs">
         {state.panels
           .filter((p) => !division || p.division === division)
@@ -391,6 +426,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
               <th className="px-4 py-3">Team</th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Pit</th>
+              <th className="px-4 py-3">Type</th>
               <th className="px-4 py-3">Division</th>
               <th className="px-4 py-3">Judge panel</th>
               <th className="px-4 py-3">Status</th>
@@ -408,6 +444,13 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                   <td className="px-4 py-2.5 font-bold tabular-nums">{team.number}</td>
                   <td className="px-4 py-2.5 text-zinc-300">{team.name}</td>
                   <td className="px-4 py-2.5 text-zinc-500">{team.pit ?? "—"}</td>
+                  <td className="px-4 py-2.5">
+                    <CategorySelect
+                      value={team.category}
+                      categories={state.categories}
+                      onChange={(id) => update(team.id, { category: id })}
+                    />
+                  </td>
                   <td className="px-4 py-2.5">
                     <select
                       value={team.division}
@@ -1007,15 +1050,18 @@ function ImportTab({
   refresh,
   onError,
   divisions,
+  categories,
 }: {
   refresh: () => Promise<void>;
   onError: (m: string | null) => void;
   divisions: string[];
+  categories: { id: string; label: string; color: string }[];
 }) {
   const [text, setText] = useState("");
   const [autoAssign, setAutoAssign] = useState(true);
   const [perPanel, setPerPanel] = useState(10);
   const [division, setDivision] = useState(divisions[0] ?? "");
+  const [category, setCategory] = useState(categories[0]?.id ?? "");
   const [loaded, setLoaded] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -1047,7 +1093,7 @@ function ImportTab({
     try {
       const res = await call<{ imported: number; skipped: number; assigned: number }>(
         "/api/admin/teams",
-        { body: { text, autoAssign, perPanel, division } },
+        { body: { text, autoAssign, perPanel, division, category } },
       );
       setResult(
         `Imported ${res.imported} team${res.imported === 1 ? "" : "s"}` +
@@ -1071,7 +1117,8 @@ function ImportTab({
           One team per line: <code className="text-zinc-300">number, name, pit</code>. Pit is
           optional. Team numbers may include letters — <code className="text-zinc-300">9882K</code>{" "}
           works as well as <code className="text-zinc-300">1234</code>. Everything you load goes
-          into the division chosen below, unless a row names one in a fourth column. Paste straight
+          into the division and team type chosen below, unless a row names them in a fourth
+          and fifth column. Paste straight
           from a spreadsheet — tabs work too, and a header row is skipped automatically.
           Re-importing updates existing teams instead of duplicating them.
         </p>
@@ -1139,6 +1186,20 @@ function ImportTab({
             {divisions.map((d) => (
               <option key={d} value={d} className="bg-zinc-900">
                 {d}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm text-zinc-300">
+          <span className="mb-1 block text-xs text-zinc-400">Team type</span>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className={`${inputClass} py-2`}
+          >
+            {categories.map((c) => (
+              <option key={c.id} value={c.id} className="bg-zinc-900">
+                {c.label}
               </option>
             ))}
           </select>
