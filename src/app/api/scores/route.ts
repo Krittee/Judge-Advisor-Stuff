@@ -97,6 +97,28 @@ export async function POST(request: Request) {
   return NextResponse.json({ score, band: bandOf(score, rubric.max) });
 }
 
+/** Clear one rubric for one team. Same scope rules as reading it. */
+export async function DELETE(request: Request) {
+  const session = await getSession();
+  if (!canReadNotes(session)) {
+    return NextResponse.json({ error: "Not authorised." }, { status: 403 });
+  }
+
+  const params = new URL(request.url).searchParams;
+  const teamId = String(params.get("teamId") ?? "");
+  const rubricId = String(params.get("rubricId") ?? "");
+
+  if (!rubricById(rubricId)) {
+    return NextResponse.json({ error: "Unknown rubric." }, { status: 400 });
+  }
+
+  const denied = await refuseIfOutOfScope(session, teamId);
+  if (denied) return denied;
+
+  const cleared = await store().clearScore(teamId, rubricId);
+  return NextResponse.json({ ok: true, cleared });
+}
+
 function bandOf(score: ScoreRow, max: number) {
   return bandFor(score.total, max, Object.keys(score.values ?? {}).length > 0);
 }

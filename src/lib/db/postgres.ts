@@ -666,6 +666,21 @@ export const postgresStore: Store = {
     )!;
   },
 
+  /**
+   * Start this rubric over.
+   *
+   * Deleted rather than zeroed: a team with no scores and a team scored
+   * zero everywhere have to stay distinguishable, or the ranking board
+   * would show a cleared team as genuinely bottom-placed.
+   */
+  async clearScore(teamId, rubricId) {
+    const gone = await query<{ id: string }>(
+      "delete from scores where team_id = $1 and rubric_id = $2 returning id",
+      [teamId, rubricId],
+    );
+    return gone.length > 0;
+  },
+
   async logActivity(entry: NewActivity) {
     // The log is a convenience, not a record of account. Never let a
     // failed audit write break the thing the user actually asked for.

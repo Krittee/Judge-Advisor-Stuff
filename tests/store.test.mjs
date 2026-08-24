@@ -125,6 +125,28 @@ function makeStore(file) {
       for (const r of data.requests) if (r.panel_id === id) r.panel_id = null;
       save();
     },
+    saveScore(teamId, rubricId, criterionId, value) {
+      let row = data.scores?.find((x) => x.team_id === teamId && x.rubric_id === rubricId);
+      data.scores = data.scores ?? [];
+      if (!row) {
+        row = { team_id: teamId, rubric_id: rubricId, values: {}, total: 0 };
+        data.scores.push(row);
+      }
+      if (value === null) delete row.values[criterionId];
+      else row.values[criterionId] = value;
+      row.total = Object.values(row.values).reduce((n, v) => n + v, 0);
+      save();
+      return row;
+    },
+    clearScore(teamId, rubricId) {
+      const before = (data.scores ?? []).length;
+      data.scores = (data.scores ?? []).filter(
+        (x) => !(x.team_id === teamId && x.rubric_id === rubricId),
+      );
+      const removed = data.scores.length < before;
+      if (removed) save();
+      return removed;
+    },
     deleteAllPanels() {
       const removed = data.panels.length;
       data.panels = [];
@@ -340,5 +362,71 @@ test("panels can be rebuilt and the surviving teams reassigned", () => {
     const fresh = s.addPanel("New", "NEW");
     assert.equal(s.autoAssign(10), 2, "both released teams pick up the new panel");
     assert.ok(s.data.teams.every((t) => t.panel_id === fresh.id));
+  });
+});
+
+/* ---- clearing scores ----------------------------------------------- */
+
+test("clearing one rubric leaves the other one alone", () => {
+  withStore((s) => {
+    s.saveScore("t1", "notebook", "notebook:a", 4);
+    s.saveScore("t1", "notebook", "notebook:b", 3);
+    s.saveScore("t1", "interview", "interview:a", 2);
+
+    assert.equal(s.clearScore("t1", "notebook"), true);
+
+    const left = s.data.scores;
+    assert.equal(left.length, 1);
+    assert.equal(left[0].rubric_id, "interview");
+    assert.equal(left[0].total, 2, "the interview score is untouched");
+  });
+});
+
+test("clearing removes the row rather than zeroing it", () => {
+  withStore((s) => {
+    s.saveScore("t1", "interview", "interview:a", 2);
+    s.clearScore("t1", "interview");
+
+    assert.equal(
+      s.data.scores.find((x) => x.team_id === "t1"),
+      undefined,
+      "a zeroed row would rank a cleared team as genuinely bottom-placed",
+    );
+  });
+});
+
+test("a cleared team and a team scored zero stay distinguishable", () => {
+  withStore((s) => {
+    // t1 is scored zero on every criterion; t2 is scored then cleared.
+    s.saveScore("t1", "interview", "interview:a", 0);
+    s.saveScore("t1", "interview", "interview:b", 0);
+    s.saveScore("t2", "interview", "interview:a", 2);
+    s.clearScore("t2", "interview");
+
+    const zeroed = s.data.scores.find((x) => x.team_id === "t1");
+    const cleared = s.data.scores.find((x) => x.team_id === "t2");
+
+    assert.equal(zeroed.total, 0);
+    assert.equal(Object.keys(zeroed.values).length, 2, "a real zero is still a judgement");
+    assert.equal(cleared, undefined, "a cleared team has no judgement at all");
+  });
+});
+
+test("clearing a rubric that was never scored is harmless", () => {
+  withStore((s) => {
+    assert.equal(s.clearScore("t1", "notebook"), false);
+    assert.deepEqual(s.data.scores ?? [], []);
+  });
+});
+
+test("clearing one team does not touch another", () => {
+  withStore((s) => {
+    s.saveScore("t1", "notebook", "notebook:a", 4);
+    s.saveScore("t2", "notebook", "notebook:a", 4);
+
+    s.clearScore("t1", "notebook");
+
+    assert.equal(s.data.scores.length, 1);
+    assert.equal(s.data.scores[0].team_id, "t2");
   });
 });

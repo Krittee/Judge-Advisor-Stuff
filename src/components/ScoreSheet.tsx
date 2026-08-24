@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { call } from "./useAppState";
-import { Banner } from "./ui";
+import { Banner, Button } from "./ui";
 import type { Rubric, ScalePoint } from "@/lib/rubrics";
 import type { ScoreRow } from "@/lib/types";
 
@@ -19,19 +19,29 @@ export function ScoreSheet({
   teamId,
   score,
   onSaved,
+  onCleared,
 }: {
   rubric: Rubric;
   teamId: string;
   score: ScoreRow | null;
   onSaved: (score: ScoreRow) => void;
+  onCleared: (rubricId: string) => void;
 }) {
   const [values, setValues] = useState<Record<string, number>>(score?.values ?? {});
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [armed, setArmed] = useState(false);
 
   useEffect(() => {
     setValues(score?.values ?? {});
   }, [score]);
+
+  // Never leave a live "clear everything" button sitting around.
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 8000);
+    return () => clearTimeout(t);
+  }, [armed]);
 
   const total = useMemo(
     () => rubric.criteria.reduce((sum, c) => sum + (Number(values[c.id]) || 0), 0),
@@ -61,6 +71,22 @@ export function ScoreSheet({
     }
   }
 
+  /** Start this rubric over, leaving the other one alone. */
+  async function clearAll() {
+    setSaving("all");
+    setError(null);
+    try {
+      await call(`/api/scores?teamId=${teamId}&rubricId=${rubric.id}`, { method: "DELETE" });
+      setValues({});
+      setArmed(false);
+      onCleared(rubric.id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
       {rubric.placeholder ? (
@@ -81,6 +107,34 @@ export function ScoreSheet({
           <span className="text-base font-normal text-zinc-500"> / {rubric.max}</span>
         </span>
       </div>
+
+      {answered ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-rose-500/[0.06] p-3 ring-1 ring-inset ring-rose-500/20">
+          {armed ? (
+            <>
+              <Button variant="danger" size="sm" disabled={saving !== null} onClick={clearAll}>
+                {saving === "all" ? "Clearing…" : `Yes, clear all ${answered}`}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setArmed(false)}>
+                Cancel
+              </Button>
+              <span className="text-xs text-rose-200">
+                {rubric.name} only — the other rubric is untouched.
+              </span>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => setArmed(true)}>
+                Clear score
+              </Button>
+              <span className="text-xs text-zinc-500">
+                Wipes this rubric so you can start it over. Tap any single value again to clear
+                just that one.
+              </span>
+            </>
+          )}
+        </div>
+      ) : null}
 
       {rubric.sections.map((section) => (
         <section key={section.name}>

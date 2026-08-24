@@ -177,8 +177,13 @@ A team already in the walk-up queue simply cannot be added twice.
 Two rubrics, each a tab on a team's card in the judge and Judge Advisor
 consoles: **Engineering Notebook** and **Team Interview**. Topics only — judges
 keep the printed rubric with its listen-fors in front of them, and this is only
-where the points land. Each tap saves immediately; tapping the chosen value
-again clears it.
+where the points land. Each tap saves immediately.
+
+Two ways to undo: tap a chosen value again to clear **that one criterion**, or
+use **Clear score** to wipe **one whole rubric** and start it over — behind a
+two-step confirm, and it never touches the other rubric. Clearing removes the
+record entirely rather than zeroing it, so a cleared team reads as *not scored*
+and ranks below a team genuinely scored zero.
 
 Points sum per rubric, then across both, and the combined total falls into a
 colour band shown on the **Scores** tab: ranked highest first, with unscored

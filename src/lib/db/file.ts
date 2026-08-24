@@ -620,6 +620,23 @@ function saveScore(input: SaveScore): ScoreRow {
   return row;
 }
 
+/**
+ * Start this rubric over.
+ *
+ * The row is removed rather than zeroed: a team with no scores and a team
+ * scored zero everywhere have to stay distinguishable, or the ranking
+ * board would show a cleared team as genuinely bottom-placed.
+ */
+function clearScore(teamId: string, rubricId: string): boolean {
+  const before = state().scores.length;
+  state().scores = state().scores.filter(
+    (s) => !(s.team_id === teamId && s.rubric_id === rubricId),
+  );
+  const removed = state().scores.length < before;
+  if (removed) save();
+  return removed;
+}
+
 function logActivity(entry: NewActivity): void {
   state().activity.push({
     id: randomUUID(),
@@ -815,6 +832,7 @@ export const fileStore: Store = {
 
   listScores: async (teamId) => listScores(teamId),
   saveScore: async (input) => saveScore(input),
+  clearScore: async (teamId, rubricId) => clearScore(teamId, rubricId),
   logActivity: async (entry) => logActivity(entry),
 
   resetDay: async () => resetDay(),

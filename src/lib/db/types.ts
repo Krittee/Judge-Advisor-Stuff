@@ -101,6 +101,8 @@ export type Store = {
   listScores(teamId?: string): Promise<ScoreRow[]>;
   /** Set one criterion. Creates the row on first score. */
   saveScore(input: SaveScore): Promise<ScoreRow>;
+  /** Wipe one rubric's scores for one team. Returns whether there were any. */
+  clearScore(teamId: string, rubricId: string): Promise<boolean>;
   logActivity(entry: NewActivity): Promise<void>;
 
   resetDay(): Promise<void>;

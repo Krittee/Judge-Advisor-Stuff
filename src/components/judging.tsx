@@ -208,6 +208,9 @@ export function NotesDrawer({
                   saved,
                 ])
               }
+              onCleared={(rubricId) =>
+                setScores((prev) => prev.filter((s) => s.rubric_id !== rubricId))
+              }
             />
           ) : null,
         )}
