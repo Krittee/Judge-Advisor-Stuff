@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { use, useMemo, useState } from "react";
-import { buildSlots, liveRequestFor } from "@/lib/data";
+import { liveRequestFor } from "@/lib/data";
 import { STATUS_META } from "@/lib/status";
 import { call, useAppState } from "@/components/useAppState";
 import { normalizeTeamNumber } from "@/lib/teamNumber";
+import { PanelBusyLine, panelLoad, SlotPicker } from "@/components/SlotPicker";
 import {
   Banner,
   Button,
@@ -29,6 +30,9 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
   const team = state.teams.find((t) => t.number === teamNumber);
   const panel = state.panels.find((p) => p.id === team?.panel_id);
   const current = team ? liveRequestFor(team.id, state.requests) : null;
+  // A booking is not the same as being in the queue: a team holding a
+  // later slot can still say they are ready now.
+  const booking = current?.status === "scheduled" ? current : null;
 
   const history = useMemo(
     () =>
@@ -38,12 +42,10 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
     [state.requests, team, current],
   );
 
-  const slots = useMemo(
-    () => (panel ? buildSlots(panel, state.requests, state.teams) : []),
-    [panel, state.requests, state.teams],
+  const load = useMemo(
+    () => (panel ? panelLoad(panel.id, state.requests) : null),
+    [panel, state.requests],
   );
-
-  const openSlots = slots.filter((s) => !s.takenBy && new Date(s.end).getTime() > Date.now());
 
   async function act(body: Record<string, unknown>) {
     setBusy(true);
@@ -57,6 +59,24 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Ready early: give up any held slot so it does not sit there unused. */
+  async function readyNow() {
+    if (booking) {
+      setBusy(true);
+      setError(null);
+      try {
+        await call(`/api/requests/${booking.id}`, { method: "PATCH", body: { action: "cancel" } });
+        await refresh();
+      } catch (e) {
+        setError((e as Error).message);
+        setBusy(false);
+        return;
+      }
+      setBusy(false);
+    }
+    await act({ teamNumber: team!.number, kind: "queue", message });
   }
 
   async function cancel() {
@@ -118,7 +138,7 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
           </Banner>
         ) : null}
 
-        {current ? (
+        {current && !booking ? (
           <section className="space-y-4 rounded-2xl bg-white/[0.04] p-5 ring-1 ring-inset ring-white/10">
             <StatusChip status={current.status} size="lg" />
             <p className="text-lg">{STATUS_META[current.status].teamLabel}</p>
@@ -148,14 +168,29 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
           </section>
         ) : (
           <section className="space-y-4">
+            {booking ? (
+              <div className="space-y-3 rounded-2xl bg-white/[0.04] p-5 ring-1 ring-inset ring-white/10">
+                <StatusChip status="scheduled" size="lg" />
+                <p className="text-lg">
+                  Booked for{" "}
+                  <span className="font-semibold">{formatClock(booking.slot_start)}</span>
+                </p>
+                <Button variant="ghost" size="sm" onClick={cancel} disabled={busy}>
+                  Cancel this booking
+                </Button>
+              </div>
+            ) : null}
+
             <Button
               variant="warn"
               size="lg"
               className="w-full"
               disabled={busy || !team.panel_id}
-              onClick={() => act({ teamNumber: team.number, kind: "queue", message })}
+              onClick={readyNow}
             >
-              We&apos;re ready — request a judge now
+              {booking
+                ? "We're ready now instead — give up our slot"
+                : "We're ready — request a judge now"}
             </Button>
             <input
               value={message}
@@ -164,36 +199,34 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
               className={inputClass}
               maxLength={280}
             />
+            {load ? (
+              <p className="text-center text-xs">
+                <PanelBusyLine load={load} />
+              </p>
+            ) : null}
           </section>
         )}
 
-        {!current && openSlots.length ? (
+        {!current && panel ? (
           <section className="rounded-2xl bg-white/[0.03] p-5 ring-1 ring-inset ring-white/10">
-            <h2 className="mb-1 text-sm font-semibold text-zinc-300">
-              Or book a time with {panel?.name}
+            <h2 className="mb-3 text-sm font-semibold text-zinc-300">
+              Or book a time with {panel.name}
             </h2>
-            <p className="mb-4 text-xs text-zinc-500">
-              {openSlots.length} slot{openSlots.length === 1 ? "" : "s"} still open.
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {openSlots.map((slot) => (
-                <button
-                  key={slot.start}
-                  disabled={busy}
-                  onClick={() =>
-                    act({
-                      teamNumber: team.number,
-                      kind: "slot",
-                      slotStart: slot.start,
-                      slotEnd: slot.end,
-                    })
-                  }
-                  className="rounded-xl bg-white/5 px-2 py-3 text-sm font-medium ring-1 ring-inset ring-white/10 transition hover:bg-indigo-500 hover:text-white disabled:opacity-40"
-                >
-                  {formatClock(slot.start)}
-                </button>
-              ))}
-            </div>
+            <SlotPicker
+              panel={panel}
+              requests={state.requests}
+              teams={state.teams}
+              teamId={team.id}
+              disabled={busy}
+              onPick={(slot) =>
+                act({
+                  teamNumber: team.number,
+                  kind: "slot",
+                  slotStart: slot.start,
+                  slotEnd: slot.end,
+                })
+              }
+            />
           </section>
         ) : null}
 

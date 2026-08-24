@@ -139,6 +139,34 @@ request is still orange. Once judges acknowledge it, it is out of their hands.
 
 ---
 
+## Booking: now, or later
+
+Both routes are offered side by side, on the team's own page and at the queue
+desk:
+
+- **Interview now** — joins the walk-up queue and goes straight to orange.
+- **Book a time** — claims one of the panel's slots and waits at *scheduled*
+  until its turn.
+
+**Conflicts are shown, not hidden.** The slot grid lists every slot with its
+state — free, taken (with the team number holding it), already gone, or yours —
+so a full schedule reads differently from a panel that runs no slots at all.
+Alongside it, the panel's current load: how many teams are waiting and how long
+the longest has been there.
+
+Two clashes get handled rather than merely reported:
+
+- **Another team already holds that slot.** Refused by the database, not just
+  the UI, so two people booking at the same instant cannot both win.
+- **This team already holds a later slot but is ready now.** The button becomes
+  *"Interview now instead (frees 2:15 PM)"* — it releases the booking, then
+  queues them. Without that the slot would sit there unused and the schedule
+  would lie about how full it is.
+
+A team already in the walk-up queue simply cannot be added twice.
+
+---
+
 ## Divisions
 
 Two divisions can run at once, and they are a **hard wall**:

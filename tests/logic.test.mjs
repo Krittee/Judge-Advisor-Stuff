@@ -207,3 +207,93 @@ test("quoted fields survive commas, doubled quotes and tab rows", () => {
   assert.equal(byNumber["11"].name, 'The "Bots"');
   assert.equal(byNumber["12"].name, "Heavy, Metal", "tabs split first, so commas are safe");
 });
+
+/* ---- booking conflicts -------------------------------------------
+   The queue desk offers "interview now" and "book a time" side by side,
+   so it has to be clear when one clashes with the other, or with a slot
+   another team already holds. */
+
+const LIVE_STATUSES = ["requested", "acknowledged", "interviewing"];
+
+/** What the desk shows about a team before it lets you add them. */
+function conflictFor(teamId, requests) {
+  const live = requests.find((r) => r.team_id === teamId && LIVE_STATUSES.includes(r.status));
+  if (live) return { kind: "already-queued", request: live };
+
+  const booked = requests.find((r) => r.team_id === teamId && r.status === "scheduled");
+  if (booked) return { kind: "already-booked", request: booked };
+
+  return null;
+}
+
+test("a team already in the queue cannot be added again", () => {
+  const requests = [{ team_id: "t1", status: "requested", kind: "queue" }];
+  assert.equal(conflictFor("t1", requests).kind, "already-queued");
+  assert.equal(conflictFor("t2", requests), null, "a different team is unaffected");
+});
+
+test("a booked team is flagged, but not as a duplicate", () => {
+  const requests = [
+    { team_id: "t1", status: "scheduled", kind: "slot", slot_start: "2026-09-01T14:00:00.000Z" },
+  ];
+  const conflict = conflictFor("t1", requests);
+  assert.equal(conflict.kind, "already-booked", "a booking is a slot to release, not a duplicate");
+  assert.equal(conflict.request.slot_start, "2026-09-01T14:00:00.000Z");
+});
+
+test("being in the queue outranks holding a later booking", () => {
+  const requests = [
+    { team_id: "t1", status: "scheduled", kind: "slot", slot_start: "2026-09-01T14:00:00.000Z" },
+    { team_id: "t1", status: "interviewing", kind: "queue" },
+  ];
+  assert.equal(
+    conflictFor("t1", requests).kind,
+    "already-queued",
+    "an interview happening now is the more urgent fact",
+  );
+});
+
+test("releasing a booking frees the slot for another team", () => {
+  const PANEL = { id: "p1", slot_start_at: "2026-09-01T14:00:00.000Z", slot_minutes: 12, slot_count: 3 };
+  const teams = [
+    { id: "t1", number: "1234" },
+    { id: "t2", number: "5678" },
+  ];
+  const booking = {
+    kind: "slot",
+    panel_id: "p1",
+    slot_start: "2026-09-01T14:00:00.000Z",
+    status: "scheduled",
+    team_id: "t1",
+  };
+
+  let slots = buildSlots(PANEL, [booking], teams);
+  assert.equal(slots[0].takenBy.teamNumber, "1234", "shown as taken, not hidden");
+
+  // The team turns up early: the booking is cancelled, then they queue.
+  booking.status = "cancelled";
+  slots = buildSlots(PANEL, [booking], teams);
+  assert.equal(slots[0].takenBy, null, "the slot goes back into circulation");
+});
+
+test("a full schedule is distinguishable from a panel that runs no slots", () => {
+  const PANEL = { id: "p1", slot_start_at: "2026-09-01T14:00:00.000Z", slot_minutes: 12, slot_count: 2 };
+  const teams = [
+    { id: "t1", number: "1" },
+    { id: "t2", number: "2" },
+  ];
+  const full = buildSlots(
+    PANEL,
+    [
+      { kind: "slot", panel_id: "p1", slot_start: "2026-09-01T14:00:00.000Z", status: "scheduled", team_id: "t1" },
+      { kind: "slot", panel_id: "p1", slot_start: "2026-09-01T14:12:00.000Z", status: "scheduled", team_id: "t2" },
+    ],
+    teams,
+  );
+
+  assert.equal(full.length, 2, "a full panel still lists its slots");
+  assert.ok(full.every((s) => s.takenBy), "every one shows who holds it");
+
+  const noSlots = buildSlots({ ...PANEL, slot_count: 0 }, [], teams);
+  assert.equal(noSlots.length, 0, "whereas a walk-up-only panel has none at all");
+});
