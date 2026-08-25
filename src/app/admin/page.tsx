@@ -437,7 +437,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
               <th className="px-4 py-3">Notebook</th>
               <th className="px-4 py-3">Division</th>
               <th className="px-4 py-3">Judge panel</th>
-              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Interview</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -514,9 +514,9 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                   </td>
                   <td className="px-4 py-2.5">
                     {req ? (
-                      <StatusChip status={req.status} size="sm" />
+                      <StatusChip status={req.status} size="sm" short />
                     ) : done ? (
-                      <StatusChip status="completed" size="sm" />
+                      <StatusChip status="completed" size="sm" short />
                     ) : (
                       <span className="text-xs text-zinc-600">—</span>
                     )}

@@ -7,9 +7,12 @@ import { STATUS_META, type Status } from "@/lib/status";
 export function StatusChip({
   status,
   size = "md",
+  short = false,
 }: {
   status: Status;
   size?: "sm" | "md" | "lg";
+  /** Drop the "Interview" prefix where a column heading already says it. */
+  short?: boolean;
 }) {
   const meta = STATUS_META[status];
   const pad =
@@ -17,11 +20,11 @@ export function StatusChip({
 
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full ${pad} ${meta.chip} ${
-        status === "requested" ? "pulse-waiting" : ""
-      }`}
+      className={`inline-flex items-center gap-2 whitespace-nowrap rounded-full ${pad} ${
+        meta.chip
+      } ${status === "requested" ? "pulse-waiting" : ""}`}
     >
-      {meta.label}
+      {short ? meta.short : meta.label}
     </span>
   );
 }
