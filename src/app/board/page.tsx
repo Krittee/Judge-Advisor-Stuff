@@ -99,9 +99,16 @@ export default function BoardPage() {
               </span>
             </div>
 
-            {panel?.judges.length ? (
-              <p className="mb-3 text-sm text-zinc-500">{panel.judges.join(" · ")}</p>
-            ) : null}
+            {/* Always say who is judging, even when nobody has been named
+                yet — a blank line reads as "no panel here" rather than
+                "nobody has filled this in". */}
+            <p className="mb-3 text-sm">
+              {panel?.judges.length ? (
+                <span className="text-zinc-500">{panel.judges.join(" · ")}</span>
+              ) : (
+                <span className="text-zinc-600 italic">NA</span>
+              )}
+            </p>
 
             <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(140px,1fr))]">
               {teams
