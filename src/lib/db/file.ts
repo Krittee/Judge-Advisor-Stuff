@@ -718,17 +718,30 @@ function demoData(): Data {
   // that pure-numeric rosters would quietly hide.
   const suffixes = ["", "", "", "A", "", "", "B", "", "", "K"];
 
-  const teams: Team[] = names.map((name, i) => ({
-    id: randomUUID(),
-    number: `${1101 + i * 7}${suffixes[i % suffixes.length]}`,
-    name,
-    panel_id: panels[i % panels.length].id,
-    division: panels[i % panels.length].division,
-    // Alternate the two kinds so the colour split is visible on first run.
-    category: i % 3 === 0 ? "fully-developed" : "developing",
-    pit: `Pit ${i + 1}`,
-    created_at: iso(0),
-  }));
+  // Deal teams to panels in blocks rather than round-robin, so each
+  // division ends up on contiguous pit rows the way a real floor is laid
+  // out — otherwise the plan on the board interleaves the two divisions
+  // and tells you nothing about where anyone is standing.
+  const perPanel = Math.ceil(names.length / panels.length);
+
+  const teams: Team[] = names.map((name, i) => {
+    const panel = panels[Math.min(panels.length - 1, Math.floor(i / perPanel))];
+    // Pit codes are a letter and a number: the letter is the row, which
+    // is what lets the board draw a floor plan nobody laid out by hand.
+    const row = String.fromCharCode(65 + Math.floor(i / 6));
+
+    return {
+      id: randomUUID(),
+      number: `${1101 + i * 7}${suffixes[i % suffixes.length]}`,
+      name,
+      panel_id: panel.id,
+      division: panel.division,
+      // Alternate the two kinds so the colour split shows on first run.
+      category: i % 3 === 0 ? "fully-developed" : "developing",
+      pit: `${row}${(i % 6) + 1}`,
+      created_at: iso(0),
+    };
+  });
 
   const request = (
     team: Team,

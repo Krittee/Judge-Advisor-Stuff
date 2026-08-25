@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { canAdminister, getSession } from "@/lib/auth";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
 import { presetDivisions, resolveCategory } from "@/lib/presets";
+import { normalizePit } from "@/lib/pit";
 import { store, StoreError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -98,7 +99,7 @@ export async function PATCH(request: Request) {
       // whichever panel held it.
       patch.panel_id = null;
     }
-    if ("pit" in body) patch.pit = body.pit ? String(body.pit).slice(0, 60) : null;
+    if ("pit" in body) patch.pit = normalizePit(body.pit);
     if ("name" in body) patch.name = String(body.name).slice(0, 120);
 
     return NextResponse.json({ team: await store().updateTeam(teamId, patch) });
@@ -164,7 +165,7 @@ function parseTeams(
     seen.set(number, {
       number,
       name: cells[1] || `Team ${number}`,
-      pit: cells[2] || null,
+      pit: normalizePit(cells[2]),
       division: cells[3] ? resolveDivision(cells[3]) : fallbackDivision,
       category: cells[4] ? resolveCategory(cells[4]) : fallbackCategory,
     });

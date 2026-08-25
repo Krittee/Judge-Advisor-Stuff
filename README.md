@@ -99,7 +99,9 @@ app knows which is in use.
    9882K, Kilo Kestrels, Pit 13
    ```
    Team numbers may contain letters (`9882K`), and are matched
-   case-insensitively so a team typing `9882k` still finds itself.
+   case-insensitively so a team typing `9882k` still finds itself. Pits read
+   best as a letter and a number (`A1`) — that is what places a team on the
+   board's pit floor plan.
 
    Spreadsheets are read in your browser — the file is never uploaded anywhere.
    Old `.xls` files are not readable; re-save them as `.xlsx` or CSV. Whatever
@@ -215,6 +217,31 @@ it is no longer the same thing being measured.
 Tests assert each rubric still matches its printed sheet — criteria counts,
 scale wording, and every section total — so an accidental edit fails the suite
 rather than surfacing on event day.
+
+---
+
+## The big board
+
+Two tabs, both meant for a TV in the judges' room. **Fullscreen** is in the
+corner.
+
+**By panel** — every judge panel with its teams, coloured by interview status.
+
+**Pit floor** — the pits seen from above. Two things read at once, so they use
+different channels rather than competing: each **division** is its own
+colour-bordered block, and **interview status** fills the pit tile itself, in
+the same colours as the queue board. A thin rail down each tile carries the team
+type.
+
+The plan draws itself from the pit codes — no floor plan to lay out. A pit is a
+**letter and a number**, `A1`, `B7`, `C12`: the letter is the row, the number the
+position along it. `a1`, `A01`, `A 1` and `Pit A1` all mean the same pit.
+
+Within a division, a blank cell is a genuinely empty pit. Where another division
+occupies that stretch of the row, the space is left silent rather than drawn as
+free — the rows still line up, but the board never says a pit is empty when
+somebody is standing in it. Teams with no pit, or one that is not a
+letter-and-number, are listed underneath rather than dropped.
 
 ---
 

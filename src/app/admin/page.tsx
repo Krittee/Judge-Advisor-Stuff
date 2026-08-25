@@ -1115,7 +1115,9 @@ function ImportTab({
         <h2 className="text-lg font-semibold">Import your team list</h2>
         <p className="mt-1 text-sm text-zinc-400">
           One team per line: <code className="text-zinc-300">number, name, pit</code>. Pit is
-          optional. Team numbers may include letters — <code className="text-zinc-300">9882K</code>{" "}
+          optional, and reads best as a letter and a number like <code className="text-zinc-300">A1</code>, which is what puts
+          the team on the board&apos;s pit floor plan. Team numbers may include letters —{" "}
+          <code className="text-zinc-300">9882K</code>{" "}
           works as well as <code className="text-zinc-300">1234</code>. Everything you load goes
           into the division and team type chosen below, unless a row names them in a fourth
           and fifth column. Paste straight
@@ -1168,7 +1170,7 @@ function ImportTab({
           }}
           rows={12}
           spellCheck={false}
-          placeholder={"1234, Iron Hawks, Pit 12\n9882K, Kilo Kestrels, Pit 13\n9882A, Alpha Antelopes"}
+          placeholder={"1234, Iron Hawks, A1\n9882K, Kilo Kestrels, A2\n9882A, Alpha Antelopes, B1"}
           className={`${inputClass} font-mono text-sm`}
         />
       </div>

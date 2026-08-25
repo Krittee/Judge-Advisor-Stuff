@@ -6,6 +6,7 @@ import { useAppState } from "@/components/useAppState";
 import { compareTeamNumbers } from "@/lib/teamNumber";
 import { ConnectionDot, Elapsed, StatusLegend } from "@/components/ui";
 import { CategoryLegend, CategoryRail } from "@/components/CategoryChip";
+import { PitMap } from "@/components/PitMap";
 import type { PublicPanel, RequestRow, Team } from "@/lib/types";
 
 /**
@@ -16,6 +17,7 @@ import type { PublicPanel, RequestRow, Team } from "@/lib/types";
 export default function BoardPage() {
   const { state, online } = useAppState(6000);
   const [hideDone, setHideDone] = useState(false);
+  const [tab, setTab] = useState<"queue" | "pits">("queue");
 
   const byPanel = useMemo(() => groupByPanel(state.panels, state.teams, state.requests), [state]);
 
@@ -27,6 +29,25 @@ export default function BoardPage() {
     <main className="min-h-screen px-6 py-5">
       <header className="mb-6 flex flex-wrap items-end gap-x-8 gap-y-3">
         <h1 className="text-3xl font-bold tracking-tight">Judging Board</h1>
+
+        <div className="flex gap-1 rounded-xl bg-white/5 p-1">
+          {(
+            [
+              ["queue", "By panel"],
+              ["pits", "Pit floor"],
+            ] as ["queue" | "pits", string][]
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${
+                tab === id ? "bg-indigo-500 text-white" : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         <div className="flex gap-6 text-sm">
           <Tally label="Waiting" value={waiting} tone="text-orange-400" />
@@ -59,7 +80,13 @@ export default function BoardPage() {
         <CategoryLegend categories={state.categories} />
       </div>
 
-      <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
+      {tab === "pits" ? <PitMap state={state} hideDone={hideDone} /> : null}
+
+      <div
+        className={`grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))] ${
+          tab === "queue" ? "" : "hidden"
+        }`}
+      >
         {byPanel.map(({ panel, teams }) => (
           <section
             key={panel?.id ?? "unassigned"}
