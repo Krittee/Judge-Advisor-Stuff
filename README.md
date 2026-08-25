@@ -235,12 +235,13 @@ the same colours as the queue board. A thin rail down each tile carries the team
 type.
 
 The plan draws itself from the pit codes — no floor plan to lay out. A pit is a
-**letter and a number**, `A1`, `B7`, `C12`: the letter is the row, the number the
-position along it. `a1`, `A01`, `A 1` and `Pit A1` all mean the same pit.
+**letter and a number**, `A1`, `B7`, `C12`. Each letter is a **column running
+down** the screen, with its numbers in order beneath it, the way the aisles run.
+`a1`, `A01`, `A 1` and `Pit A1` all mean the same pit.
 
 Within a division, a blank cell is a genuinely empty pit. Where another division
-occupies that stretch of the row, the space is left silent rather than drawn as
-free — the rows still line up, but the board never says a pit is empty when
+occupies that stretch of a column, the space is left silent rather than drawn as
+free — the columns still line up, but the board never says a pit is empty when
 somebody is standing in it. Teams with no pit, or one that is not a
 letter-and-number, are listed underneath rather than dropped.
 

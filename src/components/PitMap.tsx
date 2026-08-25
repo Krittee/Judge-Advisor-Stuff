@@ -145,11 +145,13 @@ function DivisionFloor({
         </span>
       </div>
 
-      <div className="space-y-1.5 overflow-x-auto">
+      {/* Laid out down the screen: each pit letter is a column, its
+          positions running top to bottom, the way the aisles run. */}
+      <div className="flex flex-wrap gap-2 pb-1">
         {rows.map(({ row, cells, from, to }) => (
-          <div key={row} className="flex items-stretch gap-1.5">
+          <div key={row} className="flex w-[7.5rem] shrink-0 flex-col gap-1.5">
             <span
-              className={`flex w-7 shrink-0 items-center justify-center rounded-md bg-white/5 text-sm font-bold ${tone.head}`}
+              className={`rounded-md bg-white/5 py-1 text-center text-sm font-bold ${tone.head}`}
             >
               {row}
             </span>
@@ -191,13 +193,13 @@ function PitCell({
   // Another division's stretch of this row: hold the column so the rows
   // stay aligned, but say nothing about it.
   if (outside) {
-    return <div className="min-w-[3.5rem] flex-1" aria-hidden />;
+    return <div className="h-[3.25rem]" aria-hidden />;
   }
 
   // An empty slot inside this division's span: a pit nobody occupies.
   if (!cell) {
     return (
-      <div className="min-w-[3.5rem] flex-1 rounded-md border border-dashed border-white/[0.07] px-1 py-2 text-center">
+      <div className="flex h-[3.25rem] items-center justify-center rounded-md border border-dashed border-white/[0.07]">
         <span className="text-[10px] text-zinc-700">
           {row}
           {position}
@@ -213,7 +215,7 @@ function PitCell({
   return (
     <div
       title={`${row}${position} · ${team.number} ${team.name}${meta ? ` · ${meta.label}` : ""}`}
-      className={`relative min-w-[3.5rem] flex-1 overflow-hidden rounded-md py-2 pl-2 pr-1 text-center ${
+      className={`relative flex h-[3.25rem] flex-col justify-center overflow-hidden rounded-md pl-2 pr-1 text-center ${
         meta ? meta.tile : "bg-white/[0.05] text-zinc-300 ring-1 ring-inset ring-white/10"
       } ${show === "requested" ? "pulse-waiting" : ""}`}
     >
