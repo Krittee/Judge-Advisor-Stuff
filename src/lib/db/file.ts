@@ -407,6 +407,15 @@ function upsertTeams(rows: ImportedTeam[]): number {
 function updateTeam(id: string, patch: Partial<Team>): Team {
   const team = state().teams.find((t) => t.id === id);
   if (!team) throw new StoreError("That team no longer exists.", 404);
+
+  // Team numbers identify a team to everyone in the building, so two
+  // teams cannot share one. Postgres has a unique index for this; the
+  // file store has to check.
+  if (patch.number && patch.number !== team.number) {
+    const clash = state().teams.some((t) => t.id !== id && t.number === patch.number);
+    if (clash) throw new StoreError(`Team ${patch.number} already exists.`, 409);
+  }
+
   Object.assign(team, patch);
   save();
   return team;

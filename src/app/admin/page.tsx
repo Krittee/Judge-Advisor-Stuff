@@ -315,6 +315,9 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
       await refresh();
     } catch (e) {
       onError((e as Error).message);
+      // Rethrow so an inline cell puts the old value back rather than
+      // showing a change the server refused.
+      throw e;
     }
   }
 
@@ -395,6 +398,11 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
         <span className="ml-auto text-sm text-zinc-500">
           {state.teams.length} teams · {state.panels.length} panels
         </span>
+        <p className="w-full text-xs text-zinc-600">
+          Team number, name and pit are editable — click one and type. Pits read as a letter and a
+          number (<code className="text-zinc-500">A1</code>), which is what places a team on the
+          board&apos;s floor plan.
+        </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 text-xs">
@@ -441,9 +449,29 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
               );
               return (
                 <tr key={team.id} className="hover:bg-white/[0.02]">
-                  <td className="px-4 py-2.5 font-bold tabular-nums">{team.number}</td>
-                  <td className="px-4 py-2.5 text-zinc-300">{team.name}</td>
-                  <td className="px-4 py-2.5 text-zinc-500">{team.pit ?? "—"}</td>
+                  <td className="px-2 py-1.5">
+                    <EditableCell
+                      value={team.number}
+                      className="font-bold tabular-nums"
+                      onSave={(number) => update(team.id, { number })}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <EditableCell
+                      value={team.name}
+                      className="text-zinc-300"
+                      onSave={(name) => update(team.id, { name })}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5 w-24">
+                    <EditableCell
+                      value={team.pit ?? ""}
+                      placeholder="—"
+                      align="center"
+                      className="tabular-nums text-zinc-400"
+                      onSave={(pit) => update(team.id, { pit: pit || null })}
+                    />
+                  </td>
                   <td className="px-4 py-2.5">
                     <CategorySelect
                       value={team.category}
@@ -526,6 +554,73 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
 
       <DangerZone refresh={refresh} onError={onError} />
     </div>
+  );
+}
+
+/**
+ * A table cell you can type into.
+ *
+ * Saves on blur or Enter, reverts on Escape, and puts the old value back
+ * if the server refuses — a rejected edit that stayed on screen would
+ * look saved when it is not.
+ */
+function EditableCell({
+  value,
+  onSave,
+  placeholder,
+  className = "",
+  align = "left",
+}: {
+  value: string;
+  onSave: (next: string) => Promise<void>;
+  placeholder?: string;
+  className?: string;
+  align?: "left" | "center";
+}) {
+  const [draft, setDraft] = useState(value);
+  const [busy, setBusy] = useState(false);
+
+  // Follow the row when it changes underneath us (a poll, another editor).
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  async function commit() {
+    const next = draft.trim();
+    if (next === value) return;
+    if (!next && placeholder !== "—") {
+      setDraft(value);
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await onSave(next);
+    } catch {
+      setDraft(value); // the caller surfaces the message
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <input
+      value={draft}
+      disabled={busy}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        if (e.key === "Escape") {
+          setDraft(value);
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      className={`w-full rounded-lg bg-transparent px-2 py-1.5 text-sm ring-1 ring-inset ring-transparent transition hover:bg-white/5 hover:ring-white/10 focus:bg-white/5 focus:ring-indigo-400 focus:outline-none disabled:opacity-50 ${
+        align === "center" ? "text-center" : ""
+      } ${className}`}
+    />
   );
 }
 

@@ -457,14 +457,24 @@ export const postgresStore: Store = {
     }
 
     const assignments = columns.map((c, i) => `${c} = $${i + 2}`).join(", ");
-    const updated = one(
-      await query<Team>(`update teams set ${assignments} where id = $1 returning *`, [
-        id,
-        ...columns.map((c) => (patch as Record<string, unknown>)[c]),
-      ]),
-    );
-    if (!updated) throw new StoreError("That team no longer exists.", 404);
-    return updated;
+    try {
+      const updated = one(
+        await query<Team>(`update teams set ${assignments} where id = $1 returning *`, [
+          id,
+          ...columns.map((c) => (patch as Record<string, unknown>)[c]),
+        ]),
+      );
+      if (!updated) throw new StoreError("That team no longer exists.", 404);
+      return updated;
+    } catch (e) {
+      if (e instanceof StoreError) throw e;
+      // The unique index on teams.number: someone renamed a team onto
+      // another team's number.
+      if ((e as { code?: string }).code === "23505") {
+        throw new StoreError(`Team ${patch.number ?? ""} already exists.`.replace("  ", " "), 409);
+      }
+      throw e;
+    }
   },
 
   async deleteTeam(id) {

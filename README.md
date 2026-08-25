@@ -109,7 +109,8 @@ app knows which is in use.
    Pasting straight from a spreadsheet works (tabs are handled), a header row is
    skipped, and quoted names with commas survive. Tick **spread across panels**
    to deal teams out evenly.
-5. **Teams tab** — fix any assignment by hand.
+5. **Teams tab** — fix anything by hand. Team number, name and pit are editable
+   in place: click a cell, type, press Enter.
 6. Optional: give each panel a slot grid (Panels → Booking slots). Set the count
    to `0` for walk-up queue only.
 

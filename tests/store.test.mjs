@@ -147,6 +147,18 @@ function makeStore(file) {
       if (removed) save();
       return removed;
     },
+    updateTeam(id, patch) {
+      const team = data.teams.find((t) => t.id === id);
+      if (!team) throw new Error("no such team");
+      if (patch.number && patch.number !== team.number) {
+        if (data.teams.some((t) => t.id !== id && t.number === patch.number)) {
+          throw new Error(`Team ${patch.number} already exists.`);
+        }
+      }
+      Object.assign(team, patch);
+      save();
+      return team;
+    },
     deleteAllPanels() {
       const removed = data.panels.length;
       data.panels = [];
@@ -428,5 +440,56 @@ test("clearing one team does not touch another", () => {
 
     assert.equal(s.data.scores.length, 1);
     assert.equal(s.data.scores[0].team_id, "t2");
+  });
+});
+
+/* ---- correcting a team's details ------------------------------------ */
+
+test("a team can be renamed onto a free number", () => {
+  withStore((s) => {
+    const p = s.addPanel("A", "AAA");
+    const t = s.addTeam(1234, p.id);
+
+    s.updateTeam(t.id, { number: "9882K" });
+
+    assert.equal(s.data.teams[0].number, "9882K");
+    assert.equal(s.data.teams[0].panel_id, p.id, "it keeps its panel");
+  });
+});
+
+test("renaming a team onto another team's number is refused", () => {
+  withStore((s) => {
+    const p = s.addPanel("A", "AAA");
+    const a = s.addTeam(1234, p.id);
+    s.addTeam(5678, p.id);
+
+    assert.throws(() => s.updateTeam(a.id, { number: "5678" }), /already exists/);
+    assert.equal(
+      s.data.teams.find((t) => t.id === a.id).number,
+      "1234",
+      "the refused edit leaves the roster untouched",
+    );
+  });
+});
+
+test("saving a team its own number back is not a clash", () => {
+  withStore((s) => {
+    const p = s.addPanel("A", "AAA");
+    const t = s.addTeam(1234, p.id);
+    assert.doesNotThrow(() => s.updateTeam(t.id, { number: "1234", name: "Renamed" }));
+    assert.equal(s.data.teams[0].name, "Renamed");
+  });
+});
+
+test("correcting a pit moves the team on the floor plan", () => {
+  withStore((s) => {
+    const p = s.addPanel("A", "AAA");
+    const t = s.addTeam(1234, p.id);
+
+    s.updateTeam(t.id, { pit: "B3" });
+    assert.equal(s.data.teams[0].pit, "B3");
+
+    s.updateTeam(t.id, { pit: null });
+    assert.equal(s.data.teams[0].pit, null, "clearing a pit takes it off the plan");
   });
 });

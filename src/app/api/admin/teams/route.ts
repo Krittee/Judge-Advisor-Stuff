@@ -100,7 +100,25 @@ export async function PATCH(request: Request) {
       patch.panel_id = null;
     }
     if ("pit" in body) patch.pit = normalizePit(body.pit);
-    if ("name" in body) patch.name = String(body.name).slice(0, 120);
+
+    if ("name" in body) {
+      const name = String(body.name).trim().slice(0, 120);
+      if (!name) {
+        return NextResponse.json({ error: "A team needs a name." }, { status: 400 });
+      }
+      patch.name = name;
+    }
+
+    if ("number" in body) {
+      const number = normalizeTeamNumber(body.number);
+      if (!isValidTeamNumber(number)) {
+        return NextResponse.json(
+          { error: "Enter a valid team number, for example 1234 or 9882K." },
+          { status: 400 },
+        );
+      }
+      patch.number = number;
+    }
 
     return NextResponse.json({ team: await store().updateTeam(teamId, patch) });
   } catch (e) {
