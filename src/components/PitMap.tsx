@@ -3,27 +3,33 @@
 import { useMemo } from "react";
 import { STATUS_META, type Status } from "@/lib/status";
 import { buildFloorPlan, comparePits, isMappablePit, parsePit } from "@/lib/pit";
-import { CategoryRail } from "./CategoryChip";
 import type { AppState, RequestRow, Team } from "@/lib/types";
 
 /**
  * The pit floor, seen from above.
  *
- * Two things have to read at once from across a room, so they use
- * different channels rather than competing for the same one:
+ * One floor, not one per division: at a real event the two divisions are
+ * interleaved across the same aisles, so splitting them into blocks would
+ * draw a floor that does not exist. Colour tells them apart instead.
  *
- *   division  splits the floor into blocks, each with its own colour
- *   status    fills the pit tile itself, same colours as the queue board
+ * Two channels, so they do not fight:
  *
- * Pit codes are a letter and a number, so the letter is the row and the
- * number is the position along it. Nobody has to draw a plan.
+ *   division  the ring around the tile, always present
+ *   status    the tile fill, same colours as the queue board
+ *
+ * Notebook type is deliberately absent here. It matters in the judging
+ * room, not when you are working out who is standing where, and a third
+ * encoding on a tile this size costs more than it gives.
+ *
+ * Pit codes are a letter and a number, so the letter is a column and the
+ * number is the position down it. Nobody has to draw a plan.
  */
 
 const DIVISION_TONES = [
-  { ring: "ring-sky-500/40", head: "text-sky-300", dot: "bg-sky-400" },
-  { ring: "ring-fuchsia-500/40", head: "text-fuchsia-300", dot: "bg-fuchsia-400" },
-  { ring: "ring-teal-500/40", head: "text-teal-300", dot: "bg-teal-400" },
-  { ring: "ring-orange-500/40", head: "text-orange-300", dot: "bg-orange-400" },
+  { ring: "ring-sky-400", dot: "bg-sky-400", text: "text-sky-300" },
+  { ring: "ring-fuchsia-400", dot: "bg-fuchsia-400", text: "text-fuchsia-300" },
+  { ring: "ring-teal-400", dot: "bg-teal-400", text: "text-teal-300" },
+  { ring: "ring-orange-300", dot: "bg-orange-300", text: "text-orange-200" },
 ];
 
 export function divisionTone(division: string, divisions: string[]) {
@@ -33,13 +39,7 @@ export function divisionTone(division: string, divisions: string[]) {
 
 type Placed = { team: Team; status: Status | null };
 
-export function PitMap({
-  state,
-  hideDone,
-}: {
-  state: AppState;
-  hideDone: boolean;
-}) {
+export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean }) {
   const placed = useMemo<Placed[]>(() => {
     const best = new Map<string, RequestRow>();
     for (const r of state.requests) {
@@ -54,59 +54,90 @@ export function PitMap({
     });
   }, [state.teams, state.requests]);
 
-  const divisions = state.divisions;
+  // One grid across the whole floor, both divisions together.
+  const columns = useMemo(() => buildFloorPlan(placed, (p) => p.team.pit), [placed]);
+
+  const mapped = placed.filter((p) => isMappablePit(p.team.pit));
   const unmapped = placed
     .filter((p) => !isMappablePit(p.team.pit))
     .sort((a, b) => a.team.number.localeCompare(b.team.number));
 
+  const perDivision = state.divisions.map((d) => ({
+    division: d,
+    tone: divisionTone(d, state.divisions),
+    total: mapped.filter((p) => p.team.division === d).length,
+    waiting: mapped.filter((p) => p.team.division === d && p.status === "requested").length,
+  }));
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-2 text-sm">
-        <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          {divisions.map((d) => {
-            const tone = divisionTone(d, divisions);
-            return (
-              <span key={d} className="flex items-center gap-1.5 text-zinc-400">
-                <span className={`h-3 w-3 rounded-sm ${tone.dot}`} />
-                {d}
-              </span>
-            );
-          })}
-        </span>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+        {perDivision.map(({ division, tone, total, waiting }) => (
+          <span key={division} className="flex items-center gap-2">
+            <span className={`h-3 w-3 rounded-sm ${tone.dot}`} />
+            <span className={tone.text}>{division}</span>
+            <span className="text-zinc-500">
+              {total} pit{total === 1 ? "" : "s"}
+              {waiting ? <span className="ml-1.5 text-orange-400">{waiting} waiting</span> : null}
+            </span>
+          </span>
+        ))}
       </div>
 
-      {divisions.map((division) => (
-        <DivisionFloor
-          key={division}
-          division={division}
-          divisions={divisions}
-          placed={placed.filter((p) => p.team.division === division)}
-          categories={state.categories}
-          hideDone={hideDone}
-        />
-      ))}
+      {columns.length ? (
+        <section className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/10">
+          <div className="flex flex-wrap gap-2">
+            {columns.map(({ row, cells }) => (
+              // Compress to fit rather than wrapping a lone aisle onto its
+              // own line, but never stretch past a pit's worth of width.
+              <div
+                key={row}
+                className="flex min-w-[4.75rem] max-w-[8rem] flex-1 flex-col gap-1.5"
+              >
+                <span className="rounded-md bg-white/5 py-1 text-center text-sm font-bold text-zinc-300">
+                  {row}
+                </span>
+                {cells.map((cell, i) => (
+                  <PitCell
+                    key={i}
+                    row={row}
+                    position={i + 1}
+                    cell={cell}
+                    divisions={state.divisions}
+                    hideDone={hideDone}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : (
+        <p className="rounded-2xl bg-white/[0.02] px-4 py-8 text-center text-sm text-zinc-600">
+          No pits to show. Give teams a pit like <code className="text-zinc-500">A1</code> in
+          Admin → Teams and they will appear here.
+        </p>
+      )}
 
       {unmapped.length ? (
         <section className="rounded-2xl bg-white/[0.02] p-4 ring-1 ring-inset ring-white/10">
           <h3 className="mb-2 text-sm font-semibold text-zinc-400">
             No pit on the plan ({unmapped.length})
           </h3>
-          <p className="mb-3 text-xs text-zinc-600">
-            These teams have no pit set, or one that is not a letter and a number like{" "}
-            <code className="text-zinc-500">A1</code>.
-          </p>
           <div className="flex flex-wrap gap-2">
-            {unmapped.map(({ team, status }) => (
-              <span
-                key={team.id}
-                className={`rounded-lg px-2 py-1 text-sm tabular-nums ${
-                  status ? STATUS_META[status].tile : "bg-white/5 text-zinc-500"
-                }`}
-              >
-                {team.number}
-                {team.pit ? <span className="ml-1 opacity-70">({team.pit})</span> : null}
-              </span>
-            ))}
+            {unmapped.map(({ team, status }) => {
+              const tone = divisionTone(team.division, state.divisions);
+              return (
+                <span
+                  key={team.id}
+                  title={`${team.number} ${team.name} · ${team.division}`}
+                  className={`rounded-lg px-2 py-1 text-sm tabular-nums ring-2 ${tone.ring} ${
+                    status ? STATUS_META[status].fill : "bg-white/5 text-zinc-400"
+                  }`}
+                >
+                  {team.number}
+                </span>
+              );
+            })}
           </div>
         </section>
       ) : null}
@@ -114,89 +145,21 @@ export function PitMap({
   );
 }
 
-function DivisionFloor({
-  division,
-  divisions,
-  placed,
-  categories,
-  hideDone,
-}: {
-  division: string;
-  divisions: string[];
-  placed: Placed[];
-  categories: AppState["categories"];
-  hideDone: boolean;
-}) {
-  const tone = divisionTone(division, divisions);
-  const rows = useMemo(() => buildFloorPlan(placed, (p) => p.team.pit), [placed]);
-
-  const mapped = placed.filter((p) => isMappablePit(p.team.pit));
-  const waiting = mapped.filter((p) => p.status === "requested").length;
-
-  if (!rows.length) return null;
-
-  return (
-    <section className={`rounded-2xl bg-white/[0.03] p-4 ring-2 ring-inset ${tone.ring}`}>
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
-        <h3 className={`text-lg font-semibold ${tone.head}`}>{division}</h3>
-        <span className="text-sm text-zinc-500">
-          {mapped.length} pit{mapped.length === 1 ? "" : "s"}
-          {waiting ? <span className="ml-2 text-orange-400">{waiting} waiting</span> : null}
-        </span>
-      </div>
-
-      {/* Laid out down the screen: each pit letter is a column, its
-          positions running top to bottom, the way the aisles run. */}
-      <div className="flex flex-wrap gap-2 pb-1">
-        {rows.map(({ row, cells, from, to }) => (
-          <div key={row} className="flex w-[7.5rem] shrink-0 flex-col gap-1.5">
-            <span
-              className={`rounded-md bg-white/5 py-1 text-center text-sm font-bold ${tone.head}`}
-            >
-              {row}
-            </span>
-            {cells.map((cell, i) => (
-              <PitCell
-                key={i}
-                position={i + 1}
-                row={row}
-                cell={cell}
-                // Outside this division's span the pit belongs to another
-                // division; it is spacing here, not an empty pit.
-                outside={i + 1 < from || i + 1 > to}
-                categories={categories}
-                hideDone={hideDone}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function PitCell({
   row,
   position,
   cell,
-  outside,
-  categories,
+  divisions,
   hideDone,
 }: {
   row: string;
   position: number;
   cell: Placed | null;
-  outside: boolean;
-  categories: AppState["categories"];
+  divisions: string[];
   hideDone: boolean;
 }) {
-  // Another division's stretch of this row: hold the column so the rows
-  // stay aligned, but say nothing about it.
-  if (outside) {
-    return <div className="h-[3.25rem]" aria-hidden />;
-  }
-
-  // An empty slot inside this division's span: a pit nobody occupies.
+  // A pit number nobody occupies. With one grid across the whole floor,
+  // a blank really is a blank.
   if (!cell) {
     return (
       <div className="flex h-[3.25rem] items-center justify-center rounded-md border border-dashed border-white/[0.07]">
@@ -211,15 +174,19 @@ function PitCell({
   const { team, status } = cell;
   const show = status && !(hideDone && status === "completed") ? status : null;
   const meta = show ? STATUS_META[show] : null;
+  const tone = divisionTone(team.division, divisions);
 
   return (
     <div
-      title={`${row}${position} · ${team.number} ${team.name}${meta ? ` · ${meta.label}` : ""}`}
-      className={`relative flex h-[3.25rem] flex-col justify-center overflow-hidden rounded-md pl-2 pr-1 text-center ${
-        meta ? meta.tile : "bg-white/[0.05] text-zinc-300 ring-1 ring-inset ring-white/10"
-      } ${show === "requested" ? "pulse-waiting" : ""}`}
+      title={`${row}${position} · ${team.number} ${team.name} · ${team.division}${
+        meta ? ` · ${meta.label}` : ""
+      }`}
+      className={`flex h-[3.25rem] flex-col justify-center overflow-hidden rounded-md px-1 text-center ring-2 ${
+        tone.ring
+      } ${meta ? meta.fill : "bg-white/[0.05] text-zinc-300"} ${
+        show === "requested" ? "pulse-waiting" : ""
+      }`}
     >
-      <CategoryRail category={team.category} categories={categories} />
       <div className="text-[10px] font-medium opacity-70">
         {row}
         {position}

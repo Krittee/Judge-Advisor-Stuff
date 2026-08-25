@@ -228,22 +228,27 @@ corner.
 
 **By panel** — every judge panel with its teams, coloured by interview status.
 
-**Pit floor** — the pits seen from above. Two things read at once, so they use
-different channels rather than competing: each **division** is its own
-colour-bordered block, and **interview status** fills the pit tile itself, in
-the same colours as the queue board. A thin rail down each tile carries the team
-type.
+**Pit floor** — the pits seen from above, as **one floor**. The two divisions
+share the same aisles at a real event, so they are not split into blocks; colour
+tells them apart instead. Two channels, so they do not fight:
+
+- **Division** — the ring around each tile, always present
+- **Interview status** — the tile fill, same colours as the queue board
+
+Notebook type is deliberately not shown here. It matters in the judging room, not
+when you are working out who is standing where, and a third encoding on a tile
+this size costs more than it gives.
 
 The plan draws itself from the pit codes — no floor plan to lay out. A pit is a
 **letter and a number**, `A1`, `B7`, `C12`. Each letter is a **column running
 down** the screen, with its numbers in order beneath it, the way the aisles run.
 `a1`, `A01`, `A 1` and `Pit A1` all mean the same pit.
 
-Within a division, a blank cell is a genuinely empty pit. Where another division
-occupies that stretch of a column, the space is left silent rather than drawn as
-free — the columns still line up, but the board never says a pit is empty when
-somebody is standing in it. Teams with no pit, or one that is not a
-letter-and-number, are listed underneath rather than dropped.
+Columns compress to fit rather than wrapping a lone aisle onto its own line —
+verified at 120 teams across 12 aisles, which fits on one line at both 1280 and
+1600 px wide with no sideways scroll. A blank cell is an empty pit. Teams with no
+pit, or one that is not a letter-and-number, are listed underneath rather than
+dropped.
 
 ---
 
