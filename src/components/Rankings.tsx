@@ -90,7 +90,7 @@ export function Rankings({
             <tr>
               <th className="px-3 py-3 w-10">#</th>
               <th className="px-3 py-3">Team</th>
-              <th className="px-3 py-3">Type</th>
+              <th className="px-3 py-3">Notebook</th>
               {panelName ? <th className="px-3 py-3">Panel</th> : null}
               {rubricList.map((r) => (
                 <th key={r.id} className="px-3 py-3 text-right">

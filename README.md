@@ -246,22 +246,35 @@ letter-and-number, are listed underneath rather than dropped.
 
 ---
 
-## Team types
+## Notebook type
 
-Every team is one of two kinds — **Developing** or **Fully Developed** — set from
-a dropdown in Admin → Teams, and colour-coded everywhere a team appears: the big
-board, the judge console, the queue desk, the rankings and the team's own page.
+Every team carries a notebook classification, colour-coded everywhere a team
+appears — the big board, the judge console, the queue desk, the rankings and the
+team's own page:
+
+| | |
+|---|---|
+| 🟠 **Developing** | amber |
+| 🟣 **Fully Developed** | violet |
+| ⚪ **Ungraded** | zinc |
+
 The colour carries the distinction and the label backs it up, so it still reads
 for anyone who cannot separate amber from violet.
 
-Set it per team, for a whole import at once, or per row with a fifth CSV column
-(which accepts either the label or the id). Admin → Teams filters by type and
-counts each one.
+Set it per team from the dropdown in Admin → Teams, for a whole import at once,
+or per row with a fifth CSV column (which accepts either the label or the id).
+Admin → Teams filters by type and counts each one.
 
-Rename the labels or change the colours in
-[`config/event.json`](config/event.json) under `teamCategories`. The first one
-listed is what a team gets until someone says otherwise; keep the ids stable
-once teams are assigned.
+Edit the labels, colours or the list itself in
+[`config/event.json`](config/event.json) under `teamCategories`. The **first one
+listed** is what a team gets until someone says otherwise — put `ungraded` first
+if you would rather teams start unclassified and be graded up. Keep the ids
+stable once teams are assigned.
+
+> **Ungraded and the rankings.** An ungraded team is still ranked out of the full
+> 76, so an unscored notebook counts against its percentage. If you would rather
+> ungraded teams were ranked on the interview alone, say so — it is a small
+> change, but it is a judging decision rather than a technical one.
 
 ---
 

@@ -368,10 +368,10 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           className={`${inputClass} max-w-[13rem]`}
-          aria-label="Team type"
+          aria-label="Notebook type"
         >
           <option value="" className="bg-zinc-900">
-            Both types
+            All notebooks
           </option>
           {state.categories.map((c) => (
             <option key={c.id} value={c.id} className="bg-zinc-900">
@@ -434,7 +434,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
               <th className="px-4 py-3">Team</th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Pit</th>
-              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Notebook</th>
               <th className="px-4 py-3">Division</th>
               <th className="px-4 py-3">Judge panel</th>
               <th className="px-4 py-3">Status</th>
@@ -1214,7 +1214,7 @@ function ImportTab({
           the team on the board&apos;s pit floor plan. Team numbers may include letters —{" "}
           <code className="text-zinc-300">9882K</code>{" "}
           works as well as <code className="text-zinc-300">1234</code>. Everything you load goes
-          into the division and team type chosen below, unless a row names them in a fourth
+          into the division and notebook type chosen below, unless a row names them in a fourth
           and fifth column. Paste straight
           from a spreadsheet — tabs work too, and a header row is skipped automatically.
           Re-importing updates existing teams instead of duplicating them.
@@ -1288,7 +1288,7 @@ function ImportTab({
           </select>
         </label>
         <label className="text-sm text-zinc-300">
-          <span className="mb-1 block text-xs text-zinc-400">Team type</span>
+          <span className="mb-1 block text-xs text-zinc-400">Notebook type</span>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}

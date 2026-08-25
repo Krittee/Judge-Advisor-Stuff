@@ -209,17 +209,32 @@ function resolveCategory(input) {
   return match ? match.id : defaultCategory();
 }
 
-test("there are exactly two kinds of team, each with its own colour", () => {
-  assert.equal(categories.length, 2);
+test("the notebook classifications are the three the event uses", () => {
   assert.deepEqual(
     categories.map((c) => c.label),
-    ["Developing", "Fully Developed"],
+    ["Developing", "Fully Developed", "Ungraded"],
   );
+});
+
+test("no two classifications share a colour", () => {
   const colours = categories.map((c) => c.color);
-  assert.equal(new Set(colours).size, 2, "two types sharing one colour would defeat the point");
+  assert.equal(
+    new Set(colours).size,
+    categories.length,
+    "two sharing one colour would defeat telling them apart at a glance",
+  );
+});
+
+test("every classification has an id and a label", () => {
+  for (const c of categories) {
+    assert.ok(c.id, "an id is what gets stored");
+    assert.ok(c.label, "a label is what gets read");
+  }
 });
 
 test("a category resolves from its id or its label, in any case", () => {
+  assert.equal(resolveCategory("ungraded"), "ungraded");
+  assert.equal(resolveCategory("Ungraded"), "ungraded");
   assert.equal(resolveCategory("fully-developed"), "fully-developed");
   assert.equal(resolveCategory("Fully Developed"), "fully-developed");
   assert.equal(resolveCategory("FULLY DEVELOPED"), "fully-developed");

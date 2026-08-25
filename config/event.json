@@ -10,16 +10,18 @@
     "Admin > Panels if you need to. Set slotCount to 0 for a walk-up queue only.",
     "A panel can override any of these with its own slotMinutes / slotCount / startTime.",
     "",
-    "`teamCategories` separates the two kinds of team. The first one listed is what",
-    "a team gets until someone says otherwise. Rename the labels or change the",
-    "colours to suit your event; keep the ids stable once teams are assigned."
+    "`teamCategories` is the notebook classification. The FIRST one listed is what",
+    "a team gets until someone says otherwise — put `ungraded` first if you would",
+    "rather teams start unclassified and be graded up. Rename the labels or change",
+    "the colours to suit your event; keep the ids stable once teams are assigned."
   ],
 
   "divisions": ["Division 1", "Division 2"],
 
   "teamCategories": [
     { "id": "developing", "label": "Developing", "color": "amber" },
-    { "id": "fully-developed", "label": "Fully Developed", "color": "violet" }
+    { "id": "fully-developed", "label": "Fully Developed", "color": "violet" },
+    { "id": "ungraded", "label": "Ungraded", "color": "zinc" }
   ],
 
   "booking": {

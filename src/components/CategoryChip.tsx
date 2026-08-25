@@ -3,7 +3,7 @@
 import type { AppState } from "@/lib/types";
 
 /**
- * Which of the two kinds of team this is.
+ * How a team's notebook is classified.
  *
  * The whole point is telling them apart at a glance, so the colour does
  * the work and the label backs it up — colour alone would leave anyone
