@@ -17,7 +17,9 @@ import {
 import type { Session } from "@/lib/auth";
 import { NotesDrawer, SignOutButton } from "@/components/judging";
 import { Rankings } from "@/components/Rankings";
+import { ConflictDialog } from "@/components/ConflictDialog";
 import { CategoryChip } from "@/components/CategoryChip";
+import { LanguageTag } from "@/components/Language";
 import type { RequestRow, Team } from "@/lib/types";
 
 /**
@@ -31,6 +33,7 @@ export default function JudgePage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notesFor, setNotesFor] = useState<Team | null>(null);
+  const [conflictFor, setConflictFor] = useState<Team | null>(null);
   const [view, setView] = useState<"queue" | "scores">("queue");
 
   useEffect(() => {
@@ -212,7 +215,16 @@ export default function JudgePage() {
                   <div className="flex items-center gap-3">
                     <span className="text-2xl font-bold tabular-nums">{team.number}</span>
                     <CategoryChip category={team.category} categories={state.categories} />
-                    {request ? <StatusChip status={request.status} size="sm" /> : null}
+                    {request ? (
+                      <>
+                        <LanguageTag
+                          language={request.language}
+                          languages={state.languages}
+                          size="md"
+                        />
+                        <StatusChip status={request.status} size="sm" />
+                      </>
+                    ) : null}
                   </div>
                   <div className="truncate text-zinc-300">{team.name}</div>
                   <div className="mt-1 text-xs text-zinc-500">
@@ -240,6 +252,13 @@ export default function JudgePage() {
                   <Button variant="ghost" size="sm" onClick={() => setNotesFor(team)}>
                     Notes
                   </Button>
+                  <button
+                    onClick={() => setConflictFor(team)}
+                    title="Declare a conflict of interest with this team"
+                    className="text-xs text-zinc-500 hover:text-amber-400"
+                  >
+                    conflict
+                  </button>
 
                   {request && NEXT_STATUS[request.status] ? (
                     <Button
@@ -278,6 +297,17 @@ export default function JudgePage() {
           ))}
         </ul>
       </main>
+
+      {conflictFor ? (
+        <ConflictDialog
+          team={conflictFor}
+          onClose={() => setConflictFor(null)}
+          onDone={async () => {
+            setConflictFor(null);
+            await refresh();
+          }}
+        />
+      ) : null}
 
       {notesFor ? (
         <NotesDrawer

@@ -8,16 +8,25 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { ActivityRow, Note, Panel, RequestRow, ScoreRow, Team } from "../types";
+import type {
+  ActivityRow,
+  ConflictRow,
+  Note,
+  Panel,
+  RequestRow,
+  ScoreRow,
+  Team,
+} from "../types";
 import type { Status } from "../status";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
-import { DEFAULT_DIVISION, defaultCategory, presetPanels } from "../presets";
+import { DEFAULT_DIVISION, defaultCategory, defaultLanguage, presetPanels } from "../presets";
 import {
   StoreError,
   type ImportedTeam,
   type NewActivity,
   type NewNote,
+  type NewConflict,
   type NewRequest,
   type SaveScore,
   type Store,
@@ -48,6 +57,7 @@ type Data = {
   requests: RequestRow[];
   notes: Note[];
   scores: ScoreRow[];
+  conflicts: ConflictRow[];
   activity: ActivityRow[];
 };
 
@@ -79,7 +89,15 @@ function state(): Data {
 }
 
 function empty(): Data {
-  return { panels: [], teams: [], requests: [], notes: [], scores: [], activity: [] };
+  return {
+    panels: [],
+    teams: [],
+    requests: [],
+    notes: [],
+    scores: [],
+    conflicts: [],
+    activity: [],
+  };
 }
 
 function load(): Data {
@@ -136,6 +154,11 @@ function load(): Data {
  */
 function migrate(data: Data): Data {
   data.scores ??= [];
+  data.conflicts ??= [];
+
+  // Languages and panel language cover arrived after the first rosters.
+  for (const r of data.requests) r.language ??= defaultLanguage();
+  for (const p of data.panels) p.languages ??= [];
   const fallback = data.panels[0]?.division ?? DEFAULT_DIVISION;
 
   for (const team of data.teams) {
@@ -332,6 +355,7 @@ function createRequest(input: NewRequest): RequestRow {
     panel_id: input.panelId,
     status: input.kind === "slot" ? "scheduled" : "requested",
     kind: input.kind,
+    language: input.language,
     slot_start: input.slotStart ?? null,
     slot_end: input.slotEnd ?? null,
     message: input.message ?? null,
@@ -426,6 +450,7 @@ function deleteTeam(id: string): void {
   state().requests = state().requests.filter((r) => r.team_id !== id);
   state().notes = state().notes.filter((n) => n.team_id !== id);
   state().scores = state().scores.filter((s) => s.team_id !== id);
+  state().conflicts = state().conflicts.filter((c) => c.team_id !== id);
   save();
 }
 
@@ -457,10 +482,16 @@ function autoAssignTeams(perPanel: number, includeAssigned = false, division?: s
     }
   }
 
+  // A panel that must stay away from a team is not a candidate for it.
+  const barred = new Set(state().conflicts.map((c) => `${c.panel_id}:${c.team_id}`));
+
   let assigned = 0;
   for (const team of pending) {
-    // The hard wall: only panels in this team's own division are eligible.
-    const eligible = panels.filter((p) => p.division === team.division);
+    // The hard wall: only panels in this team's own division are eligible,
+    // and never one with a declared conflict.
+    const eligible = panels.filter(
+      (p) => p.division === team.division && !barred.has(`${p.id}:${team.id}`),
+    );
     const target = eligible
       .map((p) => ({ id: p.id, count: load.get(p.id) ?? 0 }))
       .filter((p) => p.count < perPanel)
@@ -516,6 +547,8 @@ function deletePanel(id: string): void {
   state().panels = state().panels.filter((p) => p.id !== id);
   for (const t of state().teams) if (t.panel_id === id) t.panel_id = null;
   for (const r of state().requests) if (r.panel_id === id) r.panel_id = null;
+  // A conflict names a panel that no longer exists; it protects nobody.
+  state().conflicts = state().conflicts.filter((c) => c.panel_id !== id);
   save();
 }
 
@@ -530,6 +563,7 @@ function seedPresetPanels(): number {
       code: preset.code,
       division: preset.division,
       judges: preset.judges,
+      languages: [],
       sort_order: state().panels.length + 1,
       slot_start_at: preset.slotStartAt,
       slot_minutes: preset.slotMinutes,
@@ -554,6 +588,7 @@ function deleteAllPanels(): number {
   if (!removed) return 0;
 
   state().panels = [];
+  state().conflicts = [];
   for (const t of state().teams) t.panel_id = null;
   for (const r of state().requests) r.panel_id = null;
   save();
@@ -585,6 +620,38 @@ function createNote(input: NewNote): Note {
   state().notes.push(note);
   save();
   return note;
+}
+
+function listConflicts(): ConflictRow[] {
+  return [...state().conflicts];
+}
+
+function addConflict(input: NewConflict): ConflictRow {
+  const existing = state().conflicts.find(
+    (c) => c.panel_id === input.panelId && c.team_id === input.teamId,
+  );
+  if (existing) return existing;
+
+  const row: ConflictRow = {
+    id: randomUUID(),
+    panel_id: input.panelId,
+    team_id: input.teamId,
+    judge_name: input.judgeName,
+    note: input.note,
+    declared_by: input.declaredBy,
+    created_at: new Date().toISOString(),
+  };
+  state().conflicts.push(row);
+  save();
+  return row;
+}
+
+function removeConflict(id: string): boolean {
+  const before = state().conflicts.length;
+  state().conflicts = state().conflicts.filter((c) => c.id !== id);
+  const removed = state().conflicts.length < before;
+  if (removed) save();
+  return removed;
 }
 
 function listScores(teamId?: string): ScoreRow[] {
@@ -705,6 +772,8 @@ function demoData(): Data {
     code,
     division,
     judges,
+    // Demo: the third panel covers Thai as well, so a mismatch is visible.
+    languages: i === 2 ? ["en", "th"] : ["en"],
     sort_order: i + 1,
     // Every demo panel runs slots, so "Book a time" has something to show
     // straight away. Panel C keeps a shorter grid to look less uniform.
@@ -763,6 +832,7 @@ function demoData(): Data {
     panel_id: team.panel_id,
     status,
     kind: "queue",
+    language: "en",
     slot_start: null,
     slot_end: null,
     message: null,
@@ -808,7 +878,7 @@ function demoData(): Data {
     ),
   ];
 
-  return { panels, teams, requests, notes: [], scores: [], activity: [] };
+  return { panels, teams, requests, notes: [], scores: [], conflicts: [], activity: [] };
 }
 
 /* ------------------------------------------------------------------ *
@@ -851,6 +921,10 @@ export const fileStore: Store = {
   generatePanelCode: async () => generatePanelCode(),
 
   createNote: async (input) => createNote(input),
+
+  listConflicts: async () => listConflicts(),
+  addConflict: async (input) => addConflict(input),
+  removeConflict: async (id) => removeConflict(id),
 
   listScores: async (teamId) => listScores(teamId),
   saveScore: async (input) => saveScore(input),

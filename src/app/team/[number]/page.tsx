@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { liveRequestFor } from "@/lib/data";
 import { STATUS_META } from "@/lib/status";
 import { call, useAppState } from "@/components/useAppState";
 import { normalizeTeamNumber } from "@/lib/teamNumber";
 import { PanelBusyLine, panelLoad, SlotPicker } from "@/components/SlotPicker";
 import { CategoryChip } from "@/components/CategoryChip";
+import { LanguageTag } from "@/components/Language";
 import {
   Banner,
   Button,
@@ -27,6 +28,11 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [slotLanguage, setSlotLanguage] = useState("");
+
+  useEffect(() => {
+    if (!slotLanguage && state.languages.length) setSlotLanguage(state.languages[0].id);
+  }, [slotLanguage, state.languages]);
 
   const team = state.teams.find((t) => t.number === teamNumber);
   const panel = state.panels.find((p) => p.id === team?.panel_id);
@@ -63,7 +69,7 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
   }
 
   /** Ready early: give up any held slot so it does not sit there unused. */
-  async function readyNow() {
+  async function readyNow(language: string) {
     if (booking) {
       setBusy(true);
       setError(null);
@@ -77,7 +83,7 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
       }
       setBusy(false);
     }
-    await act({ teamNumber: team!.number, kind: "queue", message });
+    await act({ teamNumber: team!.number, kind: "queue", language, message });
   }
 
   async function cancel() {
@@ -144,7 +150,10 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
 
         {current && !booking ? (
           <section className="space-y-4 rounded-2xl bg-white/[0.04] p-5 ring-1 ring-inset ring-white/10">
-            <StatusChip status={current.status} size="lg" />
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusChip status={current.status} size="lg" />
+              <LanguageTag language={current.language} languages={state.languages} size="md" />
+            </div>
             <p className="text-lg">{STATUS_META[current.status].teamLabel}</p>
 
             <dl className="space-y-1 text-sm text-zinc-400">
@@ -185,17 +194,29 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
               </div>
             ) : null}
 
-            <Button
-              variant="warn"
-              size="lg"
-              className="w-full"
-              disabled={busy || !team.panel_id}
-              onClick={readyNow}
-            >
-              {booking
-                ? "We're ready now instead — give up our slot"
-                : "We're ready — request a judge now"}
-            </Button>
+            {/* A button per language, so the team says which they want
+                rather than the desk guessing. */}
+            <div className="grid gap-2">
+              {state.languages.map((lang) => (
+                <Button
+                  key={lang.id}
+                  variant="warn"
+                  size="lg"
+                  className="w-full"
+                  disabled={busy || !team.panel_id}
+                  onClick={() => readyNow(lang.id)}
+                >
+                  {booking
+                    ? `We're ready now — ${lang.label}`
+                    : `Request a judge — ${lang.label}`}
+                </Button>
+              ))}
+            </div>
+            {booking ? (
+              <p className="text-center text-xs text-zinc-500">
+                Either gives up your {formatClock(booking.slot_start)} slot.
+              </p>
+            ) : null}
             <input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -216,6 +237,21 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
             <h2 className="mb-3 text-sm font-semibold text-zinc-300">
               Or book a time with {panel.name}
             </h2>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {state.languages.map((l) => (
+                <button
+                  key={l.id}
+                  onClick={() => setSlotLanguage(l.id)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                    slotLanguage === l.id
+                      ? "bg-indigo-500 text-white"
+                      : "bg-white/5 text-zinc-400 ring-1 ring-inset ring-white/10"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
             <SlotPicker
               panel={panel}
               requests={state.requests}
@@ -226,6 +262,7 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
                 act({
                   teamNumber: team.number,
                   kind: "slot",
+                  language: slotLanguage,
                   slotStart: slot.start,
                   slotEnd: slot.end,
                 })

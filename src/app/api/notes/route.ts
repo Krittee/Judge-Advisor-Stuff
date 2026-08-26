@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canReadNotes, getSession, mayActOnPanel, type Session } from "@/lib/auth";
 import { store } from "@/lib/db";
+import { CONFLICT_MESSAGE, isConflicted } from "@/lib/conflicts";
 import type { Team } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -32,9 +33,15 @@ export async function GET(request: Request) {
   if (session?.role === "admin") return NextResponse.json({ notes });
 
   // A judge asking for everything gets their own panel's teams only.
+  const judge = session as Extract<Session, { role: "judge" }>;
+  const barred = new Set(
+    (await db.listConflicts())
+      .filter((c) => c.panel_id === judge.panelId)
+      .map((c) => c.team_id),
+  );
   const mine = new Set(
     (await db.listTeams())
-      .filter((t) => t.panel_id === (session as Extract<Session, { role: "judge" }>).panelId)
+      .filter((t) => t.panel_id === judge.panelId && !barred.has(t.id))
       .map((t) => t.id),
   );
   return NextResponse.json({ notes: notes.filter((n) => mine.has(n.team_id)) });
@@ -50,12 +57,18 @@ export async function POST(request: Request) {
   const teamId = String(body.teamId ?? "");
   const text = String(body.body ?? "").trim().slice(0, 4000);
 
-  if (!teamId || !text) {
+  if (!teamId) {
     return NextResponse.json({ error: "A team and some text are required." }, { status: 400 });
   }
 
+  // Scope first: a judge who may not touch this team should be told that,
+  // not handed notes on how to format their request.
   const denied = await refuseIfOutOfScope(session, teamId);
   if (denied) return denied;
+
+  if (!text) {
+    return NextResponse.json({ error: "A team and some text are required." }, { status: 400 });
+  }
 
   const team = await findTeam(teamId);
   const note = await store().createNote({
@@ -81,6 +94,12 @@ async function refuseIfOutOfScope(
   const team = await findTeam(teamId);
   if (!team) {
     return NextResponse.json({ error: "That team no longer exists." }, { status: 404 });
+  }
+  // Conflict first: it is the more specific reason, and once a conflict
+  // is declared the team is unassigned from that panel — so the panel
+  // check would otherwise answer with the vaguer message.
+  if (await isConflicted(session, teamId)) {
+    return NextResponse.json({ error: CONFLICT_MESSAGE }, { status: 403 });
   }
   if (!mayActOnPanel(session, team.panel_id)) {
     return NextResponse.json(

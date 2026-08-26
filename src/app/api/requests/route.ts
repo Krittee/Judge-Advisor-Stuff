@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { actorLabel, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
+import { resolveLanguage } from "@/lib/presets";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
       createdBy: session ? actorLabel(session) : "team",
       slotStart,
       slotEnd,
+      language: resolveLanguage(body.language),
     });
 
     await store().logActivity({

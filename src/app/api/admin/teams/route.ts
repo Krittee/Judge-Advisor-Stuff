@@ -90,6 +90,18 @@ export async function PATCH(request: Request) {
     const teamId = String(body.teamId ?? "");
     if (!teamId) return NextResponse.json({ error: "teamId required." }, { status: 400 });
 
+    // Assigning a team to a panel that must stay away from it would undo
+    // the conflict silently.
+    if (body.panelId) {
+      const conflicts = await store().listConflicts();
+      if (conflicts.some((c) => c.panel_id === String(body.panelId) && c.team_id === teamId)) {
+        return NextResponse.json(
+          { error: "That panel has a declared conflict of interest with this team." },
+          { status: 409 },
+        );
+      }
+    }
+
     const patch: Record<string, unknown> = {};
     if ("panelId" in body) patch.panel_id = body.panelId ? String(body.panelId) : null;
     if ("category" in body) patch.category = resolveCategory(body.category);

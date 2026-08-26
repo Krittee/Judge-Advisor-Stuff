@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canReadNotes, getSession, mayActOnPanel, type Session } from "@/lib/auth";
 import { store } from "@/lib/db";
+import { CONFLICT_MESSAGE, isConflicted } from "@/lib/conflicts";
 import { bandFor, grandTotalMax, isValidPoint, rubricById, rubrics } from "@/lib/rubrics";
 import type { ScoreRow, Team } from "@/lib/types";
 
@@ -36,10 +37,19 @@ export async function GET(request: Request) {
   const visible =
     session?.role === "admin"
       ? scores
-      : scores.filter((s) => {
-          const team = teams.find((t) => t.id === s.team_id);
-          return team ? mayActOnPanel(session, team.panel_id) : false;
-        });
+      : await (async () => {
+          const judge = session as Extract<Session, { role: "judge" }>;
+          const barred = new Set(
+            (await db.listConflicts())
+              .filter((c) => c.panel_id === judge.panelId)
+              .map((c) => c.team_id),
+          );
+          return scores.filter((s) => {
+            if (barred.has(s.team_id)) return false;
+            const team = teams.find((t) => t.id === s.team_id);
+            return team ? mayActOnPanel(session, team.panel_id) : false;
+          });
+        })();
 
   return NextResponse.json({
     scores: visible,
@@ -60,6 +70,12 @@ export async function POST(request: Request) {
   const rubricId = String(body.rubricId ?? "");
   const criterionId = String(body.criterionId ?? "");
 
+  // Authorisation before validation: a judge with a conflict on this team has
+  // no business learning the shape of its rubric, and the answer they get
+  // should be the conflict, not a note about their payload.
+  const denied = await refuseIfOutOfScope(session, teamId);
+  if (denied) return denied;
+
   const rubric = rubricById(rubricId);
   if (!rubric) {
     return NextResponse.json({ error: "Unknown rubric." }, { status: 400 });
@@ -76,9 +92,6 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-
-  const denied = await refuseIfOutOfScope(session, teamId);
-  if (denied) return denied;
 
   const team = await findTeam(teamId);
   const score = await store().saveScore({
@@ -108,12 +121,12 @@ export async function DELETE(request: Request) {
   const teamId = String(params.get("teamId") ?? "");
   const rubricId = String(params.get("rubricId") ?? "");
 
+  const denied = await refuseIfOutOfScope(session, teamId);
+  if (denied) return denied;
+
   if (!rubricById(rubricId)) {
     return NextResponse.json({ error: "Unknown rubric." }, { status: 400 });
   }
-
-  const denied = await refuseIfOutOfScope(session, teamId);
-  if (denied) return denied;
 
   const cleared = await store().clearScore(teamId, rubricId);
   return NextResponse.json({ ok: true, cleared });
@@ -135,6 +148,12 @@ async function refuseIfOutOfScope(
   const team = await findTeam(teamId);
   if (!team) {
     return NextResponse.json({ error: "That team no longer exists." }, { status: 404 });
+  }
+  // Conflict first: it is the more specific reason, and once a conflict
+  // is declared the team is unassigned from that panel — so the panel
+  // check would otherwise answer with the vaguer message.
+  if (await isConflicted(session, teamId)) {
+    return NextResponse.json({ error: CONFLICT_MESSAGE }, { status: 403 });
   }
   if (!mayActOnPanel(session, team.panel_id)) {
     return NextResponse.json(

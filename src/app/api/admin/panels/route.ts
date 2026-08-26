@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { canAdminister, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import type { Panel } from "@/lib/types";
-import { presetDivisions } from "@/lib/presets";
+import { languages as configLanguages, presetDivisions } from "@/lib/presets";
 import { normalizePanelCode } from "@/lib/panelCode";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       code: normalizePanelCode(body.code) || (await store().generatePanelCode()),
       division: resolveDivision(body.division),
       judges: parseJudges(body.judges),
+      languages: parseLanguages(body.languages),
       sort_order: Number(body.sortOrder) || 0,
       slot_minutes: clamp(body.slotMinutes, 3, 120, 12),
       slot_count: clamp(body.slotCount, 0, 60, 0),
@@ -62,6 +63,7 @@ export async function PATCH(request: Request) {
   if ("code" in body) patch.code = normalizePanelCode(body.code);
   if ("division" in body) patch.division = resolveDivision(body.division);
   if ("judges" in body) patch.judges = parseJudges(body.judges);
+  if ("languages" in body) patch.languages = parseLanguages(body.languages);
   if ("sortOrder" in body) patch.sort_order = Number(body.sortOrder) || 0;
   if ("slotMinutes" in body) patch.slot_minutes = clamp(body.slotMinutes, 3, 120, 12);
   if ("slotCount" in body) patch.slot_count = clamp(body.slotCount, 0, 60, 0);
@@ -122,6 +124,20 @@ function resolveDivision(input: unknown): string {
   const wanted = String(input ?? "").trim();
   const divisions = presetDivisions();
   return divisions.includes(wanted) ? wanted : divisions[0];
+}
+
+/** Only languages the event actually runs, de-duplicated. */
+function parseLanguages(input: unknown): string[] {
+  const known = new Set(configLanguages().map((l) => l.id));
+  const list = Array.isArray(input) ? input : String(input ?? "").split(/[,\s]+/);
+
+  return [
+    ...new Set(
+      list
+        .map((l) => String(l).trim().toLowerCase())
+        .filter((l) => known.has(l)),
+    ),
+  ];
 }
 
 function parseJudges(input: unknown): string[] {

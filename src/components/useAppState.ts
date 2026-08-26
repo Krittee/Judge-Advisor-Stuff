@@ -9,6 +9,8 @@ const EMPTY: AppState = {
   requests: [],
   divisions: [],
   categories: [],
+  languages: [],
+  conflicts: [],
   viewer: {
     role: "team",
     name: null,

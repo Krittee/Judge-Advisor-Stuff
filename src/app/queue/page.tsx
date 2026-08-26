@@ -9,6 +9,7 @@ import { Banner, Button, Elapsed, formatClock, inputClass, StatusChip, TopBar } 
 import { SignOutButton } from "@/components/judging";
 import { PanelBusyLine, panelLoad, SlotPicker } from "@/components/SlotPicker";
 import { CategoryChip } from "@/components/CategoryChip";
+import { LanguageCover, LanguageTag } from "@/components/Language";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
 import type { Session } from "@/lib/auth";
 import type { Slot } from "@/lib/types";
@@ -31,6 +32,7 @@ export default function QueuePage() {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [bookLanguage, setBookLanguage] = useState("");
 
   useEffect(() => {
     call<{ session: Session | null }>("/api/session", { method: "GET" })
@@ -43,6 +45,11 @@ export default function QueuePage() {
       })
       .catch(() => router.replace("/login"));
   }, [router]);
+
+  // Default the booking language once the config has arrived.
+  useEffect(() => {
+    if (!bookLanguage && state.languages.length) setBookLanguage(state.languages[0].id);
+  }, [bookLanguage, state.languages]);
 
   const teamByNumber = useMemo(
     () => new Map(state.teams.map((t) => [t.number, t])),
@@ -105,7 +112,7 @@ export default function QueuePage() {
    * seen now does not also need a booking at 2pm, and leaving one behind
    * makes the schedule lie about how full it is.
    */
-  async function interviewNow() {
+  async function interviewNow(language: string) {
     if (booking) {
       setBusy(true);
       setError(null);
@@ -124,18 +131,19 @@ export default function QueuePage() {
     }
 
     await submit(
-      { teamNumber: number, kind: "queue", message: message.trim() || undefined },
+      { teamNumber: number, kind: "queue", language, message: message.trim() || undefined },
       booking
         ? `Team ${normalizeTeamNumber(number)} queued now; their ${formatClock(booking.slot_start)} slot is free again.`
         : `Team ${normalizeTeamNumber(number)} added to the queue.`,
     );
   }
 
-  const bookSlot = (slot: Slot) =>
+  const bookSlot = (slot: Slot, language: string) =>
     submit(
       {
         teamNumber: number,
         kind: "slot",
+        language,
         slotStart: slot.start,
         slotEnd: slot.end,
         message: message.trim() || undefined,
@@ -261,17 +269,30 @@ export default function QueuePage() {
               maxLength={280}
               className={inputClass}
             />
-            <Button
-              variant="warn"
-              size="lg"
-              className="w-full"
-              disabled={busy || !team || !panel || Boolean(alreadyQueued)}
-              onClick={interviewNow}
-            >
-              {booking
-                ? `Interview now instead (frees ${formatClock(booking.slot_start)})`
-                : "Add to queue now"}
-            </Button>
+            {/* One button per language: the desk is told which the team
+                wants, so asking is one tap rather than a tap and a menu. */}
+            <div className="grid gap-2 sm:grid-cols-2">
+              {state.languages.map((lang) => (
+                <Button
+                  key={lang.id}
+                  variant="warn"
+                  size="lg"
+                  className="w-full"
+                  disabled={busy || !team || !panel || Boolean(alreadyQueued)}
+                  onClick={() => interviewNow(lang.id)}
+                >
+                  {booking ? `Now — ${lang.label}` : `Request — ${lang.label}`}
+                </Button>
+              ))}
+            </div>
+            {booking ? (
+              <p className="text-center text-xs text-zinc-500">
+                Either button frees their {formatClock(booking.slot_start)} slot.
+              </p>
+            ) : null}
+            {team && panel ? (
+              <LanguageCover panel={panel} languages={state.languages} />
+            ) : null}
           </div>
         ) : (
           <div className="space-y-3">
@@ -292,13 +313,28 @@ export default function QueuePage() {
                   maxLength={280}
                   className={inputClass}
                 />
+                <label className="block text-sm">
+                  <span className="mb-1 block text-xs text-zinc-400">Interview language</span>
+                  <select
+                    value={bookLanguage}
+                    onChange={(e) => setBookLanguage(e.target.value)}
+                    className={`${inputClass} py-2`}
+                  >
+                    {state.languages.map((l) => (
+                      <option key={l.id} value={l.id} className="bg-zinc-900">
+                        {l.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <LanguageCover panel={panel} languages={state.languages} />
                 <SlotPicker
                   panel={panel}
                   requests={state.requests}
                   teams={state.teams}
                   teamId={team.id}
                   disabled={busy || Boolean(existing)}
-                  onPick={bookSlot}
+                  onPick={(slot) => bookSlot(slot, bookLanguage)}
                 />
               </>
             )}
@@ -321,6 +357,7 @@ export default function QueuePage() {
                   <span className="min-w-0 flex-1 truncate text-sm text-zinc-400">
                     {t.name} · {panelById.get(r.panel_id ?? "")?.name ?? "—"}
                   </span>
+                  <LanguageTag language={r.language} languages={state.languages} />
                   <StatusChip status={r.status} size="sm" />
                   <span className="text-xs text-zinc-500">
                     <Elapsed since={r.requested_at} />

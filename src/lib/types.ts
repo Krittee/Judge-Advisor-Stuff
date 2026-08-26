@@ -7,6 +7,8 @@ export type Panel = {
   /** Divisions are a hard wall: a panel only ever judges its own. */
   division: string;
   judges: string[];
+  /** Languages this panel can interview in. Empty means unstated. */
+  languages: string[];
   sort_order: number;
   slot_start_at: string | null;
   slot_minutes: number;
@@ -33,6 +35,8 @@ export type RequestRow = {
   panel_id: string | null;
   status: Status;
   kind: "queue" | "slot";
+  /** The language the team asked to be interviewed in. */
+  language: string;
   slot_start: string | null;
   slot_end: string | null;
   message: string | null;
@@ -55,6 +59,23 @@ export type Note = {
   panel_id: string | null;
   author: string;
   body: string;
+  created_at: string;
+};
+
+/**
+ * A judge is affiliated with a team and must stay away from it.
+ *
+ * Held against the panel rather than the person: judges sign in with a
+ * panel code, so the panel is the unit anything can actually be enforced
+ * against. The affiliated judge's name is recorded alongside.
+ */
+export type ConflictRow = {
+  id: string;
+  panel_id: string;
+  team_id: string;
+  judge_name: string | null;
+  note: string | null;
+  declared_by: string;
   created_at: string;
 };
 
@@ -93,6 +114,10 @@ export type AppState = {
   divisions: string[];
   /** The two team kinds, with their colours, straight from config. */
   categories: { id: string; label: string; color: string }[];
+  /** The languages interviews run in. */
+  languages: { id: string; label: string; short: string }[];
+  /** Panel/team pairs that must stay apart. */
+  conflicts: ConflictRow[];
   /** What this viewer is allowed to do, so the UI never offers more. */
   viewer: ViewerCapabilities;
   serverTime: string;

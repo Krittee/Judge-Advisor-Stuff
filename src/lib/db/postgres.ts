@@ -1,5 +1,13 @@
 import type { Pool } from "pg";
-import type { ActivityRow, Note, Panel, RequestRow, ScoreRow, Team } from "../types";
+import type {
+  ActivityRow,
+  ConflictRow,
+  Note,
+  Panel,
+  RequestRow,
+  ScoreRow,
+  Team,
+} from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
 import { DEFAULT_DIVISION, defaultCategory, presetPanels } from "../presets";
@@ -8,6 +16,7 @@ import {
   type ImportedTeam,
   type NewActivity,
   type NewNote,
+  type NewConflict,
   type NewRequest,
   type SaveScore,
   type Store,
@@ -126,6 +135,7 @@ async function migrate(): Promise<void> {
       code          text not null unique,
       division      text not null default 'Division 1',
       judges        text[] not null default '{}',
+      languages     text[] not null default '{}',
       sort_order    int not null default 0,
       slot_start_at timestamptz,
       slot_minutes  int not null default 12,
@@ -150,6 +160,7 @@ async function migrate(): Promise<void> {
       panel_id        uuid references panels(id) on delete set null,
       status          text not null default 'requested',
       kind            text not null default 'queue',
+      language        text not null default 'en',
       slot_start      timestamptz,
       slot_end        timestamptz,
       message         text,
@@ -173,6 +184,17 @@ async function migrate(): Promise<void> {
       author     text not null,
       body       text not null,
       created_at timestamptz not null default now()
+    );
+
+    create table if not exists conflicts (
+      id          uuid primary key default gen_random_uuid(),
+      panel_id    uuid not null references panels(id) on delete cascade,
+      team_id     uuid not null references teams(id) on delete cascade,
+      judge_name  text,
+      note        text,
+      declared_by text not null,
+      created_at  timestamptz not null default now(),
+      unique (panel_id, team_id)
     );
 
     create table if not exists scores (
@@ -202,6 +224,8 @@ async function migrate(): Promise<void> {
     create index if not exists requests_panel_idx on requests (panel_id);
     create index if not exists notes_team_idx     on notes (team_id);
     create index if not exists scores_team_idx    on scores (team_id);
+    create index if not exists conflicts_panel_idx on conflicts (panel_id);
+    create index if not exists conflicts_team_idx  on conflicts (team_id);
     create index if not exists activity_created_idx on activity (created_at desc);
 
     -- The two rules that keep the board honest. Enforced here so they
@@ -233,6 +257,10 @@ async function migrate(): Promise<void> {
       alter table panels add column if not exists division text not null default 'Division 1';
       alter table teams  add column if not exists division text not null default 'Division 1';
       alter table teams  add column if not exists category text not null default 'developing';
+
+      -- Interview language, and which languages a panel covers.
+      alter table requests add column if not exists language text not null default 'en';
+      alter table panels   add column if not exists languages text[] not null default '{}';
 
       -- Panels used to carry a room, which turned out not to be wanted.
       alter table panels drop column if exists room;
@@ -344,8 +372,9 @@ export const postgresStore: Store = {
       if (existing.has(preset.code)) continue;
       await query(
         `insert into panels
-           (name, code, division, judges, sort_order, slot_start_at, slot_minutes, slot_count)
-         values ($1, $2, $3, $4, $5, $6, $7, $8)
+           (name, code, division, judges, sort_order, slot_start_at, slot_minutes, slot_count,
+            languages)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          on conflict (code) do nothing`,
         [
           preset.name,
@@ -356,6 +385,7 @@ export const postgresStore: Store = {
           preset.slotStartAt,
           preset.slotMinutes,
           preset.slotCount,
+          [],
         ],
       );
     }
@@ -377,8 +407,8 @@ export const postgresStore: Store = {
       return one(
         await query<RequestRow>(
           `insert into requests
-             (team_id, panel_id, status, kind, slot_start, slot_end, message, created_by)
-           values ($1, $2, $3, $4, $5, $6, $7, $8)
+             (team_id, panel_id, status, kind, slot_start, slot_end, message, created_by, language)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            returning *`,
           [
             input.teamId,
@@ -389,6 +419,7 @@ export const postgresStore: Store = {
             input.slotEnd ?? null,
             input.message ?? null,
             input.createdBy,
+            input.language,
           ],
         ),
       )!;
@@ -510,10 +541,18 @@ export const postgresStore: Store = {
       }
     }
 
+    // A panel that must stay away from a team is not a candidate for it.
+    const barred = new Set(
+      (await this.listConflicts()).map((c) => `${c.panel_id}:${c.team_id}`),
+    );
+
     const assignments: { teamId: string; panelId: string }[] = [];
     for (const team of pending) {
-      // The hard wall: only panels in this team's own division are eligible.
-      const eligible = panels.filter((p) => p.division === team.division);
+      // The hard wall: only panels in this team's own division are eligible,
+      // and never one with a declared conflict.
+      const eligible = panels.filter(
+        (p) => p.division === team.division && !barred.has(`${p.id}:${team.id}`),
+      );
       const target = eligible
         .map((p) => ({ id: p.id, count: load.get(p.id) ?? 0 }))
         .filter((p) => p.count < perPanel)
@@ -541,8 +580,9 @@ export const postgresStore: Store = {
       return one(
         await query<Panel>(
           `insert into panels
-             (name, code, division, judges, sort_order, slot_start_at, slot_minutes, slot_count)
-           values ($1, $2, $3, $4, $5, $6, $7, $8)
+             (name, code, division, judges, sort_order, slot_start_at, slot_minutes, slot_count,
+            languages)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            returning *`,
           [
             input.name,
@@ -553,6 +593,7 @@ export const postgresStore: Store = {
             input.slot_start_at,
             input.slot_minutes,
             input.slot_count,
+            input.languages,
           ],
         ),
       )!;
@@ -627,6 +668,33 @@ export const postgresStore: Store = {
         [input.teamId, input.requestId, input.panelId, input.author, input.body],
       ),
     )!;
+  },
+
+  async listConflicts() {
+    return rows(await query<ConflictRow>("select * from conflicts"));
+  },
+
+  /** Declaring the same pair twice returns the one already recorded. */
+  async addConflict(input: NewConflict) {
+    return one(
+      await query<ConflictRow>(
+        `insert into conflicts (panel_id, team_id, judge_name, note, declared_by)
+         values ($1, $2, $3, $4, $5)
+         on conflict (panel_id, team_id) do update set
+           judge_name = coalesce(excluded.judge_name, conflicts.judge_name),
+           note = coalesce(excluded.note, conflicts.note)
+         returning *`,
+        [input.panelId, input.teamId, input.judgeName, input.note, input.declaredBy],
+      ),
+    )!;
+  },
+
+  async removeConflict(id) {
+    const gone = await query<{ id: string }>(
+      "delete from conflicts where id = $1 returning id",
+      [id],
+    );
+    return gone.length > 0;
   },
 
   async listScores(teamId) {
@@ -716,6 +784,6 @@ export const postgresStore: Store = {
   },
 
   async resetAll() {
-    await query("truncate activity, notes, scores, requests, teams, panels cascade");
+    await query("truncate activity, notes, scores, conflicts, requests, teams, panels cascade");
   },
 };

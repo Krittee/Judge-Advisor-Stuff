@@ -175,6 +175,89 @@ A team already in the walk-up queue simply cannot be added twice.
 
 ---
 
+## Interview language
+
+Interviews run in **English** or **Thai**, and the request records which.
+
+For a **walk-up**, the ask is one button per language rather than a button plus
+a menu — the language is chosen in the same tap as the request, so it cannot be
+left on whatever the last team picked:
+
+- team's own page — *"Request a judge — English"* / *"Request a judge — ไทย"*
+- queue desk — *"Request — English"* / *"Request — ไทย"*
+
+(If the team already holds a booking, those read *"We're ready now — …"* and
+*"Now — …"*, and either one frees the slot before queueing them.)
+
+For a **booking**, the language is picked once above the slot grid — chips on
+the team page, a dropdown at the desk — then applies to the slot they claim.
+
+The language travels with the request: a short **EN**/**TH** tag on the judge
+console and the board, and a `language` column in storage.
+
+Panels declare what they can cover, in the panel editor of the Judge Advisor
+console. Wherever a panel is shown alongside a request, a line states what it
+interviews in.
+
+**A language a panel cannot cover is flagged, not blocked.** If a team asks for
+Thai and the panel holding them lists only English, the request is still
+created, and the Judge Advisor console — the one screen that can actually fix
+it — turns that line amber: *"Alpha interviews in English — this team asked for
+ไทย (Thai). The Judge Advisor can move them."* Refusing the request outright
+would leave the team with nothing on a busy floor, and the remedy (move the
+team, or send a Thai-speaking judge over) is a human decision.
+
+A panel that has **not** stated its languages says nothing at all, rather than
+warning on every request — an unstated cover is not the same as no cover, and a
+warning everybody sees is a warning everybody learns to ignore.
+
+Languages live in `config/event.json` and are free to change:
+
+```json
+"languages": [
+  { "id": "en", "label": "English", "short": "EN" },
+  { "id": "th", "label": "ไทย (Thai)", "short": "TH" }
+]
+```
+
+The first entry is the default. An unrecognised value falls back to it rather
+than erroring, so an old link or a stale form cannot wedge a request.
+
+---
+
+## Conflict of interest
+
+A judge affiliated with a team — coached it, mentored it, has a child on it —
+must not interview that team or read its notebook. The app takes that as a hard
+rule rather than a reminder.
+
+**Declaring one.** Either the judge (on their own panel) or the Judge Advisor
+(on any panel) marks the conflict from the team's card. It takes effect at once:
+
+- the team is **unassigned from that panel**, so it stops appearing in the
+  panel's queue
+- the team **disappears from that judge's `/api/state` entirely** — not greyed
+  out, not hidden by CSS, simply not sent to their browser
+- notes, scores and the notebook tab all return `403` for that panel, with the
+  reason spelled out
+- **auto-assign will not put the team back**, and the Judge Advisor reassigning
+  it onto that panel by hand is refused with `409`
+
+Authorisation is checked before the request body is even validated, so a
+conflicted judge poking at the API learns nothing about the team — not the
+rubric's shape, not whether a criterion exists.
+
+**Withdrawing one is the Judge Advisor's alone.** A judge cannot clear their own
+conflict, and neither can the queue desk; both get `403`. Withdrawing does *not*
+put the team back on the panel — that is a separate, deliberate reassignment, so
+a mistaken withdrawal cannot quietly restore access.
+
+Conflicts are per **panel**, not per individual judge, because a panel
+interviews as a unit — one affiliated member is enough to disqualify the panel
+from that team.
+
+---
+
 ## Scoring
 
 Two rubrics, each a tab on a team's card in the judge and Judge Advisor

@@ -1,4 +1,12 @@
-import type { ActivityRow, Note, Panel, RequestRow, ScoreRow, Team } from "../types";
+import type {
+  ActivityRow,
+  ConflictRow,
+  Note,
+  Panel,
+  RequestRow,
+  ScoreRow,
+  Team,
+} from "../types";
 
 /** Thrown for rule violations we want to show the user verbatim. */
 export class StoreError extends Error {
@@ -18,6 +26,7 @@ export type NewRequest = {
   createdBy: string;
   slotStart?: string | null;
   slotEnd?: string | null;
+  language: string;
 };
 
 export type NewNote = {
@@ -38,6 +47,14 @@ export type SaveScore = {
   panelId: string | null;
   /** Recomputes the stored total from the merged values. */
   totalOf: (values: Record<string, number>) => number;
+};
+
+export type NewConflict = {
+  panelId: string;
+  teamId: string;
+  judgeName: string | null;
+  note: string | null;
+  declaredBy: string;
 };
 
 export type NewActivity = {
@@ -97,6 +114,11 @@ export type Store = {
   generatePanelCode(): Promise<string>;
 
   createNote(input: NewNote): Promise<Note>;
+
+  listConflicts(): Promise<ConflictRow[]>;
+  /** Idempotent: declaring the same pair twice returns the existing one. */
+  addConflict(input: NewConflict): Promise<ConflictRow>;
+  removeConflict(id: string): Promise<boolean>;
 
   listScores(teamId?: string): Promise<ScoreRow[]>;
   /** Set one criterion. Creates the row on first score. */

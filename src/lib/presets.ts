@@ -24,9 +24,11 @@ export type PresetPanel = {
 export const DEFAULT_DIVISION = "Division 1";
 
 export type TeamCategory = { id: string; label: string; color: string };
+export type Language = { id: string; label: string; short: string };
 
 type RawPreset = {
   divisions?: unknown;
+  languages?: unknown;
   teamCategories?: unknown;
   booking?: unknown;
   panels?: unknown;
@@ -44,6 +46,49 @@ export function presetDivisions(): string[] {
     ? raw.divisions.map((d) => String(d).trim()).filter(Boolean)
     : [];
   return list.length ? unique(list) : [DEFAULT_DIVISION];
+}
+
+const LANGUAGE_FALLBACK: Language[] = [
+  { id: "en", label: "English", short: "EN" },
+  { id: "th", label: "ไทย (Thai)", short: "TH" },
+];
+
+/** The languages interviews are conducted in. Always at least one. */
+export function languages(): Language[] {
+  const list = Array.isArray(raw.languages) ? raw.languages : [];
+
+  const parsed = list
+    .map((l) => {
+      const o = (l ?? {}) as Record<string, unknown>;
+      const id = String(o.id ?? "").trim().toLowerCase();
+      if (!id) return null;
+      return {
+        id,
+        label: String(o.label ?? id),
+        short: String(o.short ?? id).toUpperCase().slice(0, 4),
+      };
+    })
+    .filter((l): l is Language => l !== null);
+
+  return parsed.length ? parsed : LANGUAGE_FALLBACK;
+}
+
+export function defaultLanguage(): string {
+  return languages()[0].id;
+}
+
+/** Map free text onto a real language, by id, short code or label. */
+export function resolveLanguage(input: unknown): string {
+  const wanted = String(input ?? "").trim().toLowerCase();
+  if (!wanted) return defaultLanguage();
+
+  const match = languages().find(
+    (l) =>
+      l.id.toLowerCase() === wanted ||
+      l.short.toLowerCase() === wanted ||
+      l.label.toLowerCase() === wanted,
+  );
+  return match ? match.id : defaultLanguage();
 }
 
 const CATEGORY_FALLBACK: TeamCategory[] = [

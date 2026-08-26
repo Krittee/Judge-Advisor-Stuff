@@ -17,12 +17,14 @@ import {
 } from "@/components/ui";
 import { NotesDrawer, SignOutButton } from "@/components/judging";
 import { Rankings } from "@/components/Rankings";
+import { ConflictDialog } from "@/components/ConflictDialog";
 import { CategoryChip, CategorySelect } from "@/components/CategoryChip";
+import { LanguageCover, LanguageTag } from "@/components/Language";
 import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
 import type { ActivityRow, Panel, RequestRow, Team } from "@/lib/types";
 
-type Tab = "floor" | "scores" | "teams" | "panels" | "import" | "log";
+type Tab = "floor" | "scores" | "teams" | "panels" | "conflicts" | "import" | "log";
 
 /** The Judge Advisor's console: every panel at once, and the tools to unstick it. */
 export default function AdminPage() {
@@ -54,6 +56,7 @@ export default function AdminPage() {
     ["scores", "Scores"],
     ["teams", "Teams"],
     ["panels", "Panels"],
+    ["conflicts", "Conflicts"],
     ["import", "Import"],
     ["log", "Activity"],
   ];
@@ -107,7 +110,15 @@ export default function AdminPage() {
         ) : null}
         {tab === "teams" ? <TeamsTab state={state} refresh={refresh} onError={setError} /> : null}
         {tab === "panels" ? (
-          <PanelsTab refresh={refresh} onError={setError} divisions={state.divisions} />
+          <PanelsTab
+            refresh={refresh}
+            onError={setError}
+            divisions={state.divisions}
+            languages={state.languages}
+          />
+        ) : null}
+        {tab === "conflicts" ? (
+          <ConflictsTab state={state} refresh={refresh} onError={setError} />
         ) : null}
         {tab === "import" ? (
           <ImportTab
@@ -238,6 +249,11 @@ function FloorTab({
                 ))}
               </select>
 
+              <LanguageTag
+                language={request!.language}
+                languages={state.languages}
+                size="md"
+              />
               <StatusChip status={request!.status} size="sm" />
               <span className="w-16 text-xs text-zinc-500">
                 <Elapsed since={request!.requested_at} />
@@ -270,6 +286,15 @@ function FloorTab({
                 <span className="w-full text-xs text-zinc-600">
                   {panel.judges.join(", ") || "no judges listed"}
                 </span>
+              ) : null}
+              {/* A request in a language its panel has not said it covers
+                  is worth surfacing here, where it can be reassigned. */}
+              {panel ? (
+                <LanguageCover
+                  panel={panel}
+                  languages={state.languages}
+                  asking={request!.language}
+                />
               ) : null}
             </li>
           );
@@ -558,6 +583,135 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
 }
 
 /**
+ * Declared conflicts of interest.
+ *
+ * The Judge Advisor is the only one who can withdraw one, so this is the
+ * only place a conflict can be lifted. A team named here has been taken
+ * off that panel and needs assigning to another.
+ */
+function ConflictsTab({ state, refresh, onError }: TabProps) {
+  const [adding, setAdding] = useState<Team | null>(null);
+  const [pick, setPick] = useState("");
+  const [panelId, setPanelId] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const teamById = useMemo(() => new Map(state.teams.map((t) => [t.id, t])), [state.teams]);
+  const panelById = useMemo(() => new Map(state.panels.map((p) => [p.id, p])), [state.panels]);
+
+  async function withdraw(id: string) {
+    if (!confirm("Withdraw this conflict? The panel will be able to judge the team again.")) {
+      return;
+    }
+    setBusy(true);
+    onError(null);
+    try {
+      await call(`/api/conflicts?id=${id}`, { method: "DELETE" });
+      await refresh();
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const chosen = state.teams.find((t) => t.number === pick.trim().toUpperCase());
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end gap-3 rounded-xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/10">
+        <label className="min-w-[9rem] flex-1">
+          <span className="mb-1 block text-xs text-zinc-400">Team number</span>
+          <input
+            value={pick}
+            onChange={(e) => setPick(e.target.value.toUpperCase())}
+            placeholder="1234"
+            className={`${inputClass} py-2`}
+          />
+        </label>
+        <label className="min-w-[10rem] flex-1">
+          <span className="mb-1 block text-xs text-zinc-400">Judge panel</span>
+          <select
+            value={panelId}
+            onChange={(e) => setPanelId(e.target.value)}
+            className={`${inputClass} py-2`}
+          >
+            <option value="" className="bg-zinc-900">
+              — pick a panel —
+            </option>
+            {state.panels.map((p) => (
+              <option key={p.id} value={p.id} className="bg-zinc-900">
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button
+          disabled={!chosen || !panelId}
+          onClick={() => chosen && setAdding(chosen)}
+        >
+          Declare conflict
+        </Button>
+        <p className="w-full text-xs text-zinc-600">
+          {pick && !chosen ? (
+            <span className="text-amber-400">No team with that number.</span>
+          ) : (
+            "A conflict takes the team off that panel and keeps it off — no interview, no notebook, no notes."
+          )}
+        </p>
+      </div>
+
+      <ul className="divide-y divide-white/5 rounded-xl ring-1 ring-inset ring-white/10">
+        {state.conflicts.map((c) => {
+          const team = teamById.get(c.team_id);
+          const panel = panelById.get(c.panel_id);
+          return (
+            <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
+              <span className="font-bold tabular-nums">{team?.number ?? "—"}</span>
+              <span className="min-w-[8rem] flex-1 truncate text-zinc-400">
+                {team?.name ?? "team removed"}
+              </span>
+              <span className="text-zinc-300">{panel?.name ?? "panel removed"}</span>
+              {c.judge_name ? <span className="text-zinc-500">{c.judge_name}</span> : null}
+              {c.note ? <span className="text-zinc-600">{c.note}</span> : null}
+              {team && !team.panel_id ? (
+                <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-300">
+                  needs a panel
+                </span>
+              ) : null}
+              <button
+                onClick={() => withdraw(c.id)}
+                disabled={busy}
+                className="ml-auto text-xs text-zinc-500 hover:text-rose-400"
+              >
+                withdraw
+              </button>
+            </li>
+          );
+        })}
+        {!state.conflicts.length ? (
+          <li className="px-4 py-8 text-center text-sm text-zinc-600">
+            No conflicts declared. Judges can declare their own from their console.
+          </li>
+        ) : null}
+      </ul>
+
+      {adding ? (
+        <ConflictDialog
+          team={adding}
+          panelId={panelId}
+          onClose={() => setAdding(null)}
+          onDone={async () => {
+            setAdding(null);
+            setPick("");
+            await refresh();
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * A table cell you can type into.
  *
  * Saves on blur or Enter, reverts on Escape, and puts the old value back
@@ -752,10 +906,12 @@ function PanelsTab({
   refresh,
   onError,
   divisions,
+  languages,
 }: {
   refresh: () => Promise<void>;
   onError: (m: string | null) => void;
   divisions: string[];
+  languages: { id: string; label: string; short: string }[];
 }) {
   const [panels, setPanels] = useState<Panel[]>([]);
   const [busy, setBusy] = useState(false);
@@ -855,6 +1011,7 @@ function PanelsTab({
             key={p.id}
             panel={p}
             divisions={divisions}
+            languages={languages}
             onPatch={patch}
             onError={onError}
             onReload={load}
@@ -996,12 +1153,14 @@ function DeleteAllPanels({
 function PanelCard({
   panel,
   divisions,
+  languages,
   onPatch,
   onError,
   onReload,
 }: {
   panel: Panel;
   divisions: string[];
+  languages: { id: string; label: string; short: string }[];
   onPatch: (id: string, body: Record<string, unknown>) => Promise<void>;
   onError: (m: string | null) => void;
   onReload: () => Promise<void> | void;
@@ -1029,6 +1188,37 @@ function PanelCard({
         placeholder="Judge names, comma separated"
         className={`${inputClass} py-2 text-sm`}
       />
+
+      <div className="text-xs text-zinc-400">
+        <span className="mb-1 block">Interviews in</span>
+        <div className="flex flex-wrap gap-2">
+          {languages.map((l) => {
+            const on = panel.languages.includes(l.id);
+            return (
+              <button
+                key={l.id}
+                onClick={() =>
+                  onPatch(panel.id, {
+                    languages: on
+                      ? panel.languages.filter((x) => x !== l.id)
+                      : [...panel.languages, l.id],
+                  })
+                }
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  on
+                    ? "bg-indigo-500 text-white"
+                    : "bg-white/5 text-zinc-500 ring-1 ring-inset ring-white/10"
+                }`}
+              >
+                {l.label}
+              </button>
+            );
+          })}
+        </div>
+        {!panel.languages.length ? (
+          <p className="mt-1 text-zinc-600">Not stated — no request will be flagged.</p>
+        ) : null}
+      </div>
 
       <label className="block text-xs text-zinc-400">
         Division

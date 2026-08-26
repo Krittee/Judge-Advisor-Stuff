@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { actorLabel, canAdvance, canCancel, getSession, mayActOnPanel } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
+import { CONFLICT_MESSAGE, isConflicted } from "@/lib/conflicts";
 import type { RequestRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +46,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   // A judge may only touch their own panel's work. Admin may touch anything.
   // This is the scope check; the role checks above only decided whether
   // the action is available at all.
+  // A conflict outranks everything: an affiliated panel may not move this
+  // team's interview along, whoever assigned it to them. Checked first so
+  // the judge is told the real reason rather than the vaguer one.
+  if (await isConflicted(session, current.team_id)) {
+    return NextResponse.json({ error: CONFLICT_MESSAGE }, { status: 403 });
+  }
+
   if (session?.role !== "queuer" && !mayActOnPanel(session, current.panel_id)) {
     return NextResponse.json(
       { error: "That request belongs to another judge panel." },
@@ -73,6 +81,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!target) {
       return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
     }
+    const conflicts = await db.listConflicts();
+    if (conflicts.some((c) => c.panel_id === panelId && c.team_id === current.team_id)) {
+      return NextResponse.json(
+        { error: `${target.name} has a declared conflict of interest with this team.` },
+        { status: 409 },
+      );
+    }
+
     if (team && target.division !== team.division) {
       return NextResponse.json(
         {

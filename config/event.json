@@ -10,6 +10,10 @@
     "Admin > Panels if you need to. Set slotCount to 0 for a walk-up queue only.",
     "A panel can override any of these with its own slotMinutes / slotCount / startTime.",
     "",
+    "`languages` are the languages interviews run in. A team asks in one of them,",
+    "and each panel says which it can cover; a request that lands on a panel not",
+    "covering it is flagged rather than blocked, so you can still reassign.",
+    "",
     "`teamCategories` is the notebook classification. The FIRST one listed is what",
     "a team gets until someone says otherwise — put `ungraded` first if you would",
     "rather teams start unclassified and be graded up. Rename the labels or change",
@@ -17,6 +21,11 @@
   ],
 
   "divisions": ["Division 1", "Division 2"],
+
+  "languages": [
+    { "id": "en", "label": "English", "short": "EN" },
+    { "id": "th", "label": "ไทย (Thai)", "short": "TH" }
+  ],
 
   "teamCategories": [
     { "id": "developing", "label": "Developing", "color": "amber" },
