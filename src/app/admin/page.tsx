@@ -242,11 +242,27 @@ function FloorTab({
                 className="rounded-lg bg-white/5 px-2 py-1.5 text-xs ring-1 ring-inset ring-white/10"
                 title="Move this interview to another panel"
               >
-                {state.panels.map((p) => (
-                  <option key={p.id} value={p.id} className="bg-zinc-900">
-                    {p.name}
-                  </option>
-                ))}
+                {/* Only somewhere this interview could actually go: the
+                    team's own division, and never a panel declared
+                    conflicted with them. The API refuses both, so offering
+                    them here only produces an error to undo. */}
+                {state.panels
+                  .filter(
+                    (p) =>
+                      (p.division === team.division &&
+                        !state.conflicts.some(
+                          (c) => c.panel_id === p.id && c.team_id === team.id,
+                        )) ||
+                      // Never drop the current value: a select whose value is
+                      // missing from its options shows a different panel than
+                      // the one actually holding the interview.
+                      p.id === request!.panel_id,
+                  )
+                  .map((p) => (
+                    <option key={p.id} value={p.id} className="bg-zinc-900">
+                      {p.name}
+                    </option>
+                  ))}
               </select>
 
               <LanguageTag
@@ -332,6 +348,13 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
     }
     return c;
   }, [state.teams]);
+
+  /* Panel/team pairs that must never be put together. The API refuses them
+     anyway, but an option you cannot choose does not belong in the list. */
+  const conflicted = useMemo(
+    () => new Set(state.conflicts.map((c) => `${c.panel_id}:${c.team_id}`)),
+    [state.conflicts],
+  );
 
   async function update(teamId: string, patch: Record<string, unknown>) {
     onError(null);
@@ -527,12 +550,24 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                       <option value="" className="bg-zinc-900">
                         — unassigned —
                       </option>
-                      {/* Only panels on this team's side of the wall. */}
+                      {/* Only panels on this team's side of the wall, and
+                          never one declared conflicted with this team. */}
                       {state.panels
-                        .filter((p) => p.division === team.division)
+                        .filter(
+                          (p) =>
+                            p.division === team.division &&
+                            (!conflicted.has(`${p.id}:${team.id}`) ||
+                              // A conflicted panel is dropped from the list,
+                              // but never the one currently selected: a select
+                              // whose value is missing from its own options
+                              // renders as something else and quietly
+                              // misreports who holds the team.
+                              p.id === team.panel_id),
+                        )
                         .map((p) => (
                           <option key={p.id} value={p.id} className="bg-zinc-900">
                             {p.name}
+                            {conflicted.has(`${p.id}:${team.id}`) ? " — conflicted" : ""}
                           </option>
                         ))}
                     </select>

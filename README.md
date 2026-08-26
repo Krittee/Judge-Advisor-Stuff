@@ -273,6 +273,9 @@ at once:
   reason spelled out
 - **auto-assign will not put the team back**, and the Judge Advisor reassigning
   it onto that panel by hand is refused with `409`
+- the panel **stops being offered** in that team's panel picker, on the Teams
+  tab and when moving an interview on the Floor — an option that can only
+  return an error is not worth showing
 
 Authorisation is checked before the request body is even validated, so a
 conflicted judge poking at the API learns nothing about the team — not the
