@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { actorLabel, canAdminister, canReadNotes, getSession } from "@/lib/auth";
+import type { Session } from "@/lib/auth";
 import { store } from "@/lib/db";
+import { danglingSuffixes, parseTeamNumberList } from "@/lib/teamNumber";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +44,12 @@ export async function POST(request: Request) {
   // can record one for any.
   const panelId =
     session?.role === "judge" ? session.panelId : String(body.panelId ?? "");
+
+  // Asking a panel "any conflicts?" comes back as a handful of team numbers
+  // at once, so take them that way rather than making it one dialog each.
+  if (typeof body.teamNumbers === "string" && body.teamNumbers.trim()) {
+    return declareMany(session, panelId, body.teamNumbers, String(body.judgeName ?? "").trim().slice(0, 80) || null);
+  }
 
   if (!teamId || !panelId) {
     return NextResponse.json({ error: "A team and a panel are required." }, { status: 400 });
@@ -99,4 +107,108 @@ export async function DELETE(request: Request) {
 
   const removed = await store().removeConflict(id);
   return NextResponse.json({ ok: true, removed });
+}
+
+/**
+ * Record a whole panel's conflicts in one go.
+ *
+ * This is the Judge Advisor's actual workflow: ask each panel whether they
+ * are affiliated with anyone, and get back a short list of team numbers.
+ * Doing that a team at a time across six panels is where mistakes creep in.
+ *
+ * Every number is reported back under exactly one heading, so a typo cannot
+ * pass as a recorded conflict.
+ */
+async function declareMany(
+  session: Session | null,
+  panelId: string,
+  input: string,
+  judgeName: string | null,
+) {
+  if (!panelId) {
+    return NextResponse.json({ error: "Pick a judge panel first." }, { status: 400 });
+  }
+
+  const db = store();
+  const [teams, panels, existing] = await Promise.all([
+    db.listTeams(),
+    db.listPanels(),
+    db.listConflicts(),
+  ]);
+
+  const panel = panels.find((p) => p.id === panelId);
+  if (!panel) {
+    return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
+  }
+
+  const numbers = parseTeamNumberList(input);
+  if (!numbers.length) {
+    return NextResponse.json({ error: "No team numbers found." }, { status: 400 });
+  }
+
+  // Refuse the whole list rather than record part of it: a stray space in
+  // "9882 K" would otherwise conflict team 9882 and leave 9882K judgeable.
+  const adrift = danglingSuffixes(input);
+  if (adrift.length) {
+    return NextResponse.json(
+      {
+        error:
+          `"${adrift.join('", "')}" ${adrift.length === 1 ? "is" : "are"} not a team number. ` +
+          `If you meant a letter suffix, write it with no space — 9882K, not 9882 K. ` +
+          `Nothing was recorded.`,
+      },
+      { status: 400 },
+    );
+  }
+  if (numbers.length > 200) {
+    return NextResponse.json({ error: "That is too many at once." }, { status: 400 });
+  }
+
+  const byNumber = new Map(teams.map((t) => [t.number, t]));
+  const already = new Set(
+    existing.filter((c) => c.panel_id === panelId).map((c) => c.team_id),
+  );
+
+  const recorded: string[] = [];
+  const unchanged: string[] = [];
+  const notFound: string[] = [];
+  const unassigned: string[] = [];
+
+  for (const number of numbers) {
+    const team = byNumber.get(number);
+    if (!team) {
+      notFound.push(number);
+      continue;
+    }
+    if (already.has(team.id)) {
+      unchanged.push(number);
+      continue;
+    }
+
+    await db.addConflict({
+      panelId,
+      teamId: team.id,
+      judgeName,
+      note: null,
+      declaredBy: actorLabel(session),
+    });
+
+    // Same rule as a single declaration: a conflicted panel cannot hold
+    // the team, so hand it back for reassignment.
+    if (team.panel_id === panelId) {
+      await db.updateTeam(team.id, { panel_id: null });
+      unassigned.push(number);
+    }
+    recorded.push(number);
+  }
+
+  if (recorded.length) {
+    await db.logActivity({
+      actor: actorLabel(session),
+      action: "declared conflicts of interest",
+      detail: `${panel.name} · ${recorded.join(", ")}`,
+    });
+  }
+
+  return NextResponse.json({ recorded, unchanged, notFound, unassigned, panel: panel.name });
 }

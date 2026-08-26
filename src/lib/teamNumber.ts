@@ -56,3 +56,33 @@ export function compareTeamNumbers(a: string, b: string): number {
   if (numA !== numB) return numA < numB ? -1 : 1;
   return restA.localeCompare(restB);
 }
+
+/**
+ * Read a list of team numbers written out by hand.
+ *
+ * A panel asked "any teams you're affiliated with?" writes the answer down
+ * however they like — commas, spaces, semicolons, one per line, or a mix —
+ * so all of those separate. Numbers are normalised and de-duplicated, and
+ * order is preserved so what comes back can be read against what was typed.
+ */
+export function parseTeamNumberList(input: string): string[] {
+  const seen = new Set<string>();
+  for (const raw of String(input ?? "").split(/[\s,;]+/)) {
+    const number = normalizeTeamNumber(raw);
+    if (number) seen.add(number);
+  }
+  return [...seen];
+}
+
+/**
+ * Find suffixes that have come adrift from their number.
+ *
+ * In a list, a space separates entries — so "9882 K" reads as two entries,
+ * 9882 and K, rather than one team. Left alone that records a conflict
+ * against team 9882, who may well exist and be someone else entirely, while
+ * 9882K stays judgeable. No VIQRC team is a bare letter or two, so treat
+ * those as a stray space and make the caller ask rather than guess.
+ */
+export function danglingSuffixes(input: string): string[] {
+  return parseTeamNumberList(input).filter((n) => n.length <= 2 && !/\d/.test(n));
+}

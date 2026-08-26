@@ -231,8 +231,39 @@ A judge affiliated with a team — coached it, mentored it, has a child on it �
 must not interview that team or read its notebook. The app takes that as a hard
 rule rather than a reminder.
 
-**Declaring one.** Either the judge (on their own panel) or the Judge Advisor
-(on any panel) marks the conflict from the team's card. It takes effect at once:
+**Asking up front.** The usual way this gets collected is the Judge Advisor
+asking each panel once, before anything is assigned: *"any teams you're
+affiliated with?"* The Conflicts tab takes the answer as it was given — pick
+the panel, paste the team numbers, done. Commas, spaces, semicolons and
+newlines all separate, so it does not matter how the panel wrote their list
+down.
+
+Every number comes back under exactly one heading, so a typo cannot pass for a
+recorded conflict:
+
+- **recorded** — newly declared against that panel
+- **already declared** — was on the list before, left alone
+- **no team with that number** — nothing was recorded for these, check them
+- **needing a panel** — teams this just took off that panel
+
+Do this *before* auto-assigning and no conflicted pairing is ever made in the
+first place. Do it after, and the teams are taken off that panel and handed
+back for reassignment.
+
+One input is refused outright rather than half-recorded: a team number with a
+space in it, like `9882 K`. In a list a space separates entries, so that reads
+as *9882* and *K* — and 9882 may well be a real team, so recording it would
+conflict the wrong people and leave 9882K judgeable. The whole batch is
+rejected with a note to write the suffix without a space.
+
+**If every panel in a division is conflicted with a team**, that team can never
+be assigned — auto-assign skips it and it sits unplaced. The Conflicts tab says
+so in red rather than letting it pass quietly, because otherwise nobody finds
+out until the team turns up expecting to be judged.
+
+**Declaring one at a time.** Either the judge (on their own panel) or the Judge
+Advisor (on any panel) marks the conflict from the team's card. It takes effect
+at once:
 
 - the team is **unassigned from that panel**, so it stops appearing in the
   panel's queue
@@ -254,7 +285,11 @@ a mistaken withdrawal cannot quietly restore access.
 
 Conflicts are per **panel**, not per individual judge, because a panel
 interviews as a unit — one affiliated member is enough to disqualify the panel
-from that team.
+from that team. The Conflicts tab lists them grouped by panel, which is how
+they were collected and how you would read them back to check.
+
+Optionally each one records **which judge** is affiliated and **how** — useful
+months later when someone asks why a panel never saw a particular team.
 
 ---
 
