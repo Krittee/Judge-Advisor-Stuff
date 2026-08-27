@@ -261,9 +261,9 @@ be assigned — auto-assign skips it and it sits unplaced. The Conflicts tab say
 so in red rather than letting it pass quietly, because otherwise nobody finds
 out until the team turns up expecting to be judged.
 
-**Declaring one at a time.** Either the judge (on their own panel) or the Judge
-Advisor (on any panel) marks the conflict from the team's card. It takes effect
-at once:
+**Declaring one at a time.** For the conflict that turns up after the round of
+asking, the Judge Advisor records it against a panel from the Conflicts tab.
+It takes effect at once:
 
 - the team is **unassigned from that panel**, so it stops appearing in the
   panel's queue
@@ -281,10 +281,14 @@ Authorisation is checked before the request body is even validated, so a
 conflicted judge poking at the API learns nothing about the team — not the
 rubric's shape, not whether a criterion exists.
 
-**Withdrawing one is the Judge Advisor's alone.** A judge cannot clear their own
-conflict, and neither can the queue desk; both get `403`. Withdrawing does *not*
-put the team back on the panel — that is a separate, deliberate reassignment, so
-a mistaken withdrawal cannot quietly restore access.
+**Recording and withdrawing are both the Judge Advisor's.** Judges have no
+conflict controls in their console: they only ever see their own panel's
+assigned teams, and a conflict takes the team off the panel, so there is
+nothing there for them to act on. The queue desk gets `403` on both.
+
+Withdrawing does *not* put the team back on the panel — that is a separate,
+deliberate reassignment, so a mistaken withdrawal cannot quietly restore
+access.
 
 Conflicts are per **panel**, not per individual judge, because a panel
 interviews as a unit — one affiliated member is enough to disqualify the panel

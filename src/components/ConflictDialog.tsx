@@ -6,11 +6,14 @@ import { Banner, Button, inputClass } from "./ui";
 import type { Team } from "@/lib/types";
 
 /**
- * Declare a conflict of interest with a team.
+ * Declare one panel's conflict of interest with one team.
  *
- * Deliberately one-way from here: a judge can put a conflict up, but only
- * the Judge Advisor can take one down. Letting a judge withdraw their own
- * would make the declaration worth nothing.
+ * The Judge Advisor's screen: they ask the panels who they are affiliated
+ * with and record the answers. A whole panel's list at once goes through
+ * the Conflicts tab instead; this is for the one that turns up later.
+ *
+ * Deliberately one-way from here — withdrawing is a separate, deliberate
+ * act, so a conflict cannot be put up and taken down in the same breath.
  */
 export function ConflictDialog({
   team,
@@ -19,8 +22,8 @@ export function ConflictDialog({
   onDone,
 }: {
   team: Team;
-  /** Only the Judge Advisor passes this; a judge's own panel is implied. */
-  panelId?: string;
+  /** The panel that is conflicted with this team. */
+  panelId: string;
   onClose: () => void;
   onDone: () => Promise<void> | void;
 }) {
@@ -56,8 +59,8 @@ export function ConflictDialog({
           Conflict of interest — {team.number} {team.name}
         </h2>
         <p className="mt-1 mb-4 text-sm text-zinc-400">
-          Declaring this puts the team out of reach for your whole panel: no interview, no
-          notebook, no notes. Only the Judge Advisor can undo it.
+          This puts the team out of reach for that whole panel — no interview, no notebook,
+          no notes — and takes them off it if they are on it now.
         </p>
 
         {error ? <Banner kind="error">{error}</Banner> : null}

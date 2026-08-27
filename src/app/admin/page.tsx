@@ -910,7 +910,8 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
         </div>
       ) : (
         <p className="rounded-xl px-4 py-8 text-center text-sm text-zinc-600 ring-1 ring-inset ring-white/10">
-          No conflicts declared. Judges can declare their own from their console.
+          No conflicts declared. Ask each panel who they are affiliated with, and record
+          the answers above.
         </p>
       )}
 

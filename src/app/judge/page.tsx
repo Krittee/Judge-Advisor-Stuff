@@ -17,7 +17,6 @@ import {
 import type { Session } from "@/lib/auth";
 import { NotesDrawer, SignOutButton } from "@/components/judging";
 import { Rankings } from "@/components/Rankings";
-import { ConflictDialog } from "@/components/ConflictDialog";
 import { CategoryChip } from "@/components/CategoryChip";
 import { LanguageTag } from "@/components/Language";
 import type { RequestRow, Team } from "@/lib/types";
@@ -33,7 +32,6 @@ export default function JudgePage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notesFor, setNotesFor] = useState<Team | null>(null);
-  const [conflictFor, setConflictFor] = useState<Team | null>(null);
   const [view, setView] = useState<"queue" | "scores">("queue");
 
   useEffect(() => {
@@ -252,14 +250,6 @@ export default function JudgePage() {
                   <Button variant="ghost" size="sm" onClick={() => setNotesFor(team)}>
                     Notes
                   </Button>
-                  <button
-                    onClick={() => setConflictFor(team)}
-                    title="Declare a conflict of interest with this team"
-                    className="text-xs text-zinc-500 hover:text-amber-400"
-                  >
-                    conflict
-                  </button>
-
                   {request && NEXT_STATUS[request.status] ? (
                     <Button
                       variant={nextVariant(request.status)}
@@ -297,17 +287,6 @@ export default function JudgePage() {
           ))}
         </ul>
       </main>
-
-      {conflictFor ? (
-        <ConflictDialog
-          team={conflictFor}
-          onClose={() => setConflictFor(null)}
-          onDone={async () => {
-            setConflictFor(null);
-            await refresh();
-          }}
-        />
-      ) : null}
 
       {notesFor ? (
         <NotesDrawer
