@@ -6,6 +6,7 @@ import { call } from "./useAppState";
 import { Banner, Button, formatClock, inputClass } from "./ui";
 import { ScoreSheet } from "./ScoreSheet";
 import { BandChip } from "./BandChip";
+import { rubricsFor, totalFor } from "@/lib/rubrics";
 import type { Rubric } from "@/lib/rubrics";
 import type { Note, ScoreRow, Team } from "@/lib/types";
 
@@ -38,10 +39,13 @@ export function SignOutButton() {
 export function NotesDrawer({
   team,
   requestId,
+  categories,
   onClose,
 }: {
   team: Team;
   requestId: string | null;
+  /** Needed to know which rubrics this team's category is judged on. */
+  categories: { id: string; label: string; excludesRubrics?: string[] }[];
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<string>("notes");
@@ -96,15 +100,23 @@ export function NotesDrawer({
     }
   }
 
-  /** Total across every rubric, which is what the colour band reads. */
-  const grandTotal = scores.reduce((sum, s) => sum + s.total, 0);
-  const grandMax = rubrics.reduce((sum, r) => sum + r.max, 0);
-  const anyScored = scores.some((s) => Object.keys(s.values ?? {}).length);
+  /* Total across the rubrics this team is judged on, which is what the
+     colour band reads. A category can put one out of scope: an Ungraded
+     notebook is unmarked, not zero, so it counts in neither the total nor
+     the denominator. */
+  const applicable = rubricsFor(rubrics, team.category, categories);
+  const {
+    total: grandTotal,
+    max: grandMax,
+    scored: anyScored,
+  } = totalFor(scores, applicable);
 
   const tabs: [string, string][] = [
     ["notes", "Notes"],
     ...rubrics.map((r) => [r.id, r.name] as [string, string]),
   ];
+
+  const excludedLabel = rubrics.find((r) => !applicable.some((a) => a.id === r.id))?.name;
 
   return (
     <div
@@ -121,6 +133,14 @@ export function NotesDrawer({
               {team.number} · {team.name}
             </h2>
             <p className="text-xs text-zinc-500">Private to judges and the Judge Advisor.</p>
+            {/* Say why the denominator is smaller, rather than leaving a
+                judge to wonder whether scores went missing. */}
+            {excludedLabel ? (
+              <p className="mt-1 text-xs text-amber-400/80">
+                {excludedLabel} is not counted for this team —{" "}
+                {categories.find((c) => c.id === team.category)?.label ?? "excluded"}.
+              </p>
+            ) : null}
           </div>
           <div className="flex items-center gap-3">
             {grandMax > 0 ? (

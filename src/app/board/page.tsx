@@ -7,7 +7,7 @@ import { compareTeamNumbers } from "@/lib/teamNumber";
 import { ConnectionDot, Elapsed, StatusLegend } from "@/components/ui";
 import { CategoryLegend, CategoryRail } from "@/components/CategoryChip";
 import { PitMap } from "@/components/PitMap";
-import type { PublicPanel, RequestRow, Team } from "@/lib/types";
+import type { PublicPanel, RequestRow, Team, TeamCategoryView } from "@/lib/types";
 
 /**
  * Big-screen board. Meant for a TV in the judges' room, read from three
@@ -139,7 +139,7 @@ function TeamTile({
   team: Team;
   status: Status | null;
   since: string | null;
-  categories: { id: string; label: string; color: string }[];
+  categories: TeamCategoryView[];
 }) {
   const meta = status ? STATUS_META[status] : null;
 

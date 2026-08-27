@@ -23,7 +23,21 @@ export type PresetPanel = {
 
 export const DEFAULT_DIVISION = "Division 1";
 
-export type TeamCategory = { id: string; label: string; color: string };
+export type TeamCategory = {
+  id: string;
+  label: string;
+  color: string;
+  /**
+   * Rubrics that do not apply to this category, by id.
+   *
+   * An Ungraded notebook is not a notebook that scored zero — nobody
+   * marked it. Counting it out of 64 would bury the team beneath every
+   * team whose notebook simply was not very good, on a judgement no one
+   * made. Listing the rubric here drops it from both the team's total
+   * and the denominator its colour band is worked out against.
+   */
+  excludesRubrics: string[];
+};
 export type Language = { id: string; label: string; short: string };
 
 type RawPreset = {
@@ -36,7 +50,7 @@ type RawPreset = {
 
 type Booking = { startTime: string; slotMinutes: number; slotCount: number };
 
-const BOOKING_FALLBACK: Booking = { startTime: "09:00", slotMinutes: 15, slotCount: 12 };
+const BOOKING_FALLBACK: Booking = { startTime: "09:00", slotMinutes: 20, slotCount: 12 };
 
 const raw = presetFile as RawPreset;
 
@@ -92,8 +106,8 @@ export function resolveLanguage(input: unknown): string {
 }
 
 const CATEGORY_FALLBACK: TeamCategory[] = [
-  { id: "developing", label: "Developing", color: "amber" },
-  { id: "fully-developed", label: "Fully Developed", color: "violet" },
+  { id: "developing", label: "Developing", color: "amber", excludesRubrics: [] },
+  { id: "fully-developed", label: "Fully Developed", color: "violet", excludesRubrics: [] },
 ];
 
 /**
@@ -115,6 +129,9 @@ export function teamCategories(): TeamCategory[] {
         id,
         label: String(o.label ?? id),
         color: String(o.color ?? "zinc"),
+        excludesRubrics: Array.isArray(o.excludesRubrics)
+          ? o.excludesRubrics.map((r) => String(r).trim()).filter(Boolean)
+          : [],
       };
     })
     .filter((c): c is TeamCategory => c !== null);
@@ -139,7 +156,7 @@ export function resolveCategory(input: unknown): string {
 }
 
 /** The booking grid every preset panel starts with. */
-function bookingDefaults(): Booking {
+export function bookingDefaults(): Booking {
   const raw2 = (raw.booking ?? {}) as Record<string, unknown>;
   const startTime = String(raw2.startTime ?? BOOKING_FALLBACK.startTime);
 

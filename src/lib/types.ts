@@ -69,6 +69,15 @@ export type Note = {
  * panel code, so the panel is the unit anything can actually be enforced
  * against. The affiliated judge's name is recorded alongside.
  */
+/** A team category as the browser receives it. */
+export type TeamCategoryView = {
+  id: string;
+  label: string;
+  color: string;
+  /** Rubric ids that do not count toward this category's total or band. */
+  excludesRubrics: string[];
+};
+
 export type ConflictRow = {
   id: string;
   panel_id: string;
@@ -113,7 +122,7 @@ export type AppState = {
   /** Every division in play, so the UI can offer them without guessing. */
   divisions: string[];
   /** The two team kinds, with their colours, straight from config. */
-  categories: { id: string; label: string; color: string }[];
+  categories: TeamCategoryView[];
   /** The languages interviews run in. */
   languages: { id: string; label: string; short: string }[];
   /** Panel/team pairs that must stay apart. */

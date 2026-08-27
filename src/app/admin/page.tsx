@@ -22,7 +22,7 @@ import { CategoryChip, CategorySelect } from "@/components/CategoryChip";
 import { LanguageCover, LanguageTag } from "@/components/Language";
 import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
-import type { ActivityRow, Panel, RequestRow, Team } from "@/lib/types";
+import type { ActivityRow, Panel, RequestRow, Team, TeamCategoryView } from "@/lib/types";
 
 type Tab = "floor" | "scores" | "teams" | "panels" | "conflicts" | "import" | "log";
 
@@ -135,6 +135,7 @@ export default function AdminPage() {
         <NotesDrawer
           team={notesFor}
           requestId={liveRequestFor(notesFor.id, state.requests)?.id ?? null}
+          categories={state.categories}
           onClose={() => setNotesFor(null)}
         />
       ) : null}
@@ -1560,7 +1561,7 @@ function ImportTab({
   refresh: () => Promise<void>;
   onError: (m: string | null) => void;
   divisions: string[];
-  categories: { id: string; label: string; color: string }[];
+  categories: TeamCategoryView[];
 }) {
   const [text, setText] = useState("");
   const [autoAssign, setAutoAssign] = useState(true);

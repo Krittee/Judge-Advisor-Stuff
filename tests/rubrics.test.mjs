@@ -257,3 +257,113 @@ test("no scoring band shares a name with a team type", () => {
     );
   }
 });
+
+/* ---- a category that puts a rubric out of scope ---------------------- */
+
+/* An Ungraded notebook is unmarked, not a notebook that scored zero.
+   Counting it out of 64 would rank the team below every team whose
+   notebook was merely weak, on a judgement nobody made. */
+
+function rubricsFor(all, category, categories) {
+  const excluded = categories.find((c) => c.id === category)?.excludesRubrics ?? [];
+  if (!excluded.length) return all;
+  const kept = all.filter((r) => !excluded.includes(r.id));
+  return kept.length ? kept : all;
+}
+
+function totalFor(scores, applicable) {
+  const ids = new Set(applicable.map((r) => r.id));
+  const counted = scores.filter((s) => ids.has(s.rubric_id));
+  return {
+    total: counted.reduce((sum, s) => sum + s.total, 0),
+    max: applicable.reduce((sum, r) => sum + r.max, 0),
+    scored: counted.some((s) => Object.keys(s.values ?? {}).length > 0),
+  };
+}
+
+const ALL = [
+  { id: "notebook", max: 64 },
+  { id: "interview", max: 12 },
+];
+const CATS = [
+  { id: "developing", excludesRubrics: [] },
+  { id: "fully-developed", excludesRubrics: [] },
+  { id: "ungraded", excludesRubrics: ["notebook"] },
+];
+
+test("a graded team is judged on everything", () => {
+  const applicable = rubricsFor(ALL, "fully-developed", CATS);
+  assert.deepEqual(applicable.map((r) => r.id), ["notebook", "interview"]);
+  assert.equal(totalFor([], applicable).max, 76);
+});
+
+test("an ungraded team is judged on the interview alone", () => {
+  const applicable = rubricsFor(ALL, "ungraded", CATS);
+  assert.deepEqual(applicable.map((r) => r.id), ["interview"]);
+  assert.equal(totalFor([], applicable).max, 12);
+});
+
+test("an ungraded team's notebook score does not creep into the total", () => {
+  /* Nothing stops a judge scoring a notebook before it is marked Ungraded.
+     Those points must not count once it is, or the denominator lies. */
+  const scores = [
+    { rubric_id: "notebook", total: 40, values: { a: 4 } },
+    { rubric_id: "interview", total: 10, values: { b: 2 } },
+  ];
+  const { total, max, scored } = totalFor(scores, rubricsFor(ALL, "ungraded", CATS));
+  assert.equal(total, 10);
+  assert.equal(max, 12);
+  assert.equal(scored, true);
+});
+
+test("a team with only the excluded rubric scored counts as unscored", () => {
+  /* Their notebook has points but nothing that counts has been marked, so
+     they must not be ranked above teams who genuinely scored nothing. */
+  const scores = [{ rubric_id: "notebook", total: 40, values: { a: 4 } }];
+  const { total, scored } = totalFor(scores, rubricsFor(ALL, "ungraded", CATS));
+  assert.equal(total, 0);
+  assert.equal(scored, false);
+});
+
+test("a category excluding everything falls back to the full set", () => {
+  /* Otherwise every team in it ranks zero out of zero, and the band
+     divides by nothing. */
+  const cats = [{ id: "odd", excludesRubrics: ["notebook", "interview"] }];
+  assert.deepEqual(rubricsFor(ALL, "odd", cats).map((r) => r.id), ["notebook", "interview"]);
+});
+
+test("an unknown or missing category is judged on everything", () => {
+  for (const c of ["not-a-category", null, undefined, ""]) {
+    assert.equal(rubricsFor(ALL, c, CATS).length, 2);
+  }
+});
+
+test("rank is on points, but the band is on the team's own denominator", () => {
+  /* These pull in different directions on purpose. A team with no notebook
+     tops out at 12 where a graded team reaches 76, so ranking on share
+     would seat a perfect interview and no notebook above a team strong at
+     both — and the awards this list feeds need a notebook. Position
+     therefore reads on points; colour reads on what was actually judged. */
+  const ungraded = { total: 12, max: 12 };
+  const graded = { total: 60, max: 76 };
+
+  assert.ok(graded.total > ungraded.total, "the graded team ranks higher");
+
+  const percent = (r) => (r.total / r.max) * 100;
+  assert.ok(
+    percent(ungraded) > percent(graded),
+    "yet the ungraded team's colour is the stronger one, which is the point",
+  );
+  assert.equal(percent(ungraded), 100);
+});
+
+test("the config actually excludes the notebook for ungraded", () => {
+  const ungraded = event.teamCategories.find((c) => c.id === "ungraded");
+  assert.ok(ungraded, "the ungraded category went missing");
+  assert.deepEqual(ungraded.excludesRubrics, ["notebook"]);
+
+  /* And the other categories are judged on everything. */
+  for (const c of event.teamCategories.filter((c) => c.id !== "ungraded")) {
+    assert.ok(!c.excludesRubrics?.length, `${c.id} unexpectedly excludes a rubric`);
+  }
+});

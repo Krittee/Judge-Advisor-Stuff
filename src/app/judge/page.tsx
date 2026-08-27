@@ -292,6 +292,7 @@ export default function JudgePage() {
         <NotesDrawer
           team={notesFor}
           requestId={liveRequestFor(notesFor.id, state.requests)?.id ?? null}
+          categories={state.categories}
           onClose={() => setNotesFor(null)}
         />
       ) : null}

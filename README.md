@@ -162,7 +162,26 @@ so a full schedule reads differently from a panel that runs no slots at all.
 Alongside it, the panel's current load: how many teams are waiting and how long
 the longest has been there.
 
-Two clashes get handled rather than merely reported:
+### Slots tile the session
+
+Slots are **20 minutes** by default and run back to back with no gap and no
+overlap: 1:00–1:20, then 1:20–1:40, then 1:40–2:00. They are not stored rows —
+they are computed from the panel's start time, length and count, so re-timing a
+whole panel is two numbers in Admin → Panels rather than a migration. Change the
+default in [`config/event.json`](config/event.json) under `booking.slotMinutes`;
+panels already created keep the length they were given.
+
+**Two teams can never hold overlapping time.** The database refuses two bookings
+that share a start time, but on its own that would not stop a booking landing
+*across* two slots — 1:10–1:30 shares a start with nothing, yet overlaps both
+1:00–1:20 and 1:20–1:40. The times arrive in the request body, so they are
+checked against the panel's own grid before anything is stored: both ends must
+match a real slot exactly. That closes the honest case as well as the crafted
+one — a page left open while the Judge Advisor re-times a panel is offering
+slots that no longer exist, and gets *"That is not one of Alpha's slots — their
+times may have changed"* instead of booking a clash.
+
+Two other clashes get handled rather than merely reported:
 
 - **Another team already holds that slot.** Refused by the database, not just
   the UI, so two people booking at the same instant cannot both win.
@@ -402,10 +421,38 @@ listed** is what a team gets until someone says otherwise — put `ungraded` fir
 if you would rather teams start unclassified and be graded up. Keep the ids
 stable once teams are assigned.
 
-> **Ungraded and the rankings.** An ungraded team is still ranked out of the full
-> 76, so an unscored notebook counts against its percentage. If you would rather
-> ungraded teams were ranked on the interview alone, say so — it is a small
-> change, but it is a judging decision rather than a technical one.
+### Ungraded and the rankings
+
+An **Ungraded** notebook is not a notebook that scored zero — nobody marked it.
+So the notebook rubric drops out of that team's total *and* out of the
+denominator its colour band is worked against: they are judged on the interview
+alone, out of 12 rather than 76. Their notebook column reads `n/a`, and any
+notebook points entered before the team was marked Ungraded stop counting.
+
+Two things deliberately pull apart on that row:
+
+- **Position is on points.** A team with no notebook tops out at 12 where a
+  graded team reaches 76, so ranking by percentage would seat a perfect
+  interview and no notebook above a team strong at both — and the awards this
+  list feeds need a notebook.
+- **Colour is on their own denominator.** A team scoring 12/12 on the interview
+  shows **Top**, because that is how they did on what was actually judged.
+
+So an Ungraded team can read "Top" while sitting below teams with more points.
+That is the intended reading: the colour rates them, the position ranks them.
+Because the denominator is no longer the same for everyone, the Total column
+always prints it — `60/76`, `12/12`.
+
+Which rubrics a category drops is set per category in
+[`config/event.json`](config/event.json):
+
+```json
+{ "id": "ungraded", "label": "Ungraded", "color": "zinc", "excludesRubrics": ["notebook"] }
+```
+
+Remove `excludesRubrics` and Ungraded teams go back to being ranked out of the
+full 76. A category that excluded *every* rubric falls back to the full set,
+rather than ranking everyone zero out of zero.
 
 ---
 

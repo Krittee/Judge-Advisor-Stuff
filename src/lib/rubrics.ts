@@ -172,3 +172,43 @@ export function bandFor(total: number, max: number, scored: boolean): Band | nul
 export function isValidPoint(rubric: Rubric, value: number): boolean {
   return rubric.scale.some((p) => p.value === value);
 }
+
+/**
+ * The rubrics that actually apply to a team, given its category.
+ *
+ * A team whose notebook is Ungraded has no notebook mark — not a mark of
+ * zero. Scoring them out of the full 76 would rank them below every team
+ * whose notebook was merely weak, on the strength of a judgement nobody
+ * made. So the rubric drops out of their total and out of the denominator
+ * their colour band is worked against, and they are ranked on what was
+ * actually judged.
+ *
+ * Which rubrics a category drops is set per category in config/event.json.
+ */
+export function rubricsFor(
+  all: Rubric[],
+  category: string | null | undefined,
+  categories: { id: string; excludesRubrics?: string[] }[],
+): Rubric[] {
+  const excluded = categories.find((c) => c.id === category)?.excludesRubrics ?? [];
+  if (!excluded.length) return all;
+
+  const kept = all.filter((r) => !excluded.includes(r.id));
+  // Never leave a team with nothing to be judged on: a category that
+  // excluded every rubric would rank everyone at zero out of zero.
+  return kept.length ? kept : all;
+}
+
+/** A team's total and denominator, counting only the rubrics that apply. */
+export function totalFor(
+  scores: { rubric_id: string; total: number; values?: Record<string, unknown> | null }[],
+  applicable: Rubric[],
+): { total: number; max: number; scored: boolean } {
+  const ids = new Set(applicable.map((r) => r.id));
+  const counted = scores.filter((s) => ids.has(s.rubric_id));
+  return {
+    total: counted.reduce((sum, s) => sum + s.total, 0),
+    max: applicable.reduce((sum, r) => sum + r.max, 0),
+    scored: counted.some((s) => Object.keys(s.values ?? {}).length > 0),
+  };
+}

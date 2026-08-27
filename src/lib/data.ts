@@ -38,12 +38,7 @@ export function buildSlots(
     held.set(new Date(r.slot_start).getTime(), r);
   }
 
-  const startMs = new Date(panel.slot_start_at).getTime();
-  const lengthMs = panel.slot_minutes * 60_000;
-
-  return Array.from({ length: panel.slot_count }, (_, i) => {
-    const start = new Date(startMs + i * lengthMs);
-    const end = new Date(startMs + (i + 1) * lengthMs);
+  return slotTimes(panel).map(({ start, end }) => {
     const taken = held.get(start.getTime());
     const team = taken ? teamById.get(taken.team_id) : undefined;
 
@@ -77,4 +72,48 @@ export function liveRequestFor(teamId: string, requests: RequestRow[]): RequestR
 /** Most recent request of any status, used for "already interviewed" checks. */
 export function latestRequestFor(teamId: string, requests: RequestRow[]): RequestRow | null {
   return requests.find((r) => r.team_id === teamId) ?? null;
+}
+
+/**
+ * Just the clock times a panel's slots occupy, back to back.
+ *
+ * Slot i runs from start + i lengths to start + (i+1) lengths, so they
+ * tile the session with no gap and no overlap: 1:00-1:20, 1:20-1:40, and
+ * so on. Bookings are checked against this list, which is what makes two
+ * teams overlapping impossible rather than merely unlikely — every
+ * accepted booking sits exactly on the grid, so two bookings either share
+ * a start time (refused) or do not intersect at all.
+ */
+export function slotTimes(
+  panel: Pick<PublicPanel, "slot_start_at" | "slot_minutes" | "slot_count">,
+): { start: Date; end: Date }[] {
+  if (!panel.slot_start_at || panel.slot_count <= 0 || panel.slot_minutes <= 0) return [];
+
+  const startMs = new Date(panel.slot_start_at).getTime();
+  if (Number.isNaN(startMs)) return [];
+  const lengthMs = panel.slot_minutes * 60_000;
+
+  return Array.from({ length: panel.slot_count }, (_, i) => ({
+    start: new Date(startMs + i * lengthMs),
+    end: new Date(startMs + (i + 1) * lengthMs),
+  }));
+}
+
+/**
+ * Whether a requested start and end are exactly one of the panel's slots.
+ *
+ * The times arrive in the request body, so they are not to be trusted:
+ * a page left open while the panel was re-timed will offer slots that no
+ * longer exist, and anything posting straight at the API can name any
+ * time at all. Either would land a booking across two real slots, which
+ * the one-team-per-start-time rule would not catch.
+ */
+export function isRealSlot(
+  panel: Pick<PublicPanel, "slot_start_at" | "slot_minutes" | "slot_count">,
+  start: Date,
+  end: Date,
+): boolean {
+  return slotTimes(panel).some(
+    (s) => s.start.getTime() === start.getTime() && s.end.getTime() === end.getTime(),
+  );
 }

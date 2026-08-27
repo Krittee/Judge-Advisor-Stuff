@@ -3,6 +3,7 @@ import { actorLabel, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
 import { resolveLanguage } from "@/lib/presets";
+import { isRealSlot } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,27 @@ export async function POST(request: Request) {
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       return NextResponse.json({ error: "That time slot is not valid." }, { status: 400 });
     }
+
+    // The times come from the request body, so they are checked against
+    // the panel's own grid rather than taken on trust. A page left open
+    // while the panel was re-timed would otherwise book a slot that no
+    // longer exists, landing across two real ones — an overlap the
+    // one-team-per-start-time rule cannot see.
+    const panel = (await store().listPanels()).find((p) => p.id === team.panel_id);
+    if (!panel) {
+      return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
+    }
+    if (!isRealSlot(panel, start, end)) {
+      return NextResponse.json(
+        {
+          error:
+            `That is not one of ${panel.name}'s slots — their times may have changed. ` +
+            `Refresh and pick again.`,
+        },
+        { status: 409 },
+      );
+    }
+
     slotStart = start.toISOString();
     slotEnd = end.toISOString();
   }

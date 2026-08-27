@@ -19,32 +19,107 @@
     "rather teams start unclassified and be graded up. Rename the labels or change",
     "the colours to suit your event; keep the ids stable once teams are assigned."
   ],
-
-  "divisions": ["Division 1", "Division 2"],
-
+  "divisions": [
+    "Division 1",
+    "Division 2"
+  ],
   "languages": [
-    { "id": "en", "label": "English", "short": "EN" },
-    { "id": "th", "label": "ไทย (Thai)", "short": "TH" }
+    {
+      "id": "en",
+      "label": "English",
+      "short": "EN"
+    },
+    {
+      "id": "th",
+      "label": "ไทย (Thai)",
+      "short": "TH"
+    }
   ],
-
   "teamCategories": [
-    { "id": "developing", "label": "Developing", "color": "amber" },
-    { "id": "fully-developed", "label": "Fully Developed", "color": "violet" },
-    { "id": "ungraded", "label": "Ungraded", "color": "zinc" }
+    {
+      "id": "developing",
+      "label": "Developing",
+      "color": "amber"
+    },
+    {
+      "id": "fully-developed",
+      "label": "Fully Developed",
+      "color": "violet"
+    },
+    {
+      "id": "ungraded",
+      "label": "Ungraded",
+      "color": "zinc",
+      "excludesRubrics": [
+        "notebook"
+      ]
+    }
   ],
-
   "booking": {
     "startTime": "09:00",
-    "slotMinutes": 15,
+    "slotMinutes": 20,
     "slotCount": 12
   },
-
   "panels": [
-    { "name": "Panel A", "division": "Division 1", "code": "REDCAT", "judges": ["", "", ""] },
-    { "name": "Panel B", "division": "Division 1", "code": "BLUEFOX", "judges": ["", "", ""] },
-    { "name": "Panel C", "division": "Division 1", "code": "GOLDELK", "judges": ["", "", ""] },
-    { "name": "Panel D", "division": "Division 2", "code": "GREENOWL", "judges": ["", "", ""] },
-    { "name": "Panel E", "division": "Division 2", "code": "GREYHAWK", "judges": ["", "", ""] },
-    { "name": "Panel F", "division": "Division 2", "code": "TEALWOLF", "judges": ["", "", ""] }
+    {
+      "name": "Panel A",
+      "division": "Division 1",
+      "code": "REDCAT",
+      "judges": [
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "name": "Panel B",
+      "division": "Division 1",
+      "code": "BLUEFOX",
+      "judges": [
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "name": "Panel C",
+      "division": "Division 1",
+      "code": "GOLDELK",
+      "judges": [
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "name": "Panel D",
+      "division": "Division 2",
+      "code": "GREENOWL",
+      "judges": [
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "name": "Panel E",
+      "division": "Division 2",
+      "code": "GREYHAWK",
+      "judges": [
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "name": "Panel F",
+      "division": "Division 2",
+      "code": "TEALWOLF",
+      "judges": [
+        "",
+        "",
+        ""
+      ]
+    }
   ]
 }

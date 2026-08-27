@@ -20,7 +20,13 @@ import type {
 import type { Status } from "../status";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
-import { DEFAULT_DIVISION, defaultCategory, defaultLanguage, presetPanels } from "../presets";
+import {
+  bookingDefaults,
+  DEFAULT_DIVISION,
+  defaultCategory,
+  defaultLanguage,
+  presetPanels,
+} from "../presets";
 import {
   StoreError,
   type ImportedTeam,
@@ -778,7 +784,7 @@ function demoData(): Data {
     // Every demo panel runs slots, so "Book a time" has something to show
     // straight away. Panel C keeps a shorter grid to look less uniform.
     slot_start_at: iso(20),
-    slot_minutes: 12,
+    slot_minutes: bookingDefaults().slotMinutes,
     slot_count: i === 2 ? 5 : 8,
     created_at: iso(0),
   }));
