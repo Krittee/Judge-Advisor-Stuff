@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 
 /* These mirror the implementations in src/lib and src/app/api. They are the
    bits with real edge cases — time maths, pasted spreadsheet junk, and
@@ -296,4 +297,73 @@ test("a full schedule is distinguishable from a panel that runs no slots", () =>
 
   const noSlots = buildSlots({ ...PANEL, slot_count: 0 }, [], teams);
   assert.equal(noSlots.length, 0, "whereas a walk-up-only panel has none at all");
+});
+
+/* ---- one panel, many teams ------------------------------------------- */
+
+/* A panel covers 8-10 teams, and on a busy floor several of them are in
+   the queue at the same moment. The "one live request" rule is per TEAM.
+   Were it ever per panel, a panel could only ever have one team waiting
+   and the event would grind to a halt -- so pin which column it keys on. */
+
+function liveFor(requests, predicate) {
+  return requests.filter(
+    (r) => predicate(r) && ["requested", "acknowledged", "interviewing"].includes(r.status),
+  );
+}
+
+test("several teams on one panel can be in the queue at once", () => {
+  const panel = "p1";
+  const requests = [
+    { id: "r1", team_id: "t1", panel_id: panel, status: "requested" },
+    { id: "r2", team_id: "t2", panel_id: panel, status: "requested" },
+    { id: "r3", team_id: "t3", panel_id: panel, status: "acknowledged" },
+    { id: "r4", team_id: "t4", panel_id: panel, status: "interviewing" },
+  ];
+  assert.equal(liveFor(requests, (r) => r.panel_id === panel).length, 4);
+
+  /* And each team still has exactly one of its own. */
+  for (const team of ["t1", "t2", "t3", "t4"]) {
+    assert.equal(liveFor(requests, (r) => r.team_id === team).length, 1);
+  }
+});
+
+test("the live-request index keys on the team, not the panel", () => {
+  const src = readFileSync(new URL("../src/lib/db/postgres.ts", import.meta.url), "utf8");
+  const index = /create unique index if not exists requests_one_live_per_team\s+on requests \(([^)]*)\)/
+    .exec(src);
+  assert.ok(index, "requests_one_live_per_team is gone or was renamed");
+  assert.equal(
+    index[1].trim(),
+    "team_id",
+    "keying this on panel_id would let a panel hold only one live request",
+  );
+});
+
+test("the slot index keys on panel and start time, so a panel runs many slots", () => {
+  const src = readFileSync(new URL("../src/lib/db/postgres.ts", import.meta.url), "utf8");
+  const index = /create unique index if not exists requests_unique_slot\s+on requests \(([^)]*)\)/
+    .exec(src);
+  assert.ok(index, "requests_unique_slot is gone or was renamed");
+  const columns = index[1].split(",").map((c) => c.trim());
+  assert.deepEqual(
+    columns,
+    ["panel_id", "slot_start"],
+    "one team per slot is the rule; one team per panel is not",
+  );
+});
+
+test("a panel's slots hold a different team in each", () => {
+  const panel = "p1";
+  const booked = Array.from({ length: 12 }, (_, i) => ({
+    team_id: `t${i}`,
+    panel_id: panel,
+    kind: "slot",
+    slot_start: new Date(Date.UTC(2026, 8, 1, 9, i * 20)).toISOString(),
+    status: "scheduled",
+  }));
+  const starts = new Set(booked.map((b) => b.slot_start));
+  const teams = new Set(booked.map((b) => b.team_id));
+  assert.equal(starts.size, 12, "12 distinct start times");
+  assert.equal(teams.size, 12, "12 distinct teams, all on the one panel");
 });
