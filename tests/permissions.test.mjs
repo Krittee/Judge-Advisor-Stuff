@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 
 /* Mirrors the scope rules in src/lib/auth.ts and the division wall in the
    stores. These are the rules that decide who can see and touch what, so
@@ -160,5 +161,61 @@ test("moving a panel across the wall releases its teams", () => {
   assert.ok(
     teams.every((t) => t.division === "Division 1"),
     "teams keep the division they compete in",
+  );
+});
+
+/* ---- who receives declared conflicts of interest --------------------- */
+
+/* A conflict names a judge and describes their connection to a team —
+   "coaches this team", "parent of a member". That is information about a
+   person, and the team page and the big board both poll the same state
+   endpoint with no login at all. It goes only to the people who act on
+   it. */
+
+function conflictsFor(session, all, canReadNotes) {
+  if (!canReadNotes) return [];
+  if (session?.role === "judge") return all.filter((c) => c.panel_id === session.panelId);
+  return all;
+}
+
+const CONFLICTS = [
+  { id: "a", panel_id: "p1", team_id: "t1", judge_name: "Ann", note: "coaches them" },
+  { id: "b", panel_id: "p2", team_id: "t2", judge_name: "Bo", note: "parent" },
+];
+
+test("an anonymous team viewer receives no conflicts at all", () => {
+  assert.deepEqual(conflictsFor(null, CONFLICTS, false), []);
+});
+
+test("the queue desk receives no conflicts either", () => {
+  /* The desk takes requests; it has no part in judging affiliations. */
+  assert.deepEqual(conflictsFor({ role: "queuer" }, CONFLICTS, false), []);
+});
+
+test("a judge receives only their own panel's", () => {
+  const got = conflictsFor({ role: "judge", panelId: "p1" }, CONFLICTS, true);
+  assert.equal(got.length, 1);
+  assert.equal(got[0].panel_id, "p1");
+});
+
+test("the Judge Advisor receives all of them", () => {
+  assert.equal(conflictsFor({ role: "admin" }, CONFLICTS, true).length, 2);
+});
+
+test("no judge name or note can reach a viewer without notes access", () => {
+  /* The fields that make this worth gating. */
+  for (const session of [null, { role: "queuer" }]) {
+    const got = conflictsFor(session, CONFLICTS, false);
+    const text = JSON.stringify(got);
+    assert.ok(!text.includes("Ann"), "a judge's name reached an unauthorised viewer");
+    assert.ok(!text.includes("coaches"), "an affiliation note reached an unauthorised viewer");
+  }
+});
+
+test("the payload builder actually gates on notes access", () => {
+  const src = readFileSync(new URL("../src/lib/server-state.ts", import.meta.url), "utf8");
+  assert.ok(
+    /conflicts:\s*!canReadNotes\(session\)/.test(src),
+    "server-state no longer gates conflicts on canReadNotes",
   );
 });

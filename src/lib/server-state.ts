@@ -18,8 +18,9 @@ import type { AppState, ViewerCapabilities } from "./types";
  *
  * Team numbers, names and statuses are public by design: they are on the
  * big board on the wall. The private things are judging notes, panel
- * codes and the free-text message a team leaves, and none of those are
- * in this payload for anyone who has not earned them.
+ * codes, the free-text message a team leaves, and declared conflicts of
+ * interest — which name a judge and their connection to a team. None of
+ * those are in this payload for anyone who has not earned them.
  */
 export async function loadState(session: Session | null): Promise<AppState> {
   const db = store();
@@ -77,10 +78,15 @@ export async function loadState(session: Session | null): Promise<AppState> {
     divisions: division ? [division] : divisions,
     categories: teamCategories(),
     languages: languages(),
-    // A judge only needs their own panel's conflicts; the Judge Advisor
-    // needs all of them to reassign around.
-    conflicts:
-      session?.role === "judge"
+    /* A conflict names a judge and says how they are connected to a team.
+       That is about a person, not about the queue, so it goes only to
+       those who act on it: the Judge Advisor, who records and clears them,
+       and a judge for their own panel. Everyone else — the desk, the big
+       board, and every team polling this without logging in — gets none,
+       rather than a list of which judges are related to which teams. */
+    conflicts: !canReadNotes(session)
+      ? []
+      : session?.role === "judge"
         ? allConflicts.filter((c) => c.panel_id === session.panelId)
         : allConflicts,
     viewer: describeViewer(session, division),

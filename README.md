@@ -132,6 +132,12 @@ same refusal.
 | **Judge** (panel code) | own panel | **own panel** | own panel | **own panel** | — |
 | **Judge Advisor** (`ADMIN_CODE`) | any | any | any | any | ✅ |
 
+**Declared conflicts are not in the public payload.** A conflict names a judge
+and says how they are connected to a team. The team page and the big board both
+poll `/api/state` with no login, so conflicts go only to the Judge Advisor and,
+for their own panel, to judges. The desk and anonymous viewers get an empty
+list — not a filtered one.
+
 **"Own panel" is the load-bearing part.** A judge may only advance, cancel, read
 or write against teams assigned to the panel whose code they typed. Another
 panel's team returns `403` on every one of those, and a judge's `/api/state` is
@@ -398,9 +404,8 @@ dropped.
 
 ## Notebook type
 
-Every team carries a notebook classification, colour-coded everywhere a team
-appears — the big board, the judge console, the queue desk, the rankings and the
-team's own page:
+Every team carries a notebook classification, colour-coded on the big board, the
+judge console, the queue desk and the rankings:
 
 | | |
 |---|---|
@@ -414,6 +419,11 @@ for anyone who cannot separate amber from violet.
 Set it per team from the dropdown in Admin → Teams, for a whole import at once,
 or per row with a fifth CSV column (which accepts either the label or the id).
 Admin → Teams filters by type and counts each one.
+
+**Not on the team's own page.** It is a judging assessment, and the team's page
+is theirs — it shows where they are in the queue, not how their notebook was
+read. It is still on the big board, which is a wall everyone can see, so this
+keeps it off the one screen a team looks at rather than making it a secret.
 
 Edit the labels, colours or the list itself in
 [`config/event.json`](config/event.json) under `teamCategories`. The **first one
