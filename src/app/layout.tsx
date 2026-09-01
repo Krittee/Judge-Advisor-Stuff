@@ -9,7 +9,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // No maximumScale: capping it blocks pinch-zoom, and someone squinting at
+  // a team number on a phone in a loud hall needs to be able to zoom in.
   themeColor: "#0a0a0f",
 };
 

@@ -519,6 +519,35 @@ labels and ordering all live in one table.
 
 ---
 
+## On a phone
+
+Teams request from their own phones and judges work off theirs, so every
+screen is checked at phone size rather than assumed to reflow.
+
+- **Nothing scrolls sideways** on any screen, down to a 320px-wide viewport.
+  The judge card's status chip wraps rather than pushing the row out; the
+  Judge Advisor's counters wrap; the board's columns never exceed the
+  viewport width.
+- **Tap targets are at least 44px** on touch pointers -- applied to the
+  elements, not one Button component, so the small text controls (`cancel`,
+  `undo`, `withdraw`) grow too. A mouse keeps the denser desktop layout,
+  since the rule is scoped to `(pointer: coarse)`.
+- **A tap shows it registered.** The tap highlight is switched off for
+  looks, so `:active` dims the control instead; without it a phone user gets
+  no feedback at all.
+- **Inputs are 16px**, which is what stops iOS Safari zooming the page in
+  when a field takes focus.
+- **Pinch-zoom is allowed.** The viewport used to cap `maximumScale` at 1,
+  which blocks zooming entirely -- unhelpful for anyone reading a team
+  number on a phone in a loud hall.
+
+Checked on iPhone SE (375x667), iPhone 14 (390x844) and Pixel 7 (412x915),
+by driving real taps through each screen: a team requesting a judge, a judge
+advancing the status and saving a note, and the Judge Advisor reaching every
+tab.
+
+---
+
 ## The screens
 
 | URL | Who | What |

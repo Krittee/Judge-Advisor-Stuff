@@ -194,7 +194,7 @@ function FloorTab({
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-        <div className="flex gap-6">
+        <div className="flex flex-wrap gap-x-6 gap-y-3">
           {(["requested", "acknowledged", "interviewing", "completed"] as Status[]).map((s) => (
             <div key={s}>
               <div className="text-2xl font-bold tabular-nums">{counts[s] ?? 0}</div>

@@ -210,7 +210,9 @@ export default function JudgePage() {
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-3">
+                  {/* Wraps: on a narrow phone the number, category, language
+                      and a long status label do not fit on one line. */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                     <span className="text-2xl font-bold tabular-nums">{team.number}</span>
                     <CategoryChip category={team.category} categories={state.categories} />
                     {request ? (

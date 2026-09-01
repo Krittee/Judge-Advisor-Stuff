@@ -51,6 +51,36 @@ textarea {
   touch-action: manipulation;
 }
 
+/* 44px is about the smallest a fingertip hits reliably, and a judge tapping
+   "Finish" between interviews should not have to aim. Scoped to touch
+   pointers so a mouse keeps the denser desktop layout, and applied to the
+   elements themselves rather than one Button component, because the small
+   text controls -- "cancel", "undo", "withdraw" -- are plain buttons. */
+@media (pointer: coarse) {
+  button,
+  select,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* min-height does nothing to a non-replaced inline box, so a link inside a
+     sentence is untouched; only the standalone block ones grow. */
+  a,
+  input,
+  textarea {
+    min-height: 44px;
+  }
+
+  /* The tap highlight is turned off above, so give a tap something to show
+     for itself. Without this a phone user cannot tell a press registered. */
+  button:not(:disabled):active,
+  a:active,
+  [role="button"]:active {
+    opacity: 0.65;
+  }
+}
+
 input,
 select,
 textarea {

@@ -83,7 +83,7 @@ export default function BoardPage() {
       {tab === "pits" ? <PitMap state={state} hideDone={hideDone} /> : null}
 
       <div
-        className={`grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))] ${
+        className={`grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))] ${
           tab === "queue" ? "" : "hidden"
         }`}
       >
@@ -110,7 +110,7 @@ export default function BoardPage() {
               )}
             </p>
 
-            <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(140px,1fr))]">
+            <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(140px,100%),1fr))]">
               {teams
                 .filter((t) => !hideDone || t.status !== "completed")
                 .map((t) => (
