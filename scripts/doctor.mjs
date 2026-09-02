@@ -96,6 +96,42 @@ if (existsSync("config/event.json")) {
         "Give every panel in config/event.json a different code, or judges will land on the wrong panel.",
       );
     }
+
+    /* Renaming the divisions and forgetting the panels is easy to do and
+       silent: a panel naming a division that no longer exists is quietly
+       moved to the first one, so every panel piles into one division and
+       the others cannot be auto-assigned at all. */
+    const named = Array.isArray(cfg.divisions) ? cfg.divisions.map((d) => String(d).trim()) : [];
+    const stranded = (cfg.panels ?? []).filter(
+      (p) => p?.division && !named.includes(String(p.division).trim()),
+    );
+    if (named.length && stranded.length) {
+      const wrong = [...new Set(stranded.map((p) => String(p.division).trim()))];
+      warn(
+        `${stranded.length} preset panel${stranded.length === 1 ? "" : "s"} name a division that no longer exists`,
+        `They say ${wrong.map((w) => `"${w}"`).join(", ")}, but divisions are ` +
+          `${named.map((d) => `"${d}"`).join(", ")}. They will all be moved into ` +
+          `"${named[0]}". Update each panel's "division" in config/event.json.`,
+      );
+    }
+
+    /* Even with every name spelled right, a division with no panel cannot
+       take an auto-assign: it fails with "No judge panels in X yet." */
+    if (named.length && Array.isArray(cfg.panels) && cfg.panels.length) {
+      const covered = new Set(
+        cfg.panels
+          .map((p) => String(p?.division ?? "").trim())
+          .map((d) => (named.includes(d) ? d : named[0])),
+      );
+      const empty = named.filter((d) => !covered.has(d));
+      if (empty.length) {
+        warn(
+          `No preset panel judges ${empty.map((d) => `"${d}"`).join(", ")}`,
+          "Auto-assign in that division will have nowhere to put its teams. " +
+            "Add a panel for it in config/event.json, or create one in the Judge Advisor console.",
+        );
+      }
+    }
   } catch (e) {
     bad(
       `config/event.json is not valid JSON — ${e.message}`,
