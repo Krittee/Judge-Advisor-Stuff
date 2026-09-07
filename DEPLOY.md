@@ -68,6 +68,13 @@ database setting the app needs, and you never have to look at it.
 > open your project → **Storage** tab → **Create Database** → Neon. Then
 > **Deployments** → the ⋯ menu on the newest one → **Redeploy**.
 
+**Using Supabase instead of Neon?** Skip the Storage step. In the Supabase
+dashboard open **Connect → Transaction pooler** (port 6543), copy the
+`postgresql://…pooler.supabase.com:6543/postgres` string, fill in your
+database password, and add it as `DATABASE_URL` in **Environment Variables**
+(Step 4). The app creates its own tables on first connect; running
+`supabase/schema.sql` in the SQL editor first is optional.
+
 ---
 
 ## Step 4 — Set your three codes
