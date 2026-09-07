@@ -236,9 +236,14 @@ them. Before the real day:
 
 1. In the app folder, make a copy of the file `.env.example` and name the copy
    `.env.local`
-2. Open it in Notepad or TextEdit and change these two lines to your own codes:
+2. Open it in Notepad or TextEdit and change these lines to your own codes.
+   `ADMIN_CODE_2` through `ADMIN_CODE_4` are optional; use one separate code
+   for each additional Judge Advisor:
    ```
    ADMIN_CODE=pick-something-only-you-know
+   ADMIN_CODE_2=second-admin-code
+   ADMIN_CODE_3=third-admin-code
+   ADMIN_CODE_4=fourth-admin-code
    QUEUER_CODE=pick-something-for-the-desk
    ```
 3. Stop the app (`Ctrl + C`) and start it again (`npm run dev`)

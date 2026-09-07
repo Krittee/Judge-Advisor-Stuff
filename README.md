@@ -43,7 +43,8 @@ cp .env.example .env.local     # then edit the codes
 
 | Variable | Dev default | What it is |
 |---|---|---|
-| `ADMIN_CODE` | `JA2026` | Judge Advisor. Full control. Keep it to yourself. |
+| `ADMIN_CODE` | `JA2026` | First Judge Advisor. Full control. |
+| `ADMIN_CODE_2`–`ADMIN_CODE_4` | unset | Optional codes for up to three more Judge Advisors. |
 | `QUEUER_CODE` | `DESK01` | Queue desk. Can only add teams to the queue. |
 | `SESSION_SECRET` | insecure key | Signs the login cookie. `openssl rand -base64 32` |
 | `DATABASE_URL` | unset | Set it to use Postgres; unset uses the JSON file. |
@@ -87,7 +88,8 @@ app knows which is in use.
 
 ## Before the event
 
-1. Sign in at `/login` with your `ADMIN_CODE`.
+1. Sign in at `/login` with any configured Judge Advisor code (`ADMIN_CODE` through
+   `ADMIN_CODE_4`).
 2. **Teams tab → Reset → Wipe everything.** This clears the demo roster. Do
    this first, or you will be judging the Quantum Quokkas.
 3. **Panels tab** — add each judge group: name, room, judge names. Write down
@@ -130,7 +132,7 @@ same refusal.
 | **Team** (no login) | own team | — | own request | — | — |
 | **Queue desk** (`QUEUER_CODE`) | any team | — | un-seen only | — | — |
 | **Judge** (panel code) | own panel | **own panel** | own panel | **own panel** | — |
-| **Judge Advisor** (`ADMIN_CODE`) | any | any | any | any | ✅ |
+| **Judge Advisor** (`ADMIN_CODE`–`ADMIN_CODE_4`) | any | any | any | any | ✅ |
 
 **Declared conflicts are not in the public payload.** A conflict names a judge
 and says how they are connected to a team. The team page and the big board both
