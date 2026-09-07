@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,8 +17,30 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen antialiased">{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitializer }} />
+      </head>
+      <body className="min-h-screen antialiased">
+        {children}
+        <ThemeToggle />
+      </body>
     </html>
   );
 }
+
+/** Set the saved or system theme before the page paints, avoiding a bright flash. */
+const themeInitializer = `
+  (() => {
+    try {
+      const saved = localStorage.getItem("judge-queue-theme");
+      const theme = saved === "light" || saved === "dark"
+        ? saved
+        : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.colorScheme = theme;
+    } catch (_) {
+      document.documentElement.dataset.theme = "dark";
+    }
+  })();
+`;

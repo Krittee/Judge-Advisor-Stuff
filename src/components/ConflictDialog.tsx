@@ -52,7 +52,7 @@ export function ConflictDialog({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-t-2xl bg-[#14141c] p-5 ring-1 ring-white/10 sm:rounded-2xl"
+        className="dialog-surface w-full max-w-md rounded-t-2xl p-5 ring-1 ring-white/10 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-bold">

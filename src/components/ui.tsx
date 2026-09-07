@@ -194,7 +194,7 @@ export function TopBar({
   right?: React.ReactNode;
 }) {
   return (
-    <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0a0a0f]/90 backdrop-blur">
+    <header className="app-header sticky top-0 z-20 border-b border-white/10 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
         <Link href="/" className="text-lg font-semibold tracking-tight hover:text-indigo-300">
           {title}

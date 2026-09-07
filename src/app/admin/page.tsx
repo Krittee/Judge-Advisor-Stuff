@@ -70,7 +70,7 @@ export default function AdminPage() {
         right={<SignOutButton />}
       />
 
-      <nav className="sticky top-[57px] z-10 border-b border-white/10 bg-[#0a0a0f]/90 backdrop-blur">
+      <nav className="app-header sticky top-[57px] z-10 border-b border-white/10 backdrop-blur">
         <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4">
           {tabs.map(([id, label]) => (
             <button
