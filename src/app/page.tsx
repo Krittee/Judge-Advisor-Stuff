@@ -68,6 +68,9 @@ export default function Home() {
         <Link href="/login" className="hover:text-zinc-300">
           Judge / staff sign in
         </Link>
+        <Link href="/referee/login" className="hover:text-zinc-300">
+          Referee sign in
+        </Link>
       </nav>
     </main>
   );

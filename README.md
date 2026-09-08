@@ -399,9 +399,17 @@ They live in `config/event.json` and are yours to change:
 what fits on a chip. Colours are `emerald`, `amber`, `orange`, `rose`,
 `sky` and `zinc`.
 
-Referees sign in with `REFEREE_CODE` (development default `REF001`, which
-— being printed here — is refused in production like every other
-published code).
+### Signing in
+
+Referees have their own door at **`/referee/login`**, linked from the front
+page as *Referee sign in*. It is the same code box as `/login` — the code
+still decides the role — but a referee handed that address never has to
+work out whether "judge / staff sign in" was meant for them. Signing out,
+or opening `/referee` without a session, returns them there rather than to
+the staff page.
+
+The code is `REFEREE_CODE` (development default `REF001`, which — being
+printed here — is refused in production like every other published code).
 
 ---
 

@@ -34,12 +34,12 @@ export default function RefereePage() {
     call<{ session: Session | null }>("/api/session", { method: "GET" })
       .then(({ session }) => {
         if (!session) {
-          router.replace("/login");
+          router.replace("/referee/login");
           return;
         }
         setSession(session);
       })
-      .catch(() => router.replace("/login"));
+      .catch(() => router.replace("/referee/login"));
   }, [router]);
 
   const teamByNumber = useMemo(
@@ -98,7 +98,7 @@ export default function RefereePage() {
         title="Referee"
         subtitle={session ? session.name : undefined}
         online={online}
-        right={<SignOutButton />}
+        right={<SignOutButton to="/referee/login" />}
       />
 
       <main className="mx-auto max-w-lg space-y-5 px-5 py-6">
