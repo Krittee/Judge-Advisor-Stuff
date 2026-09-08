@@ -11,6 +11,7 @@ const EMPTY: AppState = {
   categories: [],
   languages: [],
   conflicts: [],
+  pitFloor: { columns: "right-to-left", rows: "bottom-to-top" },
   flagKinds: [],
   flags: [],
   viewer: {

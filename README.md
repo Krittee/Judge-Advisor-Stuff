@@ -473,6 +473,31 @@ rather than surfacing on event day.
 
 ---
 
+## Pit floor orientation
+
+The floor plan is a picture of a real hall, and halls do not all run the
+way a spreadsheet does. Drawing it mirrored sends someone to the opposite
+corner of the room, so which way round it goes is a setting:
+
+```json
+"pitFloor": { "columns": "right-to-left", "rows": "bottom-to-top" }
+```
+
+- `columns` — `"left-to-right"` puts column A on the left, `"right-to-left"`
+  puts it on the right.
+- `rows` — `"top-to-bottom"` puts position 1 at the top, `"bottom-to-top"`
+  puts it at the bottom.
+
+The shipped setting draws A1 at the **bottom right**, with the letters
+running right to left and the numbers climbing upward — matching a hall
+whose gate is on the A1 corner.
+
+**Only the drawing flips.** A pit is still `A1`, still typed as `A1`, and
+still sorts A1, A2, B1. This changes where the tile is put on screen, not
+what it is called — so nothing downstream of the plan is affected.
+
+---
+
 ## The big board
 
 Two tabs, both meant for a TV in the judges' room. **Fullscreen** is in the

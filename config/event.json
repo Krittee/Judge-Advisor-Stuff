@@ -90,5 +90,9 @@
     "slotMinutes": 20,
     "slotCount": 12
   },
+  "pitFloor": {
+    "columns": "right-to-left",
+    "rows": "bottom-to-top"
+  },
   "panels": []
 }

@@ -144,6 +144,8 @@ export type AppState = {
   languages: { id: string; label: string; short: string }[];
   /** Panel/team pairs that must stay apart. */
   conflicts: ConflictRow[];
+  /** Which way round the pit floor is drawn, so the plan matches the room. */
+  pitFloor: { columns: "left-to-right" | "right-to-left"; rows: "top-to-bottom" | "bottom-to-top" };
   /** The kinds of flag a referee can record, with their colours. */
   flagKinds: { id: string; label: string; short: string; color: string; severity: number }[];
   /** What referees have flagged. Judges read these; only referees write them. */

@@ -1,6 +1,6 @@
 import { store } from "./db";
 import { stripCode } from "./data";
-import { languages, presetDivisions, refereeFlags, teamCategories } from "./presets";
+import { languages, pitFloor, presetDivisions, refereeFlags, teamCategories } from "./presets";
 import {
   canAdminister,
   canAdvance,
@@ -105,6 +105,7 @@ export async function loadState(session: Session | null): Promise<AppState> {
       : session?.role === "judge"
         ? allConflicts.filter((c) => c.panel_id === session.panelId)
         : allConflicts,
+    pitFloor: pitFloor(),
     flagKinds: refereeFlags(),
     /* A referee's flag is about a team's conduct, not the queue, so it
        goes only to those who act on it: referees writing them, judges

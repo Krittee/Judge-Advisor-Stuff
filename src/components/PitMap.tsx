@@ -23,6 +23,10 @@ import type { AppState, RequestRow, Team } from "@/lib/types";
  *
  * Pit codes are a letter and a number, so the letter is a column and the
  * number is the position down it. Nobody has to draw a plan.
+ *
+ * Which way round it is drawn comes from config/event.json, because the
+ * plan is a picture of a real room and rooms do not all run the same way.
+ * Only the drawing flips — a pit is still A1 and still sorts as A1.
  */
 
 const DIVISION_TONES = [
@@ -54,8 +58,25 @@ export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean
     });
   }, [state.teams, state.requests]);
 
-  // One grid across the whole floor, both divisions together.
-  const columns = useMemo(() => buildFloorPlan(placed, (p) => p.team.pit), [placed]);
+  // One grid across the whole floor, both divisions together, then turned
+  // to face the way the hall actually does.
+  const columns = useMemo(() => {
+    const plan = buildFloorPlan(placed, (p) => p.team.pit);
+    const facing = state.pitFloor.columns === "right-to-left" ? [...plan].reverse() : plan;
+
+    if (state.pitFloor.rows === "bottom-to-top") {
+      // Reverse the cells but keep each one's real position, so the tile
+      // still says A1 wherever A1 has ended up on screen.
+      return facing.map((col) => ({
+        ...col,
+        numbered: col.cells.map((cell, i) => ({ cell, position: i + 1 })).reverse(),
+      }));
+    }
+    return facing.map((col) => ({
+      ...col,
+      numbered: col.cells.map((cell, i) => ({ cell, position: i + 1 })),
+    }));
+  }, [placed, state.pitFloor]);
 
   const mapped = placed.filter((p) => isMappablePit(p.team.pit));
   const unmapped = placed
@@ -87,7 +108,7 @@ export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean
       {columns.length ? (
         <section className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/10">
           <div className="flex flex-wrap gap-2">
-            {columns.map(({ row, cells }) => (
+            {columns.map(({ row, numbered }) => (
               // Compress to fit rather than wrapping a lone aisle onto its
               // own line, but never stretch past a pit's worth of width.
               <div
@@ -97,11 +118,11 @@ export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean
                 <span className="rounded-md bg-white/5 py-1 text-center text-sm font-bold text-zinc-300">
                   {row}
                 </span>
-                {cells.map((cell, i) => (
+                {numbered.map(({ cell, position }) => (
                   <PitCell
-                    key={i}
+                    key={position}
                     row={row}
-                    position={i + 1}
+                    position={position}
                     cell={cell}
                     divisions={state.divisions}
                     hideDone={hideDone}

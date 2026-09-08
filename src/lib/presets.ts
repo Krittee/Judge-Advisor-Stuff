@@ -42,6 +42,7 @@ export type Language = { id: string; label: string; short: string };
 
 type RawPreset = {
   divisions?: unknown;
+  pitFloor?: unknown;
   languages?: unknown;
   refereeFlags?: unknown;
   teamCategories?: unknown;
@@ -127,6 +128,40 @@ export function resolveFlagKind(input: unknown): string {
   );
   if (match) return match.id;
   return [...kinds].sort((a, b) => a.severity - b.severity)[0].id;
+}
+
+/* ------------------------------------------------------------------ *
+ * Which way round the pit floor is drawn.
+ *
+ * The plan is a picture of a real room, and the room does not always run
+ * the way a spreadsheet does. Getting this backwards sends someone to the
+ * far corner of the hall, so it is a setting rather than an assumption.
+ *
+ * Only the drawing flips. A pit is still A1, sorting is still A1, B1, C1 --
+ * this is where the tiles are put on screen, not what they are called.
+ * ------------------------------------------------------------------ */
+
+export type PitFloor = {
+  /** "left-to-right" puts column A on the left; "right-to-left" on the right. */
+  columns: "left-to-right" | "right-to-left";
+  /** "top-to-bottom" puts position 1 at the top; "bottom-to-top" at the bottom. */
+  rows: "top-to-bottom" | "bottom-to-top";
+};
+
+const PIT_FLOOR_FALLBACK: PitFloor = { columns: "right-to-left", rows: "bottom-to-top" };
+
+export function pitFloor(): PitFloor {
+  const raw_ = (raw.pitFloor ?? {}) as Record<string, unknown>;
+  const columns = String(raw_.columns ?? "");
+  const rows = String(raw_.rows ?? "");
+  return {
+    columns:
+      columns === "left-to-right" || columns === "right-to-left"
+        ? columns
+        : PIT_FLOOR_FALLBACK.columns,
+    rows:
+      rows === "top-to-bottom" || rows === "bottom-to-top" ? rows : PIT_FLOOR_FALLBACK.rows,
+  };
 }
 
 const LANGUAGE_FALLBACK: Language[] = [
