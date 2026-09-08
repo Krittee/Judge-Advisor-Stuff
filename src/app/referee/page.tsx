@@ -10,6 +10,7 @@ import { FlagList, FlagSummary, FLAG_SOLID } from "@/components/Flags";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
 import { filterMatchNumberInput, isValidField, isValidMatchNumber } from "@/lib/match";
 import type { Session } from "@/lib/auth";
+import type { FlagEdit } from "@/lib/db/types";
 
 /**
  * The referee's page.
@@ -100,6 +101,11 @@ function Referee() {
   // the same way "what did you see" is — a flag with no match reference
   // is exactly the kind of thing that cannot be tracked back later.
   const matchReady = Boolean(matchType) && isValidMatchNumber(matchNumber) && isValidField(field);
+
+  async function correctFlag(id: string, edit: FlagEdit) {
+    await call(`/api/flags`, { method: "PATCH", body: { id, ...edit } });
+    await refresh();
+  }
 
   async function record(kind: string) {
     if (!team || !matchReady) return;
@@ -270,7 +276,12 @@ function Referee() {
                   <h2 className="mb-2 text-xs font-semibold text-zinc-400">
                     Already on {team.number}
                   </h2>
-                  <FlagList flags={flagsFor(team.id)} kinds={state.flagKinds} />
+                  <FlagList
+                    flags={flagsFor(team.id)}
+                    kinds={state.flagKinds}
+                    matchTypes={state.matchTypes}
+                    onEdit={correctFlag}
+                  />
                 </div>
               ) : null}
             </>

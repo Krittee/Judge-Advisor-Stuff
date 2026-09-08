@@ -69,6 +69,23 @@ export type NewFlag = {
   field: string;
 };
 
+/**
+ * A correction to a flag already on record.
+ *
+ * Everything a referee can get wrong in a hurry -- the wrong severity
+ * tapped, a mis-typed match number -- except which team and who wrote it.
+ * Reassigning a flag to a different team, or to a different author, is a
+ * bigger mistake than this is meant to fix; that goes through the Judge
+ * Advisor deleting and refiling it instead.
+ */
+export type FlagEdit = {
+  kind: string;
+  body: string;
+  matchType: string;
+  matchNumber: string;
+  field: string;
+};
+
 export type NewActivity = {
   requestId?: string | null;
   teamId?: string | null;
@@ -130,6 +147,8 @@ export type Store = {
   /** Referee observations. Optionally narrowed to one team. */
   listFlags(teamId?: string): Promise<FlagRow[]>;
   createFlag(input: NewFlag): Promise<FlagRow>;
+  /** Throws StoreError(404) if the flag no longer exists. */
+  updateFlag(id: string, edit: FlagEdit): Promise<FlagRow>;
   /** Only the Judge Advisor removes one. Returns whether it existed. */
   removeFlag(id: string): Promise<boolean>;
 

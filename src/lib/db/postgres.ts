@@ -715,6 +715,19 @@ export const postgresStore: Store = {
     )!;
   },
 
+  async updateFlag(id, edit) {
+    const updated = one(
+      await query<FlagRow>(
+        `update flags set kind = $2, body = $3, match_type = $4, match_number = $5, field = $6
+         where id = $1
+         returning *`,
+        [id, edit.kind, edit.body, edit.matchType, edit.matchNumber, edit.field],
+      ),
+    );
+    if (!updated) throw new StoreError("That flag no longer exists.", 404);
+    return updated;
+  },
+
   async removeFlag(id) {
     const gone = await query<{ id: string }>("delete from flags where id = $1 returning id", [id]);
     return gone.length > 0;

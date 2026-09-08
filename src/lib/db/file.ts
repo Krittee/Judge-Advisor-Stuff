@@ -35,6 +35,7 @@ import {
   type NewNote,
   type NewConflict,
   type NewFlag,
+  type FlagEdit,
   type NewRequest,
   type SaveScore,
   type Store,
@@ -686,6 +687,19 @@ function createFlag(input: NewFlag): FlagRow {
   return row;
 }
 
+function updateFlag(id: string, edit: FlagEdit): FlagRow {
+  const row = state().flags.find((f) => f.id === id);
+  if (!row) throw new StoreError("That flag no longer exists.", 404);
+
+  row.kind = edit.kind;
+  row.body = edit.body;
+  row.match_type = edit.matchType;
+  row.match_number = edit.matchNumber;
+  row.field = edit.field;
+  save();
+  return row;
+}
+
 function removeFlag(id: string): boolean {
   const before = state().flags.length;
   state().flags = state().flags.filter((f) => f.id !== id);
@@ -971,6 +985,7 @@ export const fileStore: Store = {
 
   listFlags: async (teamId) => listFlags(teamId),
   createFlag: async (input) => createFlag(input),
+  updateFlag: async (id, edit) => updateFlag(id, edit),
   removeFlag: async (id) => removeFlag(id),
 
   listConflicts: async () => listConflicts(),

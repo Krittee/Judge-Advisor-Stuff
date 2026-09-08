@@ -415,10 +415,21 @@ shows up in three places:
 - **Only a referee raises a flag.** Not a judge, not the Judge Advisor.
   A flag is a record of what an official saw; if anyone could add one it
   would stop meaning that, so the API refuses all three.
+- **A referee or the Judge Advisor can correct one** — the wrong severity
+  tapped, a mis-typed match number. Tapping "edit" on a flag reopens the
+  same form it was raised with, pre-filled, and re-selecting a kind saves
+  the whole correction the same way raising it did in the first place.
 - **Only the Judge Advisor removes one** — and a referee cannot remove
   their own, or a flag could be quietly unsaid after a team complained.
+  Correcting is not that: the incident stays on the board, just described
+  more accurately, and every correction is logged to Activity (`corrected
+  a flag: major → minor`) so nothing about it happens quietly either.
+  Team and author cannot be changed this way — reassigning a flag to a
+  different team is a bigger mistake than this fixes, and goes through
+  the Judge Advisor deleting and refiling it.
 - **Judges read their own panel's only**, the same wall notes and scores
-  sit behind.
+  sit behind. They cannot correct or remove a flag — read-only, same as
+  everything else in judging.
 - **Teams and the queue desk see none of it**, in the UI *or* the API. A
   team should hear about a violation from an official, not from a page it
   is refreshing.

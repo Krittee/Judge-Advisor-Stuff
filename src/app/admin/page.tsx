@@ -23,6 +23,7 @@ import { LanguageCover, LanguageTag } from "@/components/Language";
 import { FlagList, FlagSummary } from "@/components/Flags";
 import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
+import type { FlagEdit } from "@/lib/db/types";
 import type { ActivityRow, Panel, RequestRow, Team, TeamCategoryView } from "@/lib/types";
 
 type Tab = "floor" | "scores" | "teams" | "panels" | "conflicts" | "flags" | "import" | "log";
@@ -692,6 +693,17 @@ function FlagsTab({
     }
   }
 
+  async function edit(id: string, patch: FlagEdit) {
+    onError(null);
+    try {
+      await call(`/api/flags`, { method: "PATCH", body: { id, ...patch } });
+      await refresh();
+    } catch (e) {
+      onError((e as Error).message);
+      throw e; // let the flag's own inline form show it too
+    }
+  }
+
   /* Grouped by team, worst first: the question this screen answers is
      "who has been flagged, and how badly", not "what happened at 2:14". */
   const byTeam = useMemo(() => {
@@ -767,7 +779,13 @@ function FlagsTab({
                 <FlagSummary flags={flags} kinds={state.flagKinds} />
               </div>
               <div className={`p-3 ${busy ? "opacity-60" : ""}`}>
-                <FlagList flags={flags} kinds={state.flagKinds} onRemove={remove} />
+                <FlagList
+                  flags={flags}
+                  kinds={state.flagKinds}
+                  matchTypes={state.matchTypes}
+                  onRemove={remove}
+                  onEdit={edit}
+                />
               </div>
             </div>
             );
