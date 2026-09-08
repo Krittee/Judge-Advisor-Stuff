@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { actorLabel, canAdminister, canFlag, canReadFlags, getSession } from "@/lib/auth";
 import { store } from "@/lib/db";
-import { resolveFlagKind } from "@/lib/presets";
+import { isValidMatchType, matchTypes, resolveFlagKind } from "@/lib/presets";
+import { isValidField, isValidMatchNumber, normalizeField, normalizeMatchNumber } from "@/lib/match";
 
 export const dynamic = "force-dynamic";
 
@@ -67,18 +68,49 @@ export async function POST(request: Request) {
     );
   }
 
+  // Match and field are what let a head referee trace a flag back to a
+  // moment, so unlike the flag kind they are required and validated
+  // outright rather than guessed at: recording a Qualification incident
+  // as Practice because the request was malformed would be worse than
+  // refusing it.
+  const matchType = String(body.matchType ?? "").trim().toUpperCase();
+  if (!isValidMatchType(matchType)) {
+    return NextResponse.json(
+      {
+        error: `Pick which match this was — ${matchTypes()
+          .map((t) => `${t.id} (${t.label})`)
+          .join(", ")}.`,
+      },
+      { status: 400 },
+    );
+  }
+  const matchNumber = normalizeMatchNumber(body.matchNumber);
+  if (!isValidMatchNumber(matchNumber)) {
+    return NextResponse.json({ error: "Enter the match number." }, { status: 400 });
+  }
+  const field = normalizeField(body.field);
+  if (!isValidField(field)) {
+    return NextResponse.json({ error: "Enter which field this was." }, { status: 400 });
+  }
+
   const flag = await store().createFlag({
     teamId,
     kind,
     body: text,
     author: session!.name,
+    matchType,
+    matchNumber,
+    field,
   });
 
   await store().logActivity({
     teamId,
     actor: actorLabel(session),
     action: `flagged ${kind}`,
-    detail: `Team ${team.number}`,
+    // No "Field" label here: the field value is free text and a referee
+    // typing "Field 2" (the box's own placeholder) would otherwise read as
+    // "Field Field 2". FlagList shows it the same bare way on screen.
+    detail: `Team ${team.number} · ${matchType}${matchNumber} · ${field}`,
   });
 
   return NextResponse.json({ flag });

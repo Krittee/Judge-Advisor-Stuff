@@ -102,6 +102,11 @@ export type FlagRow = {
   kind: string;
   body: string;
   author: string;
+  /** One of config/event.json's matchTypes ids (P/Q/F). Null on a flag
+   *  recorded before this was required. */
+  match_type: string | null;
+  match_number: string | null;
+  field: string | null;
   created_at: string;
 };
 
@@ -146,6 +151,8 @@ export type AppState = {
   conflicts: ConflictRow[];
   /** Which way round the pit floor is drawn, so the plan matches the room. */
   pitFloor: { columns: "left-to-right" | "right-to-left"; rows: "top-to-bottom" | "bottom-to-top" };
+  /** The match types a flag can be pinned to (P/Q/F), so it can be traced back. */
+  matchTypes: { id: string; label: string }[];
   /** The kinds of flag a referee can record, with their colours. */
   flagKinds: { id: string; label: string; short: string; color: string; severity: number }[];
   /** What referees have flagged. Judges read these; only referees write them. */

@@ -12,6 +12,7 @@ const EMPTY: AppState = {
   languages: [],
   conflicts: [],
   pitFloor: { columns: "right-to-left", rows: "bottom-to-top" },
+  matchTypes: [],
   flagKinds: [],
   flags: [],
   viewer: {

@@ -1,6 +1,7 @@
 "use client";
 
 import type { AppState, FlagRow } from "@/lib/types";
+import { matchReference } from "@/lib/match";
 
 export type FlagKind = AppState["flagKinds"][number];
 
@@ -130,6 +131,17 @@ export function FlagList({
                 minute: "2-digit",
               })}
             </span>
+            {/* The match reference: what makes this traceable back to a
+                moment on the field, not just a comment. */}
+            {matchReference(f.match_type, f.match_number) ? (
+              <span
+                title="Match · Field"
+                className="rounded-md bg-white/5 px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-zinc-400"
+              >
+                {matchReference(f.match_type, f.match_number)}
+                {f.field ? ` · ${f.field}` : ""}
+              </span>
+            ) : null}
             {onRemove ? (
               <button
                 onClick={() => onRemove(f.id)}

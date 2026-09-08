@@ -43,6 +43,7 @@ export type Language = { id: string; label: string; short: string };
 type RawPreset = {
   divisions?: unknown;
   pitFloor?: unknown;
+  matchTypes?: unknown;
   languages?: unknown;
   refereeFlags?: unknown;
   teamCategories?: unknown;
@@ -128,6 +129,45 @@ export function resolveFlagKind(input: unknown): string {
   );
   if (match) return match.id;
   return [...kinds].sort((a, b) => a.severity - b.severity)[0].id;
+}
+
+/* ------------------------------------------------------------------ *
+ * Match types.
+ *
+ * A flag is only useful to a head referee if it can be traced back to a
+ * moment: which match, and which field. There is no severity axis here
+ * the way there is for a flag kind, so nothing about this resolves to a
+ * safe guess -- the API rejects an unrecognised type outright rather than
+ * silently filing a Qualification incident as Practice.
+ * ------------------------------------------------------------------ */
+
+export type MatchType = { id: string; label: string };
+
+const MATCH_TYPE_FALLBACK: MatchType[] = [
+  { id: "P", label: "Practice" },
+  { id: "Q", label: "Qualification" },
+  { id: "F", label: "Final" },
+];
+
+export function matchTypes(): MatchType[] {
+  const list = Array.isArray(raw.matchTypes) ? raw.matchTypes : [];
+
+  const parsed = list
+    .map((t: unknown) => {
+      const o = (t ?? {}) as Record<string, unknown>;
+      const id = String(o.id ?? "").trim();
+      if (!id) return null;
+      return { id, label: String(o.label ?? id) };
+    })
+    .filter((t): t is MatchType => t !== null);
+
+  return parsed.length ? parsed : MATCH_TYPE_FALLBACK;
+}
+
+/** True only for an id that is actually configured — never a guess. */
+export function isValidMatchType(input: unknown): boolean {
+  const wanted = String(input ?? "").trim();
+  return matchTypes().some((t) => t.id === wanted);
 }
 
 /* ------------------------------------------------------------------ *

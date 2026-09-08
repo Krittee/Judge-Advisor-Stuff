@@ -145,3 +145,70 @@ test("the API refuses a flag with no text", () => {
   const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
   assert.ok(src.includes("Say what you saw"), "an empty flag is no use to a judge");
 });
+
+/* ---- match reference: which match and field a flag happened at -------- */
+
+const types = event.matchTypes;
+
+test("the config offers exactly Practice, Qualification and Final", () => {
+  assert.deepEqual(
+    types.map((t) => t.id),
+    ["P", "Q", "F"],
+  );
+});
+
+function isValidMatchType(input, list = types) {
+  const wanted = String(input ?? "").trim();
+  return list.some((t) => t.id === wanted);
+}
+
+test("a configured id is valid; anything else is not", () => {
+  assert.ok(isValidMatchType("P"));
+  assert.ok(isValidMatchType("Q"));
+  assert.ok(isValidMatchType("F"));
+  for (const bad of ["", "p", "practice", "X", null, undefined, "Practice"]) {
+    assert.ok(!isValidMatchType(bad), `"${bad}" should not resolve to a match type`);
+  }
+});
+
+test("unlike a flag kind, an unrecognised match type has no safe fallback", () => {
+  /* resolveFlagKind quietly downgrades a bad kind to the least severe one
+     -- correct there, because severity is the thing being protected. There
+     is no equivalent safe guess for which match something happened in:
+     defaulting a Final incident to Practice would misfile it, so the only
+     right answer is refusing the request outright. */
+  const src = readFileSync(new URL("../src/lib/presets.ts", import.meta.url), "utf8");
+  assert.ok(
+    src.includes("export function isValidMatchType"),
+    "isValidMatchType was renamed or removed",
+  );
+  const fn = src.slice(src.indexOf("export function isValidMatchType"));
+  const body = fn.slice(0, fn.indexOf("\n}"));
+  assert.ok(
+    !/severity|fallback|sort\(/.test(body),
+    "isValidMatchType picked up a fallback; a match type must be validated, not guessed",
+  );
+});
+
+test("the API route requires match type, match number and field, and rejects rather than guesses", () => {
+  const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
+  assert.ok(src.includes("isValidMatchType(matchType)"), "match type is no longer validated");
+  assert.ok(src.includes("isValidMatchNumber(matchNumber)"), "match number is no longer validated");
+  assert.ok(src.includes("isValidField(field)"), "field is no longer validated");
+  // Each of the three failure branches must return before createFlag runs.
+  const createIdx = src.indexOf("store().createFlag");
+  for (const check of ["isValidMatchType(matchType)", "isValidMatchNumber(matchNumber)", "isValidField(field)"]) {
+    assert.ok(src.indexOf(check) < createIdx, `${check} does not run before the flag is created`);
+  }
+});
+
+test("the activity log entry carries the match reference, so Activity can trace it too", () => {
+  const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
+  assert.ok(
+    /detail:\s*`Team \$\{team\.number\} · \$\{matchType\}\$\{matchNumber\} · \$\{field\}`/.test(src),
+    "the activity log no longer records which match a flag happened at",
+  );
+  // Not "· Field ${field}" -- a referee typing the box's own placeholder,
+  // "Field 2", would otherwise read back as "Field Field 2".
+  assert.ok(!src.includes("· Field ${field}"), "the field is double-labelled again");
+});

@@ -63,6 +63,10 @@ export type NewFlag = {
   kind: string;
   body: string;
   author: string;
+  /** Which match and field this happened at, so it can be traced back. */
+  matchType: string;
+  matchNumber: string;
+  field: string;
 };
 
 export type NewActivity = {

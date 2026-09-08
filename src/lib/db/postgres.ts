@@ -200,12 +200,15 @@ async function migrate(): Promise<void> {
     );
 
     create table if not exists flags (
-      id         uuid primary key default gen_random_uuid(),
-      team_id    uuid not null references teams(id) on delete cascade,
-      kind       text not null,
-      body       text not null,
-      author     text not null,
-      created_at timestamptz not null default now()
+      id           uuid primary key default gen_random_uuid(),
+      team_id      uuid not null references teams(id) on delete cascade,
+      kind         text not null,
+      body         text not null,
+      author       text not null,
+      match_type   text,
+      match_number text,
+      field        text,
+      created_at   timestamptz not null default now()
     );
 
     create table if not exists scores (
@@ -275,6 +278,11 @@ async function migrate(): Promise<void> {
 
       -- Panels used to carry a room, which turned out not to be wanted.
       alter table panels drop column if exists room;
+
+      -- Which match and field a referee's flag happened at.
+      alter table flags add column if not exists match_type text;
+      alter table flags add column if not exists match_number text;
+      alter table flags add column if not exists field text;
     end $$;
   `);
 }
@@ -699,10 +707,10 @@ export const postgresStore: Store = {
   async createFlag(input: NewFlag) {
     return one(
       await query<FlagRow>(
-        `insert into flags (team_id, kind, body, author)
-         values ($1, $2, $3, $4)
+        `insert into flags (team_id, kind, body, author, match_type, match_number, field)
+         values ($1, $2, $3, $4, $5, $6, $7)
          returning *`,
-        [input.teamId, input.kind, input.body, input.author],
+        [input.teamId, input.kind, input.body, input.author, input.matchType, input.matchNumber, input.field],
       ),
     )!;
   },

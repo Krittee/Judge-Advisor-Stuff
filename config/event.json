@@ -65,6 +65,20 @@
       "severity": 3
     }
   ],
+  "matchTypes": [
+    {
+      "id": "P",
+      "label": "Practice"
+    },
+    {
+      "id": "Q",
+      "label": "Qualification"
+    },
+    {
+      "id": "F",
+      "label": "Final"
+    }
+  ],
   "teamCategories": [
     {
       "id": "developing",

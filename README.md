@@ -339,8 +339,10 @@ often the thing a judge most needs to know. `/referee` is their page:
 
 1. Find the team — **type the number** if you can read it off the robot,
    or **All teams** to scroll and pick one.
-2. Say what happened.
-3. Tap how serious it was.
+2. Say which match — **P / Q / F** and the match number — and which
+   **field**.
+3. Say what happened.
+4. Tap how serious it was.
 
 The **All teams** page searches by number, name *or* pit (`9882`, `nova`
 and `A1` all find a team), filters by division, and narrows to teams that
@@ -360,6 +362,33 @@ sharpest button is not the one under your thumb:
 
 **Colour never carries it alone.** Every flag also reads its own name, so
 anyone who cannot separate amber from orange still knows which is which.
+
+### Which match this happened at
+
+A flag is only useful to a head referee later if it can be traced back to a
+moment, so every one carries a match reference:
+
+- **Match** — a dropdown, **P**ractice / **Q**ualification / **F**inal.
+- **Match #** — the match number.
+- **Field** — free text (`Field 1`, `Red`, whatever the hall calls it).
+
+All three are required, the same standing as the description — a flag
+nobody can trace back is not much use days later. They show up everywhere
+a flag does as a compact reference, `Q23 · Field 2`, right beside who wrote
+it and when.
+
+**Match and field are remembered between flags, on purpose.** A referee
+works one match at a time and often flags more than one team against it,
+so only the description clears after each save — re-typing the match for
+every team would work against the whole point of tracking it. Change the
+dropdown or the number the moment you move to a different match; there is
+nothing that resets them for you.
+
+**An unrecognised match type is refused outright, not guessed.** That is
+different from a flag kind, which falls back to the least serious one on
+purpose. There is no safe guess for *which match* something happened in —
+defaulting a Final incident to Practice would misfile it — so a malformed
+request gets a `400` instead.
 
 ### Where it goes
 
@@ -412,6 +441,16 @@ They live in `config/event.json` and are yours to change:
 `severity` does the ordering and decides a team's worst flag; `short` is
 what fits on a chip. Colours are `emerald`, `amber`, `orange`, `rose`,
 `sky` and `zinc`.
+
+The match types are separate, in the same file:
+
+```json
+"matchTypes": [
+  { "id": "P", "label": "Practice" },
+  { "id": "Q", "label": "Qualification" },
+  { "id": "F", "label": "Final" }
+]
+```
 
 ### Signing in
 

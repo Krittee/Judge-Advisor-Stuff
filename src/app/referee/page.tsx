@@ -8,6 +8,7 @@ import { SignOutButton } from "@/components/judging";
 import { RefereeNav } from "@/components/RefereeNav";
 import { FlagList, FlagSummary, FLAG_SOLID } from "@/components/Flags";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
+import { filterMatchNumberInput, isValidField, isValidMatchNumber } from "@/lib/match";
 import type { Session } from "@/lib/auth";
 
 /**
@@ -36,6 +37,13 @@ function Referee() {
 
   const [number, setNumber] = useState("");
   const [body, setBody] = useState("");
+  /* Which match and field this happened at. Deliberately NOT reset after a
+     flag is recorded, the way body is — a referee works one match at a
+     time and flags several teams against it, so re-typing "Q23, Field 2"
+     for every one of them would be the opposite of easy to track back. */
+  const [matchType, setMatchType] = useState("");
+  const [matchNumber, setMatchNumber] = useState("");
+  const [field, setField] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -88,15 +96,25 @@ function Referee() {
       .sort((a, b) => b.flags[0].created_at.localeCompare(a.flags[0].created_at));
   }, [state.flags, state.teams]);
 
+  // What a head referee needs to trace this back to a moment. Required
+  // the same way "what did you see" is — a flag with no match reference
+  // is exactly the kind of thing that cannot be tracked back later.
+  const matchReady = Boolean(matchType) && isValidMatchNumber(matchNumber) && isValidField(field);
+
   async function record(kind: string) {
-    if (!team) return;
+    if (!team || !matchReady) return;
     setBusy(true);
     setError(null);
     setSaved(null);
     try {
-      await call("/api/flags", { body: { teamId: team.id, kind, body } });
+      await call("/api/flags", {
+        body: { teamId: team.id, kind, body, matchType, matchNumber, field },
+      });
       const label = state.flagKinds.find((k) => k.id === kind)?.label ?? kind;
-      setSaved(`${label} recorded against ${team.number}. The judges will see it.`);
+      setSaved(
+        `${label} recorded against ${team.number} for ${matchType}${matchNumber} · Field ${field}. ` +
+          `The judges will see it.`,
+      );
       setBody("");
       await refresh();
     } catch (e) {
@@ -158,6 +176,56 @@ function Referee() {
                 ) : null}
               </div>
 
+              {/* Which match this happened at. Required, same standing as
+                  "what did you see" — a flag nobody can trace back to a
+                  match is not much use to a head referee days later.
+                  Match and Match # share a row (2:1 — "Qualification" needs
+                  the room, a 4-digit number never does); Field gets its own
+                  full-width row so a longer name is not squeezed to a
+                  sliver, the way it briefly was in testing. */}
+              <div className="flex flex-wrap gap-2">
+                <label className="min-w-[10rem] flex-[2]">
+                  <span className="mb-1 block text-xs text-zinc-400">Match</span>
+                  <select
+                    value={matchType}
+                    onChange={(e) => setMatchType(e.target.value)}
+                    className={`${inputClass} py-2`}
+                  >
+                    <option value="" className="bg-zinc-900">
+                      — select —
+                    </option>
+                    {state.matchTypes.map((t) => (
+                      <option key={t.id} value={t.id} className="bg-zinc-900">
+                        {t.id} — {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="min-w-[4.5rem] flex-1">
+                  <span className="mb-1 block text-xs text-zinc-400">Match #</span>
+                  <input
+                    value={matchNumber}
+                    onChange={(e) => setMatchNumber(filterMatchNumberInput(e.target.value))}
+                    placeholder="23"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    className={`${inputClass} py-2 text-center`}
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="mb-1 block text-xs text-zinc-400">Field</span>
+                <input
+                  value={field}
+                  onChange={(e) => setField(e.target.value)}
+                  placeholder="Field 2"
+                  maxLength={40}
+                  autoComplete="off"
+                  className={`${inputClass} py-2`}
+                />
+              </label>
+
               <label className="block">
                 <span className="mb-1 block text-xs text-zinc-400">What did you see?</span>
                 <textarea
@@ -176,7 +244,7 @@ function Referee() {
                 {kinds.map((k) => (
                   <button
                     key={k.id}
-                    disabled={busy || !body.trim()}
+                    disabled={busy || !body.trim() || !matchReady}
                     onClick={() => record(k.id)}
                     className={`rounded-xl px-4 py-3 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
                       FLAG_SOLID[k.color] ?? FLAG_SOLID.zinc
@@ -186,7 +254,12 @@ function Referee() {
                   </button>
                 ))}
               </div>
-              {!body.trim() ? (
+              {!matchReady ? (
+                <p className="text-center text-xs text-zinc-600">
+                  Pick the match, the match number and the field first — that is what lets this
+                  be traced back later.
+                </p>
+              ) : !body.trim() ? (
                 <p className="text-center text-xs text-zinc-600">
                   Write what happened first — a judge reads this without you there.
                 </p>
