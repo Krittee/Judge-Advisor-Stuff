@@ -11,6 +11,7 @@ import { dirname, resolve } from "node:path";
 import type {
   ActivityRow,
   ConflictRow,
+  FlagRow,
   Note,
   Panel,
   RequestRow,
@@ -33,6 +34,7 @@ import {
   type NewActivity,
   type NewNote,
   type NewConflict,
+  type NewFlag,
   type NewRequest,
   type SaveScore,
   type Store,
@@ -64,6 +66,7 @@ type Data = {
   notes: Note[];
   scores: ScoreRow[];
   conflicts: ConflictRow[];
+  flags: FlagRow[];
   activity: ActivityRow[];
 };
 
@@ -102,6 +105,7 @@ function empty(): Data {
     notes: [],
     scores: [],
     conflicts: [],
+    flags: [],
     activity: [],
   };
 }
@@ -161,6 +165,7 @@ function load(): Data {
 function migrate(data: Data): Data {
   data.scores ??= [];
   data.conflicts ??= [];
+  data.flags ??= [];
 
   // Languages and panel language cover arrived after the first rosters.
   for (const r of data.requests) r.language ??= defaultLanguage();
@@ -652,6 +657,33 @@ function addConflict(input: NewConflict): ConflictRow {
   return row;
 }
 
+function listFlags(teamId?: string): FlagRow[] {
+  const rows = teamId ? state().flags.filter((f) => f.team_id === teamId) : state().flags;
+  // Newest first: on a busy field the last thing seen matters most.
+  return [...rows].sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+function createFlag(input: NewFlag): FlagRow {
+  const row: FlagRow = {
+    id: randomUUID(),
+    team_id: input.teamId,
+    kind: input.kind,
+    body: input.body,
+    author: input.author,
+    created_at: new Date().toISOString(),
+  };
+  state().flags.push(row);
+  save();
+  return row;
+}
+
+function removeFlag(id: string): boolean {
+  const before = state().flags.length;
+  state().flags = state().flags.filter((f) => f.id !== id);
+  save();
+  return state().flags.length < before;
+}
+
 function removeConflict(id: string): boolean {
   const before = state().conflicts.length;
   state().conflicts = state().conflicts.filter((c) => c.id !== id);
@@ -884,7 +916,7 @@ function demoData(): Data {
     ),
   ];
 
-  return { panels, teams, requests, notes: [], scores: [], conflicts: [], activity: [] };
+  return { panels, teams, requests, notes: [], scores: [], conflicts: [], flags: [], activity: [] };
 }
 
 /* ------------------------------------------------------------------ *
@@ -927,6 +959,10 @@ export const fileStore: Store = {
   generatePanelCode: async () => generatePanelCode(),
 
   createNote: async (input) => createNote(input),
+
+  listFlags: async (teamId) => listFlags(teamId),
+  createFlag: async (input) => createFlag(input),
+  removeFlag: async (id) => removeFlag(id),
 
   listConflicts: async () => listConflicts(),
   addConflict: async (input) => addConflict(input),

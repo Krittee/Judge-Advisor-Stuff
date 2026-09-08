@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import type {
   ActivityRow,
   ConflictRow,
+  FlagRow,
   Note,
   Panel,
   RequestRow,
@@ -17,6 +18,7 @@ import {
   type NewActivity,
   type NewNote,
   type NewConflict,
+  type NewFlag,
   type NewRequest,
   type SaveScore,
   type Store,
@@ -195,6 +197,15 @@ async function migrate(): Promise<void> {
       declared_by text not null,
       created_at  timestamptz not null default now(),
       unique (panel_id, team_id)
+    );
+
+    create table if not exists flags (
+      id         uuid primary key default gen_random_uuid(),
+      team_id    uuid not null references teams(id) on delete cascade,
+      kind       text not null,
+      body       text not null,
+      author     text not null,
+      created_at timestamptz not null default now()
     );
 
     create table if not exists scores (
@@ -675,6 +686,32 @@ export const postgresStore: Store = {
   },
 
   /** Declaring the same pair twice returns the one already recorded. */
+  async listFlags(teamId?: string) {
+    // Newest first: on a busy field the last thing seen matters most.
+    return teamId
+      ? await query<FlagRow>(
+          "select * from flags where team_id = $1 order by created_at desc",
+          [teamId],
+        )
+      : await query<FlagRow>("select * from flags order by created_at desc");
+  },
+
+  async createFlag(input: NewFlag) {
+    return one(
+      await query<FlagRow>(
+        `insert into flags (team_id, kind, body, author)
+         values ($1, $2, $3, $4)
+         returning *`,
+        [input.teamId, input.kind, input.body, input.author],
+      ),
+    )!;
+  },
+
+  async removeFlag(id) {
+    const gone = await query<{ id: string }>("delete from flags where id = $1 returning id", [id]);
+    return gone.length > 0;
+  },
+
   async addConflict(input: NewConflict) {
     return one(
       await query<ConflictRow>(

@@ -35,6 +35,36 @@
       "short": "TH"
     }
   ],
+  "refereeFlags": [
+    {
+      "id": "good",
+      "label": "Good conduct",
+      "short": "Good",
+      "color": "emerald",
+      "severity": 0
+    },
+    {
+      "id": "warning",
+      "label": "Warning",
+      "short": "Warning",
+      "color": "amber",
+      "severity": 1
+    },
+    {
+      "id": "minor",
+      "label": "Minor violation",
+      "short": "Minor",
+      "color": "orange",
+      "severity": 2
+    },
+    {
+      "id": "major",
+      "label": "Major violation",
+      "short": "Major",
+      "color": "rose",
+      "severity": 3
+    }
+  ],
   "teamCategories": [
     {
       "id": "developing",

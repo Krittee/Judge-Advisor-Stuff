@@ -8,7 +8,7 @@ import { Banner, Button, Field, inputClass } from "@/components/ui";
 import type { Session } from "@/lib/auth";
 
 /**
- * One code box for all three staff roles. The code itself decides whether
+ * One code box for every staff role. The code itself decides whether
  * you land on the judge console, the queue console or the JA console —
  * nobody has to remember which URL they were told to use.
  */
@@ -28,7 +28,13 @@ export default function LoginPage() {
         body: { code, name },
       });
       router.push(
-        session.role === "admin" ? "/admin" : session.role === "judge" ? "/judge" : "/queue",
+        session.role === "admin"
+          ? "/admin"
+          : session.role === "judge"
+            ? "/judge"
+            : session.role === "referee"
+              ? "/referee"
+              : "/queue",
       );
       router.refresh();
     } catch (e) {

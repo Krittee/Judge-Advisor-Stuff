@@ -88,6 +88,23 @@ export type ConflictRow = {
   created_at: string;
 };
 
+/**
+ * Something a referee saw on the field.
+ *
+ * Kept apart from judging notes on purpose: a note is a judge's own
+ * record of an interview, while a flag is an official observation the
+ * judges read but do not write. Whose it is, is part of what it means.
+ */
+export type FlagRow = {
+  id: string;
+  team_id: string;
+  /** One of config/event.json's refereeFlags ids. */
+  kind: string;
+  body: string;
+  author: string;
+  created_at: string;
+};
+
 export type ScoreRow = {
   id: string;
   team_id: string;
@@ -127,13 +144,17 @@ export type AppState = {
   languages: { id: string; label: string; short: string }[];
   /** Panel/team pairs that must stay apart. */
   conflicts: ConflictRow[];
+  /** The kinds of flag a referee can record, with their colours. */
+  flagKinds: { id: string; label: string; short: string; color: string; severity: number }[];
+  /** What referees have flagged. Judges read these; only referees write them. */
+  flags: FlagRow[];
   /** What this viewer is allowed to do, so the UI never offers more. */
   viewer: ViewerCapabilities;
   serverTime: string;
 };
 
 export type ViewerCapabilities = {
-  role: "team" | "queuer" | "judge" | "admin";
+  role: "team" | "queuer" | "judge" | "referee" | "admin";
   name: string | null;
   /** Set for a judge: the only panel they may act on. */
   panelId: string | null;
@@ -143,6 +164,10 @@ export type ViewerCapabilities = {
   canAdvance: boolean;
   canReadNotes: boolean;
   canAdminister: boolean;
+  /** May record a referee flag against a team. */
+  canFlag: boolean;
+  /** May read what referees have flagged. */
+  canReadFlags: boolean;
 };
 
 export type Slot = {

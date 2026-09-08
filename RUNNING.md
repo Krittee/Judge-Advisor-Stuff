@@ -240,6 +240,7 @@ them. Before the real day:
    ```
    ADMIN_CODE=pick-something-only-you-know
    QUEUER_CODE=pick-something-for-the-desk
+   REFEREE_CODE=pick-something-for-the-referees
    ```
 3. Stop the app (`Ctrl + C`) and start it again (`npm run dev`)
 

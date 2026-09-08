@@ -45,6 +45,7 @@ cp .env.example .env.local     # then edit the codes
 |---|---|---|
 | `ADMIN_CODE` | `JA2026` | Judge Advisor. Full control. Keep it to yourself. |
 | `QUEUER_CODE` | `DESK01` | Queue desk. Can only add teams to the queue. |
+| `REFEREE_CODE` | `REF001` | Referees. Can only flag what they saw on the field. |
 | `SESSION_SECRET` | insecure key | Signs the login cookie. `openssl rand -base64 32` |
 | `DATABASE_URL` | unset | Set it to use Postgres; unset uses the JSON file. |
 | `DATA_FILE` | `.data/state.json` | Where the file store keeps its data. |
@@ -130,7 +131,11 @@ same refusal.
 | **Team** (no login) | own team | — | own request | — | — |
 | **Queue desk** (`QUEUER_CODE`) | any team | — | un-seen only | — | — |
 | **Judge** (panel code) | own panel | **own panel** | own panel | **own panel** | — |
+| **Referee** (`REFEREE_CODE`) | — | — | — | — | — |
 | **Judge Advisor** (`ADMIN_CODE`) | any | any | any | any | ✅ |
+
+A referee sits outside that table: they touch no interview and read no
+judging note. Their one job is the **Referee** section below.
 
 **Declared conflicts are not in the public payload.** A conflict names a judge
 and says how they are connected to a team. The team page and the big board both
@@ -322,6 +327,79 @@ they were collected and how you would read them back to check.
 
 Optionally each one records **which judge** is affiliated and **how** — useful
 months later when someone asks why a panel never saw a particular team.
+
+---
+
+## Referee
+
+Referees work the field, not the judging room, and what they see there is
+often the thing a judge most needs to know. `/referee` is their page:
+
+1. Type a team number.
+2. Say what happened.
+3. Tap how serious it was.
+
+Four kinds, each its own colour, ordered least to most serious so the
+sharpest button is not the one under your thumb:
+
+| | |
+|---|---|
+| **Good conduct** | green — helped another team, gracious in defeat |
+| **Warning** | amber |
+| **Minor violation** | orange |
+| **Major violation** | red |
+
+**Colour never carries it alone.** Every flag also reads its own name, so
+anyone who cannot separate amber from orange still knows which is which.
+
+### Where it goes
+
+The whole point is that it reaches the people judging that team. A flag
+shows up in three places:
+
+- **The judge console** — a chip beside the team number, and the
+  referee's own words underneath, with who wrote it and when. Judges read
+  it before the interview, not after.
+- **The Judge Advisor's floor and Referee tab** — grouped by team, worst
+  first, with the running count of each kind.
+- **The referee's own page** — what is already on a team, so a second
+  referee is not writing the same thing twice.
+
+### Who can do what
+
+- **Only a referee raises a flag.** Not a judge, not the Judge Advisor.
+  A flag is a record of what an official saw; if anyone could add one it
+  would stop meaning that, so the API refuses all three.
+- **Only the Judge Advisor removes one** — and a referee cannot remove
+  their own, or a flag could be quietly unsaid after a team complained.
+- **Judges read their own panel's only**, the same wall notes and scores
+  sit behind.
+- **Teams and the queue desk see none of it**, in the UI *or* the API. A
+  team should hear about a violation from an official, not from a page it
+  is refreshing.
+
+An unrecognised kind resolves to the **least** severe one, never the
+worst, so a malformed request can never invent a major violation against
+a team.
+
+### Changing the kinds
+
+They live in `config/event.json` and are yours to change:
+
+```json
+"refereeFlags": [
+  { "id": "good", "label": "Good conduct", "short": "Good", "color": "emerald", "severity": 0 },
+  { "id": "major", "label": "Major violation", "short": "Major", "color": "rose", "severity": 3 }
+]
+```
+
+`severity` does the ordering and decides a team's worst flag; `short` is
+what fits on a chip. Colours are `emerald`, `amber`, `orange`, `rose`,
+`sky` and `zinc`.
+
+Referees sign in with `REFEREE_CODE` (development default `REF001`, which
+— being printed here — is refused in production like every other
+published code).
 
 ---
 

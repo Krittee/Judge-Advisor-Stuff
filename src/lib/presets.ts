@@ -43,6 +43,7 @@ export type Language = { id: string; label: string; short: string };
 type RawPreset = {
   divisions?: unknown;
   languages?: unknown;
+  refereeFlags?: unknown;
   teamCategories?: unknown;
   booking?: unknown;
   panels?: unknown;
@@ -60,6 +61,72 @@ export function presetDivisions(): string[] {
     ? raw.divisions.map((d) => String(d).trim()).filter(Boolean)
     : [];
   return list.length ? unique(list) : [DEFAULT_DIVISION];
+}
+
+/* ------------------------------------------------------------------ *
+ * Referee flags.
+ *
+ * A referee records what they saw on the field: good conduct, or a
+ * violation with the weight it carries. Judges read these when they judge
+ * the team, so the wording is the referee's and the ordering is severity.
+ * ------------------------------------------------------------------ */
+
+export type FlagKind = {
+  id: string;
+  label: string;
+  short: string;
+  color: string;
+  /** 0 is praise; higher is worse. Sorts the list and picks a team's worst. */
+  severity: number;
+};
+
+const FLAG_FALLBACK: FlagKind[] = [
+  { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0 },
+  { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1 },
+  { id: "minor", label: "Minor violation", short: "Minor", color: "orange", severity: 2 },
+  { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3 },
+];
+
+/** The kinds of flag a referee may record. Always at least one. */
+export function refereeFlags(): FlagKind[] {
+  const list = Array.isArray(raw.refereeFlags) ? raw.refereeFlags : [];
+
+  const parsed = list
+    .map((f: unknown) => {
+      const o = (f ?? {}) as Record<string, unknown>;
+      const id = String(o.id ?? "").trim();
+      if (!id) return null;
+      const label = String(o.label ?? id);
+      return {
+        id,
+        label,
+        short: String(o.short ?? label),
+        color: String(o.color ?? "zinc"),
+        severity: Number.isFinite(Number(o.severity)) ? Number(o.severity) : 0,
+      };
+    })
+    .filter((f): f is FlagKind => f !== null);
+
+  return parsed.length ? parsed : FLAG_FALLBACK;
+}
+
+/**
+ * Snap a typed-in kind to one that exists.
+ *
+ * Falls back to the *least* severe kind rather than the first, so a
+ * malformed request can never invent a major violation against a team.
+ */
+export function resolveFlagKind(input: unknown): string {
+  const wanted = String(input ?? "").trim().toLowerCase();
+  const kinds = refereeFlags();
+  const match = kinds.find(
+    (f) =>
+      f.id.toLowerCase() === wanted ||
+      f.label.toLowerCase() === wanted ||
+      f.short.toLowerCase() === wanted,
+  );
+  if (match) return match.id;
+  return [...kinds].sort((a, b) => a.severity - b.severity)[0].id;
 }
 
 const LANGUAGE_FALLBACK: Language[] = [

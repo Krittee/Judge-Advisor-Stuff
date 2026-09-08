@@ -11,6 +11,8 @@ const EMPTY: AppState = {
   categories: [],
   languages: [],
   conflicts: [],
+  flagKinds: [],
+  flags: [],
   viewer: {
     role: "team",
     name: null,
@@ -20,6 +22,8 @@ const EMPTY: AppState = {
     canAdvance: false,
     canReadNotes: false,
     canAdminister: false,
+    canFlag: false,
+    canReadFlags: false,
   },
   serverTime: "",
 };

@@ -1,6 +1,7 @@
 import type {
   ActivityRow,
   ConflictRow,
+  FlagRow,
   Note,
   Panel,
   RequestRow,
@@ -55,6 +56,13 @@ export type NewConflict = {
   judgeName: string | null;
   note: string | null;
   declaredBy: string;
+};
+
+export type NewFlag = {
+  teamId: string;
+  kind: string;
+  body: string;
+  author: string;
 };
 
 export type NewActivity = {
@@ -114,6 +122,12 @@ export type Store = {
   generatePanelCode(): Promise<string>;
 
   createNote(input: NewNote): Promise<Note>;
+
+  /** Referee observations. Optionally narrowed to one team. */
+  listFlags(teamId?: string): Promise<FlagRow[]>;
+  createFlag(input: NewFlag): Promise<FlagRow>;
+  /** Only the Judge Advisor removes one. Returns whether it existed. */
+  removeFlag(id: string): Promise<boolean>;
 
   listConflicts(): Promise<ConflictRow[]>;
   /** Idempotent: declaring the same pair twice returns the existing one. */

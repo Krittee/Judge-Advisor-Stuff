@@ -2,14 +2,15 @@ import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import { store } from "./db";
 
-export const ROLES = ["admin", "judge", "queuer"] as const;
+export const ROLES = ["admin", "judge", "queuer", "referee"] as const;
 export type Role = (typeof ROLES)[number];
 
 /** No cookie at all — a team on the public pages. */
 export type Session =
   | { role: "admin"; name: string }
   | { role: "judge"; name: string; panelId: string; panelName: string }
-  | { role: "queuer"; name: string };
+  | { role: "queuer"; name: string }
+  | { role: "referee"; name: string };
 
 const COOKIE = "jq_session";
 const MAX_AGE = 60 * 60 * 16; // one long event day
@@ -70,7 +71,7 @@ export async function getSession(): Promise<Session | null> {
   try {
     const { payload } = await jwtVerify(token, secret());
     const role = payload.role;
-    if (role === "admin" || role === "queuer") {
+    if (role === "admin" || role === "queuer" || role === "referee") {
       return { role, name: String(payload.name ?? role) };
     }
     if (role === "judge" && typeof payload.panelId === "string") {
@@ -110,7 +111,7 @@ const warnedAboutCode = new Set<string>();
  * so in production they are not access codes at all — setting one
  * explicitly is refused just as firmly as leaving it unset.
  */
-const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "ALPHA1", "BRAVO2", "CHARLIE3"]);
+const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "REF001", "ALPHA1", "BRAVO2", "CHARLIE3"]);
 
 function roleCode(envVar: string, devDefault: string): string {
   const configured = (process.env[envVar] ?? "").trim().toUpperCase();
@@ -157,6 +158,7 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
 
   const adminCode = roleCode("ADMIN_CODE", "JA2026");
   const queuerCode = roleCode("QUEUER_CODE", "DESK01");
+  const refereeCode = roleCode("REFEREE_CODE", "REF001");
   const cleanName = name.trim().slice(0, 60);
 
   if (adminCode && sameCode(code, adminCode)) {
@@ -164,6 +166,9 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
   }
   if (queuerCode && sameCode(code, queuerCode)) {
     return { role: "queuer", name: cleanName || "Queue" };
+  }
+  if (refereeCode && sameCode(code, refereeCode)) {
+    return { role: "referee", name: cleanName || "Referee" };
   }
 
   // Judge codes live in the store, so a panel can be added mid-event
@@ -214,6 +219,26 @@ export function canAdminister(s: Session | null): boolean {
 }
 
 /**
+ * Referee flags: written by referees, read by the people who judge.
+ *
+ * Writing is the referee's alone — the Judge Advisor can remove a flag
+ * but does not raise one, because a flag is a record of what an official
+ * saw, and it would stop meaning that if anyone could add to it.
+ */
+export function canFlag(s: Session | null): boolean {
+  return s?.role === "referee";
+}
+
+/**
+ * Reading is wider: judges need to know what was flagged against the
+ * teams they are about to judge, and referees need to see the history
+ * they are adding to. Teams and the queue desk get none of it.
+ */
+export function canReadFlags(s: Session | null): boolean {
+  return s?.role === "admin" || s?.role === "judge" || s?.role === "referee";
+}
+
+/**
  * The one scope check the whole judge separation rests on.
  *
  * A judge may only touch a team assigned to their own panel. The Judge
@@ -244,5 +269,6 @@ export function actorLabel(s: Session | null): string {
   if (!s) return "team";
   if (s.role === "judge") return `${s.name} (${s.panelName})`;
   if (s.role === "queuer") return `queuer:${s.name}`;
+  if (s.role === "referee") return `referee:${s.name}`;
   return `admin:${s.name}`;
 }

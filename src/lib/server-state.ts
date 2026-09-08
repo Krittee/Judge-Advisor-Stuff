@@ -1,7 +1,14 @@
 import { store } from "./db";
 import { stripCode } from "./data";
-import { languages, presetDivisions, teamCategories } from "./presets";
-import { canAdminister, canAdvance, canReadNotes, type Session } from "./auth";
+import { languages, presetDivisions, refereeFlags, teamCategories } from "./presets";
+import {
+  canAdminister,
+  canAdvance,
+  canFlag,
+  canReadFlags,
+  canReadNotes,
+  type Session,
+} from "./auth";
 import type { AppState, ViewerCapabilities } from "./types";
 
 /**
@@ -24,11 +31,12 @@ import type { AppState, ViewerCapabilities } from "./types";
  */
 export async function loadState(session: Session | null): Promise<AppState> {
   const db = store();
-  const [panels, teams, rows, allConflicts] = await Promise.all([
+  const [panels, teams, rows, allConflicts, allFlags] = await Promise.all([
     db.listPanels(),
     db.listTeams(),
     db.listRequests(),
     db.listConflicts(),
+    db.listFlags(),
   ]);
 
   const isJudge = session?.role === "judge";
@@ -51,6 +59,14 @@ export async function loadState(session: Session | null): Promise<AppState> {
   );
   const visiblePanelIds = new Set(visiblePanels.map((p) => p.id));
   const visibleTeamIds = new Set(visibleTeams.map((t) => t.id));
+
+  /* A judge sees their whole division's teams -- numbers and names are on
+     the board anyway -- but a referee's flag is not public, so it is held
+     to the narrower wall that notes and scores use: their own panel only.
+     This is the same set /api/flags narrows to, and the two must agree. */
+  const ownPanelTeamIds = new Set(
+    isJudge ? visibleTeams.filter((t) => t.panel_id === session.panelId).map((t) => t.id) : [],
+  );
   const visibleRequests = (
     division
       ? rows.filter((r) => visibleTeamIds.has(r.team_id) || visiblePanelIds.has(r.panel_id ?? ""))
@@ -89,6 +105,17 @@ export async function loadState(session: Session | null): Promise<AppState> {
       : session?.role === "judge"
         ? allConflicts.filter((c) => c.panel_id === session.panelId)
         : allConflicts,
+    flagKinds: refereeFlags(),
+    /* A referee's flag is about a team's conduct, not the queue, so it
+       goes only to those who act on it: referees writing them, judges
+       reading them for their own teams, and the Judge Advisor. Teams and
+       the desk get an empty list -- a team should hear about a violation
+       from an official, not from a page it is refreshing. */
+    flags: !canReadFlags(session)
+      ? []
+      : session?.role === "judge"
+        ? allFlags.filter((f) => ownPanelTeamIds.has(f.team_id))
+        : allFlags,
     viewer: describeViewer(session, division),
     serverTime: new Date().toISOString(),
   };
@@ -104,6 +131,8 @@ function describeViewer(session: Session | null, division: string | null): Viewe
     division,
     canAdvance: canAdvance(session),
     canReadNotes: canReadNotes(session),
+    canFlag: canFlag(session),
+    canReadFlags: canReadFlags(session),
     canAdminister: canAdminister(session),
   };
 }

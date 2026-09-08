@@ -20,11 +20,12 @@ import { Rankings } from "@/components/Rankings";
 import { ConflictDialog } from "@/components/ConflictDialog";
 import { CategoryChip, CategorySelect } from "@/components/CategoryChip";
 import { LanguageCover, LanguageTag } from "@/components/Language";
+import { FlagList, FlagSummary } from "@/components/Flags";
 import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
 import type { ActivityRow, Panel, RequestRow, Team, TeamCategoryView } from "@/lib/types";
 
-type Tab = "floor" | "scores" | "teams" | "panels" | "conflicts" | "import" | "log";
+type Tab = "floor" | "scores" | "teams" | "panels" | "conflicts" | "flags" | "import" | "log";
 
 /** The Judge Advisor's console: every panel at once, and the tools to unstick it. */
 export default function AdminPage() {
@@ -57,6 +58,7 @@ export default function AdminPage() {
     ["teams", "Teams"],
     ["panels", "Panels"],
     ["conflicts", "Conflicts"],
+    ["flags", "Referee"],
     ["import", "Import"],
     ["log", "Activity"],
   ];
@@ -119,6 +121,9 @@ export default function AdminPage() {
         ) : null}
         {tab === "conflicts" ? (
           <ConflictsTab state={state} refresh={refresh} onError={setError} />
+        ) : null}
+        {tab === "flags" ? (
+          <FlagsTab state={state} refresh={refresh} onError={setError} />
         ) : null}
         {tab === "import" ? (
           <ImportTab
@@ -272,6 +277,10 @@ function FloorTab({
                 size="md"
               />
               <StatusChip status={request!.status} size="sm" />
+              <FlagSummary
+                flags={state.flags.filter((f) => f.team_id === team.id)}
+                kinds={state.flagKinds}
+              />
               <span className="w-16 text-xs text-zinc-500">
                 <Elapsed since={request!.requested_at} />
               </span>
@@ -633,6 +642,97 @@ type BulkConflictResult = {
   notFound: string[];
   unassigned: string[];
 };
+
+/**
+ * What the referees have recorded.
+ *
+ * Read-only for the Judge Advisor except for removal: flags are the
+ * referees' record of the field, and the console is where you see the
+ * whole picture and strike anything raised in error.
+ */
+function FlagsTab({ state, refresh, onError }: TabProps) {
+  const [busy, setBusy] = useState(false);
+
+  const teamById = useMemo(() => new Map(state.teams.map((t) => [t.id, t])), [state.teams]);
+
+  async function remove(id: string) {
+    if (!confirm("Remove this flag? The judges will stop seeing it.")) return;
+    setBusy(true);
+    onError(null);
+    try {
+      await call(`/api/flags?id=${id}`, { method: "DELETE" });
+      await refresh();
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /* Grouped by team, worst first: the question this screen answers is
+     "who has been flagged, and how badly", not "what happened at 2:14". */
+  const byTeam = useMemo(() => {
+    const groups = new Map<string, typeof state.flags>();
+    for (const f of state.flags) groups.set(f.team_id, [...(groups.get(f.team_id) ?? []), f]);
+    return [...groups.entries()]
+      .map(([teamId, flags]) => ({
+        team: teamById.get(teamId),
+        flags,
+        worst: Math.max(
+          ...flags.map((f) => state.flagKinds.find((k) => k.id === f.kind)?.severity ?? 0),
+        ),
+      }))
+      .sort((a, b) => b.worst - a.worst || b.flags.length - a.flags.length);
+  }, [state.flags, state.flagKinds, teamById]);
+
+  const counts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of state.flags) m.set(f.kind, (m.get(f.kind) ?? 0) + 1);
+    return m;
+  }, [state.flags]);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/10">
+        {[...state.flagKinds]
+          .sort((a, b) => b.severity - a.severity)
+          .map((k) => (
+            <div key={k.id}>
+              <div className="text-2xl font-bold tabular-nums">{counts.get(k.id) ?? 0}</div>
+              <div className="text-xs text-zinc-500">{k.label}</div>
+            </div>
+          ))}
+        <p className="w-full text-xs text-zinc-600">
+          Recorded by referees on their own page. Judges see these against the teams they
+          are judging; teams and the queue desk do not.
+        </p>
+      </div>
+
+      {!byTeam.length ? (
+        <p className="rounded-xl px-4 py-8 text-center text-sm text-zinc-600 ring-1 ring-inset ring-white/10">
+          No referee has flagged anything yet.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {byTeam.map(({ team, flags }) => (
+            <div key={team?.id ?? "gone"} className="rounded-xl ring-1 ring-inset ring-white/10">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-white/5 px-4 py-2.5">
+                <span className="font-bold tabular-nums">{team?.number ?? "—"}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-zinc-400">
+                  {team?.name ?? "team removed"}
+                </span>
+                <FlagSummary flags={flags} kinds={state.flagKinds} />
+              </div>
+              <div className={`p-3 ${busy ? "opacity-60" : ""}`}>
+                <FlagList flags={flags} kinds={state.flagKinds} onRemove={remove} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ConflictsTab({ state, refresh, onError }: TabProps) {
   const [adding, setAdding] = useState<Team | null>(null);

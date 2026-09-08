@@ -19,6 +19,7 @@ import { NotesDrawer, SignOutButton } from "@/components/judging";
 import { Rankings } from "@/components/Rankings";
 import { CategoryChip } from "@/components/CategoryChip";
 import { LanguageTag } from "@/components/Language";
+import { FlagList, FlagSummary } from "@/components/Flags";
 import type { RequestRow, Team } from "@/lib/types";
 
 /**
@@ -225,6 +226,12 @@ export default function JudgePage() {
                         <StatusChip status={request.status} size="sm" />
                       </>
                     ) : null}
+                    {/* What a referee saw. On the header because it should
+                        reach the judge before they start, not after. */}
+                    <FlagSummary
+                      flags={state.flags.filter((f) => f.team_id === team.id)}
+                      kinds={state.flagKinds}
+                    />
                   </div>
                   <div className="truncate text-zinc-300">{team.name}</div>
                   <div className="mt-1 text-xs text-zinc-500">
@@ -245,6 +252,14 @@ export default function JudgePage() {
                     <p className="mt-2 rounded-lg bg-black/30 px-3 py-2 text-sm text-zinc-300">
                       “{request.message}”
                     </p>
+                  ) : null}
+                  {state.flags.some((f) => f.team_id === team.id) ? (
+                    <div className="mt-2">
+                      <FlagList
+                        flags={state.flags.filter((f) => f.team_id === team.id)}
+                        kinds={state.flagKinds}
+                      />
+                    </div>
                   ) : null}
                 </div>
 
