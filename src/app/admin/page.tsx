@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { liveRequestFor } from "@/lib/data";
 import { NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
@@ -35,6 +35,9 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("floor");
   const [error, setError] = useState<string | null>(null);
   const [notesFor, setNotesFor] = useState<Team | null>(null);
+  /* Set when the Conduct column on Scores sends you to a team's flags, so
+     the Referee tab knows which one to scroll to and mark. */
+  const [focusFlagTeam, setFocusFlagTeam] = useState<string | null>(null);
 
   useEffect(() => {
     call<{ session: Session | null }>("/api/session", { method: "GET" })
@@ -77,7 +80,11 @@ export default function AdminPage() {
           {tabs.map(([id, label]) => (
             <button
               key={id}
-              onClick={() => setTab(id)}
+              onClick={() => {
+                // A marked team belongs to the trip you took to see it.
+                if (id !== tab) setFocusFlagTeam(null);
+                setTab(id);
+              }}
               className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition ${
                 tab === id
                   ? "border-indigo-400 text-indigo-300"
@@ -108,6 +115,12 @@ export default function AdminPage() {
             categories={state.categories}
             panelName={Object.fromEntries(state.panels.map((p) => [p.id, p.name]))}
             onOpenTeam={setNotesFor}
+            flags={state.flags}
+            flagKinds={state.flagKinds}
+            onOpenFlags={(team) => {
+              setFocusFlagTeam(team.id);
+              setTab("flags");
+            }}
           />
         ) : null}
         {tab === "teams" ? <TeamsTab state={state} refresh={refresh} onError={setError} /> : null}
@@ -123,7 +136,12 @@ export default function AdminPage() {
           <ConflictsTab state={state} refresh={refresh} onError={setError} />
         ) : null}
         {tab === "flags" ? (
-          <FlagsTab state={state} refresh={refresh} onError={setError} />
+          <FlagsTab
+            state={state}
+            refresh={refresh}
+            onError={setError}
+            focusTeamId={focusFlagTeam}
+          />
         ) : null}
         {tab === "import" ? (
           <ImportTab
@@ -650,7 +668,12 @@ type BulkConflictResult = {
  * referees' record of the field, and the console is where you see the
  * whole picture and strike anything raised in error.
  */
-function FlagsTab({ state, refresh, onError }: TabProps) {
+function FlagsTab({
+  state,
+  refresh,
+  onError,
+  focusTeamId,
+}: TabProps & { focusTeamId?: string | null }) {
   const [busy, setBusy] = useState(false);
 
   const teamById = useMemo(() => new Map(state.teams.map((t) => [t.id, t])), [state.teams]);
@@ -691,6 +714,18 @@ function FlagsTab({ state, refresh, onError }: TabProps) {
     return m;
   }, [state.flags]);
 
+  /* Arriving from the Conduct column on Scores: bring that team into view
+     and ring it, because on a long list "we switched tabs" is not the same
+     as "here is the team you clicked". */
+  const focusRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    focusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Deliberately no timeout clearing the ring: someone reads a team's
+    // flags for as long as the discussion takes, and a marker that fades
+    // after a couple of seconds is gone exactly when they look up again.
+    // It clears when they leave the tab or click through to another team.
+  }, [focusTeamId]);
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/10">
@@ -714,8 +749,16 @@ function FlagsTab({ state, refresh, onError }: TabProps) {
         </p>
       ) : (
         <div className="space-y-4">
-          {byTeam.map(({ team, flags }) => (
-            <div key={team?.id ?? "gone"} className="rounded-xl ring-1 ring-inset ring-white/10">
+          {byTeam.map(({ team, flags }) => {
+            const focused = Boolean(team && team.id === focusTeamId);
+            return (
+            <div
+              key={team?.id ?? "gone"}
+              ref={focused ? focusRef : undefined}
+              className={`rounded-xl ring-1 ring-inset transition ${
+                focused ? "ring-2 ring-indigo-400 bg-indigo-500/5" : "ring-white/10"
+              }`}
+            >
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-white/5 px-4 py-2.5">
                 <span className="font-bold tabular-nums">{team?.number ?? "—"}</span>
                 <span className="min-w-0 flex-1 truncate text-sm text-zinc-400">
@@ -727,7 +770,8 @@ function FlagsTab({ state, refresh, onError }: TabProps) {
                 <FlagList flags={flags} kinds={state.flagKinds} onRemove={remove} />
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

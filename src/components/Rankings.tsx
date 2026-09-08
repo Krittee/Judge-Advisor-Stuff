@@ -5,9 +5,10 @@ import { call } from "./useAppState";
 import { Banner } from "./ui";
 import { BandChip, BandLegend } from "./BandChip";
 import { CategoryChip } from "./CategoryChip";
+import { FlagSummary } from "./Flags";
 import { rubricsFor, totalFor } from "@/lib/rubrics";
 import type { Rubric } from "@/lib/rubrics";
-import type { ScoreRow, Team, TeamCategoryView } from "@/lib/types";
+import type { AppState, FlagRow, ScoreRow, Team, TeamCategoryView } from "@/lib/types";
 
 /**
  * Teams ranked by their combined rubric total.
@@ -21,11 +22,19 @@ export function Rankings({
   categories,
   panelName,
   onOpenTeam,
+  flags = [],
+  flagKinds = [],
+  onOpenFlags,
 }: {
   teams: Team[];
   categories: TeamCategoryView[];
   panelName?: Record<string, string>;
   onOpenTeam?: (team: Team) => void;
+  /** Referee flags, so conduct sits beside the scores at deliberation. */
+  flags?: FlagRow[];
+  flagKinds?: AppState["flagKinds"];
+  /** Given, the conduct cell opens that team's flags in full. */
+  onOpenFlags?: (team: Team) => void;
 }) {
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [rubricList, setRubricList] = useState<Rubric[]>([]);
@@ -48,6 +57,14 @@ export function Rankings({
   }, []);
 
   const fullMax = rubricList.reduce((sum, r) => sum + r.max, 0);
+
+  const flagsByTeam = useMemo(() => {
+    const m = new Map<string, FlagRow[]>();
+    for (const f of flags) m.set(f.team_id, [...(m.get(f.team_id) ?? []), f]);
+    return m;
+  }, [flags]);
+
+  const showConduct = flagKinds.length > 0;
 
   const rows = useMemo(() => {
     const byTeam = new Map<string, ScoreRow[]>();
@@ -110,6 +127,7 @@ export function Rankings({
               ))}
               <th className="px-3 py-3 text-right">Total</th>
               <th className="px-3 py-3">Band</th>
+              {showConduct ? <th className="px-3 py-3">Conduct</th> : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -173,6 +191,15 @@ export function Rankings({
                 <td className="px-3 py-2.5">
                   <BandChip total={row.total} max={row.max} scored={row.scored} />
                 </td>
+                {showConduct ? (
+                  <td className="px-3 py-2.5">
+                    <ConductCell
+                      flags={flagsByTeam.get(row.team.id) ?? []}
+                      kinds={flagKinds}
+                      onOpen={onOpenFlags ? () => onOpenFlags(row.team) : undefined}
+                    />
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -183,5 +210,44 @@ export function Rankings({
         <p className="py-8 text-center text-sm text-zinc-600">No teams to score yet.</p>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * What the referees saw, next to what the judges scored.
+ *
+ * Deliberation is where these two finally have to be read together: a
+ * team can score well and still have been a problem on the field, and
+ * the awards ask about both. Counts rather than wording, because the
+ * question here is "is there anything to look at" -- clicking opens what
+ * was actually written.
+ */
+function ConductCell({
+  flags,
+  kinds,
+  onOpen,
+}: {
+  flags: FlagRow[];
+  kinds: AppState["flagKinds"];
+  onOpen?: () => void;
+}) {
+  if (!flags.length) {
+    return <span className="text-xs text-zinc-600">—</span>;
+  }
+  const summary = <FlagSummary flags={flags} kinds={kinds} size="xs" />;
+  if (!onOpen) return summary;
+
+  return (
+    <button
+      onClick={(e) => {
+        // The row itself opens notes; this cell means something else.
+        e.stopPropagation();
+        onOpen();
+      }}
+      title={`See all ${flags.length} referee ${flags.length === 1 ? "flag" : "flags"}`}
+      className="rounded-lg px-1 py-0.5 ring-1 ring-inset ring-transparent transition hover:ring-indigo-400/50 focus-visible:ring-indigo-400"
+    >
+      {summary}
+    </button>
   );
 }

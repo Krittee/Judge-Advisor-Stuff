@@ -371,6 +371,13 @@ shows up in three places:
   it before the interview, not after.
 - **The Judge Advisor's floor and Referee tab** — grouped by team, worst
   first, with the running count of each kind.
+- **A Conduct column on Scores**, which is where it matters at the end:
+  deliberation is the one moment the scores and the field have to be read
+  together, and a team can score well and still have been a problem.
+  Counts only — clicking one jumps to that team in the Referee tab, scrolls
+  it into view and rings it, so you read what was actually written rather
+  than judging anyone on a tally. The ring stays until you leave the tab,
+  because a discussion takes longer than a fading highlight.
 - **The referee's own page** — what is already on a team, so a second
   referee is not writing the same thing twice.
 

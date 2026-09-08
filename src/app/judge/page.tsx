@@ -189,7 +189,17 @@ export default function JudgePage() {
         ) : null}
 
         {view === "scores" ? (
-          <Rankings teams={myTeams} categories={state.categories} onOpenTeam={setNotesFor} />
+          <Rankings
+            teams={myTeams}
+            categories={state.categories}
+            onOpenTeam={setNotesFor}
+            /* Conduct here too: a judge ranking their own panel is asking
+               the same question the Judge Advisor asks at deliberation.
+               No click-through -- the wording is already on the queue card,
+               and judges have no referee tab to send them to. */
+            flags={state.flags}
+            flagKinds={state.flagKinds}
+          />
         ) : null}
 
         {view === "queue" && !myTeams.length ? (
