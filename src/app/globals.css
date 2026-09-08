@@ -118,6 +118,17 @@ body {
   background-color: #ffffff;
 }
 
+/* Every one of those surfaces is the same white, so hovering from one to
+   another showed nothing at all in light mode -- a row that highlights in
+   the dark theme looked dead in the light one. Hover gets its own tint. */
+:root[data-theme="light"] .hover\:bg-white\/\[0\.02\]:hover,
+:root[data-theme="light"] .hover\:bg-white\/\[0\.03\]:hover,
+:root[data-theme="light"] .hover\:bg-white\/\[0\.06\]:hover,
+:root[data-theme="light"] .hover\:bg-white\/5:hover,
+:root[data-theme="light"] .hover\:bg-white\/10:hover {
+  background-color: #eef0f4;
+}
+
 :root[data-theme="light"] .bg-black\/30 {
   background-color: rgb(39 39 42 / 5%);
 }
@@ -245,6 +256,18 @@ body {
   color: #3730a3;
 }
 
+/* A row that leads somewhere lights its ring and its chevron on hover. The
+   light theme pins .ring-white/10 and .text-zinc-600 outright, which would
+   otherwise win over the hover variants and leave the light theme with a
+   weaker cue than the dark one. */
+:root[data-theme="light"] .hover\:ring-indigo-400\/50:hover {
+  --tw-ring-color: rgb(99 102 241 / 45%);
+}
+
+:root[data-theme="light"] .group:hover .group-hover\:text-indigo-300 {
+  color: #4338ca;
+}
+
 :root[data-theme="light"] .hover\:text-rose-400:hover {
   color: #9f1239;
 }
@@ -271,6 +294,27 @@ body {
     animation: none;
     transition: none;
   }
+}
+
+/* Tailwind v4 stopped resetting the cursor on buttons, so they inherit the
+   browser default arrow and nothing on screen says "this is clickable".
+   Links already show a hand; these should match. */
+button,
+select,
+summary,
+[role="button"],
+input[type="checkbox"],
+input[type="radio"],
+label:has(input[type="checkbox"]),
+label:has(input[type="radio"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+input:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
 }
 
 /* Big tap targets: this gets used on phones, in a hurry, one-handed. */

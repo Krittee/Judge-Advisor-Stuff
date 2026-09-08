@@ -148,7 +148,7 @@ export default function RefereeTeamsPage() {
                       team number is not something to ask of anyone. */}
                   <button
                     onClick={() => router.push(`/referee?team=${encodeURIComponent(t.number)}`)}
-                    className="flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-white/[0.03] px-4 py-3 text-left ring-1 ring-inset ring-white/10 transition hover:bg-white/[0.06]"
+                    className="group flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-white/[0.03] px-4 py-3 text-left ring-1 ring-inset ring-white/10 transition hover:bg-white/[0.06] hover:ring-indigo-400/50 focus-visible:ring-2 focus-visible:ring-indigo-400"
                   >
                     <span className="text-lg font-bold tabular-nums">{t.number}</span>
                     <span className="min-w-0 flex-1 truncate text-sm text-zinc-400">
@@ -157,6 +157,14 @@ export default function RefereeTeamsPage() {
                     {flags.length ? (
                       <FlagSummary flags={flags} kinds={state.flagKinds} size="xs" />
                     ) : null}
+                    {/* Says the row goes somewhere, before anyone has to
+                        hover to find out. */}
+                    <span
+                      aria-hidden
+                      className="text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-indigo-300"
+                    >
+                      ›
+                    </span>
                     <span className="w-full text-xs text-zinc-600">
                       {t.division}
                       {t.pit ? ` · pit ${t.pit}` : ""}
