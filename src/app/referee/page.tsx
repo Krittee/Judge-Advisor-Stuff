@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { call, useAppState } from "@/components/useAppState";
 import { Banner, Button, inputClass, TopBar } from "@/components/ui";
 import { SignOutButton } from "@/components/judging";
+import { RefereeNav } from "@/components/RefereeNav";
 import { FlagList, FlagSummary, FLAG_SOLID } from "@/components/Flags";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
 import type { Session } from "@/lib/auth";
@@ -20,7 +21,16 @@ import type { Session } from "@/lib/auth";
  * is not inside anybody's division wall.
  */
 export default function RefereePage() {
+  return (
+    <Suspense fallback={<p className="p-10 text-center text-zinc-500">Loading…</p>}>
+      <Referee />
+    </Suspense>
+  );
+}
+
+function Referee() {
   const router = useRouter();
+  const params = useSearchParams();
   const { state, online, refresh } = useAppState(5000);
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
@@ -29,6 +39,14 @@ export default function RefereePage() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /* Arriving from the all-teams list, which passes the team it picked.
+     Only seeds the box: typing over it afterwards is the point of the
+     page, so this does not fight what the referee does next. */
+  const picked = params.get("team");
+  useEffect(() => {
+    if (picked) setNumber(normalizeTeamNumber(picked));
+  }, [picked]);
 
   useEffect(() => {
     call<{ session: Session | null }>("/api/session", { method: "GET" })
@@ -102,6 +120,8 @@ export default function RefereePage() {
       />
 
       <main className="mx-auto max-w-lg space-y-5 px-5 py-6">
+        <RefereeNav active="lookup" />
+
         {error ? <Banner kind="error">{error}</Banner> : null}
         {saved ? <Banner kind="success">{saved}</Banner> : null}
 

@@ -337,9 +337,16 @@ months later when someone asks why a panel never saw a particular team.
 Referees work the field, not the judging room, and what they see there is
 often the thing a judge most needs to know. `/referee` is their page:
 
-1. Type a team number.
+1. Find the team — **type the number** if you can read it off the robot,
+   or **All teams** to scroll and pick one.
 2. Say what happened.
 3. Tap how serious it was.
+
+The **All teams** page searches by number, name *or* pit (`9882`, `nova`
+and `A1` all find a team), filters by division, and narrows to teams that
+have already been flagged. Picking one hands it to the flagging page
+rather than repeating the form there, so a flag is still only ever
+written in one place.
 
 Four kinds, each its own colour, ordered least to most serious so the
 sharpest button is not the one under your thumb:
