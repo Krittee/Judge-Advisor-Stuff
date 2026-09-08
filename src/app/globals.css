@@ -4,20 +4,249 @@
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-:root {
+:root,
+:root[data-theme="dark"] {
   color-scheme: dark;
+  --app-background: #0a0a0f;
+  --app-foreground: #e8e8ee;
+  --app-header: rgb(10 10 15 / 90%);
+  --app-raised: #14141c;
+  --app-line: rgb(255 255 255 / 12%);
+  --app-shadow: rgb(0 0 0 / 35%);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --app-background: #f4f5f9;
+  --app-foreground: #18181b;
+  --app-header: rgb(244 245 249 / 92%);
+  --app-raised: #ffffff;
+  --app-line: rgb(39 39 42 / 14%);
+  --app-shadow: rgb(39 39 42 / 16%);
 }
 
 html,
 body {
-  background: #0a0a0f;
-  color: #e8e8ee;
+  background: var(--app-background);
+  color: var(--app-foreground);
   -webkit-tap-highlight-color: transparent;
 }
 
 body {
   font-family: var(--font-sans);
   overscroll-behavior-y: none;
+}
+
+.app-header {
+  background: var(--app-header);
+}
+
+.dialog-surface {
+  background: var(--app-raised);
+}
+
+.theme-toggle {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 60;
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  border: 1px solid var(--app-line);
+  border-radius: 9999px;
+  background: var(--app-raised);
+  color: var(--app-foreground);
+  box-shadow: 0 8px 24px var(--app-shadow);
+  transition: transform 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.theme-toggle:hover {
+  transform: translateY(-1px);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 3px;
+}
+
+.theme-toggle svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+/*
+ * The interface predates theme tokens and deliberately uses a small set of
+ * neutral Tailwind utilities everywhere. These light-theme mappings preserve
+ * that hierarchy while leaving the meaningful queue/status colours alone.
+ */
+:root[data-theme="light"] .text-zinc-100,
+:root[data-theme="light"] .text-zinc-200 {
+  color: #18181b;
+}
+
+:root[data-theme="light"] .text-zinc-300 {
+  color: #3f3f46;
+}
+
+:root[data-theme="light"] .text-zinc-400 {
+  color: #52525b;
+}
+
+:root[data-theme="light"] .text-zinc-500,
+:root[data-theme="light"] .text-zinc-600 {
+  color: #71717a;
+}
+
+:root[data-theme="light"] .text-zinc-700 {
+  color: #a1a1aa;
+}
+
+:root[data-theme="light"] .bg-white\/\[0\.02\],
+:root[data-theme="light"] .bg-white\/\[0\.03\],
+:root[data-theme="light"] .bg-white\/\[0\.04\],
+:root[data-theme="light"] .bg-white\/\[0\.05\],
+:root[data-theme="light"] .bg-white\/5,
+:root[data-theme="light"] .bg-white\/10,
+:root[data-theme="light"] .bg-white\/20 {
+  background-color: #ffffff;
+}
+
+:root[data-theme="light"] .bg-black\/30 {
+  background-color: rgb(39 39 42 / 5%);
+}
+
+:root[data-theme="light"] .border-white\/5,
+:root[data-theme="light"] .border-white\/10,
+:root[data-theme="light"] .border-white\/\[0\.07\] {
+  border-color: rgb(39 39 42 / 12%);
+}
+
+:root[data-theme="light"] .ring-white\/10,
+:root[data-theme="light"] .ring-white\/\[0\.06\],
+:root[data-theme="light"] .ring-white\/\[0\.07\] {
+  --tw-ring-color: rgb(39 39 42 / 13%);
+}
+
+:root[data-theme="light"] .divide-white\/5 > :not(:last-child) {
+  border-color: rgb(39 39 42 / 10%);
+}
+
+:root[data-theme="light"] .bg-zinc-900 {
+  background-color: #ffffff;
+}
+
+:root[data-theme="light"] .placeholder\:text-zinc-600::placeholder {
+  color: #71717a;
+}
+
+:root[data-theme="light"] .hover\:text-zinc-200:hover,
+:root[data-theme="light"] .hover\:text-zinc-300:hover {
+  color: #18181b;
+}
+
+:root[data-theme="light"] .hover\:bg-white\/5:hover,
+:root[data-theme="light"] .hover\:bg-white\/10:hover,
+:root[data-theme="light"] .hover\:bg-white\/\[0\.02\]:hover,
+:root[data-theme="light"] .hover\:bg-white\/\[0\.03\]:hover,
+:root[data-theme="light"] .focus\:bg-white\/5:focus {
+  background-color: #e9eaf0;
+}
+
+:root[data-theme="light"] .hover\:ring-white\/10:hover {
+  --tw-ring-color: rgb(39 39 42 / 16%);
+}
+
+/* Light equivalents for neutral scheduled/cancelled status tiles. */
+:root[data-theme="light"] .bg-slate-500\/15,
+:root[data-theme="light"] .bg-slate-800\/70 {
+  background-color: #e2e8f0;
+}
+
+:root[data-theme="light"] .text-slate-200 {
+  color: #334155;
+}
+
+:root[data-theme="light"] .ring-slate-400\/40,
+:root[data-theme="light"] .ring-slate-600 {
+  --tw-ring-color: #94a3b8;
+}
+
+:root[data-theme="light"] .bg-zinc-600\/40,
+:root[data-theme="light"] .bg-zinc-800\/60 {
+  background-color: #e4e4e7;
+}
+
+:root[data-theme="light"] .ring-zinc-500,
+:root[data-theme="light"] .ring-zinc-700 {
+  --tw-ring-color: #a1a1aa;
+}
+
+/* Pastel badges need darker ink against the light canvas. */
+:root[data-theme="light"] .text-amber-200,
+:root[data-theme="light"] .text-amber-200\/80,
+:root[data-theme="light"] .text-amber-300,
+:root[data-theme="light"] .text-amber-400,
+:root[data-theme="light"] .text-amber-400\/80,
+:root[data-theme="light"] .text-orange-200,
+:root[data-theme="light"] .text-orange-400 {
+  color: #92400e;
+}
+
+/* Orange gets its own ink rather than sharing amber's. A referee flag uses
+   amber for "warning" and orange for "minor violation", and two severities
+   that render identically would undo the point of colouring them. */
+:root[data-theme="light"] .text-orange-300 {
+  color: #9a3412;
+}
+
+:root[data-theme="light"] .text-emerald-200,
+:root[data-theme="light"] .text-emerald-300,
+:root[data-theme="light"] .text-emerald-300\/90,
+:root[data-theme="light"] .text-emerald-400 {
+  color: #047857;
+}
+
+:root[data-theme="light"] .text-sky-200,
+:root[data-theme="light"] .text-sky-300 {
+  color: #0369a1;
+}
+
+:root[data-theme="light"] .text-violet-300,
+:root[data-theme="light"] .text-violet-400,
+:root[data-theme="light"] .text-fuchsia-300 {
+  color: #6d28d9;
+}
+
+:root[data-theme="light"] .text-rose-100,
+:root[data-theme="light"] .text-rose-200,
+:root[data-theme="light"] .text-rose-300,
+:root[data-theme="light"] .text-rose-300\/80,
+:root[data-theme="light"] .text-rose-400 {
+  color: #be123c;
+}
+
+:root[data-theme="light"] .text-indigo-300,
+:root[data-theme="light"] .text-indigo-400 {
+  color: #4338ca;
+}
+
+:root[data-theme="light"] .text-teal-300 {
+  color: #0f766e;
+}
+
+:root[data-theme="light"] .hover\:text-indigo-300:hover {
+  color: #3730a3;
+}
+
+:root[data-theme="light"] .hover\:text-rose-400:hover {
+  color: #9f1239;
 }
 
 /* The one animation in the app. If a team is orange, it should be the
@@ -37,8 +266,10 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulse-waiting {
+  .pulse-waiting,
+  .theme-toggle {
     animation: none;
+    transition: none;
   }
 }
 
@@ -92,6 +323,6 @@ textarea {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #33333f;
+  background: color-mix(in srgb, var(--app-foreground) 22%, transparent);
   border-radius: 6px;
 }

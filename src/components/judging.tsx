@@ -124,7 +124,7 @@ export function NotesDrawer({
       onClick={onClose}
     >
       <div
-        className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-[#14141c] p-5 ring-1 ring-white/10 sm:rounded-2xl"
+        className="dialog-surface max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-t-2xl p-5 ring-1 ring-white/10 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">

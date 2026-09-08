@@ -68,16 +68,28 @@ database setting the app needs, and you never have to look at it.
 > open your project → **Storage** tab → **Create Database** → Neon. Then
 > **Deployments** → the ⋯ menu on the newest one → **Redeploy**.
 
+**Using Supabase instead of Neon?** Skip the Storage step. In the Supabase
+dashboard open **Connect → Transaction pooler** (port 6543), copy the
+`postgresql://…pooler.supabase.com:6543/postgres` string, fill in your
+database password, and add it as `DATABASE_URL` in **Environment Variables**
+(Step 4). The app creates its own tables on first connect; running
+`supabase/schema.sql` in the SQL editor first is optional.
+
 ---
 
-## Step 4 — Set your three codes
+## Step 4 — Set your access codes
 
-On the same page, open **Environment Variables**. Add these three, clicking
-**Add** after each:
+On the same page, open **Environment Variables**. Add `ADMIN_CODE`,
+`QUEUER_CODE`, and `SESSION_SECRET`, clicking **Add** after each. To give more
+Judge Advisors their own access, add up to three optional administrator codes
+as well:
 
 | Name | Value |
 |---|---|
-| `ADMIN_CODE` | A code only you know. This is full control. |
+| `ADMIN_CODE` | The first Judge Advisor's code. This is full control. |
+| `ADMIN_CODE_2` | Optional second Judge Advisor code. |
+| `ADMIN_CODE_3` | Optional third Judge Advisor code. |
+| `ADMIN_CODE_4` | Optional fourth Judge Advisor code. |
 | `QUEUER_CODE` | A code for whoever works the queue desk. |
 | `REFEREE_CODE` | A code for the referees, who flag what they see on the field. |
 | `SESSION_SECRET` | A long random string — see below. |
@@ -86,8 +98,9 @@ On the same page, open **Environment Variables**. Add these three, clicking
 not need to be memorable and you will never type it again. Something like
 `k3j4h5g6f7d8s9a0q1w2e3r4t5y6u7i8o9p0zxcvb` is fine.
 
-Do **not** use `JA2026` or `DESK01` — those are printed in this guide, so
-everyone can read them. The app refuses to accept them once deployed anyway.
+Give each Judge Advisor a different code, and do **not** use `JA2026` or
+`DESK01` — those are printed in this guide, so everyone can read them. The app
+refuses to accept them once deployed anyway.
 
 ---
 
@@ -108,7 +121,7 @@ from any phone, on any network, anywhere in the world.
 This is worth thirty seconds now rather than a surprise on the day.
 
 1. Go to `your-address.vercel.app/login`
-2. Sign in with the `ADMIN_CODE` you chose in Step 4
+2. Sign in with any Judge Advisor code you configured in Step 4
 3. Open the **Teams** tab and scroll to the bottom
 
 You should see:
@@ -179,7 +192,8 @@ Environment variables only apply to deployments made *after* they were saved.
 Redeploy: **Deployments** → ⋯ → **Redeploy**.
 
 **"That code was not recognised" for everyone**
-`ADMIN_CODE` was probably never set, or has a stray space. Check
+Their `ADMIN_CODE`, `ADMIN_CODE_2`, `ADMIN_CODE_3`, or `ADMIN_CODE_4` was
+probably never set, or has a stray space. Check
 **Settings → Environment Variables**, fix it, redeploy.
 
 **The build failed**

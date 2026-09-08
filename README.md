@@ -43,7 +43,8 @@ cp .env.example .env.local     # then edit the codes
 
 | Variable | Dev default | What it is |
 |---|---|---|
-| `ADMIN_CODE` | `JA2026` | Judge Advisor. Full control. Keep it to yourself. |
+| `ADMIN_CODE` | `JA2026` | First Judge Advisor. Full control. |
+| `ADMIN_CODE_2`–`ADMIN_CODE_4` | unset | Optional codes for up to three more Judge Advisors. |
 | `QUEUER_CODE` | `DESK01` | Queue desk. Can only add teams to the queue. |
 | `REFEREE_CODE` | `REF001` | Referees. Can only flag what they saw on the field. |
 | `SESSION_SECRET` | insecure key | Signs the login cookie. `openssl rand -base64 32` |
@@ -88,7 +89,8 @@ app knows which is in use.
 
 ## Before the event
 
-1. Sign in at `/login` with your `ADMIN_CODE`.
+1. Sign in at `/login` with any configured Judge Advisor code (`ADMIN_CODE` through
+   `ADMIN_CODE_4`).
 2. **Teams tab → Reset → Wipe everything.** This clears the demo roster. Do
    this first, or you will be judging the Quantum Quokkas.
 3. **Panels tab** — add each judge group: name, room, judge names. Write down
@@ -132,7 +134,7 @@ same refusal.
 | **Queue desk** (`QUEUER_CODE`) | any team | — | un-seen only | — | — |
 | **Judge** (panel code) | own panel | **own panel** | own panel | **own panel** | — |
 | **Referee** (`REFEREE_CODE`) | — | — | — | — | — |
-| **Judge Advisor** (`ADMIN_CODE`) | any | any | any | any | ✅ |
+| **Judge Advisor** (`ADMIN_CODE`–`ADMIN_CODE_4`) | any | any | any | any | ✅ |
 
 A referee sits outside that table: they touch no interview and read no
 judging note. Their one job is the **Referee** section below.

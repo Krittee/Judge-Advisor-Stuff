@@ -113,7 +113,8 @@ const warnedAboutCode = new Set<string>();
  */
 const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "REF001", "ALPHA1", "BRAVO2", "CHARLIE3"]);
 
-function roleCode(envVar: string, devDefault: string): string {
+/** Read and validate a code that may be left unset. */
+function configuredRoleCode(envVar: string): string {
   const configured = (process.env[envVar] ?? "").trim().toUpperCase();
 
   if (configured && process.env.NODE_ENV === "production" && PUBLISHED_CODES.has(configured)) {
@@ -127,6 +128,13 @@ function roleCode(envVar: string, devDefault: string): string {
     return "";
   }
 
+  if (configured) return configured;
+
+  return "";
+}
+
+function roleCode(envVar: string, devDefault: string): string {
+  const configured = configuredRoleCode(envVar);
   if (configured) return configured;
 
   if (process.env.NODE_ENV === "production") {
@@ -147,22 +155,40 @@ function roleCode(envVar: string, devDefault: string): string {
 }
 
 /**
+ * Up to four people can have their own Judge Advisor code.
+ *
+ * ADMIN_CODE remains the required primary account for compatibility with
+ * existing deployments. The other three slots are optional and deliberately
+ * explicit: accepting an arbitrary list would make the four-person limit easy
+ * to bypass accidentally in deployment settings.
+ */
+function adminCodeSlots(): { code: string; defaultName: string }[] {
+  return [
+    { code: roleCode("ADMIN_CODE", "JA2026"), defaultName: "Judge Advisor" },
+    { code: configuredRoleCode("ADMIN_CODE_2"), defaultName: "Judge Advisor 2" },
+    { code: configuredRoleCode("ADMIN_CODE_3"), defaultName: "Judge Advisor 3" },
+    { code: configuredRoleCode("ADMIN_CODE_4"), defaultName: "Judge Advisor 4" },
+  ].filter((slot) => Boolean(slot.code));
+}
+
+/**
  * Turn a typed-in code into a session.
  *
- * Admin and queuer codes come from env vars. Judge codes live on the
+ * Admin and queuer codes come from env vars. Up to four separate admin
+ * codes are accepted. Judge codes live on the
  * panels table so you can add a panel on event day without redeploying.
  */
 export async function resolveCode(rawCode: string, name: string): Promise<Session | null> {
   const code = rawCode.trim().toUpperCase();
   if (!code) return null;
 
-  const adminCode = roleCode("ADMIN_CODE", "JA2026");
+  const adminSlot = adminCodeSlots().find((slot) => sameCode(code, slot.code));
   const queuerCode = roleCode("QUEUER_CODE", "DESK01");
   const refereeCode = roleCode("REFEREE_CODE", "REF001");
   const cleanName = name.trim().slice(0, 60);
 
-  if (adminCode && sameCode(code, adminCode)) {
-    return { role: "admin", name: cleanName || "Judge Advisor" };
+  if (adminSlot) {
+    return { role: "admin", name: cleanName || adminSlot.defaultName };
   }
   if (queuerCode && sameCode(code, queuerCode)) {
     return { role: "queuer", name: cleanName || "Queue" };

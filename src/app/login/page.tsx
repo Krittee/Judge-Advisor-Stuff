@@ -47,7 +47,7 @@ export default function LoginPage() {
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-5 py-12">
       <h1 className="text-3xl font-bold tracking-tight">Staff sign in</h1>
       <p className="mt-2 mb-8 text-sm text-zinc-400">
-        For judges, queue staff and the Judge Advisor. Teams do not need to sign in.
+        For judges, queue staff and Judge Advisors. Teams do not need to sign in.
       </p>
 
       <form onSubmit={submit} className="space-y-5">
