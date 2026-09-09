@@ -141,10 +141,10 @@ test("the state payload gates flags on read access", () => {
   );
 });
 
-test("the observation text is optional -- a referee may rely on the rule/kind/match reference alone", () => {
-  const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
-  const fn = src.slice(src.indexOf("function parseFlagFields"), src.indexOf("// Match and field are what"));
-  assert.ok(!/if \(!text\)/.test(fn), "empty observation text is no longer accepted");
+test("the observation text remains required and capped for judge-readable context", () => {
+  const src = readFileSync(new URL("../src/lib/flagValidation.ts", import.meta.url), "utf8");
+  const fn = src.slice(src.indexOf("export function parseFlagFields"));
+  assert.ok(/if \(!text\)/.test(fn), "empty observation text is no longer rejected");
   assert.ok(fn.includes('.slice(0, 500)'), "the 500-character cap on the observation text is gone");
 });
 
@@ -193,15 +193,12 @@ test("unlike a flag kind, an unrecognised match type has no safe fallback", () =
 });
 
 test("the API route requires match type, match number and field, and rejects rather than guesses", () => {
-  const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../src/lib/flagValidation.ts", import.meta.url), "utf8");
   assert.ok(src.includes("isValidMatchType(matchType)"), "match type is no longer validated");
   assert.ok(src.includes("isValidMatchNumber(matchNumber)"), "match number is no longer validated");
   assert.ok(src.includes("isValidField(field)"), "field is no longer validated");
-  // Each of the three failure branches must return before createFlag runs.
-  const createIdx = src.indexOf("store().createFlag");
-  for (const check of ["isValidMatchType(matchType)", "isValidMatchNumber(matchNumber)", "isValidField(field)"]) {
-    assert.ok(src.indexOf(check) < createIdx, `${check} does not run before the flag is created`);
-  }
+  const route = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
+  assert.ok(route.indexOf("parseFlagFields(body") < route.indexOf("store().createFlag"));
 });
 
 test("the activity log entry carries the match reference, so Activity can trace it too", () => {
@@ -250,7 +247,7 @@ test("PATCH validates with the same rules as POST, not a looser copy", () => {
   const postFn = src.slice(src.indexOf("export async function POST"), src.indexOf("export async function PATCH"));
   const patchFn = src.slice(src.indexOf("export async function PATCH"), src.indexOf("export async function DELETE"));
   assert.ok(postFn.includes("parseFlagFields(body"), "POST no longer shares the validator");
-  assert.ok(patchFn.includes("parseFlagFields(body)"), "PATCH no longer shares the validator");
+  assert.ok(patchFn.includes("parseFlagFields(body"), "PATCH no longer shares the validator");
 });
 
 test("PATCH does not accept a new team or author -- only removal replaces a flag's identity", () => {

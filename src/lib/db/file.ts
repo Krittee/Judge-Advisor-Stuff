@@ -798,7 +798,7 @@ function logActivity(entry: NewActivity): void {
  * Whole-store operations
  * ------------------------------------------------------------------ */
 
-/** Clears requests, notes and the log. Teams and panels survive. */
+/** Clears day-of workflow data. Teams, panels and event-wide referee flags survive. */
 function resetDay(): void {
   state().requests = [];
   state().notes = [];
@@ -807,7 +807,7 @@ function resetDay(): void {
   save();
 }
 
-/** Wipes everything, including the roster and panels. */
+/** Wipes the active event, including its roster, panels and referee flags. */
 function resetAll(): void {
   loaded = empty();
   save();

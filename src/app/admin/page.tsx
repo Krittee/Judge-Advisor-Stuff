@@ -1254,7 +1254,7 @@ function DangerZone({
           onClick={() =>
             reset(
               "resetDay",
-              "Clear all requests, notes and activity?\n\nTeams and panels are kept.",
+              "Clear today's requests, notes, scores and activity?\n\nTeams, panels and event-wide referee history are kept.",
             )
           }
         >
@@ -1267,14 +1267,14 @@ function DangerZone({
           onClick={() =>
             reset(
               "resetAll",
-              "Delete EVERYTHING — teams, panels, requests and notes?\n\nThis cannot be undone.",
+              "Delete the ENTIRE EVENT — teams, panels, requests, notes, scores and referee history?\n\nUse this before importing a new event. This cannot be undone.",
             )
           }
         >
           Wipe everything
         </Button>
         <span className="text-xs text-zinc-600">
-          Use &ldquo;wipe everything&rdquo; once to clear the demo teams.
+          Use &ldquo;wipe everything&rdquo; before every new event (and once to clear the demo teams).
         </span>
       </div>
     </details>

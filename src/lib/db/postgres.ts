@@ -850,10 +850,14 @@ export const postgresStore: Store = {
   },
 
   async resetDay() {
+    // Referee flags intentionally survive a day reset: repeat history is
+    // event-wide, including at multi-day events.
     await query("truncate activity, notes, scores, requests");
   },
 
   async resetAll() {
+    // Teams cascade to referee flags. This is the application's event
+    // boundary and must be used before importing the next event's roster.
     await query("truncate activity, notes, scores, conflicts, requests, teams, panels cascade");
   },
 };

@@ -308,7 +308,9 @@ function FlagListItem({
             {kinds.map((k) => (
               <button
                 key={k.id}
-                disabled={busy}
+                disabled={
+                  busy || !draftBody.trim() || (k.requiresRule && !f.rule && k.id !== f.kind)
+                }
                 onClick={() => save(k.id)}
                 className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
                   k.id === f.kind ? "ring-2 ring-white/60" : ""

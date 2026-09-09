@@ -27,9 +27,7 @@ export type Rule = {
   searchKeywords: string[];
 };
 
-/** Category order, exactly as the Quick Reference groups them. Tournament
- *  Special is this event's own addition, appended after the official
- *  Quick Reference categories rather than interleaved with them. */
+/** Category order, exactly as the Quick Reference groups them. */
 export const RULE_CATEGORIES = [
   "Scoring Rules",
   "Specific Game Rules",
@@ -39,7 +37,6 @@ export const RULE_CATEGORIES = [
   "Robot Skills Challenge Rules",
   "Robot Rules",
   "Tournament Rules",
-  "Tournament Special",
 ] as const;
 
 /**
