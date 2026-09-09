@@ -24,7 +24,7 @@ import { FlagList, FlagSummary } from "@/components/Flags";
 import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
 import type { FlagEdit } from "@/lib/db/types";
-import type { ActivityRow, Panel, RequestRow, Team, TeamCategoryView } from "@/lib/types";
+import type { ActivityRow, Panel, RequestRow, Team } from "@/lib/types";
 
 type Tab = "floor" | "scores" | "teams" | "panels" | "conflicts" | "flags" | "import" | "log";
 
@@ -145,12 +145,7 @@ export default function AdminPage() {
           />
         ) : null}
         {tab === "import" ? (
-          <ImportTab
-            refresh={refresh}
-            onError={setError}
-            divisions={state.divisions}
-            categories={state.categories}
-          />
+          <ImportTab refresh={refresh} onError={setError} divisions={state.divisions} />
         ) : null}
         {tab === "log" ? <ActivityTab /> : null}
       </main>
@@ -1718,17 +1713,14 @@ function ImportTab({
   refresh,
   onError,
   divisions,
-  categories,
 }: {
   refresh: () => Promise<void>;
   onError: (m: string | null) => void;
   divisions: string[];
-  categories: TeamCategoryView[];
 }) {
   const [text, setText] = useState("");
   const [autoAssign, setAutoAssign] = useState(true);
   const [perPanel, setPerPanel] = useState(10);
-  const [category, setCategory] = useState(categories[0]?.id ?? "");
   const [loaded, setLoaded] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -1760,7 +1752,7 @@ function ImportTab({
     try {
       const res = await call<{ imported: number; skipped: number; assigned: number }>(
         "/api/admin/teams",
-        { body: { text, autoAssign, perPanel, category } },
+        { body: { text, autoAssign, perPanel } },
       );
       setResult(
         `Imported ${res.imported} team${res.imported === 1 ? "" : "s"}` +
@@ -1790,10 +1782,11 @@ function ImportTab({
           <code className="text-zinc-300">A1</code>, which is what puts the team on the
           board&apos;s pit floor plan. Team numbers may include letters —{" "}
           <code className="text-zinc-300">9882K</code>{" "}
-          works as well as <code className="text-zinc-300">1234</code>. A fifth column names the
-          notebook type, falling back to the one chosen below. Paste straight from a spreadsheet —
-          tabs work too, and a header row is skipped automatically. Re-importing updates existing
-          teams instead of duplicating them.
+          works as well as <code className="text-zinc-300">1234</code>. Notebook type isn&apos;t
+          set here — every imported team starts as the event&apos;s default classification, and
+          the Judge Advisor sorts Developing from Fully Developed during review. Paste straight
+          from a spreadsheet — tabs work too, and a header row is skipped automatically.
+          Re-importing updates existing teams instead of duplicating them.
         </p>
       </div>
 
@@ -1853,20 +1846,6 @@ function ImportTab({
       {loaded ? <Banner kind="info">{loaded}</Banner> : null}
 
       <div className="flex flex-wrap items-center gap-4">
-        <label className="text-sm text-zinc-300">
-          <span className="mb-1 block text-xs text-zinc-400">Notebook type</span>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className={`${inputClass} py-2`}
-          >
-            {categories.map((c) => (
-              <option key={c.id} value={c.id} className="bg-zinc-900">
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </label>
         <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
           <input
             type="checkbox"
