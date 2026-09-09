@@ -283,10 +283,16 @@ export function mayActOnPanel(s: Session | null, panelId: string | null): boolea
  * The queuer is allowed to undo their own mis-entry, but only while the
  * request is still untouched. Once judges have acknowledged it, it is out
  * of their hands. Drop the "queuer" branch to make the role create-only.
+ *
+ * A team with no session at all is the same case: creating a request
+ * needs no login (see POST /api/requests), so cancelling the one they
+ * just created — the "Cancel this request" / "Cancel this booking"
+ * button on their own team page — cannot need one either, or that button
+ * is dead on arrival for every team, every time.
  */
 export function canCancel(s: Session | null, status: string): boolean {
   if (s?.role === "admin" || s?.role === "judge") return true;
-  if (s?.role === "queuer") return status === "requested" || status === "scheduled";
+  if (s?.role === "queuer" || !s) return status === "requested" || status === "scheduled";
   return false;
 }
 

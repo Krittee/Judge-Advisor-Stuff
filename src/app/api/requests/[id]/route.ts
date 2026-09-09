@@ -53,7 +53,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ error: CONFLICT_MESSAGE }, { status: 403 });
   }
 
-  if (session?.role !== "queuer" && !mayActOnPanel(session, current.panel_id)) {
+  // The queuer works across every panel, so this wall does not apply to
+  // them -- and neither does it apply to a team with no session at all:
+  // by the time execution reaches here the only action such a caller can
+  // have gotten past the permission gate above with is "cancel" (see
+  // canCancel), on the one request their own page is showing them. A
+  // "panel" is not a concept a team is scoped to in the first place.
+  if (session && session.role !== "queuer" && !mayActOnPanel(session, current.panel_id)) {
     return NextResponse.json(
       { error: "That request belongs to another judge panel." },
       { status: 403 },

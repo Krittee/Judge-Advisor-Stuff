@@ -24,7 +24,7 @@ function mayActOnPanel(s, panelId) {
 
 function canCancel(s, status) {
   if (s?.role === "admin" || s?.role === "judge") return true;
-  if (s?.role === "queuer") return status === "requested" || status === "scheduled";
+  if (s?.role === "queuer" || !s) return status === "requested" || status === "scheduled";
   return false;
 }
 
@@ -67,6 +67,40 @@ test("the queue desk can undo its own entry only before judges see it", () => {
   for (const s of ["acknowledged", "interviewing", "completed"]) {
     assert.ok(!canCancel(QUEUER, s), `queuer must not cancel a ${s} interview`);
   }
+});
+
+/* Regression: the public team page has always shown a "Cancel this
+   request" / "Cancel this booking" button to every visitor with no
+   login, but canCancel(null, ...) used to return false unconditionally
+   -- the button 403'd every single time, for every team, since the
+   app's first commit. Creating a request needs no login (POST
+   /api/requests is open to everyone), so cancelling the one a team just
+   created cannot need one either. */
+test("a team with no login can cancel their own request while it is still early, same as the queue desk", () => {
+  assert.ok(canCancel(TEAM, "requested"), "a team must be able to cancel their own live request");
+  assert.ok(canCancel(TEAM, "scheduled"), "a team must be able to give up their own booking");
+  for (const s of ["acknowledged", "interviewing", "completed"]) {
+    assert.ok(!canCancel(TEAM, s), `a team must not cancel a ${s} interview out from under a judge`);
+  }
+});
+
+test("the real canCancel in src/lib/auth.ts carries the same team exemption as the mirror above", () => {
+  const src = readFileSync(new URL("../src/lib/auth.ts", import.meta.url), "utf8");
+  const fn = src.slice(src.indexOf("export function canCancel"), src.indexOf("\n}", src.indexOf("export function canCancel")));
+  assert.ok(
+    /s\?\.role === "queuer" \|\| !s/.test(fn),
+    "canCancel no longer treats a team with no session the same as the queue desk",
+  );
+});
+
+test("the route's panel-scope wall exempts a team with no login, the same way it exempts the queue desk", () => {
+  const src = readFileSync(new URL("../src/app/api/requests/[id]/route.ts", import.meta.url), "utf8");
+  assert.ok(
+    /if \(session && session\.role !== "queuer" && !mayActOnPanel\(/.test(src),
+    "the panel-scope check no longer exempts an anonymous (team) caller -- " +
+      "without this, canCancel's null-session branch above can never actually be reached, " +
+      "and the team page's cancel button is dead again",
+  );
 });
 
 /* ---- the division wall ------------------------------------------- */
