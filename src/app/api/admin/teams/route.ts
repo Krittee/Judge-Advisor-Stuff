@@ -90,11 +90,40 @@ export async function PATCH(request: Request) {
     const teamId = String(body.teamId ?? "");
     if (!teamId) return NextResponse.json({ error: "teamId required." }, { status: 400 });
 
-    // Assigning a team to a panel that must stay away from it would undo
-    // the conflict silently.
+    // Manual assignment must obey the same rules auto-assign already
+    // enforces: the panel has to actually exist, and — unless this same
+    // request is also moving the team to a new division, which always
+    // clears panel_id below regardless — it has to judge the team's own
+    // division. Assigning a team to a panel that must stay away from it
+    // would undo a declared conflict silently.
     if (body.panelId) {
-      const conflicts = await store().listConflicts();
-      if (conflicts.some((c) => c.panel_id === String(body.panelId) && c.team_id === teamId)) {
+      const panelId = String(body.panelId);
+      const [panels, teams, conflicts] = await Promise.all([
+        store().listPanels(),
+        store().listTeams(),
+        store().listConflicts(),
+      ]);
+
+      const panel = panels.find((p) => p.id === panelId);
+      if (!panel) {
+        return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
+      }
+
+      if (!("division" in body)) {
+        const team = teams.find((t) => t.id === teamId);
+        if (team && panel.division !== team.division) {
+          return NextResponse.json(
+            {
+              error:
+                `${panel.name} judges ${panel.division}, but team ${team.number} is in ` +
+                `${team.division}. Move the team's division first if that is what you meant.`,
+            },
+            { status: 409 },
+          );
+        }
+      }
+
+      if (conflicts.some((c) => c.panel_id === panelId && c.team_id === teamId)) {
         return NextResponse.json(
           { error: "That panel has a declared conflict of interest with this team." },
           { status: 409 },

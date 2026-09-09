@@ -23,7 +23,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
   // ---- permission gate -------------------------------------------------
   if (action === "cancel") {
-    if (!canCancel(session, current.status)) {
+    if (!canCancel(session, current.status, current.created_by)) {
       return NextResponse.json(
         { error: "You do not have permission to cancel this request." },
         { status: 403 },
@@ -106,6 +106,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       );
     }
 
+    // The team's own panel_id is what every other view -- the judge
+    // console's team list, /api/state's division scoping, auto-assign's
+    // load counts -- actually reads to decide who owns this team.
+    // Moving only the request would leave the two disagreeing: the
+    // request says one panel, the team still says another, and the
+    // judge this was reassigned to may not even see it. Reassigning a
+    // request IS reassigning the team; keep them as one operation.
+    if (team) await db.updateTeam(team.id, { panel_id: panelId });
+
     patch.panel_id = panelId;
     logLine = `reassigned to ${target.name}`;
   } else if (action === "cancel") {
@@ -129,6 +138,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!target || !STATUS_META[target]) {
       return NextResponse.json(
         { error: `Nothing to do — this request is already ${current.status}.` },
+        { status: 400 },
+      );
+    }
+
+    // set-status can otherwise name any enumerated value directly,
+    // skipping stages or moving backward with no state machine behind
+    // it at all. The Judge Advisor keeps that as a manual override for
+    // correcting a mistake on the floor, the same final authority they
+    // already have everywhere else in this app -- but a judge using
+    // set-status is held to the exact transition `advance` would have
+    // produced, so the two actions can never quietly diverge on what
+    // counts as a legal next step.
+    if (action === "set-status" && session?.role !== "admin" && target !== NEXT_STATUS[current.status as Status]) {
+      return NextResponse.json(
+        { error: `${current.status} cannot move directly to ${target}.` },
         { status: 400 },
       );
     }

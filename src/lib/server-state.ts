@@ -40,23 +40,38 @@ export async function loadState(session: Session | null): Promise<AppState> {
   ]);
 
   const isJudge = session?.role === "judge";
-  const division = isJudge
-    ? (panels.find((p) => p.id === session.panelId)?.division ?? null)
-    : null;
+  const judgePanel = isJudge ? panels.find((p) => p.id === session.panelId) : undefined;
+
+  // A judge's session names one specific panel. If that panel cannot be
+  // resolved -- deleted mid-event, or a token that simply outlived a
+  // panel code that got rotated -- there is no division to scope by.
+  // Falling through to the same `division === null` a non-judge caller
+  // gets would silently hand a stale judge session global visibility for
+  // up to its 16-hour lifetime. Fail closed instead: still authenticated
+  // as a judge, but sees nothing, until they sign in again with a panel
+  // that actually exists.
+  const judgeSessionValid = !isJudge || Boolean(judgePanel);
+  const division = judgePanel ? judgePanel.division : null;
 
   // A judge sees their own division and nothing else — and nothing at all
   // of a team their panel has a declared conflict with. "Cannot interview"
   // has to mean cannot see, or the team is still there to be worked on.
   const barred = new Set(
-    isJudge
+    isJudge && judgeSessionValid
       ? allConflicts.filter((c) => c.panel_id === session.panelId).map((c) => c.team_id)
       : [],
   );
 
-  const visiblePanels = division ? panels.filter((p) => p.division === division) : panels;
-  const visibleTeams = (division ? teams.filter((t) => t.division === division) : teams).filter(
-    (t) => !barred.has(t.id),
-  );
+  const visiblePanels = !judgeSessionValid
+    ? []
+    : division
+      ? panels.filter((p) => p.division === division)
+      : panels;
+  const visibleTeams = !judgeSessionValid
+    ? []
+    : (division ? teams.filter((t) => t.division === division) : teams).filter(
+        (t) => !barred.has(t.id),
+      );
   const visiblePanelIds = new Set(visiblePanels.map((p) => p.id));
   const visibleTeamIds = new Set(visibleTeams.map((t) => t.id));
 
@@ -67,11 +82,13 @@ export async function loadState(session: Session | null): Promise<AppState> {
   const ownPanelTeamIds = new Set(
     isJudge ? visibleTeams.filter((t) => t.panel_id === session.panelId).map((t) => t.id) : [],
   );
-  const visibleRequests = (
-    division
-      ? rows.filter((r) => visibleTeamIds.has(r.team_id) || visiblePanelIds.has(r.panel_id ?? ""))
-      : rows
-  ).filter((r) => !barred.has(r.team_id));
+  const visibleRequests = !judgeSessionValid
+    ? []
+    : (
+        division
+          ? rows.filter((r) => visibleTeamIds.has(r.team_id) || visiblePanelIds.has(r.panel_id ?? ""))
+          : rows
+      ).filter((r) => !barred.has(r.team_id));
 
   // The note a team types for its judges is free text, and has no
   // business being readable by the other 119 teams polling this.
@@ -91,7 +108,7 @@ export async function loadState(session: Session | null): Promise<AppState> {
     requests: includeMessages
       ? visibleRequests
       : visibleRequests.map((r) => ({ ...r, message: null })),
-    divisions: division ? [division] : divisions,
+    divisions: !judgeSessionValid ? [] : division ? [division] : divisions,
     categories: teamCategories(),
     languages: languages(),
     /* A conflict names a judge and says how they are connected to a team.
@@ -100,7 +117,7 @@ export async function loadState(session: Session | null): Promise<AppState> {
        and a judge for their own panel. Everyone else — the desk, the big
        board, and every team polling this without logging in — gets none,
        rather than a list of which judges are related to which teams. */
-    conflicts: !canReadNotes(session)
+    conflicts: !canReadNotes(session) || (isJudge && !judgeSessionValid)
       ? []
       : session?.role === "judge"
         ? allConflicts.filter((c) => c.panel_id === session.panelId)

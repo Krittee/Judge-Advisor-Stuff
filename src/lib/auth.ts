@@ -15,6 +15,24 @@ export type Session =
 const COOKIE = "jq_session";
 const MAX_AGE = 60 * 60 * 16; // one long event day
 
+/**
+ * Whether this looks like a real deployment rather than a laptop running
+ * `next dev` with nothing configured.
+ *
+ * `NODE_ENV === "production"` alone is not a safe signal: `next start`
+ * sets it, but plenty of real hosts and self-managed setups run without
+ * it ever being set explicitly, and that gap is exactly where a
+ * published default code (see PUBLISHED_CODES below) would otherwise
+ * sit active with nothing but a server console.warn nobody is watching.
+ * DATABASE_URL is a second, independent signal that is much harder to
+ * set by accident: choosing Postgres over the local JSON file is a
+ * deliberate step toward a deployment meant to be reachable by more than
+ * the one laptop it started on.
+ */
+function isProductionLike(): boolean {
+  return process.env.NODE_ENV === "production" || Boolean(process.env.DATABASE_URL);
+}
+
 /** Warn once per process rather than on every single request. */
 let warnedAboutSecret = false;
 
@@ -23,9 +41,9 @@ function secret(): Uint8Array {
 
   if (!value || value.length < 16) {
     // Zero-setup has to mean zero setup, so development gets a working
-    // fallback. Production does not: a known signing key would let anyone
-    // mint themselves a Judge Advisor cookie.
-    if (process.env.NODE_ENV === "production") {
+    // fallback. A real deployment does not: a known signing key would let
+    // anyone mint themselves a Judge Advisor cookie.
+    if (isProductionLike()) {
       throw new Error(
         "SESSION_SECRET must be set to a random string of 16+ characters before deploying. " +
           "Generate one with: openssl rand -base64 32",
@@ -117,7 +135,7 @@ const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "REF001", "ALPHA1", "BRAVO2
 function configuredRoleCode(envVar: string): string {
   const configured = (process.env[envVar] ?? "").trim().toUpperCase();
 
-  if (configured && process.env.NODE_ENV === "production" && PUBLISHED_CODES.has(configured)) {
+  if (configured && isProductionLike() && PUBLISHED_CODES.has(configured)) {
     if (!warnedAboutCode.has(envVar)) {
       warnedAboutCode.add(envVar);
       console.error(
@@ -137,7 +155,7 @@ function roleCode(envVar: string, devDefault: string): string {
   const configured = configuredRoleCode(envVar);
   if (configured) return configured;
 
-  if (process.env.NODE_ENV === "production") {
+  if (isProductionLike()) {
     if (!warnedAboutCode.has(envVar)) {
       warnedAboutCode.add(envVar);
       console.error(
@@ -212,6 +230,81 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
 }
 
 /* ------------------------------------------------------------------ *
+ * Login rate limiting.
+ *
+ * Codes are short and meant to be read aloud, so nothing about them
+ * resists a determined guesser on its own — the thing that has to do
+ * that job is throttling repeated attempts. In-memory, keyed by caller,
+ * so it does not survive a restart and does not share state across
+ * serverless instances: an honest limit for this app's shape, not one
+ * pretended away. It still fully protects the single long-running
+ * process the file-store deployment is built around, and narrows the
+ * window on every other one.
+ * ------------------------------------------------------------------ */
+
+type LoginAttempts = { count: number; windowStart: number; lockedUntil: number };
+
+const LOGIN_WINDOW_MS = 60_000;
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_MS = 5 * 60_000;
+/** Stop an attacker from growing this without bound by cycling fake keys. */
+const LOGIN_MAP_PRUNE_AT = 5_000;
+
+const loginAttempts = new Map<string, LoginAttempts>();
+
+function pruneLoginAttempts(now: number): void {
+  if (loginAttempts.size < LOGIN_MAP_PRUNE_AT) return;
+  for (const [key, entry] of loginAttempts) {
+    if (entry.lockedUntil < now && now - entry.windowStart > LOGIN_WINDOW_MS) {
+      loginAttempts.delete(key);
+    }
+  }
+}
+
+/** Call before attempting a login. Does not count as an attempt itself. */
+export function loginRateLimited(key: string): { limited: boolean; retryAfterSeconds?: number } {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (entry && entry.lockedUntil > now) {
+    return { limited: true, retryAfterSeconds: Math.ceil((entry.lockedUntil - now) / 1000) };
+  }
+  return { limited: false };
+}
+
+/** Call after a failed login. Locks the key out once it crosses the limit. */
+export function recordLoginFailure(key: string): void {
+  const now = Date.now();
+  pruneLoginAttempts(now);
+
+  const entry = loginAttempts.get(key);
+  if (!entry || now - entry.windowStart > LOGIN_WINDOW_MS) {
+    loginAttempts.set(key, { count: 1, windowStart: now, lockedUntil: 0 });
+    return;
+  }
+
+  entry.count += 1;
+  if (entry.count >= LOGIN_MAX_ATTEMPTS) {
+    entry.lockedUntil = now + LOGIN_LOCKOUT_MS;
+  }
+}
+
+/** Call after a successful login so a real staff member is never penalised
+ *  for mistyped attempts that came before the one that worked. */
+export function recordLoginSuccess(key: string): void {
+  loginAttempts.delete(key);
+}
+
+/** Best-effort caller identity for rate limiting -- a proxy header when one
+ *  is present, or one shared bucket when the app has no proxy in front of
+ *  it (a LAN event running the file store, its primary deployment shape). */
+export function clientKeyFor(request: Request): string {
+  const headers = request.headers;
+  const forwarded = headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return headers.get("x-real-ip") ?? "shared";
+}
+
+/* ------------------------------------------------------------------ *
  * Permissions.
  *
  * One table, so there is no arguing about who can do what. Everything
@@ -281,18 +374,24 @@ export function mayActOnPanel(s: Session | null, panelId: string | null): boolea
 
 /**
  * The queuer is allowed to undo their own mis-entry, but only while the
- * request is still untouched. Once judges have acknowledged it, it is out
- * of their hands. Drop the "queuer" branch to make the role create-only.
+ * request is still untouched, and only an entry the desk itself made —
+ * `createdBy` reads "queuer:Name" for those (see actorLabel below).
+ * Once judges have acknowledged it, it is out of their hands. Drop the
+ * "queuer" branch to make the role create-only.
  *
- * A team with no session at all is the same case: creating a request
- * needs no login (see POST /api/requests), so cancelling the one they
- * just created — the "Cancel this request" / "Cancel this booking"
- * button on their own team page — cannot need one either, or that button
- * is dead on arrival for every team, every time.
+ * A team with no session at all is a separate case, not a queuer acting
+ * without a login: creating a request needs no login (see POST
+ * /api/requests), so cancelling the one they just created — the "Cancel
+ * this request" / "Cancel this booking" button on their own team page —
+ * cannot need one either, or that button is dead on arrival for every
+ * team, every time. A team's own request is always createdBy "team", so
+ * this branch never has to consult it.
  */
-export function canCancel(s: Session | null, status: string): boolean {
+export function canCancel(s: Session | null, status: string, createdBy: string | null): boolean {
   if (s?.role === "admin" || s?.role === "judge") return true;
-  if (s?.role === "queuer" || !s) return status === "requested" || status === "scheduled";
+  const early = status === "requested" || status === "scheduled";
+  if (!s) return early;
+  if (s.role === "queuer") return early && createdBy?.startsWith("queuer:") === true;
   return false;
 }
 

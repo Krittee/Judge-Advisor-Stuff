@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import type {
   ActivityRow,
   ConflictRow,
@@ -244,13 +244,40 @@ async function migrate(): Promise<void> {
 
     -- The two rules that keep the board honest. Enforced here so they
     -- hold no matter how many server instances are running.
+    --
+    -- 'scheduled' belongs in this set too: without it, only the
+    -- requested/acknowledged/interviewing statuses ever collided, so a
+    -- team could hold any number of future scheduled slots at once, all
+    -- accepted, since none of them ever counted as "already in the
+    -- queue". A dropped index cannot be redefined with "if not exists"
+    -- alone -- its where clause is part of its identity -- so an
+    -- already-deployed database's narrower index is dropped first.
+    drop index if exists requests_one_live_per_team;
     create unique index if not exists requests_one_live_per_team
       on requests (team_id)
-      where status in ('requested', 'acknowledged', 'interviewing');
+      where status in ('requested', 'acknowledged', 'interviewing', 'scheduled');
 
     create unique index if not exists requests_unique_slot
       on requests (panel_id, slot_start)
       where kind = 'slot' and status <> 'cancelled';
+
+    -- Lock every table down. The app talks to Postgres only from the
+    -- server, over the connection string, which bypasses RLS -- so
+    -- enabling it with zero policies costs the app nothing while it
+    -- stops the anon/publishable key (e.g. Supabase's Data API) from
+    -- reading or writing anything, even panel login codes, even if that
+    -- key leaks. supabase/schema.sql already does this for a manual
+    -- setup; a deployment that never opens that file in the SQL editor
+    -- must not be left unprotected just because it relied on this
+    -- runtime migration instead.
+    alter table panels    enable row level security;
+    alter table teams     enable row level security;
+    alter table requests  enable row level security;
+    alter table notes     enable row level security;
+    alter table conflicts enable row level security;
+    alter table flags     enable row level security;
+    alter table scores    enable row level security;
+    alter table activity  enable row level security;
   `);
 
   // Schema changes that an already-deployed event may not have yet.
@@ -295,7 +322,7 @@ function translate(e: unknown, context: "queue" | "slot" | "panel"): never {
   const err = e as { code?: string; constraint?: string; message?: string };
   if (err?.code === "23505") {
     if (err.constraint === "requests_one_live_per_team" || context === "queue") {
-      throw new StoreError("That team is already in the queue.", 409);
+      throw new StoreError("That team already has a live request or a scheduled booking.", 409);
     }
     if (err.constraint === "requests_unique_slot" || context === "slot") {
       throw new StoreError("Someone just took that slot. Pick another one.", 409);
@@ -311,6 +338,39 @@ async function query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
   await ready();
   const { rows } = await (await db()).query(sql, params);
   return rows as T[];
+}
+
+/**
+ * Run several statements on one dedicated connection, inside one
+ * transaction. Unlike `query()`, which borrows a different connection
+ * from the pool on every call, a row lock taken by one statement here is
+ * held across every later statement in the same callback — and released
+ * only on commit or rollback. That is what lets a merge-then-recompute
+ * sequence (see saveScore) stay correct under concurrent writers: a
+ * second transaction touching the same row blocks until this one
+ * commits, then reads what this one actually wrote, rather than racing
+ * it and possibly overwriting a fresher value with a stale one.
+ */
+async function withClient<T>(
+  fn: (run: <R>(sql: string, params?: unknown[]) => Promise<R[]>) => Promise<T>,
+): Promise<T> {
+  await ready();
+  const client: PoolClient = await (await db()).connect();
+  try {
+    await client.query("begin");
+    const run = async <R>(sql: string, params: unknown[] = []): Promise<R[]> => {
+      const { rows } = await client.query(sql, params);
+      return rows as R[];
+    };
+    const result = await fn(run);
+    await client.query("commit");
+    return result;
+  } catch (e) {
+    await client.query("rollback").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 /** Postgres hands back Date objects; the app speaks ISO strings. */
@@ -625,16 +685,6 @@ export const postgresStore: Store = {
   },
 
   async updatePanel(id, patch) {
-    // Moving a panel across the wall cannot drag its teams with it — those
-    // teams belong to the division they compete in, so they are released
-    // for another panel in that division to pick up.
-    if (patch.division) {
-      await query(
-        "update teams set panel_id = null where panel_id = $1 and $2 <> (select division from panels where id = $1)",
-        [id, patch.division],
-      );
-    }
-
     const columns = Object.keys(patch);
     if (!columns.length) {
       const current = one(await query<Panel>("select * from panels where id = $1", [id]));
@@ -642,20 +692,39 @@ export const postgresStore: Store = {
       return current;
     }
 
+    // The division this panel had before any change, so the "moved to a
+    // new division" side effect below compares against what it actually
+    // was -- once the panel's own row is updated, a live subquery for its
+    // division would just read back the NEW value and never fire.
+    const before = one(await query<Panel>("select * from panels where id = $1", [id]));
+    if (!before) throw new StoreError("That panel no longer exists.", 404);
+
     const assignments = columns.map((c, i) => `${c} = $${i + 2}`).join(", ");
+    let updated: Panel | null;
     try {
-      const updated = one(
+      updated = one(
         await query<Panel>(`update panels set ${assignments} where id = $1 returning *`, [
           id,
           ...columns.map((c) => (patch as Record<string, unknown>)[c]),
         ]),
       );
-      if (!updated) throw new StoreError("That panel no longer exists.", 404);
-      return updated;
     } catch (e) {
       if (e instanceof StoreError) throw e;
       translate(e, "panel");
     }
+    if (!updated) throw new StoreError("That panel no longer exists.", 404);
+
+    // Moving a panel across the wall cannot drag its teams with it — those
+    // teams belong to the division they compete in, so they are released
+    // for another panel in that division to pick up. Done only now, after
+    // the panel's own update has actually committed: a rejected update —
+    // a duplicate code, say — must never unassign a single team on its
+    // way to being refused.
+    if (patch.division && patch.division !== before.division) {
+      await query("update teams set panel_id = null where panel_id = $1", [id]);
+    }
+
+    return updated;
   },
 
   /** Teams and requests fall back to no panel rather than vanishing. */
@@ -780,38 +849,48 @@ export const postgresStore: Store = {
    *
    * Merging happens inside the statement — scores accumulate row by row
    * as judges work down the sheet, and two judges filling in different
-   * criteria of the same rubric must not overwrite each other. Doing it
-   * in SQL keeps that true without a read-modify-write race.
+   * criteria of the same rubric must not overwrite each other. That part
+   * alone is race-free. The total is not: it depends on the rubric's
+   * scale, which SQL has no view of, so it has to be computed in JS from
+   * the merged values and written back in a second statement — and
+   * without both statements sharing one transaction and one row lock,
+   * two concurrent saves on the same team/rubric can each read a values
+   * snapshot that does not yet include the other's criterion, then write
+   * their total in whichever order the network happens to deliver,
+   * silently overwriting a fresher total with a stale one. withClient
+   * holds the row lock from the merge across the total write, so a
+   * second save on this row blocks until this one has fully committed.
    */
   async saveScore(input: SaveScore) {
     const patch =
       input.value === null ? null : JSON.stringify({ [input.criterionId]: input.value });
 
-    const merged = one(
-      await query<ScoreRow>(
-        `insert into scores (team_id, rubric_id, values, total, scored_by, panel_id)
-         values ($1, $2, coalesce($3::jsonb, '{}'::jsonb), 0, $4, $5)
-         on conflict (team_id, rubric_id) do update set
-           values = case
-             when $3::jsonb is null then scores.values - $6::text
-             else scores.values || $3::jsonb
-           end,
-           scored_by = excluded.scored_by,
-           panel_id = coalesce(excluded.panel_id, scores.panel_id),
-           updated_at = now()
-         returning *`,
-        [input.teamId, input.rubricId, patch, input.scoredBy, input.panelId, input.criterionId],
-      ),
-    )!;
+    return withClient(async (run) => {
+      const merged = one(
+        await run<ScoreRow>(
+          `insert into scores (team_id, rubric_id, values, total, scored_by, panel_id)
+           values ($1, $2, coalesce($3::jsonb, '{}'::jsonb), 0, $4, $5)
+           on conflict (team_id, rubric_id) do update set
+             values = case
+               when $3::jsonb is null then scores.values - $6::text
+               else scores.values || $3::jsonb
+             end,
+             scored_by = excluded.scored_by,
+             panel_id = coalesce(excluded.panel_id, scores.panel_id),
+             updated_at = now()
+           returning *`,
+          [input.teamId, input.rubricId, patch, input.scoredBy, input.panelId, input.criterionId],
+        ),
+      )!;
 
-    // The total depends on the rubric's scale, which SQL has no view of.
-    const total = input.totalOf(merged.values ?? {});
-    return one(
-      await query<ScoreRow>("update scores set total = $2 where id = $1 returning *", [
-        merged.id,
-        total,
-      ]),
-    )!;
+      const total = input.totalOf(merged.values ?? {});
+      return one(
+        await run<ScoreRow>("update scores set total = $2 where id = $1 returning *", [
+          merged.id,
+          total,
+        ]),
+      )!;
+    });
   },
 
   /**

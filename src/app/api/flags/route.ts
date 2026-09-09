@@ -89,10 +89,19 @@ export async function POST(request: Request) {
 
 /**
  * Correct a flag already on record — the wrong severity tapped, a
- * mis-typed match number. Open to referees and the Judge Advisor, unlike
- * removal, because this does not make the incident disappear: it stays on
- * the board, just described more accurately, and the correction itself is
- * logged to Activity so nothing about it happens quietly.
+ * mis-typed match number. Open to the referee who raised it and the
+ * Judge Advisor, unlike removal, because this does not make the
+ * incident disappear: it stays on the board, just described more
+ * accurately, and the correction itself is logged to Activity so
+ * nothing about it happens quietly.
+ *
+ * A referee correcting a colleague's flag was previously accepted from
+ * any referee session, not just the one who wrote it — the role check
+ * below never compared against the flag's own `author`. The record's
+ * author has always been fixed once a flag is created (see the note
+ * below), so who is allowed to invoke this correction in the first
+ * place should match that: the one name attached to the report, or the
+ * Judge Advisor's standing authority to correct anything.
  *
  * Team and author are not editable here. Reassigning a flag to a
  * different team, or rewriting who raised it, is a bigger mistake than
@@ -118,6 +127,14 @@ export async function PATCH(request: Request) {
   if (!existing) {
     return NextResponse.json({ error: "That flag no longer exists." }, { status: 404 });
   }
+
+  if (!canAdminister(session) && existing.author !== session!.name) {
+    return NextResponse.json(
+      { error: "Only the referee who raised this flag, or the Judge Advisor, can correct it." },
+      { status: 403 },
+    );
+  }
+
   // Read before updateFlag runs, not after: the file store hands back the
   // very object it stores, so existing.kind would already read as the NEW
   // value by the time we get here otherwise — the same trap the conflicts

@@ -12,7 +12,7 @@ import test from "node:test";
  * round-robin assignment, and the file lifecycle.
  */
 
-const LIVE = ["requested", "acknowledged", "interviewing"];
+const LIVE = ["requested", "acknowledged", "interviewing", "scheduled"];
 
 function makeStore(file) {
   let data = load();
@@ -262,6 +262,71 @@ test("cancelling a booking releases the slot for someone else", () => {
       s.createRequest({ teamId: b.id, panelId: p.id, kind: "slot", slotStart: when }),
     );
   });
+});
+
+/* Regression: 'scheduled' was missing from LIVE, so the "one live
+   request per team" invariant never saw a scheduled booking as
+   occupying anything. Two different future slot times don't collide on
+   requests_unique_slot (different slot_start), so both were accepted --
+   a team could reserve as many interview slots as it liked. */
+test("a team cannot hold two scheduled bookings at once, even at different times", () => {
+  withStore((s) => {
+    const p = s.addPanel("A", "AAA");
+    const t = s.addTeam(1, p.id);
+    s.createRequest({ teamId: t.id, panelId: p.id, kind: "slot", slotStart: "2026-09-01T14:00:00.000Z" });
+    assert.throws(
+      () =>
+        s.createRequest({
+          teamId: t.id,
+          panelId: p.id,
+          kind: "slot",
+          slotStart: "2026-09-01T15:00:00.000Z",
+        }),
+      /already in the queue/,
+      "a second scheduled booking for the same team must be refused",
+    );
+  });
+});
+
+test("a team cannot book a slot while it already has a live queue request", () => {
+  withStore((s) => {
+    const p = s.addPanel("A", "AAA");
+    const t = s.addTeam(1, p.id);
+    s.createRequest({ teamId: t.id, panelId: p.id, kind: "queue" });
+    assert.throws(
+      () => s.createRequest({ teamId: t.id, panelId: p.id, kind: "slot", slotStart: "2026-09-01T14:00:00.000Z" }),
+      /already in the queue/,
+    );
+  });
+});
+
+test("cancelling a scheduled booking frees the team to book or queue again", () => {
+  withStore((s) => {
+    const p = s.addPanel("A", "AAA");
+    const t = s.addTeam(1, p.id);
+    const r = s.createRequest({ teamId: t.id, panelId: p.id, kind: "slot", slotStart: "2026-09-01T14:00:00.000Z" });
+    s.updateRequest(r.id, { status: "cancelled" });
+    assert.doesNotThrow(() => s.createRequest({ teamId: t.id, panelId: p.id, kind: "queue" }));
+  });
+});
+
+test("the real stores treat 'scheduled' as occupying the team's one slot, in both backends", () => {
+  const fileSrc = readFileSync(new URL("../src/lib/db/file.ts", import.meta.url), "utf8");
+  const pgSrc = readFileSync(new URL("../src/lib/db/postgres.ts", import.meta.url), "utf8");
+  assert.match(
+    fileSrc,
+    /const LIVE: Status\[\] = \["requested", "acknowledged", "interviewing", "scheduled"\];/,
+    "file.ts's LIVE no longer includes 'scheduled'",
+  );
+  assert.match(
+    pgSrc,
+    /where status in \('requested', 'acknowledged', 'interviewing', 'scheduled'\)/,
+    "postgres.ts's requests_one_live_per_team index no longer includes 'scheduled'",
+  );
+  assert.ok(
+    pgSrc.includes("drop index if exists requests_one_live_per_team"),
+    "an already-deployed database's narrower index is never dropped, so the fix would never reach it",
+  );
 });
 
 test("auto-assign spreads teams evenly and respects the cap", () => {

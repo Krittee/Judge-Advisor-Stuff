@@ -1,13 +1,22 @@
 -- =====================================================================
 -- Judge Queue — database schema
 -- Paste this whole file into: Supabase Dashboard > SQL Editor > New query
--- Safe to re-run: it drops and recreates everything.
 --
--- You do not strictly need to run this. When the app starts with
--- DATABASE_URL set it creates every table below on its own (see
--- src/lib/db/postgres.ts). This file is here for when you would rather
--- set the database up once in the SQL editor and see it laid out.
--- Keep it in step with that migrate() function if you change one.
+-- DESTRUCTIVE. This drops every application table before recreating
+-- them, deleting all teams, panels, requests, notes, scores, flags,
+-- conflicts and activity — irreversibly. Only run this against an empty
+-- project, or one you have deliberately decided to wipe. It is
+-- "re-runnable" only in the narrow sense that running it twice in a row
+-- on an already-empty database is harmless; running it against a live
+-- event destroys that event's data.
+--
+-- You do not strictly need to run this at all. When the app starts with
+-- DATABASE_URL set it creates every table below on its own, additively
+-- (see migrate() in src/lib/db/postgres.ts) — that path never drops a
+-- table and is what every real deployment actually runs. This file is
+-- only here for someone who would rather set an EMPTY database up once
+-- in the SQL editor and see the whole schema laid out at a glance.
+-- Keep it in step with migrate() if you change one.
 -- =====================================================================
 
 drop table if exists activity  cascade;
@@ -96,11 +105,13 @@ create index requests_status_idx on requests (status);
 create index requests_panel_idx  on requests (panel_id);
 create index requests_team_idx   on requests (team_id);
 
--- A team can only be live in the queue once at a time. This is what stops
--- double-tapping "request a judge" from filling the board with duplicates.
+-- A team can only be live in the queue -- or hold a scheduled booking --
+-- once at a time. This is what stops double-tapping "request a judge"
+-- from filling the board with duplicates, and stops a team reserving
+-- more than one future slot.
 create unique index requests_one_live_per_team
   on requests (team_id)
-  where status in ('requested', 'acknowledged', 'interviewing');
+  where status in ('requested', 'acknowledged', 'interviewing', 'scheduled');
 
 -- Two teams can never hold the same slot on the same panel.
 create unique index requests_unique_slot

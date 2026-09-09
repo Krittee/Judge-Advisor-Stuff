@@ -22,9 +22,11 @@ function mayActOnPanel(s, panelId) {
   return false;
 }
 
-function canCancel(s, status) {
+function canCancel(s, status, createdBy) {
   if (s?.role === "admin" || s?.role === "judge") return true;
-  if (s?.role === "queuer" || !s) return status === "requested" || status === "scheduled";
+  const early = status === "requested" || status === "scheduled";
+  if (!s) return early;
+  if (s.role === "queuer") return early && createdBy?.startsWith("queuer:") === true;
   return false;
 }
 
@@ -61,11 +63,11 @@ test("the Judge Advisor may act on any panel", () => {
   for (const p of ["panel-a", "panel-c", null]) assert.ok(mayActOnPanel(JA, p));
 });
 
-test("the queue desk can undo its own entry only before judges see it", () => {
-  assert.ok(canCancel(QUEUER, "requested"));
-  assert.ok(canCancel(QUEUER, "scheduled"));
+test("the queue desk can undo its own entry only before judges see it, and only its own entry", () => {
+  assert.ok(canCancel(QUEUER, "requested", "queuer:Desk"));
+  assert.ok(canCancel(QUEUER, "scheduled", "queuer:Desk"));
   for (const s of ["acknowledged", "interviewing", "completed"]) {
-    assert.ok(!canCancel(QUEUER, s), `queuer must not cancel a ${s} interview`);
+    assert.ok(!canCancel(QUEUER, s, "queuer:Desk"), `queuer must not cancel a ${s} interview`);
   }
 });
 
@@ -75,21 +77,34 @@ test("the queue desk can undo its own entry only before judges see it", () => {
    -- the button 403'd every single time, for every team, since the
    app's first commit. Creating a request needs no login (POST
    /api/requests is open to everyone), so cancelling the one a team just
-   created cannot need one either. */
+   created cannot need one either. A team's own request is always
+   createdBy "team", so the null-session branch never has to consult it. */
 test("a team with no login can cancel their own request while it is still early, same as the queue desk", () => {
-  assert.ok(canCancel(TEAM, "requested"), "a team must be able to cancel their own live request");
-  assert.ok(canCancel(TEAM, "scheduled"), "a team must be able to give up their own booking");
+  assert.ok(canCancel(TEAM, "requested", "team"), "a team must be able to cancel their own live request");
+  assert.ok(canCancel(TEAM, "scheduled", "team"), "a team must be able to give up their own booking");
   for (const s of ["acknowledged", "interviewing", "completed"]) {
-    assert.ok(!canCancel(TEAM, s), `a team must not cancel a ${s} interview out from under a judge`);
+    assert.ok(!canCancel(TEAM, s, "team"), `a team must not cancel a ${s} interview out from under a judge`);
   }
 });
 
-test("the real canCancel in src/lib/auth.ts carries the same team exemption as the mirror above", () => {
+/* Regression: the comment above canCancel has always described the queue
+   desk as undoing "their own mis-entry", but the check never actually
+   looked at who created the request -- any queuer session could cancel
+   any team-created request too, in any status the check let through. */
+test("a queuer cannot cancel a request it did not create, even while early", () => {
+  assert.ok(!canCancel(QUEUER, "requested", "team"), "a queuer must not cancel a team's own request");
+  assert.ok(!canCancel(QUEUER, "scheduled", "team"), "a queuer must not cancel a team's own booking");
+  assert.ok(!canCancel(QUEUER, "requested", "admin"), "a queuer must not cancel an admin-created request");
+  assert.ok(!canCancel(QUEUER, "requested", null), "a queuer must not cancel a request with no recorded creator");
+});
+
+test("the real canCancel in src/lib/auth.ts carries the same team exemption and queuer ownership check as the mirror above", () => {
   const src = readFileSync(new URL("../src/lib/auth.ts", import.meta.url), "utf8");
   const fn = src.slice(src.indexOf("export function canCancel"), src.indexOf("\n}", src.indexOf("export function canCancel")));
+  assert.ok(fn.includes("if (!s) return early;"), "canCancel no longer exempts a team with no session");
   assert.ok(
-    /s\?\.role === "queuer" \|\| !s/.test(fn),
-    "canCancel no longer treats a team with no session the same as the queue desk",
+    fn.includes('createdBy?.startsWith("queuer:") === true'),
+    "canCancel no longer restricts a queuer to requests the desk itself created",
   );
 });
 

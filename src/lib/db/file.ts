@@ -72,7 +72,13 @@ type Data = {
 };
 
 const FILE = resolve(process.env.DATA_FILE ?? ".data/state.json");
-const LIVE: Status[] = ["requested", "acknowledged", "interviewing"];
+/** A team may only hold one of these at a time -- see the two invariant
+ *  checks below. 'scheduled' belongs here too: without it, a team could
+ *  hold any number of future scheduled slots at once, since none of them
+ *  ever counted as "already in the queue". Not the same list as
+ *  status.ts's LIVE_STATUSES, which drives board urgency colouring and
+ *  must not treat a calm future booking as something needing attention. */
+const LIVE: Status[] = ["requested", "acknowledged", "interviewing", "scheduled"];
 
 /* ------------------------------------------------------------------ *
  * Loading and saving
@@ -350,10 +356,17 @@ function findRequest(id: string): RequestRow | null {
 function createRequest(input: NewRequest): RequestRow {
   const now = new Date().toISOString();
 
-  // Invariant 1: a team can only be live in the queue once.
+  // Invariant 1: a team can only hold one live request or scheduled
+  // booking at a time.
   if (state().requests.some((r) => r.team_id === input.teamId && LIVE.includes(r.status))) {
     const team = state().teams.find((t) => t.id === input.teamId);
-    throw new StoreError(`Team ${team?.number ?? ""} is already in the queue.`.trim(), 409);
+    throw new StoreError(
+      `Team ${team?.number ?? ""} already has a live request or a scheduled booking.`.replace(
+        "  ",
+        " ",
+      ),
+      409,
+    );
   }
 
   // Invariant 2: one team per panel slot.
@@ -545,15 +558,18 @@ function updatePanel(id: string, patch: Partial<Panel>): Panel {
   const panel = state().panels.find((p) => p.id === id);
   if (!panel) throw new StoreError("That panel no longer exists.", 404);
 
-  // Moving a panel across the wall cannot drag its teams with it — those
-  // teams belong to the division they compete in. They are released so
-  // another panel in that division can pick them up.
-  if (patch.division && patch.division !== panel.division) {
-    for (const t of state().teams) if (t.panel_id === id) t.panel_id = null;
-  }
-
   if (patch.code && state().panels.some((p) => p.id !== id && p.code.toUpperCase() === patch.code!.toUpperCase())) {
     throw new StoreError("That panel code is already in use.", 409);
+  }
+
+  // Moving a panel across the wall cannot drag its teams with it — those
+  // teams belong to the division they compete in. They are released so
+  // another panel in that division can pick them up. Done only now, after
+  // every validation above has passed: a rejected update — a duplicate
+  // code, say — must never unassign a single team on its way to being
+  // refused.
+  if (patch.division && patch.division !== panel.division) {
+    for (const t of state().teams) if (t.panel_id === id) t.panel_id = null;
   }
 
   Object.assign(panel, patch);
