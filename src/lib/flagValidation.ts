@@ -30,14 +30,9 @@ export function parseFlagFields(
   { allowLegacyRulelessKind = null }: ParseOptions = {},
 ): FlagFieldParseResult {
   const kind = resolveFlagKind(body.kind);
+  // Optional: match, severity and (where required) rule are enough to
+  // record a report. Keep any supplied context, capped for storage.
   const text = String(body.body ?? "").trim().slice(0, 500);
-  if (!text) {
-    return {
-      ok: false,
-      status: 400,
-      error: "Say what you saw — judges read this without you there to explain.",
-    };
-  }
 
   const matchType = String(body.matchType ?? "").trim().toUpperCase();
   if (!isValidMatchType(matchType)) {

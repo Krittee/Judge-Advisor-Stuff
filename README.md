@@ -372,12 +372,11 @@ moment, so every one carries a match reference:
 
 - **Match** — a dropdown, **P**ractice / **Q**ualification / **F**inal.
 - **Match #** — the match number.
-- **Field** — free text (`Field 1`, `Red`, whatever the hall calls it).
+- **Field** — an ES/MS/HS/BL selector plus its short field number.
 
-All three are required, the same standing as the description — a flag
-nobody can trace back is not much use days later. They show up everywhere
-a flag does as a compact reference, `Q23 · Field 2`, right beside who wrote
-it and when.
+All three are required; the description is optional. A flag nobody can trace
+back is not much use days later. They show up everywhere a flag does as a
+compact reference, `Q23 · ES2`, right beside who wrote it and when.
 
 **Match and field are remembered between flags, on purpose.** A referee
 works one match at a time and often flags more than one team against it,
@@ -387,9 +386,10 @@ dropdown or the number the moment you move to a different match; there is
 nothing that resets them for you.
 
 **Rule violated** is one searchable list containing the complete Level Up
-Quick Reference. It accepts rule ids (with or without angle brackets), title
-words and common field terms. A rule is required for Minor and Major, optional
-for Warning, and never attached to Good Conduct. The referee page shows
+Quick Reference plus this event's TS1–TS3 Tournament Special rules. It accepts
+rule ids (with or without angle brackets), title words and common field terms.
+A rule is required for Minor and Major, optional for Warning, and never
+attached to Good Conduct. The referee page shows
 same-rule, same-match and overall active-event history. Prior Minor violations
 only prompt an escalation review: they never select Major or disqualify a team.
 The Head Referee always chooses the outcome.

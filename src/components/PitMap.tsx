@@ -115,9 +115,6 @@ export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean
                 key={row}
                 className="flex min-w-[4.75rem] max-w-[8rem] flex-1 flex-col gap-1.5"
               >
-                <span className="rounded-md bg-white/5 py-1 text-center text-sm font-bold text-zinc-300">
-                  {row}
-                </span>
                 {numbered.map(({ cell, position }) => (
                   <PitCell
                     key={position}
@@ -128,6 +125,9 @@ export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean
                     hideDone={hideDone}
                   />
                 ))}
+                <span className="rounded-md bg-white/5 py-1 text-center text-sm font-bold text-zinc-300">
+                  {row}
+                </span>
               </div>
             ))}
           </div>

@@ -49,6 +49,12 @@ test("the page sends the selected rule and only resets it after a successful req
   assert.ok(!record.includes('setField("")'));
 });
 
+test("What did you see is optional in the UI and server path", () => {
+  assert.ok(pageSrc.includes("(optional)"));
+  assert.ok(!pageSrc.includes("!body.trim()"));
+  assert.ok(!flagsSrc.includes("!draftBody.trim()"));
+});
+
 test("the selector remains one searchable control between observation and action buttons", () => {
   const observation = pageSrc.indexOf("What did you see?");
   const selector = pageSrc.indexOf("Rule violated");
@@ -58,6 +64,13 @@ test("the selector remains one searchable control between observation and action
   assert.ok(!pageSrc.includes("choose category"));
   assert.ok(pageSrc.includes("break-words"));
   assert.ok(pageSrc.includes("overflow-y-auto"));
+});
+
+test("field selection combines the event division prefix and field number", () => {
+  assert.ok(pageSrc.includes('const FIELD_PREFIXES = ["ES", "MS", "HS", "BL"]'));
+  assert.ok(pageSrc.includes("value={fieldPrefix}"));
+  assert.ok(pageSrc.includes("value={fieldNumber}"));
+  assert.ok(pageSrc.includes("normalizeField(`${fieldPrefix}${fieldNumber}`)"));
 });
 
 test("repeated history comes from the tested helper and cannot submit an automatic Major", () => {

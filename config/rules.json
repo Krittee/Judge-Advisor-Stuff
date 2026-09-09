@@ -83,5 +83,9 @@
   { "id": "T16", "category": "Tournament Rules", "officialTitle": "No requirement that Skills Fields have the same modifications as the Teamwork Fields", "shortLabel": "Skills Field Differences", "searchKeywords": ["16", "skills field", "differences"] },
   { "id": "T17", "category": "Tournament Rules", "officialTitle": "Skills Rankings at events", "shortLabel": "Event Skills Ranking", "searchKeywords": ["17", "skills ranking", "event ranking"] },
   { "id": "T18", "category": "Tournament Rules", "officialTitle": "Skills Rankings globally", "shortLabel": "Global Skills Ranking", "searchKeywords": ["18", "global ranking", "world skills"] },
-  { "id": "T19", "category": "Tournament Rules", "officialTitle": "Robot Skills at League Events", "shortLabel": "League Skills", "searchKeywords": ["19", "league skills", "league events"] }
+  { "id": "T19", "category": "Tournament Rules", "officialTitle": "Robot Skills at League Events", "shortLabel": "League Skills", "searchKeywords": ["19", "league skills", "league events"] },
+
+  { "id": "TS1", "category": "Tournament Special", "officialTitle": "Teams and individuals are expected to display good sportsmanship toward opponents, officials and volunteers at all times", "shortLabel": "Sportsmanlike Conduct", "searchKeywords": ["1", "sportsmanlike", "sportsmanship", "good conduct", "respect"] },
+  { "id": "TS2", "category": "Tournament Special", "officialTitle": "Unsportsmanlike conduct by a Team or individual is a violation and may be penalized", "shortLabel": "Unsportsmanlike Conduct", "searchKeywords": ["2", "unsportsmanlike", "poor sportsmanship", "taunting", "disrespect", "bad behavior"] },
+  { "id": "TS3", "category": "Tournament Special", "officialTitle": "A Team may help another Team reset the Field between Matches", "shortLabel": "Helping Reset the Field", "searchKeywords": ["3", "reset", "help reset", "field reset", "helping"] }
 ]

@@ -17,6 +17,7 @@ const RULE_CATEGORIES = [
   "Robot Skills Challenge Rules",
   "Robot Rules",
   "Tournament Rules",
+  "Tournament Special",
 ];
 
 const COMMON_FIELD_RULE_IDS = ["SG6", "SG7", "GG4", "GG10", "GG12", "SG2", "S1"];
@@ -72,7 +73,7 @@ function searchRules(query) {
 
 /* ---- the catalog itself ------------------------------------------------ */
 
-test("every category from the Quick Reference is present, in order, with no extras", () => {
+test("official categories are followed by the event's Tournament Special category", () => {
   const seen = [...new Set(RULES.map((r) => r.category))];
   assert.deepEqual(seen, RULE_CATEGORIES);
 });
@@ -87,6 +88,7 @@ test("every rule id is in the required order and assigned to its exact category"
     ["Robot Skills Challenge Rules", "RSC", 8],
     ["Robot Rules", "R", 17],
     ["Tournament Rules", "T", 19],
+    ["Tournament Special", "TS", 3],
   ];
   const expected = groups.flatMap(([category, prefix, count]) =>
     Array.from({ length: count }, (_, index) => ({ id: `${prefix}${index + 1}`, category })),
@@ -108,8 +110,8 @@ test("every rule has an official title, a short label and at least one keyword",
   }
 });
 
-test("the complete 8-category Quick Reference is present with no extra rules", () => {
-  assert.equal(RULES.length, 78);
+test("the 78 official rules and three Tournament Special rules are present", () => {
+  assert.equal(RULES.length, 81);
 });
 
 test("every official title exactly preserves the supplied Quick Reference wording", () => {
@@ -195,9 +197,46 @@ test("every official title exactly preserves the supplied Quick Reference wordin
   };
 
   assert.deepEqual(
-    Object.fromEntries(RULES.map((rule) => [rule.id, rule.officialTitle])),
+    Object.fromEntries(
+      RULES.filter((rule) => rule.category !== "Tournament Special").map((rule) => [rule.id, rule.officialTitle]),
+    ),
     expected,
   );
+});
+
+test("Tournament Special preserves TS1-TS3 and their event-specific titles", () => {
+  assert.deepEqual(
+    RULES.filter((rule) => rule.category === "Tournament Special").map(
+      ({ id, officialTitle }) => ({ id, officialTitle }),
+    ),
+    [
+      {
+        id: "TS1",
+        officialTitle:
+          "Teams and individuals are expected to display good sportsmanship toward opponents, officials and volunteers at all times",
+      },
+      {
+        id: "TS2",
+        officialTitle:
+          "Unsportsmanlike conduct by a Team or individual is a violation and may be penalized",
+      },
+      {
+        id: "TS3",
+        officialTitle: "A Team may help another Team reset the Field between Matches",
+      },
+    ],
+  );
+
+  for (const [query, id] of [
+    ["TS1", "TS1"],
+    ["sportsmanship", "TS1"],
+    ["TS2", "TS2"],
+    ["unsportsmanlike", "TS2"],
+    ["TS3", "TS3"],
+    ["help reset", "TS3"],
+  ]) {
+    assert.ok(searchRules(query).some((rule) => rule.id === id), `${query} missed ${id}`);
+  }
 });
 
 /* ---- common field rule shortcuts --------------------------------------- */

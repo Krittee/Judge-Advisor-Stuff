@@ -13,12 +13,17 @@ import {
   isValidField,
   isValidMatchNumber,
   matchReference,
+  normalizeField,
 } from "@/lib/match";
 import { refereeHistory } from "@/lib/refereeHistory";
 import { RULE_CATEGORIES, commonFieldRules, ruleDisplayLabel, searchRules, type Rule } from "@/lib/rules";
 import type { Session } from "@/lib/auth";
 import type { FlagEdit } from "@/lib/db/types";
 import type { FlagRow, Team } from "@/lib/types";
+
+/** Division shorthand for the field name, so a referee picks it instead
+ *  of typing it out — "ES2" rather than "Elementary School Field 2". */
+const FIELD_PREFIXES = ["ES", "MS", "HS", "BL"] as const;
 
 /**
  * The referee's page.
@@ -52,7 +57,11 @@ function Referee() {
      for every one of them would be the opposite of easy to track back. */
   const [matchType, setMatchType] = useState("");
   const [matchNumber, setMatchNumber] = useState("");
-  const [field, setField] = useState("");
+  /* Field is built from a division prefix and a number. Both parts remain
+     selected after a successful report, just like match type and number. */
+  const [fieldPrefix, setFieldPrefix] = useState("");
+  const [fieldNumber, setFieldNumber] = useState("");
+  const field = normalizeField(`${fieldPrefix}${fieldNumber}`);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -168,7 +177,7 @@ function Referee() {
   }
 
   async function record(kind: string) {
-    if (!team || !body.trim() || !matchReady) return;
+    if (!team || !matchReady) return;
     // Defence in depth: the button is already disabled for this case, but
     // the request must never depend on the UI alone to enforce it.
     if (kindOf(kind, state.flagKinds)?.requiresRule && !rule) return;
@@ -288,20 +297,41 @@ function Referee() {
                 </label>
               </div>
 
-              <label className="block">
-                <span className="mb-1 block text-xs text-zinc-400">Field</span>
-                <input
-                  value={field}
-                  onChange={(e) => setField(e.target.value)}
-                  placeholder="Field 2"
-                  maxLength={40}
-                  autoComplete="off"
-                  className={`${inputClass} py-2`}
-                />
-              </label>
+              <div className="flex flex-wrap gap-2">
+                <label className="min-w-[7rem] flex-1">
+                  <span className="mb-1 block text-xs text-zinc-400">Field</span>
+                  <select
+                    value={fieldPrefix}
+                    onChange={(e) => setFieldPrefix(e.target.value)}
+                    className={`${inputClass} py-2`}
+                  >
+                    <option value="" className="bg-zinc-900">
+                      — division —
+                    </option>
+                    {FIELD_PREFIXES.map((prefix) => (
+                      <option key={prefix} value={prefix} className="bg-zinc-900">
+                        {prefix}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="min-w-[4.5rem] flex-1">
+                  <span className="mb-1 block text-xs text-zinc-400">Field #</span>
+                  <input
+                    value={fieldNumber}
+                    onChange={(e) => setFieldNumber(filterMatchNumberInput(e.target.value))}
+                    placeholder="1"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    className={`${inputClass} py-2 text-center`}
+                  />
+                </label>
+              </div>
 
               <label className="block">
-                <span className="mb-1 block text-xs text-zinc-400">What did you see?</span>
+                <span className="mb-1 block text-xs text-zinc-400">
+                  What did you see? <span className="text-zinc-600">(optional)</span>
+                </span>
                 <textarea
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
@@ -470,7 +500,7 @@ function Referee() {
                   return (
                     <button
                       key={k.id}
-                      disabled={busy || !body.trim() || !matchReady || missingRule}
+                      disabled={busy || !matchReady || missingRule}
                       onClick={() => record(k.id)}
                       className={`rounded-xl px-4 py-3 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
                         FLAG_SOLID[k.color] ?? FLAG_SOLID.zinc
@@ -485,10 +515,6 @@ function Referee() {
                 <p className="text-center text-xs text-zinc-600">
                   Pick the match, the match number and the field first — that is what lets this
                   be traced back later.
-                </p>
-              ) : !body.trim() ? (
-                <p className="text-center text-xs text-zinc-600">
-                  Write what happened first — a judge reads this without you there.
                 </p>
               ) : !rule && kinds.some((k) => k.requiresRule) ? (
                 <p className="text-center text-xs text-zinc-600">

@@ -141,10 +141,10 @@ test("the state payload gates flags on read access", () => {
   );
 });
 
-test("the observation text remains required and capped for judge-readable context", () => {
+test("the observation text is optional and capped when supplied", () => {
   const src = readFileSync(new URL("../src/lib/flagValidation.ts", import.meta.url), "utf8");
   const fn = src.slice(src.indexOf("export function parseFlagFields"));
-  assert.ok(/if \(!text\)/.test(fn), "empty observation text is no longer rejected");
+  assert.ok(!/if \(!text\)/.test(fn), "empty observation text is being rejected");
   assert.ok(fn.includes('.slice(0, 500)'), "the 500-character cap on the observation text is gone");
 });
 

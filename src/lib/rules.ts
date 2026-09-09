@@ -27,8 +27,8 @@ export type Rule = {
   searchKeywords: string[];
 };
 
-/** Category order, exactly as the Quick Reference groups them. */
-export const RULE_CATEGORIES = [
+/** The official Quick Reference categories, kept independently testable. */
+export const QUICK_REFERENCE_RULE_CATEGORIES = [
   "Scoring Rules",
   "Specific Game Rules",
   "Safety Rules",
@@ -37,6 +37,12 @@ export const RULE_CATEGORIES = [
   "Robot Skills Challenge Rules",
   "Robot Rules",
   "Tournament Rules",
+] as const;
+
+/** Official categories followed by this event's intentional custom rules. */
+export const RULE_CATEGORIES = [
+  ...QUICK_REFERENCE_RULE_CATEGORIES,
+  "Tournament Special",
 ] as const;
 
 /**

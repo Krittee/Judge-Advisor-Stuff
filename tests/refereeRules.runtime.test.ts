@@ -4,7 +4,12 @@ import test from "node:test";
 import { parseFlagFields } from "../src/lib/flagValidation";
 import { normalizeMatchNumber } from "../src/lib/match";
 import { refereeHistory } from "../src/lib/refereeHistory";
-import { RULE_CATEGORIES, RULES, searchRules } from "../src/lib/rules";
+import {
+  QUICK_REFERENCE_RULE_CATEGORIES,
+  RULE_CATEGORIES,
+  RULES,
+  searchRules,
+} from "../src/lib/rules";
 import type { FlagRow } from "../src/lib/types";
 
 const validReport = {
@@ -17,20 +22,20 @@ const validReport = {
 };
 
 test("the real validator applies the exact rule requirement for every severity", () => {
-  const good = parseFlagFields({ ...validReport, kind: "good" });
+  const good = parseFlagFields({ ...validReport, kind: "good", body: "" });
   assert.equal(good.ok, true, "Good Conduct must work without a rule");
 
-  const warning = parseFlagFields(validReport);
+  const warning = parseFlagFields({ ...validReport, body: "" });
   assert.equal(warning.ok, true, "Warning must work without a rule");
 
-  const minor = parseFlagFields({ ...validReport, kind: "minor" });
+  const minor = parseFlagFields({ ...validReport, kind: "minor", body: "" });
   assert.equal(minor.ok, false, "Minor must be blocked without a rule");
 
-  const major = parseFlagFields({ ...validReport, kind: "major" });
+  const major = parseFlagFields({ ...validReport, kind: "major", body: "" });
   assert.equal(major.ok, false, "Major must be blocked without a rule");
 
   for (const kind of ["minor", "major"]) {
-    const result = parseFlagFields({ ...validReport, kind, rule: "sg6" });
+    const result = parseFlagFields({ ...validReport, kind, rule: "sg6", body: "" });
     assert.equal(result.ok, true, `${kind} must work with a real rule`);
     if (result.ok) assert.equal(result.rule, "SG6");
   }
@@ -45,9 +50,8 @@ test("Good Conduct cannot retain a stale rule and malformed rule ids are rejecte
   assert.equal(malformed.ok, false);
 });
 
-test("the real validator preserves the existing required observation and match fields", () => {
+test("the real validator preserves the required match fields", () => {
   for (const [field, value] of [
-    ["body", ""],
     ["matchType", "X"],
     ["matchNumber", ""],
     ["field", ""],
@@ -131,8 +135,8 @@ test("changing team or rule cannot leave another selection's repeated history be
   assert.deepEqual(refereeHistory(reports, null, "SG6", "Q", "23").sameRule, []);
 });
 
-test("the runtime rule catalog has exactly the required categories and 78 ids", () => {
-  assert.deepEqual([...RULE_CATEGORIES], [
+test("the runtime rule catalog keeps 78 official rules plus TS1-TS3", () => {
+  assert.deepEqual([...QUICK_REFERENCE_RULE_CATEGORIES], [
     "Scoring Rules",
     "Specific Game Rules",
     "Safety Rules",
@@ -142,8 +146,12 @@ test("the runtime rule catalog has exactly the required categories and 78 ids", 
     "Robot Rules",
     "Tournament Rules",
   ]);
-  assert.equal(RULES.length, 78);
-  assert.equal(new Set(RULES.map((rule) => rule.id)).size, 78);
+  assert.deepEqual([...RULE_CATEGORIES], [
+    ...QUICK_REFERENCE_RULE_CATEGORIES,
+    "Tournament Special",
+  ]);
+  assert.equal(RULES.length, 81);
+  assert.equal(new Set(RULES.map((rule) => rule.id)).size, 81);
 
   const expectedIds = [
     ...Array.from({ length: 5 }, (_, i) => `SC${i + 1}`),
@@ -154,6 +162,7 @@ test("the runtime rule catalog has exactly the required categories and 78 ids", 
     ...Array.from({ length: 8 }, (_, i) => `RSC${i + 1}`),
     ...Array.from({ length: 17 }, (_, i) => `R${i + 1}`),
     ...Array.from({ length: 19 }, (_, i) => `T${i + 1}`),
+    ...Array.from({ length: 3 }, (_, i) => `TS${i + 1}`),
   ];
   assert.deepEqual(RULES.map((rule) => rule.id), expectedIds);
 });
@@ -165,6 +174,9 @@ test("the real search finds every mandated rule using partial, case-insensitive 
     GG4: ["GG4", "hands", "hand", "field"],
     GG10: ["GG10", "handling", "robot", "reset"],
     GG12: ["GG12", "timer", "start", "stop", "early", "late", "timing"],
+    TS1: ["TS1", "sportsmanship", "respect"],
+    TS2: ["TS2", "unsportsmanlike", "taunting"],
+    TS3: ["TS3", "help reset", "field reset"],
   };
 
   for (const [id, queries] of Object.entries(cases)) {
