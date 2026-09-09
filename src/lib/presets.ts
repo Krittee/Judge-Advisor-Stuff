@@ -80,13 +80,15 @@ export type FlagKind = {
   color: string;
   /** 0 is praise; higher is worse. Sorts the list and picks a team's worst. */
   severity: number;
+  /** Whether a rule must be picked before this kind can be recorded. */
+  requiresRule: boolean;
 };
 
 const FLAG_FALLBACK: FlagKind[] = [
-  { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0 },
-  { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1 },
-  { id: "minor", label: "Minor violation", short: "Minor", color: "orange", severity: 2 },
-  { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3 },
+  { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },
+  { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
+  { id: "minor", label: "Minor violation", short: "Minor", color: "orange", severity: 2, requiresRule: true },
+  { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3, requiresRule: true },
 ];
 
 /** The kinds of flag a referee may record. Always at least one. */
@@ -105,6 +107,7 @@ export function refereeFlags(): FlagKind[] {
         short: String(o.short ?? label),
         color: String(o.color ?? "zinc"),
         severity: Number.isFinite(Number(o.severity)) ? Number(o.severity) : 0,
+        requiresRule: o.requiresRule === true,
       };
     })
     .filter((f): f is FlagKind => f !== null);

@@ -283,6 +283,9 @@ async function migrate(): Promise<void> {
       alter table flags add column if not exists match_type text;
       alter table flags add column if not exists match_number text;
       alter table flags add column if not exists field text;
+
+      -- Which Quick Reference rule a violation flag was against.
+      alter table flags add column if not exists rule text;
     end $$;
   `);
 }
@@ -707,10 +710,19 @@ export const postgresStore: Store = {
   async createFlag(input: NewFlag) {
     return one(
       await query<FlagRow>(
-        `insert into flags (team_id, kind, body, author, match_type, match_number, field)
-         values ($1, $2, $3, $4, $5, $6, $7)
+        `insert into flags (team_id, kind, body, author, match_type, match_number, field, rule)
+         values ($1, $2, $3, $4, $5, $6, $7, $8)
          returning *`,
-        [input.teamId, input.kind, input.body, input.author, input.matchType, input.matchNumber, input.field],
+        [
+          input.teamId,
+          input.kind,
+          input.body,
+          input.author,
+          input.matchType,
+          input.matchNumber,
+          input.field,
+          input.rule,
+        ],
       ),
     )!;
   },
@@ -718,10 +730,10 @@ export const postgresStore: Store = {
   async updateFlag(id, edit) {
     const updated = one(
       await query<FlagRow>(
-        `update flags set kind = $2, body = $3, match_type = $4, match_number = $5, field = $6
+        `update flags set kind = $2, body = $3, match_type = $4, match_number = $5, field = $6, rule = $7
          where id = $1
          returning *`,
-        [id, edit.kind, edit.body, edit.matchType, edit.matchNumber, edit.field],
+        [id, edit.kind, edit.body, edit.matchType, edit.matchNumber, edit.field, edit.rule],
       ),
     );
     if (!updated) throw new StoreError("That flag no longer exists.", 404);

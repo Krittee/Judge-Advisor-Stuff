@@ -55,14 +55,16 @@
       "label": "Minor violation",
       "short": "Minor",
       "color": "orange",
-      "severity": 2
+      "severity": 2,
+      "requiresRule": true
     },
     {
       "id": "major",
       "label": "Major violation",
       "short": "Major",
       "color": "rose",
-      "severity": 3
+      "severity": 3,
+      "requiresRule": true
     }
   ],
   "matchTypes": [

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { actorLabel, canAdminister, canFlag, canReadFlags, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
-import { isValidMatchType, matchTypes, resolveFlagKind } from "@/lib/presets";
+import { isValidMatchType, matchTypes, refereeFlags, resolveFlagKind } from "@/lib/presets";
 import { isValidField, isValidMatchNumber, normalizeField, normalizeMatchNumber } from "@/lib/match";
+import { isValidRuleId } from "@/lib/rules";
 import type { FlagEdit } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
@@ -46,11 +47,27 @@ export async function GET(request: Request) {
  * The kind falls back to the least severe reading on garbage input; the
  * rest have no safe guess and are refused outright (see the comment on
  * matchType below).
+ *
+ * `requireRuleForSeverity` only applies to a brand-new flag (POST): a
+ * Minor or Major violation must name a rule going forward. It is left
+ * off for corrections (PATCH), so a Minor/Major flag recorded before
+ * this feature existed — with no rule on file — can still be corrected
+ * (a typo fixed, a match number corrected) without being forced to
+ * invent a rule for it retroactively.
  */
 function parseFlagFields(
   body: Record<string, unknown>,
+  { requireRuleForSeverity = false }: { requireRuleForSeverity?: boolean } = {},
 ):
-  | { ok: true; kind: string; text: string; matchType: string; matchNumber: string; field: string }
+  | {
+      ok: true;
+      kind: string;
+      text: string;
+      matchType: string;
+      matchNumber: string;
+      field: string;
+      rule: string | null;
+    }
   | { ok: false; response: NextResponse } {
   const kind = resolveFlagKind(body.kind);
   const text = String(body.body ?? "").trim().slice(0, 500);
@@ -98,7 +115,32 @@ function parseFlagFields(
     };
   }
 
-  return { ok: true, kind, text, matchType, matchNumber, field };
+  // Which Quick Reference rule this was against. A garbage value is
+  // refused rather than silently dropped -- the referee picked from a
+  // known list, so anything else means the request was malformed.
+  const rawRule = String(body.rule ?? "").trim().toUpperCase();
+  if (rawRule && !isValidRuleId(rawRule)) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: "That's not a recognised rule." }, { status: 400 }),
+    };
+  }
+  const rule = rawRule || null;
+
+  if (requireRuleForSeverity && !rule) {
+    const kindMeta = refereeFlags().find((k) => k.id === kind);
+    if (kindMeta?.requiresRule) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: `Pick which rule was violated — required for ${kindMeta.label}.` },
+          { status: 400 },
+        ),
+      };
+    }
+  }
+
+  return { ok: true, kind, text, matchType, matchNumber, field, rule };
 }
 
 export async function POST(request: Request) {
@@ -121,9 +163,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That team no longer exists." }, { status: 404 });
   }
 
-  const parsed = parseFlagFields(body);
+  const parsed = parseFlagFields(body, { requireRuleForSeverity: true });
   if (!parsed.ok) return parsed.response;
-  const { kind, text, matchType, matchNumber, field } = parsed;
+  const { kind, text, matchType, matchNumber, field, rule } = parsed;
 
   const flag = await store().createFlag({
     teamId,
@@ -133,6 +175,7 @@ export async function POST(request: Request) {
     matchType,
     matchNumber,
     field,
+    rule,
   });
 
   await store().logActivity({
@@ -188,9 +231,9 @@ export async function PATCH(request: Request) {
 
   const parsed = parseFlagFields(body);
   if (!parsed.ok) return parsed.response;
-  const { kind, text, matchType, matchNumber, field } = parsed;
+  const { kind, text, matchType, matchNumber, field, rule } = parsed;
 
-  const edit: FlagEdit = { kind, body: text, matchType, matchNumber, field };
+  const edit: FlagEdit = { kind, body: text, matchType, matchNumber, field, rule };
   let flag;
   try {
     flag = await store().updateFlag(id, edit);

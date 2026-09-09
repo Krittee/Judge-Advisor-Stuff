@@ -107,6 +107,9 @@ export type FlagRow = {
   match_type: string | null;
   match_number: string | null;
   field: string | null;
+  /** A Rule id from src/lib/rules.ts (e.g. "SG6"). Null for Good Conduct,
+   *  an optional-rule Warning, or a flag recorded before this existed. */
+  rule: string | null;
   created_at: string;
 };
 
@@ -154,7 +157,14 @@ export type AppState = {
   /** The match types a flag can be pinned to (P/Q/F), so it can be traced back. */
   matchTypes: { id: string; label: string }[];
   /** The kinds of flag a referee can record, with their colours. */
-  flagKinds: { id: string; label: string; short: string; color: string; severity: number }[];
+  flagKinds: {
+    id: string;
+    label: string;
+    short: string;
+    color: string;
+    severity: number;
+    requiresRule: boolean;
+  }[];
   /** What referees have flagged. Judges read these; only referees write them. */
   flags: FlagRow[];
   /** What this viewer is allowed to do, so the UI never offers more. */

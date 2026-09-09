@@ -242,9 +242,12 @@ test("PATCH validates with the same rules as POST, not a looser copy", () => {
   const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
   // Both handlers must route through the one shared validator, or a
   // correction could accept something a fresh flag would have refused.
+  // POST additionally opts into requiring a rule for Minor/Major (an
+  // options argument on the same shared call, not a second validator),
+  // so the match here is a prefix rather than the exact literal call.
   const postFn = src.slice(src.indexOf("export async function POST"), src.indexOf("export async function PATCH"));
   const patchFn = src.slice(src.indexOf("export async function PATCH"), src.indexOf("export async function DELETE"));
-  assert.ok(postFn.includes("parseFlagFields(body)"), "POST no longer shares the validator");
+  assert.ok(postFn.includes("parseFlagFields(body"), "POST no longer shares the validator");
   assert.ok(patchFn.includes("parseFlagFields(body)"), "PATCH no longer shares the validator");
 });
 
@@ -302,7 +305,7 @@ test("the file store's updateFlag only assigns the correctable fields", () => {
   assert.ok(assigned.length > 0, "updateFlag does not assign anything -- did it move?");
   assert.deepEqual(
     new Set(assigned),
-    new Set(["kind", "body", "match_type", "match_number", "field"]),
+    new Set(["kind", "body", "match_type", "match_number", "field", "rule"]),
     "updateFlag assigns a field beyond the correctable ones -- id, team_id, author and " +
       "created_at must stay fixed",
   );
@@ -322,7 +325,7 @@ test("the Postgres store's updateFlag only sets the correctable columns", () => 
   const columns = [...setClause[1].matchAll(/(\w+)\s*=\s*\$\d/g)].map((m) => m[1]);
   assert.deepEqual(
     new Set(columns),
-    new Set(["kind", "body", "match_type", "match_number", "field"]),
+    new Set(["kind", "body", "match_type", "match_number", "field", "rule"]),
     "updateFlag's SET clause writes a column beyond the correctable ones -- id, team_id, " +
       "author and created_at must stay fixed",
   );

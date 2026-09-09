@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { AppState, FlagRow } from "@/lib/types";
 import type { FlagEdit } from "@/lib/db/types";
 import { filterMatchNumberInput, matchReference } from "@/lib/match";
+import { ruleDisplayLabel } from "@/lib/rules";
 
 export type FlagKind = AppState["flagKinds"][number];
 export type MatchType = AppState["matchTypes"][number];
@@ -180,6 +181,11 @@ function FlagListItem({
   // it does when a flag is first raised — a referee re-selecting "Minor"
   // instead of "Major" is doing exactly the gesture they did the first
   // time, not filling in a separate form.
+  //
+  // This correction form has no rule picker of its own -- rule is set
+  // once, when the flag is first raised. f.rule is passed through
+  // unchanged here so a correction (fixing a typo, a match number) can
+  // never silently wipe the rule already on record.
   async function save(kind: string) {
     if (!onEdit) return;
     setBusy(true);
@@ -191,6 +197,7 @@ function FlagListItem({
         matchType: draftMatchType,
         matchNumber: draftMatchNumber,
         field: draftField,
+        rule: f.rule,
       });
       setEditing(false);
     } catch (e) {
@@ -219,6 +226,18 @@ function FlagListItem({
           >
             {matchReference(f.match_type, f.match_number)}
             {f.field ? ` · ${f.field}` : ""}
+          </span>
+        ) : null}
+        {/* Which rule this was against, when there is one -- never shown
+            for Good Conduct, an optional-rule Warning, or a flag recorded
+            before this existed (f.rule is null either way, so there is
+            nothing to tell apart here and nothing renders). */}
+        {ruleDisplayLabel(f.rule) ? (
+          <span
+            title="Rule violated"
+            className="rounded-md bg-white/5 px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-indigo-300"
+          >
+            {ruleDisplayLabel(f.rule)}
           </span>
         ) : null}
         <span className="ml-auto flex items-center gap-3">

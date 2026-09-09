@@ -153,6 +153,7 @@ create table flags (
   match_type   text,
   match_number text,
   field        text,
+  rule         text,                          -- Quick Reference rule id, e.g. 'SG6'
   created_at   timestamptz not null default now()
 );
 

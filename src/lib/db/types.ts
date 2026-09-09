@@ -67,6 +67,8 @@ export type NewFlag = {
   matchType: string;
   matchNumber: string;
   field: string;
+  /** A Rule id from src/lib/rules.ts, or null when none was picked. */
+  rule: string | null;
 };
 
 /**
@@ -84,6 +86,9 @@ export type FlagEdit = {
   matchType: string;
   matchNumber: string;
   field: string;
+  /** A Rule id from src/lib/rules.ts, or null. Carried through unchanged
+   *  by the correction UI -- see FlagListItem's save() in Flags.tsx. */
+  rule: string | null;
 };
 
 export type NewActivity = {

@@ -167,11 +167,12 @@ function migrate(data: Data): Data {
   data.scores ??= [];
   data.conflicts ??= [];
   data.flags ??= [];
-  // Match and field arrived after the first flags did.
+  // Match and field arrived after the first flags did; rule after that.
   for (const f of data.flags) {
     f.match_type ??= null;
     f.match_number ??= null;
     f.field ??= null;
+    f.rule ??= null;
   }
 
   // Languages and panel language cover arrived after the first rosters.
@@ -680,6 +681,7 @@ function createFlag(input: NewFlag): FlagRow {
     match_type: input.matchType,
     match_number: input.matchNumber,
     field: input.field,
+    rule: input.rule,
     created_at: new Date().toISOString(),
   };
   state().flags.push(row);
@@ -696,6 +698,7 @@ function updateFlag(id: string, edit: FlagEdit): FlagRow {
   row.match_type = edit.matchType;
   row.match_number = edit.matchNumber;
   row.field = edit.field;
+  row.rule = edit.rule;
   save();
   return row;
 }
