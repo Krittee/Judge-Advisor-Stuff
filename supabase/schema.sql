@@ -12,6 +12,7 @@
 
 drop table if exists activity  cascade;
 drop table if exists scores    cascade;
+drop table if exists flags     cascade;
 drop table if exists conflicts cascade;
 drop table if exists notes     cascade;
 drop table if exists requests  cascade;
@@ -139,6 +140,23 @@ create index conflicts_panel_idx on conflicts (panel_id);
 create index conflicts_team_idx  on conflicts (team_id);
 
 -- ---------------------------------------------------------------------
+-- Referee flags — what a referee saw on the field. Written by referees,
+-- read by the people who judge. match_type/match_number/field let a
+-- flag be traced back to the moment it happened.
+-- ---------------------------------------------------------------------
+create table flags (
+  id           uuid primary key default gen_random_uuid(),
+  team_id      uuid not null references teams(id) on delete cascade,
+  kind         text not null,
+  body         text not null,
+  author       text not null,
+  match_type   text,
+  match_number text,
+  field        text,
+  created_at   timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------
 -- Scores — one row per (team, rubric). values holds each criterion.
 -- ---------------------------------------------------------------------
 create table scores (
@@ -200,5 +218,6 @@ alter table teams     enable row level security;
 alter table requests  enable row level security;
 alter table notes     enable row level security;
 alter table conflicts enable row level security;
+alter table flags     enable row level security;
 alter table scores    enable row level security;
 alter table activity  enable row level security;
