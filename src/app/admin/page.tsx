@@ -1728,7 +1728,6 @@ function ImportTab({
   const [text, setText] = useState("");
   const [autoAssign, setAutoAssign] = useState(true);
   const [perPanel, setPerPanel] = useState(10);
-  const [division, setDivision] = useState(divisions[0] ?? "");
   const [category, setCategory] = useState(categories[0]?.id ?? "");
   const [loaded, setLoaded] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -1761,7 +1760,7 @@ function ImportTab({
     try {
       const res = await call<{ imported: number; skipped: number; assigned: number }>(
         "/api/admin/teams",
-        { body: { text, autoAssign, perPanel, division, category } },
+        { body: { text, autoAssign, perPanel, category } },
       );
       setResult(
         `Imported ${res.imported} team${res.imported === 1 ? "" : "s"}` +
@@ -1782,15 +1781,19 @@ function ImportTab({
       <div>
         <h2 className="text-lg font-semibold">Import your team list</h2>
         <p className="mt-1 text-sm text-zinc-400">
-          One team per line: <code className="text-zinc-300">number, name, pit</code>. Pit is
-          optional, and reads best as a letter and a number like <code className="text-zinc-300">A1</code>, which is what puts
-          the team on the board&apos;s pit floor plan. Team numbers may include letters —{" "}
+          One team per line: <code className="text-zinc-300">number, name, pit, division</code>.
+          Division is each team&apos;s own — <code className="text-zinc-300">Elementary School</code>,{" "}
+          <code className="text-zinc-300">Middle School</code>, and so on — so one paste can bring
+          in every division at once; a row with nothing in that column falls back to{" "}
+          {divisions[0] ? <code className="text-zinc-300">{divisions[0]}</code> : "the first configured division"}.
+          Pit is optional, and reads best as a letter and a number like{" "}
+          <code className="text-zinc-300">A1</code>, which is what puts the team on the
+          board&apos;s pit floor plan. Team numbers may include letters —{" "}
           <code className="text-zinc-300">9882K</code>{" "}
-          works as well as <code className="text-zinc-300">1234</code>. Everything you load goes
-          into the division and notebook type chosen below, unless a row names them in a fourth
-          and fifth column. Paste straight
-          from a spreadsheet — tabs work too, and a header row is skipped automatically.
-          Re-importing updates existing teams instead of duplicating them.
+          works as well as <code className="text-zinc-300">1234</code>. A fifth column names the
+          notebook type, falling back to the one chosen below. Paste straight from a spreadsheet —
+          tabs work too, and a header row is skipped automatically. Re-importing updates existing
+          teams instead of duplicating them.
         </p>
       </div>
 
@@ -1838,7 +1841,11 @@ function ImportTab({
           }}
           rows={12}
           spellCheck={false}
-          placeholder={"1234, Iron Hawks, A1\n9882K, Kilo Kestrels, A2\n9882A, Alpha Antelopes, B1"}
+          placeholder={
+            "1234, Iron Hawks, A1, Elementary School\n" +
+            "9882K, Kilo Kestrels, A2, Middle School\n" +
+            "9882A, Alpha Antelopes, B1, Elementary School"
+          }
           className={`${inputClass} font-mono text-sm`}
         />
       </div>
@@ -1846,20 +1853,6 @@ function ImportTab({
       {loaded ? <Banner kind="info">{loaded}</Banner> : null}
 
       <div className="flex flex-wrap items-center gap-4">
-        <label className="text-sm text-zinc-300">
-          <span className="mb-1 block text-xs text-zinc-400">Import into</span>
-          <select
-            value={division}
-            onChange={(e) => setDivision(e.target.value)}
-            className={`${inputClass} py-2`}
-          >
-            {divisions.map((d) => (
-              <option key={d} value={d} className="bg-zinc-900">
-                {d}
-              </option>
-            ))}
-          </select>
-        </label>
         <label className="text-sm text-zinc-300">
           <span className="mb-1 block text-xs text-zinc-400">Notebook type</span>
           <select
