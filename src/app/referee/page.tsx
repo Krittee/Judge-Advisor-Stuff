@@ -8,10 +8,20 @@ import { SignOutButton } from "@/components/judging";
 import { RefereeNav } from "@/components/RefereeNav";
 import { FlagList, FlagSummary, FLAG_SOLID, kindOf } from "@/components/Flags";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
-import { filterMatchNumberInput, isValidField, isValidMatchNumber, matchReference } from "@/lib/match";
+import {
+  filterMatchNumberInput,
+  isValidField,
+  isValidMatchNumber,
+  matchReference,
+  normalizeField,
+} from "@/lib/match";
 import { RULE_CATEGORIES, commonFieldRules, ruleDisplayLabel, searchRules, type Rule } from "@/lib/rules";
 import type { Session } from "@/lib/auth";
 import type { FlagEdit } from "@/lib/db/types";
+
+/** Division shorthand for the field name, so a referee picks it instead
+ *  of typing it out — "ES2" rather than "Elementary School Field 2". */
+const FIELD_PREFIXES = ["ES", "MS", "HS", "BL"] as const;
 
 /**
  * The referee's page.
@@ -45,7 +55,12 @@ function Referee() {
      for every one of them would be the opposite of easy to track back. */
   const [matchType, setMatchType] = useState("");
   const [matchNumber, setMatchNumber] = useState("");
-  const [field, setField] = useState("");
+  /* Field is built from a division prefix and a number rather than typed
+     out in full -- same "don't reset after a flag is recorded" rule as
+     match/matchNumber applies to both halves. */
+  const [fieldPrefix, setFieldPrefix] = useState("");
+  const [fieldNumber, setFieldNumber] = useState("");
+  const field = normalizeField(`${fieldPrefix}${fieldNumber}`);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -296,17 +311,39 @@ function Referee() {
                 </label>
               </div>
 
-              <label className="block">
-                <span className="mb-1 block text-xs text-zinc-400">Field</span>
-                <input
-                  value={field}
-                  onChange={(e) => setField(e.target.value)}
-                  placeholder="Field 2"
-                  maxLength={40}
-                  autoComplete="off"
-                  className={`${inputClass} py-2`}
-                />
-              </label>
+              {/* Division prefix + number, not free text -- a referee
+                  picks "ES" and types "2" rather than writing out
+                  "Elementary School Field 2" every time. */}
+              <div className="flex flex-wrap gap-2">
+                <label className="min-w-[7rem] flex-1">
+                  <span className="mb-1 block text-xs text-zinc-400">Field</span>
+                  <select
+                    value={fieldPrefix}
+                    onChange={(e) => setFieldPrefix(e.target.value)}
+                    className={`${inputClass} py-2`}
+                  >
+                    <option value="" className="bg-zinc-900">
+                      — division —
+                    </option>
+                    {FIELD_PREFIXES.map((p) => (
+                      <option key={p} value={p} className="bg-zinc-900">
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="min-w-[4.5rem] flex-1">
+                  <span className="mb-1 block text-xs text-zinc-400">Field #</span>
+                  <input
+                    value={fieldNumber}
+                    onChange={(e) => setFieldNumber(filterMatchNumberInput(e.target.value))}
+                    placeholder="1"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    className={`${inputClass} py-2 text-center`}
+                  />
+                </label>
+              </div>
 
               <label className="block">
                 <span className="mb-1 block text-xs text-zinc-400">
