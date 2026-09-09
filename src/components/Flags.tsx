@@ -320,9 +320,9 @@ function FlagListItem({
             ))}
           </div>
         </div>
-      ) : (
+      ) : f.body ? (
         <p className="mt-1.5 text-sm text-zinc-200">{f.body}</p>
-      )}
+      ) : null}
     </li>
   );
 }

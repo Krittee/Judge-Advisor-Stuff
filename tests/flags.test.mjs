@@ -141,9 +141,11 @@ test("the state payload gates flags on read access", () => {
   );
 });
 
-test("the API refuses a flag with no text", () => {
+test("the observation text is optional -- a referee may rely on the rule/kind/match reference alone", () => {
   const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
-  assert.ok(src.includes("Say what you saw"), "an empty flag is no use to a judge");
+  const fn = src.slice(src.indexOf("function parseFlagFields"), src.indexOf("// Match and field are what"));
+  assert.ok(!/if \(!text\)/.test(fn), "empty observation text is no longer accepted");
+  assert.ok(fn.includes('.slice(0, 500)'), "the 500-character cap on the observation text is gone");
 });
 
 /* ---- match reference: which match and field a flag happened at -------- */

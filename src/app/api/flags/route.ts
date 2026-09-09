@@ -70,16 +70,10 @@ function parseFlagFields(
     }
   | { ok: false; response: NextResponse } {
   const kind = resolveFlagKind(body.kind);
+  // Optional: a referee may record a flag with nothing written, relying on
+  // the rule/kind/match reference alone. Still capped at 500 chars when
+  // something is written.
   const text = String(body.body ?? "").trim().slice(0, 500);
-  if (!text) {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        { error: "Say what you saw — judges read this without you there to explain." },
-        { status: 400 },
-      ),
-    };
-  }
 
   // Match and field are what let a head referee trace a flag back to a
   // moment, so unlike the flag kind they are required and validated

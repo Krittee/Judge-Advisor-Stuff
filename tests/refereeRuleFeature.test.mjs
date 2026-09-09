@@ -112,13 +112,22 @@ test("record() sends the selected rule and clears it after a successful submit",
   assert.ok(!/setField\(""\)/.test(recordFn), "record() must not reset field (existing behaviour)");
 });
 
+test("the observation text (\"What did you see?\") is optional, not required to submit", () => {
+  assert.ok(pageSrc.includes("What did you see? "), "the label is missing");
+  assert.ok(pageSrc.includes("(optional)"), "the observation box is no longer marked optional");
+  assert.ok(
+    !/disabled=\{[^}]*!body\.trim\(\)/.test(pageSrc),
+    "a kind button still disables on empty observation text -- it must be optional",
+  );
+});
+
 test("Minor/Major are disabled without a rule, driven by each kind's own requiresRule flag", () => {
   assert.ok(
     pageSrc.includes("const missingRule = k.requiresRule && !rule;"),
     "the per-button rule requirement is no longer computed from k.requiresRule",
   );
   assert.ok(
-    /disabled=\{busy \|\| !body\.trim\(\) \|\| !matchReady \|\| missingRule\}/.test(pageSrc),
+    /disabled=\{busy \|\| !matchReady \|\| missingRule\}/.test(pageSrc),
     "the kind buttons no longer factor missingRule into their disabled state",
   );
   // Must not be hardcoded to specific ids -- that would silently stop

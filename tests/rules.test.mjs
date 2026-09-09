@@ -17,6 +17,7 @@ const RULE_CATEGORIES = [
   "Robot Skills Challenge Rules",
   "Robot Rules",
   "Tournament Rules",
+  "Tournament Special",
 ];
 
 const COMMON_FIELD_RULE_IDS = ["SG6", "SG7", "GG4", "GG10", "GG12", "SG2", "S1"];
@@ -91,8 +92,22 @@ test("every rule has an official title, a short label and at least one keyword",
   }
 });
 
-test("the full 8-category, 78-rule Quick Reference is present", () => {
-  assert.equal(RULES.length, 78);
+test("the full 8-category Quick Reference plus this event's Tournament Special additions is present", () => {
+  assert.equal(RULES.length, 81);
+});
+
+test("Tournament Special (TS1-TS3) is present and searchable", () => {
+  for (const [query, id] of [
+    ["TS1", "TS1"],
+    ["sportsmanlike", "TS1"],
+    ["TS2", "TS2"],
+    ["unsportsmanlike", "TS2"],
+    ["TS3", "TS3"],
+    ["reset", "TS3"],
+    ["help reset", "TS3"],
+  ]) {
+    assert.ok(searchRules(query).some((r) => r.id === id), `"${query}" did not find ${id}`);
+  }
 });
 
 /* ---- common field rule shortcuts --------------------------------------- */
