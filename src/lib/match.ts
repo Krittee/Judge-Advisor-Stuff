@@ -14,9 +14,10 @@ const MAX_MATCH_NUMBER_LENGTH = 4;
 const MAX_FIELD_LENGTH = 40;
 
 export function normalizeMatchNumber(input: unknown): string {
-  return String(input ?? "")
+  const digits = String(input ?? "")
     .replace(/\D/g, "")
-    .slice(0, MAX_MATCH_NUMBER_LENGTH);
+    .replace(/^0+(?=\d)/, "");
+  return digits.slice(0, MAX_MATCH_NUMBER_LENGTH);
 }
 
 export function isValidMatchNumber(value: string): boolean {
@@ -25,7 +26,7 @@ export function isValidMatchNumber(value: string): boolean {
 
 /** Strip anything a match number may not contain, for use while typing. */
 export function filterMatchNumberInput(input: string): string {
-  return input.replace(/\D/g, "").slice(0, MAX_MATCH_NUMBER_LENGTH);
+  return normalizeMatchNumber(input);
 }
 
 export function normalizeField(input: unknown): string {

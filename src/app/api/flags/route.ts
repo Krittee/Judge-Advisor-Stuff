@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { actorLabel, canAdminister, canFlag, canReadFlags, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
-import { isValidMatchType, matchTypes, refereeFlags, resolveFlagKind } from "@/lib/presets";
-import { isValidField, isValidMatchNumber, normalizeField, normalizeMatchNumber } from "@/lib/match";
-import { isValidRuleId } from "@/lib/rules";
+import { parseFlagFields } from "@/lib/flagValidation";
 import type { FlagEdit } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
@@ -39,104 +37,6 @@ export async function GET(request: Request) {
   return NextResponse.json({ flags });
 }
 
-/**
- * Validate the fields a referee fills in for a flag — shared between
- * raising a new one and correcting one already on record, so the two
- * paths can never quietly drift apart on what counts as valid.
- *
- * The kind falls back to the least severe reading on garbage input; the
- * rest have no safe guess and are refused outright (see the comment on
- * matchType below).
- *
- * `requireRuleForSeverity` only applies to a brand-new flag (POST): a
- * Minor or Major violation must name a rule going forward. It is left
- * off for corrections (PATCH), so a Minor/Major flag recorded before
- * this feature existed — with no rule on file — can still be corrected
- * (a typo fixed, a match number corrected) without being forced to
- * invent a rule for it retroactively.
- */
-function parseFlagFields(
-  body: Record<string, unknown>,
-  { requireRuleForSeverity = false }: { requireRuleForSeverity?: boolean } = {},
-):
-  | {
-      ok: true;
-      kind: string;
-      text: string;
-      matchType: string;
-      matchNumber: string;
-      field: string;
-      rule: string | null;
-    }
-  | { ok: false; response: NextResponse } {
-  const kind = resolveFlagKind(body.kind);
-  // Optional: a referee may record a flag with nothing written, relying on
-  // the rule/kind/match reference alone. Still capped at 500 chars when
-  // something is written.
-  const text = String(body.body ?? "").trim().slice(0, 500);
-
-  // Match and field are what let a head referee trace a flag back to a
-  // moment, so unlike the flag kind they are required and validated
-  // outright rather than guessed at: recording a Qualification incident
-  // as Practice because the request was malformed would be worse than
-  // refusing it.
-  const matchType = String(body.matchType ?? "").trim().toUpperCase();
-  if (!isValidMatchType(matchType)) {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        {
-          error: `Pick which match this was — ${matchTypes()
-            .map((t) => `${t.id} (${t.label})`)
-            .join(", ")}.`,
-        },
-        { status: 400 },
-      ),
-    };
-  }
-  const matchNumber = normalizeMatchNumber(body.matchNumber);
-  if (!isValidMatchNumber(matchNumber)) {
-    return {
-      ok: false,
-      response: NextResponse.json({ error: "Enter the match number." }, { status: 400 }),
-    };
-  }
-  const field = normalizeField(body.field);
-  if (!isValidField(field)) {
-    return {
-      ok: false,
-      response: NextResponse.json({ error: "Enter which field this was." }, { status: 400 }),
-    };
-  }
-
-  // Which Quick Reference rule this was against. A garbage value is
-  // refused rather than silently dropped -- the referee picked from a
-  // known list, so anything else means the request was malformed.
-  const rawRule = String(body.rule ?? "").trim().toUpperCase();
-  if (rawRule && !isValidRuleId(rawRule)) {
-    return {
-      ok: false,
-      response: NextResponse.json({ error: "That's not a recognised rule." }, { status: 400 }),
-    };
-  }
-  const rule = rawRule || null;
-
-  if (requireRuleForSeverity && !rule) {
-    const kindMeta = refereeFlags().find((k) => k.id === kind);
-    if (kindMeta?.requiresRule) {
-      return {
-        ok: false,
-        response: NextResponse.json(
-          { error: `Pick which rule was violated — required for ${kindMeta.label}.` },
-          { status: 400 },
-        ),
-      };
-    }
-  }
-
-  return { ok: true, kind, text, matchType, matchNumber, field, rule };
-}
-
 export async function POST(request: Request) {
   const session = await getSession();
   if (!canFlag(session)) {
@@ -157,8 +57,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That team no longer exists." }, { status: 404 });
   }
 
-  const parsed = parseFlagFields(body, { requireRuleForSeverity: true });
-  if (!parsed.ok) return parsed.response;
+  const parsed = parseFlagFields(body);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+  }
   const { kind, text, matchType, matchNumber, field, rule } = parsed;
 
   const flag = await store().createFlag({
@@ -223,8 +125,12 @@ export async function PATCH(request: Request) {
   const teamId = existing.team_id;
   const previousKind = existing.kind;
 
-  const parsed = parseFlagFields(body);
-  if (!parsed.ok) return parsed.response;
+  const parsed = parseFlagFields(body, {
+    allowLegacyRulelessKind: existing.rule ? null : existing.kind,
+  });
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+  }
   const { kind, text, matchType, matchNumber, field, rule } = parsed;
 
   const edit: FlagEdit = { kind, body: text, matchType, matchNumber, field, rule };

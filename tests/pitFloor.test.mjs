@@ -48,6 +48,15 @@ test("this event's setting draws the floor the way the hall runs", () => {
   );
 });
 
+test("column letters render beneath the pit cells", () => {
+  const src = readFileSync(new URL("../src/components/PitMap.tsx", import.meta.url), "utf8");
+  const column = src.slice(src.indexOf("{columns.map"), src.indexOf("</div>", src.indexOf("{columns.map")));
+  assert.ok(
+    column.indexOf("numbered.map") < column.lastIndexOf("{row}"),
+    "the column letter moved above the pit cells",
+  );
+});
+
 test("flipping the setting flips the drawing, both ways", () => {
   const normal = draw(plan, { columns: "left-to-right", rows: "top-to-bottom" });
   assert.deepEqual(normal.map((c) => c.row), ["A", "B", "C"]);

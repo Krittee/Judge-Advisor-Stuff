@@ -91,8 +91,10 @@ app knows which is in use.
 
 1. Sign in at `/login` with any configured Judge Advisor code (`ADMIN_CODE` through
    `ADMIN_CODE_4`).
-2. **Teams tab → Reset → Wipe everything.** This clears the demo roster. Do
-   this first, or you will be judging the Quantum Quokkas.
+2. **Teams tab → Reset → Wipe everything.** This clears the previous active
+   event, including its referee history, as well as the demo roster. Do this
+   before every new event, or repeat-violation history can cross event
+   boundaries (and you may be judging the Quantum Quokkas).
 3. **Panels tab** — add each judge group: name, room, judge names. Write down
    each panel's code and hand it to that group.
 4. **Import tab** — drop in a `.xlsx`, `.csv` or `.tsv` file, or paste your roster
@@ -370,12 +372,11 @@ moment, so every one carries a match reference:
 
 - **Match** — a dropdown, **P**ractice / **Q**ualification / **F**inal.
 - **Match #** — the match number.
-- **Field** — free text (`Field 1`, `Red`, whatever the hall calls it).
+- **Field** — an ES/MS/HS/BL selector plus its short field number.
 
-All three are required, the same standing as the description — a flag
-nobody can trace back is not much use days later. They show up everywhere
-a flag does as a compact reference, `Q23 · Field 2`, right beside who wrote
-it and when.
+All three are required; the description is optional. A flag nobody can trace
+back is not much use days later. They show up everywhere a flag does as a
+compact reference, `Q23 · ES2`, right beside who wrote it and when.
 
 **Match and field are remembered between flags, on purpose.** A referee
 works one match at a time and often flags more than one team against it,
@@ -383,6 +384,20 @@ so only the description clears after each save — re-typing the match for
 every team would work against the whole point of tracking it. Change the
 dropdown or the number the moment you move to a different match; there is
 nothing that resets them for you.
+
+**Rule violated** is one searchable list containing the complete Level Up
+Quick Reference plus this event's TS1–TS3 Tournament Special rules. It accepts
+rule ids (with or without angle brackets), title words and common field terms.
+A rule is required for Minor and Major, optional for Warning, and never
+attached to Good Conduct. The referee page shows
+same-rule, same-match and overall active-event history. Prior Minor violations
+only prompt an escalation review: they never select Major or disqualify a team.
+The Head Referee always chooses the outcome.
+
+This application has one active event per data store. **Clear today's
+requests** deliberately keeps referee flags so repeat history spans a multi-day
+event. **Wipe everything** is the event boundary and removes that history
+before the next roster is imported.
 
 **An unrecognised match type is refused outright, not guessed.** That is
 different from a flag kind, which falls back to the least serious one on
@@ -445,7 +460,8 @@ They live in `config/event.json` and are yours to change:
 ```json
 "refereeFlags": [
   { "id": "good", "label": "Good conduct", "short": "Good", "color": "emerald", "severity": 0 },
-  { "id": "major", "label": "Major violation", "short": "Major", "color": "rose", "severity": 3 }
+  { "id": "minor", "label": "Minor violation", "short": "Minor", "color": "orange", "severity": 2, "requiresRule": true },
+  { "id": "major", "label": "Major violation", "short": "Major", "color": "rose", "severity": 3, "requiresRule": true }
 ]
 ```
 

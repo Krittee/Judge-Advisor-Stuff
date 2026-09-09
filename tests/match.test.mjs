@@ -10,13 +10,14 @@ const MAX_MATCH_NUMBER_LENGTH = 4;
 const MAX_FIELD_LENGTH = 40;
 
 function normalizeMatchNumber(input) {
-  return String(input ?? "").replace(/\D/g, "").slice(0, MAX_MATCH_NUMBER_LENGTH);
+  const digits = String(input ?? "").replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+  return digits.slice(0, MAX_MATCH_NUMBER_LENGTH);
 }
 function isValidMatchNumber(value) {
   return value.length > 0 && value.length <= MAX_MATCH_NUMBER_LENGTH && /^\d+$/.test(value);
 }
 function filterMatchNumberInput(input) {
-  return input.replace(/\D/g, "").slice(0, MAX_MATCH_NUMBER_LENGTH);
+  return normalizeMatchNumber(input);
 }
 function normalizeField(input) {
   return String(input ?? "").trim().replace(/\s+/g, " ").slice(0, MAX_FIELD_LENGTH);
@@ -37,6 +38,9 @@ test("a match number keeps only digits", () => {
   assert.equal(normalizeMatchNumber(""), "");
   assert.equal(normalizeMatchNumber(null), "");
   assert.equal(normalizeMatchNumber(undefined), "");
+  assert.equal(normalizeMatchNumber("023"), "23");
+  assert.equal(normalizeMatchNumber("Q0023"), "23");
+  assert.equal(normalizeMatchNumber("0000"), "0");
 });
 
 test("a match number is capped rather than truncating silently wrong", () => {

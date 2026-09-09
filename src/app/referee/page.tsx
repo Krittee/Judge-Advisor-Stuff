@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { call, useAppState } from "@/components/useAppState";
-import { Banner, Button, inputClass, TopBar } from "@/components/ui";
+import { Banner, inputClass, TopBar } from "@/components/ui";
 import { SignOutButton } from "@/components/judging";
 import { RefereeNav } from "@/components/RefereeNav";
 import { FlagList, FlagSummary, FLAG_SOLID, kindOf } from "@/components/Flags";
@@ -15,9 +15,11 @@ import {
   matchReference,
   normalizeField,
 } from "@/lib/match";
+import { refereeHistory } from "@/lib/refereeHistory";
 import { RULE_CATEGORIES, commonFieldRules, ruleDisplayLabel, searchRules, type Rule } from "@/lib/rules";
 import type { Session } from "@/lib/auth";
 import type { FlagEdit } from "@/lib/db/types";
+import type { FlagRow, Team } from "@/lib/types";
 
 /** Division shorthand for the field name, so a referee picks it instead
  *  of typing it out — "ES2" rather than "Elementary School Field 2". */
@@ -55,9 +57,8 @@ function Referee() {
      for every one of them would be the opposite of easy to track back. */
   const [matchType, setMatchType] = useState("");
   const [matchNumber, setMatchNumber] = useState("");
-  /* Field is built from a division prefix and a number rather than typed
-     out in full -- same "don't reset after a flag is recorded" rule as
-     match/matchNumber applies to both halves. */
+  /* Field is built from a division prefix and a number. Both parts remain
+     selected after a successful report, just like match type and number. */
   const [fieldPrefix, setFieldPrefix] = useState("");
   const [fieldNumber, setFieldNumber] = useState("");
   const field = normalizeField(`${fieldPrefix}${fieldNumber}`);
@@ -93,18 +94,17 @@ function Referee() {
       .catch(() => router.replace("/referee/login"));
   }, [router]);
 
-  // Close the rule dropdown on an outside click — mousedown, not click, so
-  // it fires before a click on an option inside it would otherwise be
-  // lost to the close.
+  // Close the rule dropdown on an outside pointer press. Option buttons use
+  // ordinary click events so touch, mouse and keyboard activation all work.
   useEffect(() => {
     if (!ruleOpen) return;
-    function onPointerDown(e: MouseEvent) {
+    function onPointerDown(e: PointerEvent) {
       if (ruleBoxRef.current && !ruleBoxRef.current.contains(e.target as Node)) {
         setRuleOpen(false);
       }
     }
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [ruleOpen]);
 
   const teamByNumber = useMemo(
@@ -123,6 +123,7 @@ function Referee() {
   // the Quick Reference's own order. Common Field Rules only appear as a
   // shortcut section while the search box is empty — they're the same
   // Rule objects as below, never a duplicate copy.
+  const commonRules = useMemo(() => commonFieldRules(), []);
   const ruleMatches = useMemo(() => searchRules(ruleQuery), [ruleQuery]);
   const ruleGroups = useMemo(() => {
     const byCategory = new Map<string, Rule[]>();
@@ -136,13 +137,13 @@ function Referee() {
 
   /** Teams flagged today, worst first, so a referee can see the pattern. */
   const flagged = useMemo(() => {
-    const byTeam = new Map<string, typeof state.flags>();
+    const byTeam = new Map<string, FlagRow[]>();
     for (const f of state.flags) {
       byTeam.set(f.team_id, [...(byTeam.get(f.team_id) ?? []), f]);
     }
     return [...byTeam.entries()]
       .map(([teamId, flags]) => ({ team: state.teams.find((t) => t.id === teamId), flags }))
-      .filter((row): row is { team: NonNullable<typeof row.team>; flags: typeof state.flags } =>
+      .filter((row): row is { team: Team; flags: FlagRow[] } =>
         Boolean(row.team),
       )
       .sort((a, b) => b.flags[0].created_at.localeCompare(a.flags[0].created_at));
@@ -158,32 +159,17 @@ function Referee() {
   // order above is.
   const maxSeverity = kinds.length ? Math.max(...kinds.map((k) => k.severity)) : 0;
 
-  /* Repeated-violation detection, computed from the reports already on
-     record rather than a separate counter — the same set of flags the
-     "Flagged today" list below already renders from. Referees see every
-     flag in the store (see server-state.ts), so this is complete without
-     a dedicated query. Never sets a kind or pre-selects a button: this
-     is display only. */
-  const sameRuleHistory = useMemo(
-    () => (team && rule ? state.flags.filter((f) => f.team_id === team.id && f.rule === rule) : []),
-    [state.flags, team, rule],
+  /* Repeated-violation detection is a pure calculation over the current
+     event store. It excludes Good Conduct and never selects or changes a
+     severity; the Head Referee still makes that decision. */
+  const history = useMemo(
+    () => refereeHistory(state.flags, team?.id, rule, matchType, matchNumber),
+    [state.flags, team?.id, rule, matchType, matchNumber],
   );
-  const sameMatchSameRule = useMemo(
-    () => sameRuleHistory.filter((f) => f.match_type === matchType && f.match_number === matchNumber),
-    [sameRuleHistory, matchType, matchNumber],
-  );
-  const eventTotalsForTeam = useMemo(() => {
-    const counts = new Map<string, number>();
-    if (!team) return counts;
-    for (const f of state.flags) {
-      if (f.team_id === team.id) counts.set(f.kind, (counts.get(f.kind) ?? 0) + 1);
-    }
-    return counts;
-  }, [state.flags, team]);
-  // "if previousMinorViolationsExist: escalationReviewRequired = true" —
-  // never turns into an automatic Major, only a warning the Head Referee
-  // reads before deciding.
-  const escalationReviewRequired = sameRuleHistory.some((f) => f.kind === "minor");
+  const sameRuleHistory = history.sameRule;
+  const sameMatchSameRule = history.sameMatchSameRule;
+  const eventTotalsForTeam = history.eventTotals;
+  const escalationReviewRequired = history.escalationReviewRequired;
 
   async function correctFlag(id: string, edit: FlagEdit) {
     await call(`/api/flags`, { method: "PATCH", body: { id, ...edit } });
@@ -204,7 +190,7 @@ function Referee() {
       });
       const label = state.flagKinds.find((k) => k.id === kind)?.label ?? kind;
       setSaved(
-        `${label} recorded against ${team.number} for ${matchType}${matchNumber} · Field ${field}. ` +
+        `${label} recorded against ${team.number} for ${matchType}${matchNumber} · ${field}. ` +
           `The judges will see it.`,
       );
       setBody("");
@@ -311,9 +297,6 @@ function Referee() {
                 </label>
               </div>
 
-              {/* Division prefix + number, not free text -- a referee
-                  picks "ES" and types "2" rather than writing out
-                  "Elementary School Field 2" every time. */}
               <div className="flex flex-wrap gap-2">
                 <label className="min-w-[7rem] flex-1">
                   <span className="mb-1 block text-xs text-zinc-400">Field</span>
@@ -325,9 +308,9 @@ function Referee() {
                     <option value="" className="bg-zinc-900">
                       — division —
                     </option>
-                    {FIELD_PREFIXES.map((p) => (
-                      <option key={p} value={p} className="bg-zinc-900">
-                        {p}
+                    {FIELD_PREFIXES.map((prefix) => (
+                      <option key={prefix} value={prefix} className="bg-zinc-900">
+                        {prefix}
                       </option>
                     ))}
                   </select>
@@ -372,10 +355,10 @@ function Referee() {
                   onClick={() => setRuleOpen((o) => !o)}
                   className={`${inputClass} flex items-center justify-between py-2 text-left`}
                 >
-                  <span className={rule ? "" : "text-zinc-600"}>
+                  <span className={`min-w-0 break-words ${rule ? "" : "text-zinc-600"}`}>
                     {rule ? ruleDisplayLabel(rule) : "— select/search rule —"}
                   </span>
-                  <span aria-hidden className="text-zinc-500">
+                  <span aria-hidden className="shrink-0 text-zinc-500">
                     ▾
                   </span>
                 </button>
@@ -390,37 +373,35 @@ function Referee() {
                       autoComplete="off"
                       className="w-full border-b border-white/10 bg-transparent px-4 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
                     />
-                    <div className="max-h-72 overflow-y-auto py-1">
+                    <div className="max-h-[min(18rem,50vh)] overflow-y-auto py-1">
                       {rule ? (
                         <button
                           type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
+                          onClick={() => {
                             setRule(null);
                             setRuleOpen(false);
                           }}
-                          className="block w-full px-4 py-2 text-left text-sm text-rose-300 hover:bg-white/5"
+                          className="block min-h-11 w-full px-4 py-2.5 text-left text-sm text-rose-300 hover:bg-white/5"
                         >
                           Clear rule
                         </button>
                       ) : null}
 
-                      {!ruleQuery.trim() && commonFieldRules().length ? (
+                      {!ruleQuery.trim() && commonRules.length ? (
                         <div>
                           <p className="px-4 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-zinc-500">
                             COMMON FIELD RULES
                           </p>
-                          {commonFieldRules().map((r) => (
+                          {commonRules.map((r) => (
                             <button
                               key={`common-${r.id}`}
                               type="button"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
+                              onClick={() => {
                                 setRule(r.id);
                                 setRuleOpen(false);
                                 setRuleQuery("");
                               }}
-                              className="block w-full px-4 py-2 text-left text-sm text-zinc-200 hover:bg-white/5"
+                              className="block min-h-11 w-full break-words px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-white/5"
                             >
                               <span className="font-semibold text-indigo-300">{r.displayId}</span>{" "}
                               {r.shortLabel}
@@ -439,13 +420,12 @@ function Referee() {
                               <button
                                 key={r.id}
                                 type="button"
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
+                                onClick={() => {
                                   setRule(r.id);
                                   setRuleOpen(false);
                                   setRuleQuery("");
                                 }}
-                                className="block w-full px-4 py-2 text-left text-sm text-zinc-200 hover:bg-white/5"
+                                className="block min-h-11 w-full break-words px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-white/5"
                               >
                                 <span className="font-semibold text-indigo-300">{r.displayId}</span>{" "}
                                 {r.shortLabel}
@@ -495,15 +475,17 @@ function Referee() {
                       Referee.
                     </p>
                   ) : null}
+                </div>
+              ) : null}
 
-                  {eventTotalsForTeam.size ? (
-                    <p className="text-xs text-zinc-500">
-                      Event total for {team.number}:{" "}
-                      {[...eventTotalsForTeam.entries()]
-                        .map(([id, count]) => `${kindOf(id, state.flagKinds)?.short ?? id} ×${count}`)
-                        .join(", ")}
-                    </p>
-                  ) : null}
+              {eventTotalsForTeam.size ? (
+                <div className="rounded-xl bg-white/[0.03] p-3 ring-1 ring-inset ring-white/10">
+                  <p className="text-xs text-zinc-400">
+                    Event violation history for {team.number}:{" "}
+                    {[...eventTotalsForTeam.entries()]
+                      .map(([id, count]) => `${kindOf(id, state.flagKinds)?.short ?? id} ×${count}`)
+                      .join(", ")}
+                  </p>
                 </div>
               ) : null}
 
@@ -566,18 +548,20 @@ function Referee() {
           ) : (
             <ul className="space-y-2">
               {flagged.map(({ team: t, flags }) => (
-                <li
-                  key={t.id}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-inset ring-white/10"
-                >
-                  <button
-                    onClick={() => setNumber(t.number)}
-                    className="text-lg font-bold tabular-nums hover:text-indigo-300"
-                  >
-                    {t.number}
-                  </button>
-                  <span className="min-w-0 flex-1 truncate text-sm text-zinc-400">{t.name}</span>
-                  <FlagSummary flags={flags} kinds={state.flagKinds} />
+                <li key={t.id} className="rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-inset ring-white/10">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <button
+                      onClick={() => setNumber(t.number)}
+                      className="text-lg font-bold tabular-nums hover:text-indigo-300"
+                    >
+                      {t.number}
+                    </button>
+                    <span className="min-w-0 flex-1 truncate text-sm text-zinc-400">{t.name}</span>
+                    <FlagSummary flags={flags} kinds={state.flagKinds} />
+                  </div>
+                  <div className="mt-3">
+                    <FlagList flags={flags} kinds={state.flagKinds} matchTypes={state.matchTypes} />
+                  </div>
                 </li>
               ))}
             </ul>

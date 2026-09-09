@@ -73,9 +73,27 @@ function searchRules(query) {
 
 /* ---- the catalog itself ------------------------------------------------ */
 
-test("every category from the Quick Reference is present, in order, with no extras", () => {
+test("official categories are followed by the event's Tournament Special category", () => {
   const seen = [...new Set(RULES.map((r) => r.category))];
   assert.deepEqual(seen, RULE_CATEGORIES);
+});
+
+test("every rule id is in the required order and assigned to its exact category", () => {
+  const groups = [
+    ["Scoring Rules", "SC", 5],
+    ["Specific Game Rules", "SG", 7],
+    ["Safety Rules", "S", 3],
+    ["General Rules", "G", 5],
+    ["General Game Rules", "GG", 14],
+    ["Robot Skills Challenge Rules", "RSC", 8],
+    ["Robot Rules", "R", 17],
+    ["Tournament Rules", "T", 19],
+    ["Tournament Special", "TS", 3],
+  ];
+  const expected = groups.flatMap(([category, prefix, count]) =>
+    Array.from({ length: count }, (_, index) => ({ id: `${prefix}${index + 1}`, category })),
+  );
+  assert.deepEqual(RULES.map(({ id, category }) => ({ id, category })), expected);
 });
 
 test("every rule id is unique", () => {
@@ -92,21 +110,132 @@ test("every rule has an official title, a short label and at least one keyword",
   }
 });
 
-test("the full 8-category Quick Reference plus this event's Tournament Special additions is present", () => {
+test("the 78 official rules and three Tournament Special rules are present", () => {
   assert.equal(RULES.length, 81);
 });
 
-test("Tournament Special (TS1-TS3) is present and searchable", () => {
+test("every official title exactly preserves the supplied Quick Reference wording", () => {
+  const expected = {
+    SC1: "All scoring statuses are evaluated after the Match ends",
+    SC2: "All scoring statuses are evaluated visually by a Head Referee",
+    SC3: "Scored Bean Bag in a Floor Goal criteria",
+    SC4: "Scored Bean Bag in a L1, L2, or L3 Goal criteria",
+    SC5: "Scored Bean Bag on a L4 Goal criteria",
+    SG1: "Starting a Match",
+    SG2: "Horizontal expansion is limited",
+    SG3: "Vertical expansion is unlimited",
+    SG4: "Keep Scoring Objects in the Field",
+    SG5: "Each Robot gets one yellow Bean Bag as a Preload",
+    SG6: "Possession / Plowing is limited to a maximum of one (1) Bean Bag",
+    SG7: "Using the Load Zone",
+    S1: "Stay safe, don’t damage the Field",
+    S2: "Students must be accompanied by an Adult",
+    S3: "Each Student Team member must have a completed participant release form on file",
+    G1: "Participants must follow the Code of Conduct",
+    G2: "Participants must follow the Student Centered Policy",
+    G3: "Use common sense",
+    G4: "Students must meet the Student Eligibility Policy requirements",
+    G5: "There is a difference between accidentally and willfully violating a Robot rule",
+    GG1: "Drivers drive your Robot, and stay in the Driver Station",
+    GG2: "A Team’s Robot should attend every Match",
+    GG3: "Robots on the Field must be ready to play",
+    GG4: "Hands out of the Field",
+    GG5: "Match Replays are allowed, but rare",
+    GG6: "Disqualifications",
+    GG7: "Time-outs",
+    GG8: "Keep your Robot together",
+    GG9: "Don’t damage the Field",
+    GG10: "Handling the Robot mid-Match is allowed under certain circumstances",
+    GG11: "A Team’s two Drivers switch controllers midway through the Match",
+    GG12: "Don’t start before the timer, and stop moving at the end of the Match",
+    GG13: "Ending a Match early",
+    GG14: "Drive Team Members are permitted to appeal the Head Referee’s ruling",
+    RSC1: "Standard rules apply in most cases",
+    RSC2: "Scoring Robot Skills Matches",
+    RSC3: "Robot and Field setup for Robot Skills Matches",
+    RSC4: "Loading and Driver differences",
+    RSC5: "Handling Robots during an Autonomous Coding Skills Match",
+    RSC6: "Starting an Autonomous Coding Skills Match",
+    RSC7: "Autonomous means “no humans”",
+    RSC8: "Skills Stop Time",
+    R1: "One Robot per Team",
+    R2: "Robots must pass inspection",
+    R3: "Robots must fit within an 11” x 20” x 15” (279.4mm x 508mm x 381.0mm) volume",
+    R4: "License Plates",
+    R5: "Let it go after the Match is over",
+    R6: "Robots have one Brain",
+    R7: "Keep the power button accessible",
+    R8: "Firmware",
+    R9: "Motors",
+    R10: "Batteries",
+    R11: "One controller per Robot",
+    R12: "Robots are built from the VEX IQ product line",
+    R13: "Prohibited items",
+    R14: "Legal Non-VEX IQ components",
+    R15: "Decorations are allowed",
+    R16: "Pneumatics",
+    R17: "Modifications of parts",
+    T1: "Head Referees have ultimate and final authority on all gameplay and Robot ruling decisions",
+    T2: "Head Referees must be qualified",
+    T3: "The Drive Team Members are permitted to immediately appeal the Head Referee’s ruling",
+    T4: "The Event Partner has ultimate authority regarding all non-gameplay decisions",
+    T5: "Be prepared for minor Field variance",
+    T6: "Fields and Field Elements may be repaired at the Event Partner’s discretion",
+    T7: "Fields at an event must be consistent with each other",
+    T8: "Qualification Matches will occur according to the official Match Schedule",
+    T9: "Each Team will be scheduled Qualification Matches as follows",
+    T10: "Teams are ranked by their average Qualification Match scores",
+    T11: "Qualification Match tiebreakers",
+    T12: "How Alliances are formed for Teamwork Matches",
+    T13: "Teams playing in Finals Matches.",
+    T14: "Finals Match Schedule",
+    T15: "Skills Match Schedule",
+    T16: "No requirement that Skills Fields have the same modifications as the Teamwork Fields",
+    T17: "Skills Rankings at events",
+    T18: "Skills Rankings globally",
+    T19: "Robot Skills at League Events",
+  };
+
+  assert.deepEqual(
+    Object.fromEntries(
+      RULES.filter((rule) => rule.category !== "Tournament Special").map((rule) => [rule.id, rule.officialTitle]),
+    ),
+    expected,
+  );
+});
+
+test("Tournament Special preserves TS1-TS3 and their event-specific titles", () => {
+  assert.deepEqual(
+    RULES.filter((rule) => rule.category === "Tournament Special").map(
+      ({ id, officialTitle }) => ({ id, officialTitle }),
+    ),
+    [
+      {
+        id: "TS1",
+        officialTitle:
+          "Teams and individuals are expected to display good sportsmanship toward opponents, officials and volunteers at all times",
+      },
+      {
+        id: "TS2",
+        officialTitle:
+          "Unsportsmanlike conduct by a Team or individual is a violation and may be penalized",
+      },
+      {
+        id: "TS3",
+        officialTitle: "A Team may help another Team reset the Field between Matches",
+      },
+    ],
+  );
+
   for (const [query, id] of [
     ["TS1", "TS1"],
-    ["sportsmanlike", "TS1"],
+    ["sportsmanship", "TS1"],
     ["TS2", "TS2"],
     ["unsportsmanlike", "TS2"],
     ["TS3", "TS3"],
-    ["reset", "TS3"],
     ["help reset", "TS3"],
   ]) {
-    assert.ok(searchRules(query).some((r) => r.id === id), `"${query}" did not find ${id}`);
+    assert.ok(searchRules(query).some((rule) => rule.id === id), `${query} missed ${id}`);
   }
 });
 
