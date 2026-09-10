@@ -348,6 +348,17 @@ function FloorTab({
 /* Teams — the roster and who judges whom                                */
 /* ==================================================================== */
 
+/** What the Judge Advisor's status override can move a request to.
+ *  "scheduled" is left out -- getting back there needs a slot_start too,
+ *  which this override was never meant to reconstruct. */
+const RESETTABLE_STATUSES: Status[] = [
+  "requested",
+  "acknowledged",
+  "interviewing",
+  "completed",
+  "cancelled",
+];
+
 function TeamsTab({ state, refresh, onError }: TabProps) {
   const [filter, setFilter] = useState("");
   const [perPanel, setPerPanel] = useState(10);
@@ -390,6 +401,32 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
       // Rethrow so an inline cell puts the old value back rather than
       // showing a change the server refused.
       throw e;
+    }
+  }
+
+  /**
+   * Judge Advisor override for a mis-clicked interview status.
+   *
+   * Routed through whichever existing action actually gets a status
+   * right, rather than always calling set-status directly: "reopen"
+   * clears the stale acknowledged/started/finished timestamps a
+   * completed or cancelled request is still carrying (set-status alone
+   * does not), and "cancel" is what actually stamps cancelled_at.
+   * set-status covers the rest, and is unrestricted for an admin
+   * session — this whole page is admin-only already (see the redirect
+   * on load), so nothing further needs to gate this by role.
+   */
+  async function resetRequestStatus(requestId: string, status: Status) {
+    onError(null);
+    try {
+      const action = status === "requested" ? "reopen" : status === "cancelled" ? "cancel" : "set-status";
+      await call(`/api/requests/${requestId}`, {
+        method: "PATCH",
+        body: action === "set-status" ? { action, status } : { action },
+      });
+      await refresh();
+    } catch (e) {
+      onError((e as Error).message);
     }
   }
 
@@ -597,10 +634,31 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                     </select>
                   </td>
                   <td className="px-4 py-2.5">
-                    {req ? (
-                      <StatusChip status={req.status} size="sm" short />
-                    ) : done ? (
-                      <StatusChip status="completed" size="sm" short />
+                    {req || done ? (
+                      <div className="flex items-center gap-1.5">
+                        <StatusChip status={(req ?? done)!.status} size="sm" short />
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const status = e.target.value as Status;
+                            if (!status) return;
+                            resetRequestStatus((req ?? done)!.id, status);
+                            e.target.value = "";
+                          }}
+                          title="Judge Advisor override — corrects a mistake, not the normal flow"
+                          aria-label={`Reset ${team.number}'s interview status`}
+                          className="rounded-md bg-white/5 px-1 py-1 text-[11px] text-zinc-500 ring-1 ring-inset ring-white/10 hover:text-zinc-300"
+                        >
+                          <option value="" className="bg-zinc-900">
+                            reset…
+                          </option>
+                          {RESETTABLE_STATUSES.map((s) => (
+                            <option key={s} value={s} className="bg-zinc-900">
+                              {STATUS_META[s].label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     ) : (
                       <span className="text-xs text-zinc-600">—</span>
                     )}
