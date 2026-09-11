@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0a0a0f" />
+    <title>Offline · Judge Queue</title>
+    <style>
+      :root { color-scheme: dark; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+      body { min-height: 100vh; min-height: 100dvh; margin: 0; display: grid; place-items: center; background: #0a0a0f; color: #e8e8ee; }
+      main { width: min(28rem, calc(100% - 2.5rem)); text-align: center; }
+      img { width: 6rem; height: 6rem; border-radius: 1.5rem; }
+      h1 { margin: 1.5rem 0 .75rem; font-size: 2rem; }
+      p { margin: 0; color: #a1a1aa; line-height: 1.6; }
+      button { margin-top: 1.75rem; min-height: 2.75rem; padding: 0 1.25rem; border: 0; border-radius: .75rem; background: #6366f1; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+      button:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 3px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/icons/icon-192.png" alt="" />
+      <h1>You’re offline</h1>
+      <p>Judge Queue needs a connection for live judging, sign-in, and event data. Reconnect, then try again.</p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>
