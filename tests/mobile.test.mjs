@@ -9,6 +9,9 @@ import { readFileSync, readdirSync } from "node:fs";
 
 const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
 const layout = readFileSync(new URL("../src/app/layout.tsx", import.meta.url), "utf8");
+const ui = readFileSync(new URL("../src/components/ui.tsx", import.meta.url), "utf8");
+const admin = readFileSync(new URL("../src/app/admin/page.tsx", import.meta.url), "utf8");
+const referee = readFileSync(new URL("../src/app/referee/page.tsx", import.meta.url), "utf8");
 
 /* The file explains in a comment why the cap is absent, so match the setting
    itself rather than the word. */
@@ -71,6 +74,24 @@ test("light mode gives hover somewhere to go", () => {
     /hover\\:bg-white/.test(css),
     "light-theme hover backgrounds are gone; hovering will show nothing",
   );
+});
+
+test("operational controls cannot be covered by the floating theme button", () => {
+  assert.ok(ui.includes("<ThemeToggle inline />"), "the theme control is no longer in the app header");
+  assert.ok(
+    css.includes("body:has(.app-header) > .theme-toggle"),
+    "the duplicate floating control can cover field actions again",
+  );
+});
+
+test("dense admin navigation remains discoverable on a phone", () => {
+  assert.ok(admin.includes('aria-label="Admin section"'), "the mobile admin section picker is gone");
+  assert.ok(admin.includes("sm:hidden"), "the admin picker is no longer scoped to mobile");
+});
+
+test("referee field actions and rule search fit a phone viewport", () => {
+  assert.ok(referee.includes("grid grid-cols-2 gap-2"), "referee outcomes returned to a long stack");
+  assert.ok(referee.includes("max-h-[75dvh]"), "the mobile rule picker can escape the viewport");
 });
 
 test("every page a person opens is covered by the browser checks", () => {

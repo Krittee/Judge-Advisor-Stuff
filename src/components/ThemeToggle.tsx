@@ -15,7 +15,7 @@ function applyTheme(theme: Theme) {
 }
 
 /** A device-local display preference; it never touches event data. */
-export function ThemeToggle() {
+export function ThemeToggle({ inline = false }: { inline?: boolean }) {
   const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
@@ -36,7 +36,14 @@ export function ThemeToggle() {
       applyTheme(next);
     };
     preference.addEventListener("change", followSystem);
-    return () => preference.removeEventListener("change", followSystem);
+    const followInPageToggle = (event: Event) => {
+      setTheme((event as CustomEvent<Theme>).detail);
+    };
+    window.addEventListener("judge-queue-theme-change", followInPageToggle);
+    return () => {
+      preference.removeEventListener("change", followSystem);
+      window.removeEventListener("judge-queue-theme-change", followInPageToggle);
+    };
   }, []);
 
   function toggle() {
@@ -48,6 +55,7 @@ export function ThemeToggle() {
     }
     setTheme(next);
     applyTheme(next);
+    window.dispatchEvent(new CustomEvent<Theme>("judge-queue-theme-change", { detail: next }));
   }
 
   const nextTheme = theme === "dark" ? "light" : "dark";
@@ -56,7 +64,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      className="theme-toggle"
+      className={inline ? "theme-toggle-inline" : "theme-toggle"}
       aria-label={`Switch to ${nextTheme} mode`}
       title={`Switch to ${nextTheme} mode`}
     >

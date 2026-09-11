@@ -11,6 +11,7 @@
   --app-foreground: #e8e8ee;
   --app-header: rgb(10 10 15 / 90%);
   --app-raised: #14141c;
+  --app-raised-strong: #191922;
   --app-line: rgb(255 255 255 / 12%);
   --app-shadow: rgb(0 0 0 / 35%);
 }
@@ -21,6 +22,7 @@
   --app-foreground: #18181b;
   --app-header: rgb(244 245 249 / 92%);
   --app-raised: #ffffff;
+  --app-raised-strong: #ffffff;
   --app-line: rgb(39 39 42 / 14%);
   --app-shadow: rgb(39 39 42 / 16%);
 }
@@ -43,6 +45,54 @@ body {
 
 .dialog-surface {
   background: var(--app-raised);
+}
+
+/* Operational screens carry the theme control in their header so it can
+   never cover a field action. Public and sign-in screens keep the floating
+   control that was already familiar. */
+body:has(.app-header) > .theme-toggle {
+  display: none;
+}
+
+.theme-toggle-inline {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--app-line);
+  border-radius: 0.75rem;
+  background: var(--app-raised);
+  color: var(--app-foreground);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.theme-toggle-inline:hover {
+  background: var(--app-raised-strong);
+}
+
+.theme-toggle-inline:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+
+.theme-toggle-inline svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.table-scroll-hint {
+  display: none;
+}
+
+.sticky-table-cell {
+  background: var(--app-raised);
+  box-shadow: 1px 0 0 var(--app-line);
 }
 
 .theme-toggle {
@@ -290,9 +340,27 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .pulse-waiting,
-  .theme-toggle {
+  .theme-toggle,
+  .theme-toggle-inline {
     animation: none;
     transition: none;
+  }
+}
+
+@media (max-width: 639px) {
+  .table-scroll-hint {
+    display: block;
+  }
+}
+
+@media (max-width: 420px) {
+  .connection-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 }
 

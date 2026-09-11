@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { STATUS_META, type Status } from "@/lib/status";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function StatusChip({
   status,
@@ -177,7 +178,7 @@ export function ConnectionDot({ online }: { online: boolean }) {
       <span
         className={`h-2 w-2 rounded-full ${online ? "bg-emerald-400" : "bg-amber-400 pulse-waiting"}`}
       />
-      {online ? "Live" : "Reconnecting"}
+      <span className="connection-label">{online ? "Live" : "Reconnecting"}</span>
     </span>
   );
 }
@@ -195,16 +196,24 @@ export function TopBar({
 }) {
   return (
     <header className="app-header sticky top-0 z-20 border-b border-white/10 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-        <Link href="/" className="text-lg font-semibold tracking-tight hover:text-indigo-300">
-          {title}
-        </Link>
-        {subtitle ? <span className="text-sm text-zinc-500">{subtitle}</span> : null}
-        <div className="ml-auto flex items-center gap-3">
+      <div className="mx-auto flex min-h-14 max-w-7xl items-center gap-3 px-4 py-2">
+        <div className="min-w-0 flex-1 sm:flex sm:items-baseline sm:gap-3">
+          <Link href="/" className="block truncate text-lg font-semibold tracking-tight hover:text-indigo-300">
+            {title}
+          </Link>
+          {subtitle ? <span className="block truncate text-xs text-zinc-500 sm:text-sm">{subtitle}</span> : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {online !== undefined ? <ConnectionDot online={online} /> : null}
+          <ThemeToggle inline />
           {right}
         </div>
       </div>
+      {online === false ? (
+        <div role="status" className="border-t border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-xs font-medium text-amber-300">
+          Connection lost — live updates are paused. Online features will resume automatically.
+        </div>
+      ) : null}
     </header>
   );
 }

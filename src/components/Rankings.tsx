@@ -112,8 +112,9 @@ export function Rankings({
         <BandLegend />
       </div>
 
+      <p className="table-scroll-hint text-xs text-zinc-500">Swipe sideways to compare all scoring details.</p>
       <div className="overflow-x-auto rounded-xl ring-1 ring-inset ring-white/10">
-        <table className="w-full text-sm">
+        <table className="min-w-[58rem] w-full text-sm">
           <thead className="bg-white/[0.04] text-left text-xs uppercase tracking-wide text-zinc-500">
             <tr>
               <th className="px-3 py-3 w-10">#</th>

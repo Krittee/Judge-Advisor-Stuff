@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { call } from "./useAppState";
 import { Banner, Button, inputClass } from "./ui";
 import type { Team } from "@/lib/types";
@@ -32,6 +32,14 @@ export function ConflictDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [busy, onClose]);
+
   async function declare() {
     setBusy(true);
     setError(null);
@@ -50,12 +58,15 @@ export function ConflictDialog({
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="conflict-title"
     >
       <div
         className="dialog-surface w-full max-w-md rounded-t-2xl p-5 ring-1 ring-white/10 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-bold">
+        <h2 id="conflict-title" className="text-lg font-bold">
           Conflict of interest — {team.number} {team.name}
         </h2>
         <p className="mt-1 mb-4 text-sm text-zinc-400">

@@ -105,8 +105,15 @@ function Referee() {
         setRuleOpen(false);
       }
     }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setRuleOpen(false);
+    }
     document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [ruleOpen]);
 
   const teamByNumber = useMemo(
@@ -356,6 +363,8 @@ function Referee() {
                   type="button"
                   onClick={() => setRuleOpen((o) => !o)}
                   className={`${inputClass} flex items-center justify-between py-2 text-left`}
+                  aria-expanded={ruleOpen}
+                  aria-controls="rule-picker"
                 >
                   <span className={`min-w-0 break-words ${rule ? "" : "text-zinc-600"}`}>
                     {rule ? ruleDisplayLabel(rule) : "— select/search rule —"}
@@ -366,7 +375,12 @@ function Referee() {
                 </button>
 
                 {ruleOpen ? (
-                  <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl bg-zinc-900 shadow-xl ring-1 ring-inset ring-white/10">
+                  <div
+                    id="rule-picker"
+                    className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-50 max-h-[75dvh] overflow-hidden rounded-2xl bg-zinc-900 shadow-xl ring-1 ring-inset ring-white/10 sm:absolute sm:inset-x-0 sm:bottom-auto sm:mt-1 sm:max-h-none sm:w-full sm:rounded-xl"
+                    role="dialog"
+                    aria-label="Choose a rule"
+                  >
                     <input
                       autoFocus
                       value={ruleQuery}
@@ -375,7 +389,7 @@ function Referee() {
                       autoComplete="off"
                       className="w-full border-b border-white/10 bg-transparent px-4 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
                     />
-                    <div className="max-h-[min(18rem,50vh)] overflow-y-auto py-1">
+                    <div className="max-h-[calc(75dvh-3.5rem)] overflow-y-auto py-1 sm:max-h-[min(18rem,50vh)]">
                       {rule ? (
                         <button
                           type="button"
@@ -480,38 +494,32 @@ function Referee() {
                 </div>
               ) : null}
 
-              {eventTotalsForTeam.size ? (
-                <div className="rounded-xl bg-white/[0.03] p-3 ring-1 ring-inset ring-white/10">
-                  <p className="text-xs text-zinc-400">
-                    Event violation history for {team.number}:{" "}
-                    {[...eventTotalsForTeam.entries()]
-                      .map(([id, count]) => `${kindOf(id, state.flagKinds)?.short ?? id} ×${count}`)
-                      .join(", ")}
-                  </p>
-                </div>
-              ) : null}
-
               {/* One button per kind. The colour is the severity, and the
                   label says it too, so nobody taps "Major" meaning "Good". */}
-              <div className="grid gap-2">
-                {kinds.map((k) => {
-                  const missingRule = k.requiresRule && !rule;
-                  // Highlight only the highest-severity kind, and only as
-                  // a visual nudge — this never selects or submits it.
-                  const highlight = escalationReviewRequired && k.severity === maxSeverity;
-                  return (
-                    <button
-                      key={k.id}
-                      disabled={busy || !matchReady || missingRule}
-                      onClick={() => record(k.id)}
-                      className={`rounded-xl px-4 py-3 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                        FLAG_SOLID[k.color] ?? FLAG_SOLID.zinc
-                      } ${highlight ? "ring-2 ring-offset-2 ring-offset-zinc-950 ring-amber-300" : ""}`}
-                    >
-                      {k.label}
-                    </button>
-                  );
-                })}
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Record outcome
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {kinds.map((k) => {
+                    const missingRule = k.requiresRule && !rule;
+                    // Highlight only the highest-severity kind, and only as
+                    // a visual nudge — this never selects or submits it.
+                    const highlight = escalationReviewRequired && k.severity === maxSeverity;
+                    return (
+                      <button
+                        key={k.id}
+                        disabled={busy || !matchReady || missingRule}
+                        onClick={() => record(k.id)}
+                        className={`rounded-xl px-4 py-3 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                          FLAG_SOLID[k.color] ?? FLAG_SOLID.zinc
+                        } ${highlight ? "ring-2 ring-offset-2 ring-offset-zinc-950 ring-amber-300" : ""}`}
+                      >
+                        {k.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               {!matchReady ? (
                 <p className="text-center text-xs text-zinc-600">
@@ -522,6 +530,17 @@ function Referee() {
                 <p className="text-center text-xs text-zinc-600">
                   Minor and Major violations need a rule picked first.
                 </p>
+              ) : null}
+
+              {eventTotalsForTeam.size ? (
+                <div className="rounded-xl bg-white/[0.03] p-3 ring-1 ring-inset ring-white/10">
+                  <p className="text-xs text-zinc-400">
+                    Event violation history for {team.number}:{" "}
+                    {[...eventTotalsForTeam.entries()]
+                      .map(([id, count]) => `${kindOf(id, state.flagKinds)?.short ?? id} ×${count}`)
+                      .join(", ")}
+                  </p>
+                </div>
               ) : null}
 
               {flagsFor(team.id).length ? (

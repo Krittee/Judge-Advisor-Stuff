@@ -76,8 +76,30 @@ export default function AdminPage() {
         right={<SignOutButton />}
       />
 
-      <nav className="app-header sticky top-[57px] z-10 border-b border-white/10 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4">
+      <nav className="app-header border-b border-white/10 backdrop-blur sm:sticky sm:top-[57px] sm:z-10">
+        <div className="mx-auto max-w-7xl px-4 py-2 sm:hidden">
+          <label className="flex items-center gap-3">
+            <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              Section
+            </span>
+            <select
+              value={tab}
+              onChange={(event) => {
+                setFocusFlagTeam(null);
+                setTab(event.target.value as Tab);
+              }}
+              className={`${inputClass} py-2.5 font-medium`}
+              aria-label="Admin section"
+            >
+              {tabs.map(([id, label]) => (
+                <option key={id} value={id} className="bg-zinc-900">
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="mx-auto hidden max-w-7xl gap-1 overflow-x-auto px-4 sm:flex">
           {tabs.map(([id, label]) => (
             <button
               key={id}
@@ -536,11 +558,14 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
           ))}
       </div>
 
+      <p className="table-scroll-hint text-xs text-zinc-500">Swipe sideways to see and edit every column.</p>
       <div className="overflow-x-auto rounded-xl ring-1 ring-inset ring-white/10">
-        <table className="w-full text-sm">
+        <table className="min-w-[72rem] w-full text-sm">
           <thead className="bg-white/[0.04] text-left text-xs uppercase tracking-wide text-zinc-500">
             <tr>
-              <th className="px-4 py-3">Team</th>
+              <th className="sticky-table-cell sticky left-0 z-[1] w-28 min-w-28 px-4 py-3">
+                Team
+              </th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Pit</th>
               <th className="px-4 py-3">Notebook</th>
@@ -558,7 +583,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
               );
               return (
                 <tr key={team.id} className="hover:bg-white/[0.02]">
-                  <td className="px-2 py-1.5">
+                  <td className="sticky-table-cell sticky left-0 z-[1] w-28 min-w-28 px-2 py-1.5">
                     <EditableCell
                       value={team.number}
                       className="font-bold tabular-nums"

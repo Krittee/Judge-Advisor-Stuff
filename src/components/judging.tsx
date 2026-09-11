@@ -127,6 +127,9 @@ export function NotesDrawer({
     <div
       className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 sm:items-center"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="team-notes-title"
     >
       <div
         className="dialog-surface max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-t-2xl p-5 ring-1 ring-white/10 sm:rounded-2xl"
@@ -134,7 +137,7 @@ export function NotesDrawer({
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-xl font-bold">
+            <h2 id="team-notes-title" className="text-xl font-bold">
               {team.number} · {team.name}
             </h2>
             <p className="text-xs text-zinc-500">Private to judges and the Judge Advisor.</p>
@@ -157,7 +160,11 @@ export function NotesDrawer({
                 <BandChip total={grandTotal} max={grandMax} scored={anyScored} />
               </div>
             ) : null}
-            <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200">
+            <button
+              onClick={onClose}
+              className="text-zinc-500 hover:text-zinc-200"
+              aria-label="Close team notes"
+            >
               ✕
             </button>
           </div>
