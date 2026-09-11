@@ -152,10 +152,10 @@ test("the observation text is optional and capped when supplied", () => {
 
 const types = event.matchTypes;
 
-test("the config offers exactly Practice, Qualification and Final", () => {
+test("the config offers exactly Practice, Qualification, Final and Skills", () => {
   assert.deepEqual(
     types.map((t) => t.id),
-    ["P", "Q", "F"],
+    ["P", "Q", "F", "SK"],
   );
 });
 
@@ -168,7 +168,8 @@ test("a configured id is valid; anything else is not", () => {
   assert.ok(isValidMatchType("P"));
   assert.ok(isValidMatchType("Q"));
   assert.ok(isValidMatchType("F"));
-  for (const bad of ["", "p", "practice", "X", null, undefined, "Practice"]) {
+  assert.ok(isValidMatchType("SK"));
+  for (const bad of ["", "p", "practice", "skills", "X", null, undefined, "Practice"]) {
     assert.ok(!isValidMatchType(bad), `"${bad}" should not resolve to a match type`);
   }
 });

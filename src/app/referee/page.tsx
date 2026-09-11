@@ -22,8 +22,10 @@ import type { FlagEdit } from "@/lib/db/types";
 import type { FlagRow, Team } from "@/lib/types";
 
 /** Division shorthand for the field name, so a referee picks it instead
- *  of typing it out — "ES2" rather than "Elementary School Field 2". */
-const FIELD_PREFIXES = ["ES", "MS", "HS", "BL"] as const;
+ *  of typing it out — "ES2" rather than "Elementary School Field 2".
+ *  "SK" is the Skills field(s), which run alongside the other matches
+ *  rather than belonging to any one division. */
+const FIELD_PREFIXES = ["ES", "MS", "HS", "BL", "SK"] as const;
 
 /**
  * The referee's page.

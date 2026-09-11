@@ -79,6 +79,10 @@
     {
       "id": "F",
       "label": "Final"
+    },
+    {
+      "id": "SK",
+      "label": "Skills"
     }
   ],
   "teamCategories": [

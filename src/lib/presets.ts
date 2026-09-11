@@ -150,6 +150,7 @@ const MATCH_TYPE_FALLBACK: MatchType[] = [
   { id: "P", label: "Practice" },
   { id: "Q", label: "Qualification" },
   { id: "F", label: "Final" },
+  { id: "SK", label: "Skills" },
 ];
 
 export function matchTypes(): MatchType[] {
