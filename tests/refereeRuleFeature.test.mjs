@@ -66,8 +66,8 @@ test("the selector remains one searchable control between observation and action
   assert.ok(pageSrc.includes("overflow-y-auto"));
 });
 
-test("field selection combines the event division prefix and field number", () => {
-  assert.ok(pageSrc.includes('const FIELD_PREFIXES = ["ES", "MS", "HS", "BL"]'));
+test("field selection combines the event division prefix (plus Skills) and field number", () => {
+  assert.ok(pageSrc.includes('const FIELD_PREFIXES = ["ES", "MS", "HS", "BL", "SK"]'));
   assert.ok(pageSrc.includes("value={fieldPrefix}"));
   assert.ok(pageSrc.includes("value={fieldNumber}"));
   assert.ok(pageSrc.includes("normalizeField(`${fieldPrefix}${fieldNumber}`)"));
