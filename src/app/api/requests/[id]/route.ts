@@ -3,6 +3,7 @@ import { actorLabel, canAdvance, canCancel, getSession, mayActOnPanel } from "@/
 import { store, StoreError } from "@/lib/db";
 import { NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
 import { CONFLICT_MESSAGE, isConflicted } from "@/lib/conflicts";
+import { divisionsCompatible } from "@/lib/presets";
 import type { RequestRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -77,8 +78,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       return NextResponse.json({ error: "Pick a panel to move this to." }, { status: 400 });
     }
 
-    // Divisions are a hard wall: a team may only be handed to a panel
-    // judging its own division.
+    // Divisions are a hard wall: a team may only be handed to a panel that
+    // may judge its division (see divisionsCompatible).
     const db = store();
     const [panels, teams] = await Promise.all([db.listPanels(), db.listTeams()]);
     const target = panels.find((p) => p.id === panelId);
@@ -95,7 +96,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       );
     }
 
-    if (team && target.division !== team.division) {
+    // A blended team may be handed to any panel -- it competes across age
+    // groups, so no single division's panel owns it.
+    if (team && !divisionsCompatible(team.division, target.division)) {
       return NextResponse.json(
         {
           error:

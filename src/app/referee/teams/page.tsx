@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { call, useAppState } from "@/components/useAppState";
 import { inputClass, TopBar } from "@/components/ui";
+import { TabBar } from "@/components/nav";
 import { SignOutButton } from "@/components/judging";
-import { RefereeNav } from "@/components/RefereeNav";
 import { FlagSummary } from "@/components/Flags";
 import { compareTeamNumbers } from "@/lib/teamNumber";
 import type { Session } from "@/lib/auth";
@@ -64,7 +64,7 @@ export default function RefereeTeamsPage() {
   }, [state.teams, query, division, flaggedOnly, flagsByTeam]);
 
   if (session === undefined) {
-    return <p className="p-10 text-center text-zinc-500">Loading…</p>;
+    return <p className="p-10 text-center text-ink-faint">Loading…</p>;
   }
 
   return (
@@ -73,15 +73,28 @@ export default function RefereeTeamsPage() {
         title="Referee"
         subtitle={session ? session.name : undefined}
         online={online}
+        role={state.viewer.role}
+        current="/referee/teams"
         right={<SignOutButton to="/referee/login" />}
       />
 
       <main className="mx-auto max-w-lg space-y-4 px-5 py-6">
-        <RefereeNav active="teams" />
+        {/* The head referee's main move is "show me all the teams", so the
+            way there is the first thing on the page rather than a link in
+            the bar. */}
+        <TabBar
+          label="Referee views"
+          variant="segmented"
+          active={"teams"}
+          items={[
+            { id: "lookup", label: "Type a number", href: "/referee" },
+            { id: "teams", label: "All teams", href: "/referee/teams" },
+          ]}
+        />
 
-        <div className="space-y-3 rounded-2xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/10">
+        <div className="space-y-3 rounded-2xl bg-surface p-4 ring-1 ring-inset ring-line">
           <label className="block">
-            <span className="mb-1 block text-xs text-zinc-400">
+            <span className="mb-1 block text-xs text-ink-subtle">
               Search by number, name or pit
             </span>
             <input
@@ -96,17 +109,17 @@ export default function RefereeTeamsPage() {
           <div className="flex flex-wrap items-end gap-3">
             {state.divisions.length > 1 ? (
               <label className="min-w-[10rem] flex-1">
-                <span className="mb-1 block text-xs text-zinc-400">Division</span>
+                <span className="mb-1 block text-xs text-ink-subtle">Division</span>
                 <select
                   value={division}
                   onChange={(e) => setDivision(e.target.value)}
                   className={`${inputClass} py-2`}
                 >
-                  <option value="" className="bg-zinc-900">
+                  <option value="" className="bg-surface">
                     All divisions
                   </option>
                   {state.divisions.map((d) => (
-                    <option key={d} value={d} className="bg-zinc-900">
+                    <option key={d} value={d} className="bg-surface">
                       {d}
                     </option>
                   ))}
@@ -114,28 +127,28 @@ export default function RefereeTeamsPage() {
               </label>
             ) : null}
 
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-400">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-subtle">
               <input
                 type="checkbox"
                 checked={flaggedOnly}
                 onChange={(e) => setFlaggedOnly(e.target.checked)}
-                className="h-4 w-4 accent-indigo-500"
+                className="h-4 w-4 accent-[var(--accent)]"
               />
               Flagged only
             </label>
           </div>
 
-          <p className="text-xs text-zinc-600">
+          <p className="text-xs text-ink-faint">
             {shown.length} of {state.teams.length} teams
           </p>
         </div>
 
         {!state.teams.length ? (
-          <p className="rounded-xl px-4 py-8 text-center text-sm text-zinc-600 ring-1 ring-inset ring-white/10">
+          <p className="rounded-xl px-4 py-8 text-center text-sm text-ink-faint ring-1 ring-inset ring-line">
             No teams have been imported yet.
           </p>
         ) : !shown.length ? (
-          <p className="rounded-xl px-4 py-8 text-center text-sm text-zinc-600 ring-1 ring-inset ring-white/10">
+          <p className="rounded-xl px-4 py-8 text-center text-sm text-ink-faint ring-1 ring-inset ring-line">
             Nothing matches that.
           </p>
         ) : (
@@ -148,10 +161,10 @@ export default function RefereeTeamsPage() {
                       team number is not something to ask of anyone. */}
                   <button
                     onClick={() => router.push(`/referee?team=${encodeURIComponent(t.number)}`)}
-                    className="group flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-white/[0.03] px-4 py-3 text-left ring-1 ring-inset ring-white/10 transition hover:bg-white/[0.06] hover:ring-indigo-400/50 focus-visible:ring-2 focus-visible:ring-indigo-400"
+                    className="group flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-surface px-4 py-3 text-left ring-1 ring-inset ring-line transition hover:bg-surface-2 hover:ring-accent/60 focus-visible:ring-2 focus-visible:ring-accent"
                   >
                     <span className="text-lg font-bold tabular-nums">{t.number}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm text-zinc-400">
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink-subtle">
                       {t.name}
                     </span>
                     {flags.length ? (
@@ -161,11 +174,11 @@ export default function RefereeTeamsPage() {
                         hover to find out. */}
                     <span
                       aria-hidden
-                      className="text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-indigo-300"
+                      className="text-ink-faint transition group-hover:translate-x-0.5 group-hover:text-accent"
                     >
                       ›
                     </span>
-                    <span className="w-full text-xs text-zinc-600">
+                    <span className="w-full text-xs text-ink-faint">
                       {t.division}
                       {t.pit ? ` · pit ${t.pit}` : ""}
                     </span>

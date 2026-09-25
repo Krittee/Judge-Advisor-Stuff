@@ -2,38 +2,13 @@
 
 import { useState } from "react";
 import type { AppState, FlagRow } from "@/lib/types";
+import { tone, toneSolid } from "@/lib/tone";
 import type { FlagEdit } from "@/lib/db/types";
 import { filterMatchNumberInput, matchReference } from "@/lib/match";
 import { ruleDisplayLabel } from "@/lib/rules";
 
 export type FlagKind = AppState["flagKinds"][number];
 export type MatchType = AppState["matchTypes"][number];
-
-/**
- * Referee flags, shown wherever a judge looks at a team.
- *
- * Colour carries the severity, but never alone: someone who cannot tell
- * amber from orange still reads "Minor violation", and a referee's flag
- * is not the place to make anyone guess.
- */
-const TONES: Record<string, string> = {
-  emerald: "bg-emerald-500/20 text-emerald-300 ring-emerald-500/40",
-  amber: "bg-amber-500/20 text-amber-300 ring-amber-500/40",
-  orange: "bg-orange-500/20 text-orange-300 ring-orange-500/40",
-  rose: "bg-rose-500/20 text-rose-300 ring-rose-500/40",
-  sky: "bg-sky-500/20 text-sky-300 ring-sky-500/40",
-  zinc: "bg-zinc-500/20 text-zinc-400 ring-zinc-500/40",
-};
-
-/** Solid, for the button a referee taps. */
-const SOLID: Record<string, string> = {
-  emerald: "bg-emerald-500 text-emerald-950 hover:bg-emerald-400",
-  amber: "bg-amber-500 text-amber-950 hover:bg-amber-400",
-  orange: "bg-orange-500 text-orange-950 hover:bg-orange-400",
-  rose: "bg-rose-600 text-white hover:bg-rose-500",
-  sky: "bg-sky-500 text-sky-950 hover:bg-sky-400",
-  zinc: "bg-zinc-500 text-zinc-950 hover:bg-zinc-400",
-};
 
 export function kindOf(id: string, kinds: FlagKind[]): FlagKind | null {
   return kinds.find((k) => k.id === id) ?? null;
@@ -49,7 +24,7 @@ export function worstFlag(flags: FlagRow[], kinds: FlagKind[]): FlagKind | null 
   return worst;
 }
 
-export function FlagChip({
+function FlagChip({
   kind,
   kinds,
   size = "sm",
@@ -68,7 +43,7 @@ export function FlagChip({
     <span
       title={found.label}
       className={`inline-block whitespace-nowrap rounded-full font-medium ring-1 ring-inset ${pad} ${
-        TONES[found.color] ?? TONES.zinc
+        tone(found.color)
       }`}
     >
       {found.short}
@@ -129,7 +104,7 @@ export function FlagList({
   onEdit?: (id: string, edit: FlagEdit) => Promise<void>;
 }) {
   if (!flags.length) {
-    return <p className="text-sm text-zinc-600">Nothing flagged by a referee.</p>;
+    return <p className="text-sm text-ink-faint">Nothing flagged by a referee.</p>;
   }
   return (
     <ul className="space-y-2">
@@ -208,10 +183,10 @@ function FlagListItem({
   }
 
   return (
-    <li className="rounded-xl bg-white/[0.03] p-3 ring-1 ring-inset ring-white/10">
+    <li className="rounded-xl bg-surface p-3 ring-1 ring-inset ring-line">
       <div className="flex flex-wrap items-center gap-2">
         <FlagChip kind={f.kind} kinds={kinds} />
-        <span className="text-xs text-zinc-500">
+        <span className="text-xs text-ink-faint">
           {f.author} · {new Date(f.created_at).toLocaleTimeString([], {
             hour: "numeric",
             minute: "2-digit",
@@ -222,7 +197,7 @@ function FlagListItem({
         {matchReference(f.match_type, f.match_number) ? (
           <span
             title="Match · Field"
-            className="rounded-md bg-white/5 px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-zinc-400"
+            className="rounded-md bg-surface px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-ink-subtle"
           >
             {matchReference(f.match_type, f.match_number)}
             {f.field ? ` · ${f.field}` : ""}
@@ -235,7 +210,7 @@ function FlagListItem({
         {ruleDisplayLabel(f.rule) ? (
           <span
             title="Rule violated"
-            className="rounded-md bg-white/5 px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-indigo-300"
+            className="rounded-md bg-surface px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-accent-quiet"
           >
             {ruleDisplayLabel(f.rule)}
           </span>
@@ -244,7 +219,7 @@ function FlagListItem({
           {onEdit ? (
             <button
               onClick={() => (editing ? setEditing(false) : startEditing())}
-              className="text-xs text-zinc-500 hover:text-indigo-300"
+              className="text-xs text-ink-faint hover:text-accent"
             >
               {editing ? "cancel" : "edit"}
             </button>
@@ -252,7 +227,7 @@ function FlagListItem({
           {onRemove ? (
             <button
               onClick={() => onRemove(f.id)}
-              className="text-xs text-zinc-600 hover:text-rose-400"
+              className="text-xs text-ink-faint hover:text-danger-quiet"
             >
               remove
             </button>
@@ -261,20 +236,20 @@ function FlagListItem({
       </div>
 
       {editing ? (
-        <div className="mt-2 space-y-2 rounded-lg bg-black/20 p-2.5 ring-1 ring-inset ring-white/10">
-          {error ? <p className="text-xs text-rose-400">{error}</p> : null}
+        <div className="mt-2 space-y-2 rounded-lg bg-sunken/60 p-2.5 ring-1 ring-inset ring-line">
+          {error ? <p className="text-xs text-danger-quiet">{error}</p> : null}
           <div className="flex flex-wrap gap-2">
             <select
               value={draftMatchType}
               onChange={(e) => setDraftMatchType(e.target.value)}
               disabled={busy}
-              className="min-w-[9rem] flex-[2] rounded-lg bg-white/5 px-2 py-1.5 text-xs ring-1 ring-inset ring-white/10 disabled:opacity-50"
+              className="min-w-[9rem] flex-[2] rounded-lg bg-surface px-2 py-1.5 text-xs ring-1 ring-inset ring-line disabled:opacity-50"
             >
-              <option value="" className="bg-zinc-900">
+              <option value="" className="bg-surface">
                 — match —
               </option>
               {matchTypes.map((t) => (
-                <option key={t.id} value={t.id} className="bg-zinc-900">
+                <option key={t.id} value={t.id} className="bg-surface">
                   {t.id} — {t.label}
                 </option>
               ))}
@@ -285,7 +260,7 @@ function FlagListItem({
               placeholder="#"
               inputMode="numeric"
               disabled={busy}
-              className="min-w-[3.5rem] flex-1 rounded-lg bg-white/5 px-2 py-1.5 text-center text-xs ring-1 ring-inset ring-white/10 disabled:opacity-50"
+              className="min-w-[3.5rem] flex-1 rounded-lg bg-surface px-2 py-1.5 text-center text-xs ring-1 ring-inset ring-line disabled:opacity-50"
             />
           </div>
           <input
@@ -294,7 +269,7 @@ function FlagListItem({
             placeholder="Field"
             maxLength={40}
             disabled={busy}
-            className="w-full rounded-lg bg-white/5 px-2 py-1.5 text-xs ring-1 ring-inset ring-white/10 disabled:opacity-50"
+            className="w-full rounded-lg bg-surface px-2 py-1.5 text-xs ring-1 ring-inset ring-line disabled:opacity-50"
           />
           <textarea
             value={draftBody}
@@ -302,7 +277,7 @@ function FlagListItem({
             rows={2}
             maxLength={500}
             disabled={busy}
-            className="w-full rounded-lg bg-white/5 px-2 py-1.5 text-xs ring-1 ring-inset ring-white/10 disabled:opacity-50"
+            className="w-full rounded-lg bg-surface px-2 py-1.5 text-xs ring-1 ring-inset ring-line disabled:opacity-50"
           />
           <div className="flex flex-wrap gap-1.5">
             {kinds.map((k) => (
@@ -313,8 +288,8 @@ function FlagListItem({
                 }
                 onClick={() => save(k.id)}
                 className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                  k.id === f.kind ? "ring-2 ring-white/60" : ""
-                } ${SOLID[k.color] ?? SOLID.zinc}`}
+                  k.id === f.kind ? "ring-2 ring-ink/60" : ""
+                } ${toneSolid(k.color)}`}
                 title={k.id === f.kind ? "Currently set to this" : undefined}
               >
                 {k.label}
@@ -323,10 +298,8 @@ function FlagListItem({
           </div>
         </div>
       ) : f.body ? (
-        <p className="mt-1.5 text-sm text-zinc-200">{f.body}</p>
+        <p className="mt-1.5 text-sm text-ink">{f.body}</p>
       ) : null}
     </li>
   );
 }
-
-export { SOLID as FLAG_SOLID, TONES as FLAG_TONES };

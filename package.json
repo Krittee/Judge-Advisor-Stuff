@@ -12,8 +12,6 @@
     "test": "tsx --tsconfig tsconfig.test.json --test tests/*.test.mjs tests/*.test.ts tests/*.test.tsx"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.12.5",
-    "@supabase/supabase-js": "^2.112.4",
     "jose": "^5.9.6",
     "next": "^15.5.23",
     "react": "19.1.0",

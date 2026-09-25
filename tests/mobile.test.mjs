@@ -64,14 +64,34 @@ test("buttons look clickable", () => {
   assert.ok(/cursor:\s*not-allowed/.test(css), "disabled controls no longer say so");
 });
 
-test("light mode gives hover somewhere to go", () => {
-  /* Every faint surface maps to the same white there, so without these the
-     hover states are invisible in light mode. */
-  assert.ok(
-    /hover\\:bg-white/.test(css),
-    "light-theme hover backgrounds are gone; hovering will show nothing",
-  );
+test("hover has somewhere to go, in both themes", () => {
+  /* The light theme used to collapse every faint surface onto the same
+     white, so a row that lit up in the dark theme did nothing at all in
+     the light one. It is now structural: hover moves between two named
+     surfaces rather than between two opacities of white, so the only way
+     to reintroduce that bug is to give them the same value. */
+  for (const theme of ["dark", "light"]) {
+    const block = blockFor(theme);
+    const surface = /--surface:\s*([^;]+);/.exec(block)?.[1]?.trim();
+    const raised = /--surface-2:\s*([^;]+);/.exec(block)?.[1]?.trim();
+    assert.ok(surface && raised, `${theme}: surface tokens are missing`);
+    assert.notEqual(
+      surface,
+      raised,
+      `${theme}: --surface and --surface-2 are identical, so hovering shows nothing`,
+    );
+  }
 });
+
+/** The custom-property block for one theme. */
+function blockFor(theme) {
+  const start =
+    theme === "light"
+      ? css.indexOf(':root[data-theme="light"]')
+      : css.indexOf(":root,");
+  assert.notEqual(start, -1, `${theme}: theme block not found`);
+  return css.slice(start, css.indexOf("}", start));
+}
 
 test("every page a person opens is covered by the browser checks", () => {
   /* A new route added without a mobile pass is the likely regression, so

@@ -29,14 +29,18 @@ import type { AppState, RequestRow, Team } from "@/lib/types";
  * Only the drawing flips — a pit is still A1 and still sorts as A1.
  */
 
+/* Labels, not states. These are the only categorical colours in the app:
+   they say which division a pit belongs to and nothing about whether
+   anyone needs to go there. Kept clear of the waiting orange and the
+   danger red for exactly that reason -- see --cat-* in globals.css. */
 const DIVISION_TONES = [
-  { ring: "ring-sky-400", dot: "bg-sky-400", text: "text-sky-300" },
-  { ring: "ring-fuchsia-400", dot: "bg-fuchsia-400", text: "text-fuchsia-300" },
-  { ring: "ring-teal-400", dot: "bg-teal-400", text: "text-teal-300" },
-  { ring: "ring-orange-300", dot: "bg-orange-300", text: "text-orange-200" },
+  { ring: "ring-cat-1", dot: "bg-cat-1", text: "text-cat-1" },
+  { ring: "ring-cat-2", dot: "bg-cat-2", text: "text-cat-2" },
+  { ring: "ring-cat-3", dot: "bg-cat-3", text: "text-cat-3" },
+  { ring: "ring-cat-4", dot: "bg-cat-4", text: "text-cat-4" },
 ];
 
-export function divisionTone(division: string, divisions: string[]) {
+function divisionTone(division: string, divisions: string[]) {
   const i = Math.max(0, divisions.indexOf(division));
   return DIVISION_TONES[i % DIVISION_TONES.length];
 }
@@ -97,16 +101,16 @@ export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean
           <span key={division} className="flex items-center gap-2">
             <span className={`h-3 w-3 rounded-sm ${tone.dot}`} />
             <span className={tone.text}>{division}</span>
-            <span className="text-zinc-500">
+            <span className="text-ink-faint">
               {total} pit{total === 1 ? "" : "s"}
-              {waiting ? <span className="ml-1.5 text-orange-400">{waiting} waiting</span> : null}
+              {waiting ? <span className="ml-1.5 text-waiting-quiet">{waiting} waiting</span> : null}
             </span>
           </span>
         ))}
       </div>
 
       {columns.length ? (
-        <section className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/10">
+        <section className="rounded-2xl bg-surface p-4 ring-1 ring-inset ring-line">
           <div className="flex flex-wrap gap-2">
             {columns.map(({ row, numbered }) => (
               // Compress to fit rather than wrapping a lone aisle onto its
@@ -125,7 +129,7 @@ export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean
                     hideDone={hideDone}
                   />
                 ))}
-                <span className="rounded-md bg-white/5 py-1 text-center text-sm font-bold text-zinc-300">
+                <span className="rounded-md bg-surface py-1 text-center text-sm font-bold text-ink-muted">
                   {row}
                 </span>
               </div>
@@ -133,15 +137,15 @@ export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean
           </div>
         </section>
       ) : (
-        <p className="rounded-2xl bg-white/[0.02] px-4 py-8 text-center text-sm text-zinc-600">
-          No pits to show. Give teams a pit like <code className="text-zinc-500">A1</code> in
+        <p className="rounded-2xl bg-surface px-4 py-8 text-center text-sm text-ink-faint">
+          No pits to show. Give teams a pit like <code className="text-ink-faint">A1</code> in
           Admin → Teams and they will appear here.
         </p>
       )}
 
       {unmapped.length ? (
-        <section className="rounded-2xl bg-white/[0.02] p-4 ring-1 ring-inset ring-white/10">
-          <h3 className="mb-2 text-sm font-semibold text-zinc-400">
+        <section className="rounded-2xl bg-surface p-4 ring-1 ring-inset ring-line">
+          <h3 className="mb-2 text-sm font-semibold text-ink-subtle">
             No pit on the plan ({unmapped.length})
           </h3>
           <div className="flex flex-wrap gap-2">
@@ -152,7 +156,7 @@ export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean
                   key={team.id}
                   title={`${team.number} ${team.name} · ${team.division}`}
                   className={`rounded-lg px-2 py-1 text-sm tabular-nums ring-2 ${tone.ring} ${
-                    status ? STATUS_META[status].fill : "bg-white/5 text-zinc-400"
+                    status ? STATUS_META[status].fill : "bg-surface text-ink-subtle"
                   }`}
                 >
                   {team.number}
@@ -183,8 +187,8 @@ function PitCell({
   // a blank really is a blank.
   if (!cell) {
     return (
-      <div className="flex h-[3.25rem] items-center justify-center rounded-md border border-dashed border-white/[0.07]">
-        <span className="text-[10px] text-zinc-700">
+      <div className="flex h-[3.25rem] items-center justify-center rounded-md border border-dashed border-line">
+        <span className="text-[10px] text-ink-faint">
           {row}
           {position}
         </span>
@@ -204,7 +208,7 @@ function PitCell({
       }`}
       className={`flex h-[3.25rem] flex-col justify-center overflow-hidden rounded-md px-1 text-center ring-2 ${
         tone.ring
-      } ${meta ? meta.fill : "bg-white/[0.05] text-zinc-300"} ${
+      } ${meta ? meta.fill : "bg-surface text-ink-muted"} ${
         show === "requested" ? "pulse-waiting" : ""
       }`}
     >

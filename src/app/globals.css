@@ -1,34 +1,257 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-}
+/* ------------------------------------------------------------------ *
+ * Palette
+ *
+ * OKLCH throughout, so a step in lightness looks like a step. Neutrals
+ * carry a small cool tint (hue 265) rather than being grey: it costs
+ * nothing, holds the interface together, and -- the reason it is that
+ * hue and not a warm one -- it is roughly opposite the orange that means
+ * "a team is waiting on you". Against a faintly cool surface that orange
+ * reads as hot as it possibly can, which is its whole job.
+ *
+ * Two rules keep this from turning into decoration:
+ *
+ *   Chrome is achromatic.   Panels, rules, text, tabs, inputs.
+ *   Colour is signal.       Status, referee flags, score bands.
+ *
+ * So anything coloured on screen is telling you something. The accent
+ * below is the one exception, and it is held to interactive chrome only
+ * -- focus rings, the active tab, links -- never to a tile or a chip,
+ * where it would be mistaken for a status.
+ * ------------------------------------------------------------------ */
 
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --app-background: #0a0a0f;
-  --app-foreground: #e8e8ee;
-  --app-header: rgb(10 10 15 / 90%);
-  --app-raised: #14141c;
-  --app-line: rgb(255 255 255 / 12%);
-  --app-shadow: rgb(0 0 0 / 35%);
+
+  --canvas: oklch(0.165 0.012 265);
+  --surface: oklch(0.205 0.014 265);
+  --surface-2: oklch(0.255 0.016 265);
+  --sunken: oklch(0.135 0.012 265);
+  --header: oklch(0.165 0.012 265 / 88%);
+
+  --ink: oklch(0.955 0.005 265);
+  --ink-muted: oklch(0.800 0.010 265);
+  --ink-subtle: oklch(0.670 0.013 265);
+  --ink-faint: oklch(0.610 0.014 265);
+
+  --line: oklch(0.320 0.016 265);
+  --line-strong: oklch(0.440 0.020 265);
+
+  --accent: oklch(0.680 0.140 258);
+  --accent-ink: oklch(0.180 0.030 258);
+  --accent-quiet: oklch(0.760 0.100 258);
+
+  /* Status. Each is a bright fill with dark ink on it -- the same
+     relationship every time, like a printed label. Mixing a light-on-dark
+     status in among light-on-bright ones cost contrast (white on the
+     completed green measured 2.9:1) and made one status read as a
+     different kind of thing from its neighbours. */
+  --waiting: oklch(0.735 0.185 58);
+  --waiting-ink: oklch(0.240 0.060 58);
+  --waiting-quiet: oklch(0.800 0.110 58);
+
+  --enroute: oklch(0.720 0.140 232);
+  --enroute-ink: oklch(0.220 0.050 232);
+  --enroute-quiet: oklch(0.790 0.090 232);
+
+  --active: oklch(0.680 0.170 300);
+  --active-ink: oklch(0.220 0.060 300);
+  --active-quiet: oklch(0.775 0.105 300);
+
+  --done: oklch(0.745 0.140 158);
+  --done-ink: oklch(0.225 0.055 158);
+  --done-quiet: oklch(0.775 0.100 158);
+
+  --booked: oklch(0.330 0.020 265);
+  --booked-ink: oklch(0.860 0.012 265);
+  --booked-quiet: oklch(0.780 0.014 265);
+
+  --off: oklch(0.280 0.010 265);
+  --off-ink: oklch(0.700 0.012 265);
+
+  --danger: oklch(0.555 0.200 18);
+  --danger-ink: oklch(0.985 0.010 18);
+  --danger-quiet: oklch(0.760 0.130 18);
+
+  --caution: oklch(0.790 0.150 82);
+  --caution-quiet: oklch(0.840 0.100 82);
+
+  /* Categorical, for labelling divisions on the pit floor. Evenly spaced
+     in hue and deliberately clear of the orange that means "waiting" and
+     the red that means "danger", so a floor-plan label can never be read
+     as a state. */
+  --cat-1: oklch(0.720 0.130 205);
+  --cat-2: oklch(0.700 0.150 315);
+  --cat-3: oklch(0.720 0.120 150);
+  --cat-4: oklch(0.690 0.140 265);
+
+  --shadow: oklch(0 0 0 / 45%);
+  --shadow-key: 0 1px 2px oklch(0 0 0 / 30%), 0 8px 24px oklch(0 0 0 / 35%);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --app-background: #f4f5f9;
-  --app-foreground: #18181b;
-  --app-header: rgb(244 245 249 / 92%);
-  --app-raised: #ffffff;
-  --app-line: rgb(39 39 42 / 14%);
-  --app-shadow: rgb(39 39 42 / 16%);
+
+  --canvas: oklch(0.968 0.005 265);
+  --surface: oklch(0.995 0.002 265);
+  --surface-2: oklch(0.945 0.008 265);
+  --sunken: oklch(0.925 0.010 265);
+  --header: oklch(0.968 0.005 265 / 90%);
+
+  --ink: oklch(0.225 0.016 265);
+  --ink-muted: oklch(0.400 0.015 265);
+  --ink-subtle: oklch(0.520 0.014 265);
+  --ink-faint: oklch(0.545 0.014 265);
+
+  --line: oklch(0.885 0.010 265);
+  --line-strong: oklch(0.780 0.014 265);
+
+  --accent: oklch(0.510 0.160 258);
+  --accent-ink: oklch(0.995 0.005 258);
+  --accent-quiet: oklch(0.450 0.150 258);
+
+  /* Light needs darker fills to keep the same contrast against white. */
+  --waiting: oklch(0.700 0.180 52);
+  --waiting-ink: oklch(0.205 0.055 52);
+  --waiting-quiet: oklch(0.440 0.130 52);
+
+  --enroute: oklch(0.745 0.120 232);
+  --enroute-ink: oklch(0.205 0.050 232);
+  --enroute-quiet: oklch(0.430 0.120 232);
+
+  --active: oklch(0.680 0.170 300);
+  --active-ink: oklch(0.200 0.060 300);
+  --active-quiet: oklch(0.430 0.150 300);
+
+  --done: oklch(0.735 0.135 158);
+  --done-ink: oklch(0.205 0.055 158);
+  --done-quiet: oklch(0.430 0.105 158);
+
+  --booked: oklch(0.905 0.013 265);
+  --booked-ink: oklch(0.330 0.018 265);
+  --booked-quiet: oklch(0.430 0.016 265);
+
+  --off: oklch(0.915 0.008 265);
+  --off-ink: oklch(0.500 0.012 265);
+
+  --danger: oklch(0.560 0.200 18);
+  --danger-ink: oklch(0.995 0.005 18);
+  --danger-quiet: oklch(0.470 0.170 18);
+
+  --caution: oklch(0.720 0.150 75);
+  --caution-quiet: oklch(0.470 0.120 75);
+
+  --cat-1: oklch(0.540 0.130 205);
+  --cat-2: oklch(0.520 0.155 315);
+  --cat-3: oklch(0.520 0.120 150);
+  --cat-4: oklch(0.510 0.150 265);
+
+  --shadow: oklch(0.225 0.016 265 / 14%);
+  --shadow-key: 0 1px 2px oklch(0.225 0.016 265 / 8%), 0 8px 24px
+    oklch(0.225 0.016 265 / 10%);
 }
+
+/* ------------------------------------------------------------------ *
+ * Tokens as utilities
+ *
+ * `inline` makes the generated utilities point at the variables above
+ * rather than copying their values, so one `data-theme` flip re-themes
+ * everything. This replaces ~40 rules that used to re-map individual
+ * Tailwind colour utilities per theme -- a list every new colour had to
+ * be added to by hand, and did not always get added to.
+ * ------------------------------------------------------------------ */
+
+@theme inline {
+  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-fira), ui-sans-serif, system-ui, sans-serif;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-sunken: var(--sunken);
+
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-ink-faint: var(--ink-faint);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-quiet: var(--accent-quiet);
+
+  --color-waiting: var(--waiting);
+  --color-waiting-ink: var(--waiting-ink);
+  --color-waiting-quiet: var(--waiting-quiet);
+  --color-enroute: var(--enroute);
+  --color-enroute-ink: var(--enroute-ink);
+  --color-enroute-quiet: var(--enroute-quiet);
+  --color-active: var(--active);
+  --color-active-ink: var(--active-ink);
+  --color-active-quiet: var(--active-quiet);
+  --color-done: var(--done);
+  --color-done-ink: var(--done-ink);
+  --color-done-quiet: var(--done-quiet);
+  --color-booked: var(--booked);
+  --color-booked-ink: var(--booked-ink);
+  --color-booked-quiet: var(--booked-quiet);
+  --color-off: var(--off);
+  --color-off-ink: var(--off-ink);
+  --color-danger: var(--danger);
+  --color-danger-ink: var(--danger-ink);
+  --color-danger-quiet: var(--danger-quiet);
+  --color-caution: var(--caution);
+  --color-caution-quiet: var(--caution-quiet);
+
+  --color-cat-1: var(--cat-1);
+  --color-cat-2: var(--cat-2);
+  --color-cat-3: var(--cat-3);
+  --color-cat-4: var(--cat-4);
+
+  /* No named spacing tokens here on purpose. Tailwind's own --spacing base
+     is 0.25rem, so the numeric utilities already are the 4pt scale --
+     p-3 is 12px, p-6 is 24px. Adding --spacing-sm and friends on top of
+     that does not add a scale, it adds a collision: max-w-* resolves
+     against this same namespace, so a semantic --spacing-sm silently
+     turns max-w-sm from 24rem into 0.75rem and every centred column on
+     the site collapses to a strip. */
+
+  /* Product UI: a fixed rem scale at a 1.25 ratio. Not fluid -- a judge's
+     tablet and a laptop should show the same density, and fluid type in a
+     dense table means nothing ever lines up. The board opts out below; it
+     is read from across a hall and has its own scale. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1.45;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.55;
+  --text-base: 1rem;
+  --text-base--line-height: 1.6;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.4;
+  --text-xl: 1.5625rem;
+  --text-xl--line-height: 1.25;
+  --text-2xl: 1.953rem;
+  --text-2xl--line-height: 1.18;
+  --text-3xl: 2.441rem;
+  --text-3xl--line-height: 1.12;
+  --text-4xl: 3.052rem;
+  --text-4xl--line-height: 1.05;
+}
+
+/* ------------------------------------------------------------------ *
+ * Base
+ * ------------------------------------------------------------------ */
 
 html,
 body {
-  background: var(--app-background);
-  color: var(--app-foreground);
+  background: var(--canvas);
+  color: var(--ink);
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -37,13 +260,86 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* Every figure in this app is one someone compares against another --
+   team numbers down a column, scores, clock times, counts. Tabular
+   figures everywhere means they line up without each site asking. */
+body {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "cv05" 1;
+}
+
+/* Headings and anything numeric-and-large take the display face. Its
+   figures carry more weight at size, which is what the board needs. */
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
 .app-header {
-  background: var(--app-header);
+  background: var(--header);
 }
 
 .dialog-surface {
-  background: var(--app-raised);
+  background: var(--surface);
 }
+
+/* A hairline that survives both themes. Borders at 1px on a dark canvas
+   want more contrast than the same border on a light one, and a single
+   opacity cannot serve both -- that is what --line is for. */
+.hairline {
+  border-color: var(--line);
+}
+
+/* ------------------------------------------------------------------ *
+ * The board
+ *
+ * Read from the far end of a hall, off a projector, by someone walking
+ * past. It gets its own scale rather than the product one stepped up:
+ * type that is sized by viewport, because the only thing that matters is
+ * how large it lands on the wall, and the wall is the viewport.
+ * ------------------------------------------------------------------ */
+
+.board {
+  --board-number: clamp(1.75rem, 3.4vw, 4.5rem);
+  --board-name: clamp(0.75rem, 0.95vw, 1.375rem);
+  --board-meta: clamp(0.6875rem, 0.8vw, 1.125rem);
+  --board-heading: clamp(1rem, 1.5vw, 2.25rem);
+}
+
+.board-number {
+  font-family: var(--font-display);
+  font-size: var(--board-number);
+  font-weight: 700;
+  font-stretch: 112%;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+}
+
+.board-name {
+  font-size: var(--board-name);
+  line-height: 1.2;
+}
+
+.board-meta {
+  font-size: var(--board-meta);
+  line-height: 1.1;
+  font-weight: 600;
+}
+
+.board-heading {
+  font-family: var(--font-display);
+  font-size: var(--board-heading);
+  font-weight: 650;
+  font-stretch: 108%;
+  letter-spacing: -0.01em;
+}
+
+/* ------------------------------------------------------------------ *
+ * Controls
+ * ------------------------------------------------------------------ */
 
 .theme-toggle {
   position: fixed;
@@ -54,21 +350,17 @@ body {
   width: 3rem;
   height: 3rem;
   place-items: center;
-  border: 1px solid var(--app-line);
+  border: 1px solid var(--line);
   border-radius: 9999px;
-  background: var(--app-raised);
-  color: var(--app-foreground);
-  box-shadow: 0 8px 24px var(--app-shadow);
-  transition: transform 150ms ease, background-color 150ms ease, color 150ms ease;
+  background: var(--surface);
+  color: var(--ink-muted);
+  box-shadow: var(--shadow-key);
+  transition: transform 150ms ease, color 150ms ease;
 }
 
 .theme-toggle:hover {
   transform: translateY(-1px);
-}
-
-.theme-toggle:focus-visible {
-  outline: 2px solid #818cf8;
-  outline-offset: 3px;
+  color: var(--ink);
 }
 
 .theme-toggle svg {
@@ -81,219 +373,12 @@ body {
   stroke-width: 1.8;
 }
 
-/*
- * The interface predates theme tokens and deliberately uses a small set of
- * neutral Tailwind utilities everywhere. These light-theme mappings preserve
- * that hierarchy while leaving the meaningful queue/status colours alone.
- */
-:root[data-theme="light"] .text-zinc-100,
-:root[data-theme="light"] .text-zinc-200 {
-  color: #18181b;
-}
-
-:root[data-theme="light"] .text-zinc-300 {
-  color: #3f3f46;
-}
-
-:root[data-theme="light"] .text-zinc-400 {
-  color: #52525b;
-}
-
-:root[data-theme="light"] .text-zinc-500,
-:root[data-theme="light"] .text-zinc-600 {
-  color: #71717a;
-}
-
-:root[data-theme="light"] .text-zinc-700 {
-  color: #a1a1aa;
-}
-
-:root[data-theme="light"] .bg-white\/\[0\.02\],
-:root[data-theme="light"] .bg-white\/\[0\.03\],
-:root[data-theme="light"] .bg-white\/\[0\.04\],
-:root[data-theme="light"] .bg-white\/\[0\.05\],
-:root[data-theme="light"] .bg-white\/5,
-:root[data-theme="light"] .bg-white\/10,
-:root[data-theme="light"] .bg-white\/20 {
-  background-color: #ffffff;
-}
-
-/* Every one of those surfaces is the same white, so hovering from one to
-   another showed nothing at all in light mode -- a row that highlights in
-   the dark theme looked dead in the light one. Hover gets its own tint. */
-:root[data-theme="light"] .hover\:bg-white\/\[0\.02\]:hover,
-:root[data-theme="light"] .hover\:bg-white\/\[0\.03\]:hover,
-:root[data-theme="light"] .hover\:bg-white\/\[0\.06\]:hover,
-:root[data-theme="light"] .hover\:bg-white\/5:hover,
-:root[data-theme="light"] .hover\:bg-white\/10:hover {
-  background-color: #eef0f4;
-}
-
-:root[data-theme="light"] .bg-black\/30 {
-  background-color: rgb(39 39 42 / 5%);
-}
-
-:root[data-theme="light"] .border-white\/5,
-:root[data-theme="light"] .border-white\/10,
-:root[data-theme="light"] .border-white\/\[0\.07\] {
-  border-color: rgb(39 39 42 / 12%);
-}
-
-:root[data-theme="light"] .ring-white\/10,
-:root[data-theme="light"] .ring-white\/\[0\.06\],
-:root[data-theme="light"] .ring-white\/\[0\.07\] {
-  --tw-ring-color: rgb(39 39 42 / 13%);
-}
-
-:root[data-theme="light"] .divide-white\/5 > :not(:last-child) {
-  border-color: rgb(39 39 42 / 10%);
-}
-
-:root[data-theme="light"] .bg-zinc-900 {
-  background-color: #ffffff;
-}
-
-:root[data-theme="light"] .placeholder\:text-zinc-600::placeholder {
-  color: #71717a;
-}
-
-:root[data-theme="light"] .hover\:text-zinc-200:hover,
-:root[data-theme="light"] .hover\:text-zinc-300:hover {
-  color: #18181b;
-}
-
-:root[data-theme="light"] .hover\:bg-white\/5:hover,
-:root[data-theme="light"] .hover\:bg-white\/10:hover,
-:root[data-theme="light"] .hover\:bg-white\/\[0\.02\]:hover,
-:root[data-theme="light"] .hover\:bg-white\/\[0\.03\]:hover,
-:root[data-theme="light"] .focus\:bg-white\/5:focus {
-  background-color: #e9eaf0;
-}
-
-:root[data-theme="light"] .hover\:ring-white\/10:hover {
-  --tw-ring-color: rgb(39 39 42 / 16%);
-}
-
-/* Light equivalents for neutral scheduled/cancelled status tiles. */
-:root[data-theme="light"] .bg-slate-500\/15,
-:root[data-theme="light"] .bg-slate-800\/70 {
-  background-color: #e2e8f0;
-}
-
-:root[data-theme="light"] .text-slate-200 {
-  color: #334155;
-}
-
-:root[data-theme="light"] .ring-slate-400\/40,
-:root[data-theme="light"] .ring-slate-600 {
-  --tw-ring-color: #94a3b8;
-}
-
-:root[data-theme="light"] .bg-zinc-600\/40,
-:root[data-theme="light"] .bg-zinc-800\/60 {
-  background-color: #e4e4e7;
-}
-
-:root[data-theme="light"] .ring-zinc-500,
-:root[data-theme="light"] .ring-zinc-700 {
-  --tw-ring-color: #a1a1aa;
-}
-
-/* Pastel badges need darker ink against the light canvas. */
-:root[data-theme="light"] .text-amber-200,
-:root[data-theme="light"] .text-amber-200\/80,
-:root[data-theme="light"] .text-amber-300,
-:root[data-theme="light"] .text-amber-400,
-:root[data-theme="light"] .text-amber-400\/80,
-:root[data-theme="light"] .text-orange-200,
-:root[data-theme="light"] .text-orange-400 {
-  color: #92400e;
-}
-
-/* Orange gets its own ink rather than sharing amber's. A referee flag uses
-   amber for "warning" and orange for "minor violation", and two severities
-   that render identically would undo the point of colouring them. */
-:root[data-theme="light"] .text-orange-300 {
-  color: #9a3412;
-}
-
-:root[data-theme="light"] .text-emerald-200,
-:root[data-theme="light"] .text-emerald-300,
-:root[data-theme="light"] .text-emerald-300\/90,
-:root[data-theme="light"] .text-emerald-400 {
-  color: #047857;
-}
-
-:root[data-theme="light"] .text-sky-200,
-:root[data-theme="light"] .text-sky-300 {
-  color: #0369a1;
-}
-
-:root[data-theme="light"] .text-violet-300,
-:root[data-theme="light"] .text-violet-400,
-:root[data-theme="light"] .text-fuchsia-300 {
-  color: #6d28d9;
-}
-
-:root[data-theme="light"] .text-rose-100,
-:root[data-theme="light"] .text-rose-200,
-:root[data-theme="light"] .text-rose-300,
-:root[data-theme="light"] .text-rose-300\/80,
-:root[data-theme="light"] .text-rose-400 {
-  color: #be123c;
-}
-
-:root[data-theme="light"] .text-indigo-300,
-:root[data-theme="light"] .text-indigo-400 {
-  color: #4338ca;
-}
-
-:root[data-theme="light"] .text-teal-300 {
-  color: #0f766e;
-}
-
-:root[data-theme="light"] .hover\:text-indigo-300:hover {
-  color: #3730a3;
-}
-
-/* A row that leads somewhere lights its ring and its chevron on hover. The
-   light theme pins .ring-white/10 and .text-zinc-600 outright, which would
-   otherwise win over the hover variants and leave the light theme with a
-   weaker cue than the dark one. */
-:root[data-theme="light"] .hover\:ring-indigo-400\/50:hover {
-  --tw-ring-color: rgb(99 102 241 / 45%);
-}
-
-:root[data-theme="light"] .group:hover .group-hover\:text-indigo-300 {
-  color: #4338ca;
-}
-
-:root[data-theme="light"] .hover\:text-rose-400:hover {
-  color: #9f1239;
-}
-
-/* The one animation in the app. If a team is orange, it should be the
-   thing your eye lands on from across the judges' room. */
-@keyframes waiting-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.62;
-  }
-}
-
-.pulse-waiting {
-  animation: waiting-pulse 1.8s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pulse-waiting,
-  .theme-toggle {
-    animation: none;
-    transition: none;
-  }
+/* One focus treatment for everything, so keyboard users get the same
+   answer on every control regardless of which component drew it. */
+:where(a, button, select, summary, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 0.375rem;
 }
 
 /* Tailwind v4 stopped resetting the cursor on buttons, so they inherit the
@@ -362,11 +447,75 @@ textarea {
   font-size: 16px; /* stops iOS Safari zooming on focus */
 }
 
+/* ------------------------------------------------------------------ *
+ * Motion
+ *
+ * Two animations in the whole app, and both mean something. If a team is
+ * orange it should be the thing your eye lands on from across the room;
+ * if a list just arrived it should say so once and then sit still.
+ * ------------------------------------------------------------------ */
+
+@keyframes waiting-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.62;
+  }
+}
+
+.pulse-waiting {
+  animation: waiting-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Staggered only far enough to read as one movement rather than a queue
+   of separate ones; past ~8 rows the delay is capped so a long roster
+   does not take a second and a half to finish arriving. */
+.rise-in {
+  animation: rise-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(min(var(--i, 0), 8) * 40ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-waiting,
+  .rise-in,
+  .theme-toggle {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Nav strips scroll horizontally on a narrow screen but must not show a
+   bar for it -- a scrollbar sitting under a row of tabs reads as a rule
+   and makes the row look broken on the desktop widths where it does not
+   scroll at all. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--app-foreground) 22%, transparent);
+  background: var(--line-strong);
   border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }

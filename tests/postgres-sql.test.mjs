@@ -16,8 +16,7 @@ const src = readFileSync(new URL("../src/lib/db/postgres.ts", import.meta.url), 
 function callSites(source) {
   const sites = [];
   const re = /\bquery\s*(?:<[^>]*>)?\s*\(/g;
-  let m;
-  while ((m = re.exec(source))) {
+  while (re.exec(source)) {
     let i = re.lastIndex;
     while (/\s/.test(source[i])) i++;
     const quote = source[i];

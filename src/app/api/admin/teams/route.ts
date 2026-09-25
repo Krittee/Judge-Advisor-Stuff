@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { canAdminister, getSession } from "@/lib/auth";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
-import { presetDivisions, resolveCategory } from "@/lib/presets";
+import { divisionsCompatible, presetDivisions, resolveCategory } from "@/lib/presets";
 import { normalizePit } from "@/lib/pit";
 import { store, StoreError } from "@/lib/db";
 
@@ -91,11 +91,15 @@ export async function PATCH(request: Request) {
     if (!teamId) return NextResponse.json({ error: "teamId required." }, { status: 400 });
 
     // Manual assignment must obey the same rules auto-assign already
-    // enforces: the panel has to actually exist, and — unless this same
-    // request is also moving the team to a new division, which always
-    // clears panel_id below regardless — it has to judge the team's own
-    // division. Assigning a team to a panel that must stay away from it
-    // would undo a declared conflict silently.
+    // enforces: the panel has to actually exist, and it has to be one that
+    // may judge the division the team will be in once this request is
+    // applied. Checked against that division rather than the stored one,
+    // so a request carrying both a move and an assignment is held to the
+    // wall too -- it used to skip the check entirely on the grounds that
+    // the assignment was about to be discarded anyway, which stopped being
+    // true once a compatible panel is allowed to survive a move.
+    // Assigning a team to a panel that must stay away from it would undo a
+    // declared conflict silently, so that is refused here as well.
     if (body.panelId) {
       const panelId = String(body.panelId);
       const [panels, teams, conflicts] = await Promise.all([
@@ -109,18 +113,23 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
       }
 
-      if (!("division" in body)) {
-        const team = teams.find((t) => t.id === teamId);
-        if (team && panel.division !== team.division) {
-          return NextResponse.json(
-            {
-              error:
-                `${panel.name} judges ${panel.division}, but team ${team.number} is in ` +
-                `${team.division}. Move the team's division first if that is what you meant.`,
-            },
-            { status: 409 },
-          );
-        }
+      const team = teams.find((t) => t.id === teamId);
+      const nextDivision =
+        "division" in body ? resolveDivision(body.division) : team?.division;
+
+      // A blended team clears this wall against any panel, which is the
+      // whole point of the category: it used to be refused here unless a
+      // panel happened to exist in the blended division, so the only way
+      // to get one judged was to mis-file it as a single age group.
+      if (team && nextDivision && !divisionsCompatible(nextDivision, panel.division)) {
+        return NextResponse.json(
+          {
+            error:
+              `${panel.name} judges ${panel.division}, but team ${team.number} is in ` +
+              `${nextDivision}. Move the team's division first if that is what you meant.`,
+          },
+          { status: 409 },
+        );
       }
 
       if (conflicts.some((c) => c.panel_id === panelId && c.team_id === teamId)) {
@@ -135,10 +144,20 @@ export async function PATCH(request: Request) {
     if ("panelId" in body) patch.panel_id = body.panelId ? String(body.panelId) : null;
     if ("category" in body) patch.category = resolveCategory(body.category);
     if ("division" in body) {
-      patch.division = resolveDivision(body.division);
-      // Changing division puts the team on the far side of the wall from
-      // whichever panel held it.
-      patch.panel_id = null;
+      const moved = resolveDivision(body.division);
+      patch.division = moved;
+      // Changing division normally puts the team on the far side of the
+      // wall from whichever panel held it, so the assignment goes. Not if
+      // the panel may still judge them: moving a team to Blended must not
+      // quietly drop the panel it is already booked with, or the category
+      // costs the Judge Advisor the assignment every time they set it.
+      if (!("panelId" in body)) {
+        const teams = await store().listTeams();
+        const team = teams.find((t) => t.id === teamId);
+        const panels = await store().listPanels();
+        const held = panels.find((p) => p.id === team?.panel_id);
+        if (!held || !divisionsCompatible(moved, held.division)) patch.panel_id = null;
+      }
     }
     if ("pit" in body) patch.pit = normalizePit(body.pit);
 

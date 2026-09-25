@@ -5,7 +5,16 @@ import { useRouter } from "next/navigation";
 import { liveRequestFor } from "@/lib/data";
 import { STATUS_META } from "@/lib/status";
 import { call, useAppState } from "@/components/useAppState";
-import { Banner, Button, Elapsed, formatClock, inputClass, StatusChip, TopBar } from "@/components/ui";
+import {
+  Banner,
+  BookingTime,
+  Button,
+  Elapsed,
+  formatClock,
+  inputClass,
+  StatusChip,
+  TopBar,
+} from "@/components/ui";
 import { SignOutButton } from "@/components/judging";
 import { PanelBusyLine, panelLoad, SlotPicker } from "@/components/SlotPicker";
 import { CategoryChip } from "@/components/CategoryChip";
@@ -162,16 +171,23 @@ export default function QueuePage() {
   }
 
   if (session === undefined) {
-    return <p className="p-10 text-center text-zinc-500">Loading…</p>;
+    return <p className="p-10 text-center text-ink-faint">Loading…</p>;
   }
 
   return (
     <>
-      <TopBar title="Judge Queue" subtitle="Queue desk" online={online} right={<SignOutButton />} />
+      <TopBar
+        title="Judge Queue"
+        subtitle="Queue desk"
+        online={online}
+        role={state.viewer.role}
+        current="/queue"
+        right={<SignOutButton />}
+      />
 
       <main className="mx-auto max-w-2xl space-y-6 px-4 py-6">
         {/* ---- which kind of request ---------------------------------- */}
-        <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/5 p-1">
+        <div className="grid grid-cols-2 gap-2 rounded-xl bg-surface p-1">
           {(
             [
               ["now", "Interview now"],
@@ -186,7 +202,7 @@ export default function QueuePage() {
                 setOk(null);
               }}
               className={`rounded-lg px-4 py-2.5 text-sm font-medium transition ${
-                mode === id ? "bg-indigo-500 text-white" : "text-zinc-400 hover:text-zinc-200"
+                mode === id ? "bg-accent text-white" : "text-ink-subtle hover:text-ink"
               }`}
             >
               {label}
@@ -196,7 +212,7 @@ export default function QueuePage() {
 
         {/* ---- team number ------------------------------------------- */}
         <div className="space-y-3">
-          <label className="block text-sm font-medium text-zinc-300">Team number</label>
+          <label className="block text-sm font-medium text-ink-muted">Team number</label>
           <input
             value={number}
             onChange={(e) => {
@@ -215,15 +231,15 @@ export default function QueuePage() {
           <div className="min-h-[2.5rem] text-center text-sm">
             {team ? (
               <>
-                <div className="flex items-center justify-center gap-2 text-zinc-300">
+                <div className="flex items-center justify-center gap-2 text-ink-muted">
                   <CategoryChip category={team.category} categories={state.categories} />
                   {team.name}
-                  <span className="text-zinc-500">
+                  <span className="text-ink-faint">
                     {panel ? ` → ${panel.name} · ${team.division}` : ""}
                   </span>
                 </div>
                 {!panel ? (
-                  <div className="text-amber-400">No judge panel assigned yet</div>
+                  <div className="text-caution-quiet">No judge panel assigned yet</div>
                 ) : load ? (
                   <div className="text-xs">
                     <PanelBusyLine load={load} />
@@ -231,7 +247,7 @@ export default function QueuePage() {
                 ) : null}
               </>
             ) : number ? (
-              <span className="text-zinc-600">not found</span>
+              <span className="text-ink-faint">not found</span>
             ) : null}
           </div>
         </div>
@@ -286,7 +302,7 @@ export default function QueuePage() {
               ))}
             </div>
             {booking ? (
-              <p className="text-center text-xs text-zinc-500">
+              <p className="text-center text-xs text-ink-faint">
                 Either button frees their {formatClock(booking.slot_start)} slot.
               </p>
             ) : null}
@@ -297,11 +313,11 @@ export default function QueuePage() {
         ) : (
           <div className="space-y-3">
             {!team ? (
-              <p className="rounded-xl bg-white/[0.03] px-4 py-3 text-sm text-zinc-500">
+              <p className="rounded-xl bg-surface px-4 py-3 text-sm text-ink-faint">
                 Enter a team number to see their panel&apos;s times.
               </p>
             ) : !panel ? (
-              <p className="rounded-xl bg-white/[0.03] px-4 py-3 text-sm text-amber-400">
+              <p className="rounded-xl bg-surface px-4 py-3 text-sm text-caution-quiet">
                 This team has no judge panel yet, so there is nothing to book.
               </p>
             ) : (
@@ -314,14 +330,14 @@ export default function QueuePage() {
                   className={inputClass}
                 />
                 <label className="block text-sm">
-                  <span className="mb-1 block text-xs text-zinc-400">Interview language</span>
+                  <span className="mb-1 block text-xs text-ink-subtle">Interview language</span>
                   <select
                     value={bookLanguage}
                     onChange={(e) => setBookLanguage(e.target.value)}
                     className={`${inputClass} py-2`}
                   >
                     {state.languages.map((l) => (
-                      <option key={l.id} value={l.id} className="bg-zinc-900">
+                      <option key={l.id} value={l.id} className="bg-surface">
                         {l.label}
                       </option>
                     ))}
@@ -343,7 +359,7 @@ export default function QueuePage() {
 
         {/* ---- what is already happening ------------------------------ */}
         <section>
-          <h2 className="mb-3 text-sm font-semibold text-zinc-400">Waiting now ({live.length})</h2>
+          <h2 className="mb-3 text-sm font-semibold text-ink-subtle">Waiting now ({live.length})</h2>
           <ul className="space-y-2">
             {live.map((r) => {
               const t = state.teams.find((x) => x.id === r.team_id);
@@ -351,21 +367,21 @@ export default function QueuePage() {
               return (
                 <li
                   key={r.id}
-                  className="flex flex-wrap items-center gap-3 rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-inset ring-white/10"
+                  className="flex flex-wrap items-center gap-3 rounded-xl bg-surface px-4 py-3 ring-1 ring-inset ring-line"
                 >
                   <span className="text-xl font-bold tabular-nums">{t.number}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-zinc-400">
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink-subtle">
                     {t.name} · {panelById.get(r.panel_id ?? "")?.name ?? "—"}
                   </span>
                   <LanguageTag language={r.language} languages={state.languages} />
                   <StatusChip status={r.status} size="sm" />
-                  <span className="text-xs text-zinc-500">
+                  <span className="text-xs text-ink-faint">
                     <Elapsed since={r.requested_at} />
                   </span>
                   {r.status === "requested" ? (
                     <button
                       onClick={() => undo(r.id)}
-                      className="text-xs text-zinc-500 hover:text-rose-400"
+                      className="text-xs text-ink-faint hover:text-danger-quiet"
                       title="Undo a mis-entry. Only works before judges acknowledge it."
                     >
                       undo
@@ -375,7 +391,7 @@ export default function QueuePage() {
               );
             })}
             {!live.length ? (
-              <li className="rounded-xl bg-white/[0.02] px-4 py-6 text-center text-sm text-zinc-600">
+              <li className="rounded-xl bg-surface px-4 py-6 text-center text-sm text-ink-faint">
                 Nobody waiting.
               </li>
             ) : null}
@@ -384,7 +400,7 @@ export default function QueuePage() {
 
         {booked.length ? (
           <section>
-            <h2 className="mb-3 text-sm font-semibold text-zinc-400">
+            <h2 className="mb-3 text-sm font-semibold text-ink-subtle">
               Booked later ({booked.length})
             </h2>
             <ul className="space-y-2">
@@ -394,16 +410,18 @@ export default function QueuePage() {
                 return (
                   <li
                     key={r.id}
-                    className="flex flex-wrap items-center gap-3 rounded-xl bg-white/[0.03] px-4 py-3 text-sm ring-1 ring-inset ring-white/10"
+                    className="flex flex-wrap items-center gap-3 rounded-xl bg-surface px-4 py-3 text-sm ring-1 ring-inset ring-line"
                   >
-                    <span className="w-16 font-bold tabular-nums">{formatClock(r.slot_start)}</span>
+                    <span className="w-28 shrink-0">
+                      <BookingTime slotStart={r.slot_start} status={r.status} size="sm" />
+                    </span>
                     <span className="text-lg font-bold tabular-nums">{t.number}</span>
-                    <span className="min-w-0 flex-1 truncate text-zinc-400">
+                    <span className="min-w-0 flex-1 truncate text-ink-subtle">
                       {t.name} · {panelById.get(r.panel_id ?? "")?.name ?? "—"}
                     </span>
                     <button
                       onClick={() => undo(r.id)}
-                      className="text-xs text-zinc-500 hover:text-rose-400"
+                      className="text-xs text-ink-faint hover:text-danger-quiet"
                     >
                       cancel
                     </button>
@@ -414,7 +432,7 @@ export default function QueuePage() {
           </section>
         ) : null}
 
-        <p className="text-center text-xs text-zinc-600">
+        <p className="text-center text-xs text-ink-faint">
           Signed in as {session?.name}. This desk can queue teams and book them a time, and undo an
           entry before judges pick it up.
         </p>

@@ -4,9 +4,10 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { call, useAppState } from "@/components/useAppState";
 import { Banner, inputClass, TopBar } from "@/components/ui";
+import { TabBar } from "@/components/nav";
 import { SignOutButton } from "@/components/judging";
-import { RefereeNav } from "@/components/RefereeNav";
-import { FlagList, FlagSummary, FLAG_SOLID, kindOf } from "@/components/Flags";
+import { FlagList, FlagSummary, kindOf } from "@/components/Flags";
+import { toneSolid } from "@/lib/tone";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
 import {
   filterMatchNumberInput,
@@ -39,7 +40,7 @@ const FIELD_PREFIXES = ["ES", "MS", "HS", "BL", "SK"] as const;
  */
 export default function RefereePage() {
   return (
-    <Suspense fallback={<p className="p-10 text-center text-zinc-500">Loading…</p>}>
+    <Suspense fallback={<p className="p-10 text-center text-ink-faint">Loading…</p>}>
       <Referee />
     </Suspense>
   );
@@ -210,7 +211,7 @@ function Referee() {
   }
 
   if (session === undefined) {
-    return <p className="p-10 text-center text-zinc-500">Loading…</p>;
+    return <p className="p-10 text-center text-ink-faint">Loading…</p>;
   }
 
   return (
@@ -219,18 +220,31 @@ function Referee() {
         title="Referee"
         subtitle={session ? session.name : undefined}
         online={online}
+        role={state.viewer.role}
+        current="/referee"
         right={<SignOutButton to="/referee/login" />}
       />
 
       <main className="mx-auto max-w-lg space-y-5 px-5 py-6">
-        <RefereeNav active="lookup" />
+        {/* The head referee's main move is "show me all the teams", so the
+            way there is the first thing on the page rather than a link in
+            the bar. */}
+        <TabBar
+          label="Referee views"
+          variant="segmented"
+          active={"lookup"}
+          items={[
+            { id: "lookup", label: "Type a number", href: "/referee" },
+            { id: "teams", label: "All teams", href: "/referee/teams" },
+          ]}
+        />
 
         {error ? <Banner kind="error">{error}</Banner> : null}
         {saved ? <Banner kind="success">{saved}</Banner> : null}
 
-        <div className="space-y-3 rounded-2xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/10">
+        <div className="space-y-3 rounded-2xl bg-surface p-4 ring-1 ring-inset ring-line">
           <label className="block">
-            <span className="mb-1 block text-xs text-zinc-400">Team number</span>
+            <span className="mb-1 block text-xs text-ink-subtle">Team number</span>
             <input
               value={number}
               onChange={(e) => setNumber(filterTeamNumberInput(e.target.value))}
@@ -243,14 +257,14 @@ function Referee() {
           </label>
 
           {number && !team ? (
-            <p className="text-sm text-amber-400">No team with that number.</p>
+            <p className="text-sm text-caution-quiet">No team with that number.</p>
           ) : null}
 
           {team ? (
             <>
-              <div className="rounded-xl bg-black/30 px-3 py-2">
+              <div className="rounded-xl bg-sunken px-3 py-2">
                 <p className="text-lg font-semibold">{team.name}</p>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-ink-faint">
                   {team.division}
                   {team.pit ? ` · pit ${team.pit}` : ""}
                 </p>
@@ -270,24 +284,24 @@ function Referee() {
                   sliver, the way it briefly was in testing. */}
               <div className="flex flex-wrap gap-2">
                 <label className="min-w-[10rem] flex-[2]">
-                  <span className="mb-1 block text-xs text-zinc-400">Match</span>
+                  <span className="mb-1 block text-xs text-ink-subtle">Match</span>
                   <select
                     value={matchType}
                     onChange={(e) => setMatchType(e.target.value)}
                     className={`${inputClass} py-2`}
                   >
-                    <option value="" className="bg-zinc-900">
+                    <option value="" className="bg-surface">
                       — select —
                     </option>
                     {state.matchTypes.map((t) => (
-                      <option key={t.id} value={t.id} className="bg-zinc-900">
+                      <option key={t.id} value={t.id} className="bg-surface">
                         {t.id} — {t.label}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="min-w-[4.5rem] flex-1">
-                  <span className="mb-1 block text-xs text-zinc-400">Match #</span>
+                  <span className="mb-1 block text-xs text-ink-subtle">Match #</span>
                   <input
                     value={matchNumber}
                     onChange={(e) => setMatchNumber(filterMatchNumberInput(e.target.value))}
@@ -301,24 +315,24 @@ function Referee() {
 
               <div className="flex flex-wrap gap-2">
                 <label className="min-w-[7rem] flex-1">
-                  <span className="mb-1 block text-xs text-zinc-400">Field</span>
+                  <span className="mb-1 block text-xs text-ink-subtle">Field</span>
                   <select
                     value={fieldPrefix}
                     onChange={(e) => setFieldPrefix(e.target.value)}
                     className={`${inputClass} py-2`}
                   >
-                    <option value="" className="bg-zinc-900">
+                    <option value="" className="bg-surface">
                       — division —
                     </option>
                     {FIELD_PREFIXES.map((prefix) => (
-                      <option key={prefix} value={prefix} className="bg-zinc-900">
+                      <option key={prefix} value={prefix} className="bg-surface">
                         {prefix}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="min-w-[4.5rem] flex-1">
-                  <span className="mb-1 block text-xs text-zinc-400">Field #</span>
+                  <span className="mb-1 block text-xs text-ink-subtle">Field #</span>
                   <input
                     value={fieldNumber}
                     onChange={(e) => setFieldNumber(filterMatchNumberInput(e.target.value))}
@@ -331,8 +345,8 @@ function Referee() {
               </div>
 
               <label className="block">
-                <span className="mb-1 block text-xs text-zinc-400">
-                  What did you see? <span className="text-zinc-600">(optional)</span>
+                <span className="mb-1 block text-xs text-ink-subtle">
+                  What did you see? <span className="text-ink-faint">(optional)</span>
                 </span>
                 <textarea
                   value={body}
@@ -351,29 +365,29 @@ function Referee() {
                   referee searches "plow" or "SG6" or "6" and gets there in
                   one tap. */}
               <div ref={ruleBoxRef} className="relative block">
-                <span className="mb-1 block text-xs text-zinc-400">Rule violated</span>
+                <span className="mb-1 block text-xs text-ink-subtle">Rule violated</span>
                 <button
                   type="button"
                   onClick={() => setRuleOpen((o) => !o)}
                   className={`${inputClass} flex items-center justify-between py-2 text-left`}
                 >
-                  <span className={`min-w-0 break-words ${rule ? "" : "text-zinc-600"}`}>
+                  <span className={`min-w-0 break-words ${rule ? "" : "text-ink-faint"}`}>
                     {rule ? ruleDisplayLabel(rule) : "— select/search rule —"}
                   </span>
-                  <span aria-hidden className="shrink-0 text-zinc-500">
+                  <span aria-hidden className="shrink-0 text-ink-faint">
                     ▾
                   </span>
                 </button>
 
                 {ruleOpen ? (
-                  <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl bg-zinc-900 shadow-xl ring-1 ring-inset ring-white/10">
+                  <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl bg-surface shadow-xl ring-1 ring-inset ring-line">
                     <input
                       autoFocus
                       value={ruleQuery}
                       onChange={(e) => setRuleQuery(e.target.value)}
                       placeholder="Search: SG6, 6, possession, plow…"
                       autoComplete="off"
-                      className="w-full border-b border-white/10 bg-transparent px-4 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
+                      className="w-full border-b border-line bg-transparent px-4 py-2.5 text-sm text-ink outline-none placeholder:text-ink-faint"
                     />
                     <div className="max-h-[min(18rem,50vh)] overflow-y-auto py-1">
                       {rule ? (
@@ -383,7 +397,7 @@ function Referee() {
                             setRule(null);
                             setRuleOpen(false);
                           }}
-                          className="block min-h-11 w-full px-4 py-2.5 text-left text-sm text-rose-300 hover:bg-white/5"
+                          className="block min-h-11 w-full px-4 py-2.5 text-left text-sm text-danger-quiet hover:bg-surface-2"
                         >
                           Clear rule
                         </button>
@@ -391,7 +405,7 @@ function Referee() {
 
                       {!ruleQuery.trim() && commonRules.length ? (
                         <div>
-                          <p className="px-4 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-zinc-500">
+                          <p className="px-4 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-ink-faint">
                             COMMON FIELD RULES
                           </p>
                           {commonRules.map((r) => (
@@ -403,9 +417,9 @@ function Referee() {
                                 setRuleOpen(false);
                                 setRuleQuery("");
                               }}
-                              className="block min-h-11 w-full break-words px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-white/5"
+                              className="block min-h-11 w-full break-words px-4 py-2.5 text-left text-sm text-ink hover:bg-surface-2"
                             >
-                              <span className="font-semibold text-indigo-300">{r.displayId}</span>{" "}
+                              <span className="font-semibold text-accent-quiet">{r.displayId}</span>{" "}
                               {r.shortLabel}
                             </button>
                           ))}
@@ -415,7 +429,7 @@ function Referee() {
                       {ruleGroups.length ? (
                         ruleGroups.map((group) => (
                           <div key={group.category}>
-                            <p className="px-4 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-zinc-500">
+                            <p className="px-4 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-ink-faint">
                               {group.category.toUpperCase()}
                             </p>
                             {group.rules.map((r) => (
@@ -427,16 +441,16 @@ function Referee() {
                                   setRuleOpen(false);
                                   setRuleQuery("");
                                 }}
-                                className="block min-h-11 w-full break-words px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-white/5"
+                                className="block min-h-11 w-full break-words px-4 py-2.5 text-left text-sm text-ink hover:bg-surface-2"
                               >
-                                <span className="font-semibold text-indigo-300">{r.displayId}</span>{" "}
+                                <span className="font-semibold text-accent-quiet">{r.displayId}</span>{" "}
                                 {r.shortLabel}
                               </button>
                             ))}
                           </div>
                         ))
                       ) : (
-                        <p className="px-4 py-3 text-sm text-zinc-600">No rule matches that.</p>
+                        <p className="px-4 py-3 text-sm text-ink-faint">No rule matches that.</p>
                       )}
                     </div>
                   </div>
@@ -447,14 +461,14 @@ function Referee() {
                   or creates anything. The Head Referee reads this and
                   still chooses Minor or Major themselves. */}
               {team && rule && sameRuleHistory.length ? (
-                <div className="space-y-1.5 rounded-xl bg-amber-500/10 p-3 ring-1 ring-inset ring-amber-500/30">
-                  <p className="text-sm font-semibold text-amber-300">⚠ Repeated violation</p>
-                  <p className="text-sm text-zinc-200">{ruleDisplayLabel(rule)}</p>
-                  <p className="text-xs text-zinc-400">
+                <div className="space-y-1.5 rounded-xl bg-caution/12 p-3 ring-1 ring-inset ring-caution/35">
+                  <p className="text-sm font-semibold text-caution-quiet">⚠ Repeated violation</p>
+                  <p className="text-sm text-ink">{ruleDisplayLabel(rule)}</p>
+                  <p className="text-xs text-ink-subtle">
                     {sameRuleHistory.length} previous{" "}
                     {sameRuleHistory.length === 1 ? "report" : "reports"} for this rule.
                   </p>
-                  <ul className="space-y-0.5 text-xs text-zinc-500">
+                  <ul className="space-y-0.5 text-xs text-ink-faint">
                     {sameRuleHistory.map((f) => (
                       <li key={f.id}>
                         {matchReference(f.match_type, f.match_number) ?? "—"} —{" "}
@@ -464,7 +478,7 @@ function Referee() {
                   </ul>
 
                   {sameMatchSameRule.length && matchReference(matchType, matchNumber) ? (
-                    <p className="text-xs font-medium text-orange-300">
+                    <p className="text-xs font-medium text-waiting-quiet">
                       ⚠ {ruleDisplayLabel(rule)} already recorded {sameMatchSameRule.length}{" "}
                       {sameMatchSameRule.length === 1 ? "time" : "times"} in this Match (
                       {matchReference(matchType, matchNumber)}).
@@ -472,7 +486,7 @@ function Referee() {
                   ) : null}
 
                   {escalationReviewRequired ? (
-                    <p className="text-xs font-medium text-amber-300">
+                    <p className="text-xs font-medium text-caution-quiet">
                       Repeated Minor Violations may require escalation review by the Head
                       Referee.
                     </p>
@@ -481,8 +495,8 @@ function Referee() {
               ) : null}
 
               {eventTotalsForTeam.size ? (
-                <div className="rounded-xl bg-white/[0.03] p-3 ring-1 ring-inset ring-white/10">
-                  <p className="text-xs text-zinc-400">
+                <div className="rounded-xl bg-surface p-3 ring-1 ring-inset ring-line">
+                  <p className="text-xs text-ink-subtle">
                     Event violation history for {team.number}:{" "}
                     {[...eventTotalsForTeam.entries()]
                       .map(([id, count]) => `${kindOf(id, state.flagKinds)?.short ?? id} ×${count}`)
@@ -505,8 +519,8 @@ function Referee() {
                       disabled={busy || !matchReady || missingRule}
                       onClick={() => record(k.id)}
                       className={`rounded-xl px-4 py-3 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                        FLAG_SOLID[k.color] ?? FLAG_SOLID.zinc
-                      } ${highlight ? "ring-2 ring-offset-2 ring-offset-zinc-950 ring-amber-300" : ""}`}
+                        toneSolid(k.color)
+                      } ${highlight ? "ring-2 ring-offset-2 ring-offset-canvas ring-caution" : ""}`}
                     >
                       {k.label}
                     </button>
@@ -514,19 +528,19 @@ function Referee() {
                 })}
               </div>
               {!matchReady ? (
-                <p className="text-center text-xs text-zinc-600">
+                <p className="text-center text-xs text-ink-faint">
                   Pick the match, the match number and the field first — that is what lets this
                   be traced back later.
                 </p>
               ) : !rule && kinds.some((k) => k.requiresRule) ? (
-                <p className="text-center text-xs text-zinc-600">
+                <p className="text-center text-xs text-ink-faint">
                   Minor and Major violations need a rule picked first.
                 </p>
               ) : null}
 
               {flagsFor(team.id).length ? (
                 <div className="pt-1">
-                  <h2 className="mb-2 text-xs font-semibold text-zinc-400">
+                  <h2 className="mb-2 text-xs font-semibold text-ink-subtle">
                     Already on {team.number}
                   </h2>
                   <FlagList
@@ -542,23 +556,23 @@ function Referee() {
         </div>
 
         <section>
-          <h2 className="mb-2 text-sm font-semibold text-zinc-300">Flagged today</h2>
+          <h2 className="mb-2 text-sm font-semibold text-ink-muted">Flagged today</h2>
           {!flagged.length ? (
-            <p className="rounded-xl px-4 py-6 text-center text-sm text-zinc-600 ring-1 ring-inset ring-white/10">
+            <p className="rounded-xl px-4 py-6 text-center text-sm text-ink-faint ring-1 ring-inset ring-line">
               Nothing flagged yet.
             </p>
           ) : (
             <ul className="space-y-2">
               {flagged.map(({ team: t, flags }) => (
-                <li key={t.id} className="rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-inset ring-white/10">
+                <li key={t.id} className="rounded-xl bg-surface px-4 py-3 ring-1 ring-inset ring-line">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                     <button
                       onClick={() => setNumber(t.number)}
-                      className="text-lg font-bold tabular-nums hover:text-indigo-300"
+                      className="text-lg font-bold tabular-nums hover:text-accent"
                     >
                       {t.number}
                     </button>
-                    <span className="min-w-0 flex-1 truncate text-sm text-zinc-400">{t.name}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink-subtle">{t.name}</span>
                     <FlagSummary flags={flags} kinds={state.flagKinds} />
                   </div>
                   <div className="mt-3">

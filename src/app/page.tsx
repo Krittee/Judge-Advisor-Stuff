@@ -28,7 +28,7 @@ export default function Home() {
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-5 py-12">
       <div className="mb-10 text-center">
         <h1 className="text-4xl font-bold tracking-tight">Judge Queue</h1>
-        <p className="mt-3 text-zinc-400">
+        <p className="mt-3 text-ink-subtle">
           Enter your team number to book a judging slot or call for a judge now.
         </p>
       </div>
@@ -56,19 +56,19 @@ export default function Home() {
         </Button>
       </form>
 
-      <div className="mt-12 rounded-2xl bg-white/[0.03] p-5 ring-1 ring-inset ring-white/10">
-        <h2 className="mb-3 text-sm font-semibold text-zinc-300">What the colours mean</h2>
+      <div className="mt-12 rounded-2xl bg-surface p-5 ring-1 ring-inset ring-line">
+        <h2 className="mb-3 text-sm font-semibold text-ink-muted">What the colours mean</h2>
         <StatusLegend />
       </div>
 
-      <nav className="mt-10 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-zinc-500">
-        <Link href="/board" className="hover:text-zinc-300">
+      <nav className="mt-10 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-ink-faint">
+        <Link href="/board" className="hover:text-ink-muted">
           Live board
         </Link>
-        <Link href="/login" className="hover:text-zinc-300">
+        <Link href="/login" className="hover:text-ink-muted">
           Judge / staff sign in
         </Link>
-        <Link href="/referee/login" className="hover:text-zinc-300">
+        <Link href="/referee/login" className="hover:text-ink-muted">
           Referee sign in
         </Link>
       </nav>

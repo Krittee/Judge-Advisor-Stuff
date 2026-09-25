@@ -85,7 +85,7 @@ export const RULES: Rule[] = parseRules(rulesFile);
 
 const BY_ID = new Map(RULES.map((r) => [r.id, r]));
 
-export function findRule(id: string | null | undefined): Rule | null {
+function findRule(id: string | null | undefined): Rule | null {
   if (!id) return null;
   return BY_ID.get(String(id).trim().toUpperCase()) ?? null;
 }

@@ -21,7 +21,7 @@ export function LanguageTag({
   return (
     <span
       title={found.label}
-      className={`inline-block whitespace-nowrap rounded-md bg-white/10 font-semibold tracking-wide text-zinc-300 ${pad}`}
+      className={`inline-block whitespace-nowrap rounded-md bg-surface-2 font-semibold tracking-wide text-ink-muted ${pad}`}
     >
       {found.short}
     </span>
@@ -55,7 +55,7 @@ export function LanguageCover({
   const wanted = languages.find((l) => l.id === asking)?.label ?? asking;
 
   return (
-    <p className={`text-xs ${gap ? "text-amber-400" : "text-zinc-500"}`}>
+    <p className={`text-xs ${gap ? "text-caution-quiet" : "text-ink-faint"}`}>
       {gap ? (
         <>
           {panel.name} interviews in {covered} — this team asked for {wanted}. The Judge Advisor

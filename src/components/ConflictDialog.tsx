@@ -48,17 +48,17 @@ export function ConflictDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-sunken/80 sm:items-center"
       onClick={onClose}
     >
       <div
-        className="dialog-surface w-full max-w-md rounded-t-2xl p-5 ring-1 ring-white/10 sm:rounded-2xl"
+        className="dialog-surface w-full max-w-md rounded-t-2xl p-5 ring-1 ring-line sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-bold">
           Conflict of interest — {team.number} {team.name}
         </h2>
-        <p className="mt-1 mb-4 text-sm text-zinc-400">
+        <p className="mt-1 mb-4 text-sm text-ink-subtle">
           This puts the team out of reach for that whole panel — no interview, no notebook,
           no notes — and takes them off it if they are on it now.
         </p>
@@ -66,7 +66,7 @@ export function ConflictDialog({
         {error ? <Banner kind="error">{error}</Banner> : null}
 
         <label className="mt-3 block">
-          <span className="mb-1 block text-xs text-zinc-400">Which judge is affiliated?</span>
+          <span className="mb-1 block text-xs text-ink-subtle">Which judge is affiliated?</span>
           <input
             value={judgeName}
             onChange={(e) => setJudgeName(e.target.value)}
@@ -77,7 +77,7 @@ export function ConflictDialog({
         </label>
 
         <label className="mt-3 block">
-          <span className="mb-1 block text-xs text-zinc-400">How are they connected?</span>
+          <span className="mb-1 block text-xs text-ink-subtle">How are they connected?</span>
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}

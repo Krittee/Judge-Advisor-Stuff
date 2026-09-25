@@ -11,7 +11,7 @@ function applyTheme(theme: Theme) {
   document.documentElement.style.colorScheme = theme;
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", theme === "light" ? "#f4f5f9" : "#0a0a0f");
+    ?.setAttribute("content", theme === "light" ? "#f4f5f8" : "#15151c");
 }
 
 /** A device-local display preference; it never touches event data. */

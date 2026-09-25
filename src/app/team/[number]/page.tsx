@@ -10,6 +10,7 @@ import { PanelBusyLine, panelLoad, SlotPicker } from "@/components/SlotPicker";
 import { LanguageTag } from "@/components/Language";
 import {
   Banner,
+  BookingTime,
   Button,
   Elapsed,
   formatClock,
@@ -107,8 +108,8 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
     return (
       <CenteredNote>
         <p className="mb-2 text-lg font-semibold">Team {teamNumber} is not on the list.</p>
-        <p className="text-zinc-400">Check the number, or ask the Judge Advisor to add you.</p>
-        <Link href="/" className="mt-6 inline-block text-indigo-400 hover:text-indigo-300">
+        <p className="text-ink-subtle">Check the number, or ask the Judge Advisor to add you.</p>
+        <Link href="/" className="mt-6 inline-block text-accent-quiet hover:text-accent">
           ← Try another number
         </Link>
       </CenteredNote>
@@ -121,18 +122,18 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
 
       <main className="mx-auto max-w-lg space-y-5 px-5 py-6">
         <div>
-          <p className="text-sm text-zinc-500">Team {team.number}</p>
+          <p className="text-sm text-ink-faint">Team {team.number}</p>
           <h1 className="text-3xl font-bold tracking-tight">{team.name}</h1>
           {panel ? (
-            <p className="mt-2 text-sm text-zinc-400">
-              Judged by <span className="text-zinc-200">{panel.name}</span>
+            <p className="mt-2 text-sm text-ink-subtle">
+              Judged by <span className="text-ink">{panel.name}</span>
               {` · ${panel.division}`}
               {panel.judges.length ? (
-                <span className="block text-zinc-500">{panel.judges.join(", ")}</span>
+                <span className="block text-ink-faint">{panel.judges.join(", ")}</span>
               ) : null}
             </p>
           ) : (
-            <p className="mt-2 text-sm text-amber-400">
+            <p className="mt-2 text-sm text-caution-quiet">
               No judge panel assigned yet — check with the Judge Advisor.
             </p>
           )}
@@ -145,17 +146,17 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
         ) : null}
 
         {current && !booking ? (
-          <section className="space-y-4 rounded-2xl bg-white/[0.04] p-5 ring-1 ring-inset ring-white/10">
+          <section className="space-y-4 rounded-2xl bg-surface p-5 ring-1 ring-inset ring-line">
             <div className="flex flex-wrap items-center gap-2">
               <StatusChip status={current.status} size="lg" />
               <LanguageTag language={current.language} languages={state.languages} size="md" />
             </div>
             <p className="text-lg">{STATUS_META[current.status].teamLabel}</p>
 
-            <dl className="space-y-1 text-sm text-zinc-400">
+            <dl className="space-y-1 text-sm text-ink-subtle">
               {current.kind === "slot" && current.slot_start ? (
-                <div>
-                  Slot at <span className="text-zinc-200">{formatClock(current.slot_start)}</span>
+                <div className="flex items-center gap-1.5">
+                  Slot at <BookingTime slotStart={current.slot_start} status={current.status} />
                 </div>
               ) : (
                 <div>
@@ -178,11 +179,10 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
         ) : (
           <section className="space-y-4">
             {booking ? (
-              <div className="space-y-3 rounded-2xl bg-white/[0.04] p-5 ring-1 ring-inset ring-white/10">
+              <div className="space-y-3 rounded-2xl bg-surface p-5 ring-1 ring-inset ring-line">
                 <StatusChip status="scheduled" size="lg" />
-                <p className="text-lg">
-                  Booked for{" "}
-                  <span className="font-semibold">{formatClock(booking.slot_start)}</span>
+                <p className="flex flex-wrap items-center gap-2 text-lg">
+                  Booked for <BookingTime slotStart={booking.slot_start} size="lg" />
                 </p>
                 <Button variant="ghost" size="sm" onClick={cancel} disabled={busy}>
                   Cancel this booking
@@ -190,26 +190,44 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
               </div>
             ) : null}
 
-            {/* A button per language, so the team says which they want
-                rather than the desk guessing. */}
-            <div className="grid gap-2">
-              {state.languages.map((lang) => (
-                <Button
-                  key={lang.id}
-                  variant="warn"
-                  size="lg"
-                  className="w-full"
-                  disabled={busy || !team.panel_id}
-                  onClick={() => readyNow(lang.id)}
-                >
-                  {booking
-                    ? `We're ready now — ${lang.label}`
-                    : `Request a judge — ${lang.label}`}
-                </Button>
-              ))}
+            {/* One action, offered in each language the event runs, rather
+                than one button per language each repeating the whole
+                sentence. Two identical orange bars reading "Request a
+                judge — <language>" looked like the same button twice; the
+                thing that differs between them is the only thing that
+                needs to be on them. */}
+            <div className="space-y-2.5">
+              <h2 className="font-display text-lg font-semibold">
+                {booking ? "Ready before your slot?" : "Ask for a judge"}
+              </h2>
+              {state.languages.length > 1 ? (
+                <p className="text-sm text-ink-subtle">
+                  Which language would you like to be interviewed in?
+                </p>
+              ) : null}
+              <div className="grid gap-2">
+                {state.languages.map((lang) => (
+                  <Button
+                    key={lang.id}
+                    variant="warn"
+                    size="lg"
+                    className="w-full"
+                    disabled={busy || !team.panel_id}
+                    onClick={() => readyNow(lang.id)}
+                  >
+                    {busy
+                      ? "Sending…"
+                      : state.languages.length > 1
+                        ? lang.label
+                        : booking
+                          ? "We're ready now"
+                          : "Request a judge"}
+                  </Button>
+                ))}
+              </div>
             </div>
             {booking ? (
-              <p className="text-center text-xs text-zinc-500">
+              <p className="text-center text-xs text-ink-faint">
                 Either gives up your {formatClock(booking.slot_start)} slot.
               </p>
             ) : null}
@@ -229,8 +247,8 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
         )}
 
         {!current && panel ? (
-          <section className="rounded-2xl bg-white/[0.03] p-5 ring-1 ring-inset ring-white/10">
-            <h2 className="mb-3 text-sm font-semibold text-zinc-300">
+          <section className="rounded-2xl bg-surface p-5 ring-1 ring-inset ring-line">
+            <h2 className="mb-3 text-sm font-semibold text-ink-muted">
               Or book a time with {panel.name}
             </h2>
             <div className="mb-3 flex flex-wrap gap-2">
@@ -240,8 +258,8 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
                   onClick={() => setSlotLanguage(l.id)}
                   className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                     slotLanguage === l.id
-                      ? "bg-indigo-500 text-white"
-                      : "bg-white/5 text-zinc-400 ring-1 ring-inset ring-white/10"
+                      ? "bg-accent text-white"
+                      : "bg-surface text-ink-subtle ring-1 ring-inset ring-line"
                   }`}
                 >
                   {l.label}
@@ -269,15 +287,15 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
 
         {history.length ? (
           <section>
-            <h2 className="mb-2 text-sm font-semibold text-zinc-400">Earlier today</h2>
+            <h2 className="mb-2 text-sm font-semibold text-ink-subtle">Earlier today</h2>
             <ul className="space-y-2">
               {history.map((r) => (
                 <li
                   key={r.id}
-                  className="flex items-center justify-between rounded-xl bg-white/[0.03] px-4 py-3 text-sm ring-1 ring-inset ring-white/[0.07]"
+                  className="flex items-center justify-between rounded-xl bg-surface px-4 py-3 text-sm ring-1 ring-inset ring-line"
                 >
                   <StatusChip status={r.status} size="sm" />
-                  <span className="text-zinc-500">
+                  <span className="text-ink-faint">
                     {formatClock(r.finished_at ?? r.cancelled_at ?? r.requested_at)}
                   </span>
                 </li>
@@ -288,7 +306,7 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
 
         <Link
           href="/board"
-          className="block pt-2 text-center text-sm text-zinc-500 hover:text-zinc-300"
+          className="block pt-2 text-center text-sm text-ink-faint hover:text-ink-muted"
         >
           See the full board →
         </Link>

@@ -21,6 +21,8 @@ import type {
 import type { Status } from "../status";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
+import { divisionsCompatible } from "../presets";
+import { hasNearbyBooking } from "../data";
 import {
   bookingDefaults,
   DEFAULT_DIVISION,
@@ -369,16 +371,20 @@ function createRequest(input: NewRequest): RequestRow {
     );
   }
 
-  // Invariant 2: one team per panel slot.
+  // Invariant 2: no two teams on the same panel within a judge's
+  // walk-and-interview window of each other (see hasNearbyBooking).
   if (input.kind === "slot") {
-    const clash = state().requests.some(
-      (r) =>
-        r.kind === "slot" &&
-        r.panel_id === input.panelId &&
-        r.slot_start === input.slotStart &&
-        r.status !== "cancelled",
+    const clash = hasNearbyBooking(
+      state().requests,
+      input.panelId,
+      new Date(input.slotStart!).getTime(),
     );
-    if (clash) throw new StoreError("Someone just took that slot. Pick another one.", 409);
+    if (clash) {
+      throw new StoreError(
+        "Someone already has a booking within 20 minutes of that time on this panel. Pick another one.",
+        409,
+      );
+    }
   }
 
   const row: RequestRow = {
@@ -418,6 +424,28 @@ function updateRequest(id: string, patch: Partial<RequestRow>): RequestRow {
       (r) => r.id !== id && r.team_id === row.team_id && LIVE.includes(r.status),
     );
     if (other) throw new StoreError("That team already has a live request.", 409);
+  }
+
+  // Reassigning a booked slot to another panel (or another time) is
+  // still a booking — it must not land within another team's walking
+  // window on the panel it moves to.
+  if (
+    row.kind === "slot" &&
+    row.status !== "cancelled" &&
+    (patch.panel_id !== undefined || patch.slot_start !== undefined)
+  ) {
+    const panelId = patch.panel_id ?? row.panel_id;
+    const slotStart = patch.slot_start ?? row.slot_start;
+    if (
+      panelId &&
+      slotStart &&
+      hasNearbyBooking(state().requests, panelId, new Date(slotStart).getTime(), id)
+    ) {
+      throw new StoreError(
+        "Someone already has a booking within 20 minutes of that time on this panel.",
+        409,
+      );
+    }
   }
 
   Object.assign(row, patch, { updated_at: new Date().toISOString() });
@@ -483,6 +511,13 @@ function deleteTeam(id: string): void {
   state().notes = state().notes.filter((n) => n.team_id !== id);
   state().scores = state().scores.filter((s) => s.team_id !== id);
   state().conflicts = state().conflicts.filter((c) => c.team_id !== id);
+  // Postgres cascades flags on team delete and nulls activity.team_id
+  // (on delete set null) rather than dropping the row. Match both here so
+  // a deleted team never leaves an orphan flag behind on the file store.
+  state().flags = state().flags.filter((f) => f.team_id !== id);
+  for (const a of state().activity) {
+    if (a.team_id === id) a.team_id = null;
+  }
   save();
 }
 
@@ -492,7 +527,9 @@ function deleteTeam(id: string): void {
  * mid-event top-up stays balanced.
  */
 function autoAssignTeams(perPanel: number, includeAssigned = false, division?: string): number {
-  const panels = listPanels().filter((p) => !division || p.division === division);
+  const panels = listPanels().filter(
+    (p) => !division || divisionsCompatible(p.division, division),
+  );
   if (!panels.length) {
     throw new StoreError(
       division
@@ -503,7 +540,9 @@ function autoAssignTeams(perPanel: number, includeAssigned = false, division?: s
   }
 
   const pending = listTeams().filter(
-    (t) => (includeAssigned || !t.panel_id) && (!division || t.division === division),
+    (t) =>
+      (includeAssigned || !t.panel_id) &&
+      (!division || divisionsCompatible(t.division, division)),
   );
   if (!pending.length) return 0;
 
@@ -519,10 +558,13 @@ function autoAssignTeams(perPanel: number, includeAssigned = false, division?: s
 
   let assigned = 0;
   for (const team of pending) {
-    // The hard wall: only panels in this team's own division are eligible,
-    // and never one with a declared conflict.
+    // The hard wall: only panels this team's division may be judged by,
+    // and never one with a declared conflict. A blended team clears the
+    // wall against every panel (see divisionsCompatible) -- without that
+    // it matches only a panel created in the blended division, and if the
+    // event never made one it is skipped here and silently goes unjudged.
     const eligible = panels.filter(
-      (p) => p.division === team.division && !barred.has(`${p.id}:${team.id}`),
+      (p) => divisionsCompatible(team.division, p.division) && !barred.has(`${p.id}:${team.id}`),
     );
     const target = eligible
       .map((p) => ({ id: p.id, count: load.get(p.id) ?? 0 }))
@@ -569,7 +611,13 @@ function updatePanel(id: string, patch: Partial<Panel>): Panel {
   // code, say — must never unassign a single team on its way to being
   // refused.
   if (patch.division && patch.division !== panel.division) {
-    for (const t of state().teams) if (t.panel_id === id) t.panel_id = null;
+    const moved = patch.division;
+    for (const t of state().teams) {
+      // A team the panel may still judge after the move stays with it: a
+      // blended team belongs on either side of the wall, so releasing it
+      // would be busywork for the Judge Advisor to undo by hand.
+      if (t.panel_id === id && !divisionsCompatible(t.division, moved)) t.panel_id = null;
+    }
   }
 
   Object.assign(panel, patch);

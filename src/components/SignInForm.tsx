@@ -8,7 +8,7 @@ import { Banner, Button, Field, inputClass } from "@/components/ui";
 import type { Session } from "@/lib/auth";
 
 /** Where each role lands once its code is accepted. */
-export function homeFor(role: Session["role"]): string {
+function homeFor(role: Session["role"]): string {
   if (role === "admin") return "/admin";
   if (role === "judge") return "/judge";
   if (role === "referee") return "/referee";
@@ -59,8 +59,8 @@ export function SignInForm({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-5 py-12">
-      <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-      <p className="mt-2 mb-8 text-sm text-zinc-400">{intro}</p>
+      <h1 className="font-display text-2xl font-bold tracking-tight">{title}</h1>
+      <p className="mt-2 mb-8 text-sm text-ink-subtle">{intro}</p>
 
       <form onSubmit={submit} className="space-y-5">
         <Field label="Access code">
@@ -92,7 +92,7 @@ export function SignInForm({
         </Button>
       </form>
 
-      <Link href="/" className="mt-10 text-center text-sm text-zinc-500 hover:text-zinc-300">
+      <Link href="/" className="mt-10 text-center text-sm text-ink-faint hover:text-ink-muted">
         ← Back to team view
       </Link>
     </main>

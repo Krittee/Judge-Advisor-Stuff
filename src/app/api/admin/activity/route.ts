@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { canReadNotes, getSession } from "@/lib/auth";
-import { store, StoreError } from "@/lib/db";
+import { canAdminister, getSession } from "@/lib/auth";
+import { store } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const session = await getSession();
-  if (!canReadNotes(session)) {
+  if (!canAdminister(session)) {
     return NextResponse.json({ error: "Not authorised." }, { status: 403 });
   }
 

@@ -3,10 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { liveRequestFor } from "@/lib/data";
+import { divisionsCompatible } from "@/lib/presets";
+import { TabBar, type TabItem } from "@/components/nav";
 import { NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
-import { call, useAppState } from "@/components/useAppState";
+import { call, useAppState, useScores } from "@/components/useAppState";
 import {
   Banner,
+  BookingTime,
   Button,
   Elapsed,
   formatClock,
@@ -39,6 +42,10 @@ export default function AdminPage() {
   /* Set when the Conduct column on Scores sends you to a team's flags, so
      the Referee tab knows which one to scroll to and mark. */
   const [focusFlagTeam, setFocusFlagTeam] = useState<string | null>(null);
+  /* Only while the Scores tab is open: nothing else on this console reads
+     rubric totals, so polling for them behind the other five tabs would
+     be a request every 15 seconds that nothing renders. */
+  const scoreData = useScores({ enabled: tab === "scores" });
 
   useEffect(() => {
     call<{ session: Session | null }>("/api/session", { method: "GET" })
@@ -53,18 +60,25 @@ export default function AdminPage() {
   }, [router]);
 
   if (session === undefined) {
-    return <p className="p-10 text-center text-zinc-500">Loading…</p>;
+    return <p className="p-10 text-center text-ink-faint">Loading…</p>;
   }
 
-  const tabs: [Tab, string][] = [
-    ["floor", "Floor"],
-    ["scores", "Scores"],
-    ["teams", "Teams"],
-    ["panels", "Panels"],
-    ["conflicts", "Conflicts"],
-    ["flags", "Referee"],
-    ["import", "Import"],
-    ["log", "Activity"],
+  /* Ordered by the Judge Advisor's day rather than alphabetically, and
+     grouped: what is happening now, then the roster behind it, then the
+     record of both. The counts are what turn eight words into something
+     you can triage -- "Conflicts" says nothing, "Conflicts 2" sends you
+     there. Only teams actually waiting count as urgent; a total that is
+     merely large is not a reason to look. */
+  const waiting = state.requests.filter((r) => r.status === "requested").length;
+  const tabs: TabItem<Tab>[] = [
+    { id: "floor", label: "Floor", count: waiting, urgent: waiting > 0 },
+    { id: "conflicts", label: "Conflicts", count: state.conflicts.length },
+    { id: "flags", label: "Referee", count: state.flags.length },
+    { id: "teams", label: "Teams", count: state.teams.length, startsGroup: true },
+    { id: "panels", label: "Panels", count: state.panels.length },
+    { id: "import", label: "Import" },
+    { id: "scores", label: "Scores", startsGroup: true },
+    { id: "log", label: "Activity" },
   ];
 
   return (
@@ -73,28 +87,23 @@ export default function AdminPage() {
         title="Judge Queue"
         subtitle="Judge Advisor"
         online={online}
+        role={state.viewer.role}
+        current="/admin"
         right={<SignOutButton />}
       />
 
-      <nav className="app-header sticky top-[57px] z-10 border-b border-white/10 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4">
-          {tabs.map(([id, label]) => (
-            <button
-              key={id}
-              onClick={() => {
-                // A marked team belongs to the trip you took to see it.
-                if (id !== tab) setFocusFlagTeam(null);
-                setTab(id);
-              }}
-              className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition ${
-                tab === id
-                  ? "border-indigo-400 text-indigo-300"
-                  : "border-transparent text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+      <nav className="app-header sticky top-[53px] z-10 border-b border-line backdrop-blur">
+        <div className="mx-auto max-w-7xl px-3 py-1.5">
+          <TabBar
+            label="Judge Advisor sections"
+            items={tabs}
+            active={tab}
+            onSelect={(id) => {
+              // A marked team belongs to the trip you took to see it.
+              if (id !== tab) setFocusFlagTeam(null);
+              setTab(id);
+            }}
+          />
         </div>
       </nav>
 
@@ -114,6 +123,10 @@ export default function AdminPage() {
           <Rankings
             teams={state.teams}
             categories={state.categories}
+            scores={scoreData.scores}
+            rubricList={scoreData.rubrics}
+            loaded={scoreData.loaded}
+            error={scoreData.error}
             panelName={Object.fromEntries(state.panels.map((p) => [p.id, p.name]))}
             onOpenTeam={setNotesFor}
             flags={state.flags}
@@ -217,7 +230,7 @@ function FloorTab({
           {(["requested", "acknowledged", "interviewing", "completed"] as Status[]).map((s) => (
             <div key={s}>
               <div className="text-2xl font-bold tabular-nums">{counts[s] ?? 0}</div>
-              <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+              <div className="flex items-center gap-1.5 text-xs text-ink-faint">
                 <span className={`h-2 w-2 rounded-full ${STATUS_META[s].dot}`} />
                 {STATUS_META[s].short}
               </div>
@@ -227,7 +240,7 @@ function FloorTab({
         <a
           href="/board"
           target="_blank"
-          className="ml-auto rounded-lg bg-white/5 px-3 py-2 text-sm ring-1 ring-inset ring-white/10 hover:bg-white/10"
+          className="ml-auto rounded-lg bg-surface px-3 py-2 text-sm ring-1 ring-inset ring-line hover:bg-surface-2"
         >
           Open big-screen board ↗
         </a>
@@ -247,19 +260,19 @@ function FloorTab({
               key={request!.id}
               className={`flex flex-wrap items-center gap-3 rounded-xl px-4 py-3 ring-1 ring-inset ${
                 request!.status === "requested"
-                  ? "bg-orange-500/10 ring-orange-500/40"
-                  : "bg-white/[0.03] ring-white/10"
+                  ? "bg-waiting/12 ring-waiting/45"
+                  : "bg-surface ring-line"
               }`}
             >
               <span className="w-16 text-xl font-bold tabular-nums">{team.number}</span>
-              <span className="min-w-[8rem] flex-1 truncate text-sm text-zinc-300">
+              <span className="min-w-[8rem] flex-1 truncate text-sm text-ink-muted">
                 {team.name}
               </span>
 
               <select
                 value={request!.panel_id ?? ""}
                 onChange={(e) => act(request!, "reassign", { panelId: e.target.value })}
-                className="rounded-lg bg-white/5 px-2 py-1.5 text-xs ring-1 ring-inset ring-white/10"
+                className="rounded-lg bg-surface px-2 py-1.5 text-xs ring-1 ring-inset ring-line"
                 title="Move this interview to another panel"
               >
                 {/* Only somewhere this interview could actually go: the
@@ -269,7 +282,7 @@ function FloorTab({
                 {state.panels
                   .filter(
                     (p) =>
-                      (p.division === team.division &&
+                      (divisionsCompatible(team.division, p.division) &&
                         !state.conflicts.some(
                           (c) => c.panel_id === p.id && c.team_id === team.id,
                         )) ||
@@ -279,7 +292,7 @@ function FloorTab({
                       p.id === request!.panel_id,
                   )
                   .map((p) => (
-                    <option key={p.id} value={p.id} className="bg-zinc-900">
+                    <option key={p.id} value={p.id} className="bg-surface">
                       {p.name}
                     </option>
                   ))}
@@ -295,9 +308,12 @@ function FloorTab({
                 flags={state.flags.filter((f) => f.team_id === team.id)}
                 kinds={state.flagKinds}
               />
-              <span className="w-16 text-xs text-zinc-500">
+              <span className="w-16 text-xs text-ink-faint">
                 <Elapsed since={request!.requested_at} />
               </span>
+              {request!.kind === "slot" ? (
+                <BookingTime slotStart={request!.slot_start} status={request!.status} size="sm" label="Booked" />
+              ) : null}
 
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" onClick={() => onNotes(team)}>
@@ -316,14 +332,14 @@ function FloorTab({
                 <button
                   onClick={() => act(request!, "cancel")}
                   disabled={busy === request!.id}
-                  className="text-xs text-zinc-500 hover:text-rose-400"
+                  className="text-xs text-ink-faint hover:text-danger-quiet"
                 >
                   cancel
                 </button>
               </div>
 
               {panel ? (
-                <span className="w-full text-xs text-zinc-600">
+                <span className="w-full text-xs text-ink-faint">
                   {panel.judges.join(", ") || "no judges listed"}
                 </span>
               ) : null}
@@ -464,11 +480,11 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
           className={`${inputClass} max-w-[12rem]`}
           aria-label="Division"
         >
-          <option value="" className="bg-zinc-900">
+          <option value="" className="bg-surface">
             All divisions
           </option>
           {state.divisions.map((d) => (
-            <option key={d} value={d} className="bg-zinc-900">
+            <option key={d} value={d} className="bg-surface">
               {d}
             </option>
           ))}
@@ -479,17 +495,17 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
           className={`${inputClass} max-w-[13rem]`}
           aria-label="Notebook type"
         >
-          <option value="" className="bg-zinc-900">
+          <option value="" className="bg-surface">
             All notebooks
           </option>
           {state.categories.map((c) => (
-            <option key={c.id} value={c.id} className="bg-zinc-900">
+            <option key={c.id} value={c.id} className="bg-surface">
               {c.label}
             </option>
           ))}
         </select>
         <div className="flex items-end gap-2">
-          <label className="text-sm text-zinc-400">
+          <label className="text-sm text-ink-subtle">
             <span className="mb-1 block text-xs">Max per panel</span>
             <input
               type="number"
@@ -504,12 +520,12 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
             Auto-assign {unassigned} unassigned
           </Button>
         </div>
-        <span className="ml-auto text-sm text-zinc-500">
+        <span className="ml-auto text-sm text-ink-faint">
           {state.teams.length} teams · {state.panels.length} panels
         </span>
-        <p className="w-full text-xs text-zinc-600">
+        <p className="w-full text-xs text-ink-faint">
           Team number, name and pit are editable — click one and type. Pits read as a letter and a
-          number (<code className="text-zinc-500">A1</code>), which is what places a team on the
+          number (<code className="text-ink-faint">A1</code>), which is what places a team on the
           board&apos;s floor plan.
         </p>
       </div>
@@ -518,7 +534,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
         {state.categories.map((c) => (
           <span key={c.id} className="flex items-center gap-1.5">
             <CategoryChip category={c.id} categories={state.categories} />
-            <span className="text-zinc-300">
+            <span className="text-ink-muted">
               {shown.filter((t) => t.category === c.id).length}
             </span>
           </span>
@@ -529,36 +545,54 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
         {state.panels
           .filter((p) => !division || p.division === division)
           .map((p) => (
-            <span key={p.id} className="rounded-lg bg-white/5 px-3 py-1.5 text-zinc-400">
-              {p.name}: <span className="text-zinc-200">{perPanelCount.get(p.id) ?? 0}</span>
-              <span className="ml-2 text-zinc-600">{p.division}</span>
+            <span key={p.id} className="rounded-lg bg-surface px-3 py-1.5 text-ink-subtle">
+              {p.name}: <span className="text-ink">{perPanelCount.get(p.id) ?? 0}</span>
+              <span className="ml-2 text-ink-faint">{p.division}</span>
             </span>
           ))}
       </div>
 
-      <div className="overflow-x-auto rounded-xl ring-1 ring-inset ring-white/10">
-        <table className="w-full text-sm">
-          <thead className="bg-white/[0.04] text-left text-xs uppercase tracking-wide text-zinc-500">
+      <div className="overflow-x-auto rounded-xl ring-1 ring-inset ring-line">
+        {/* min-w-max so the table overflows its scroller instead of
+            squeezing every column to fit -- squeezed columns truncate the
+            team number, which is the one thing on this row you navigate
+            by. Overflowing is what makes the pinned first column mean
+            anything. */}
+        <table className="w-full min-w-max text-sm">
+          <thead className="bg-surface text-left text-xs uppercase tracking-wide text-ink-faint">
+            {/* Nine columns do not fit a phone and never will. Rather than
+                keep a second card rendering of every editable cell in
+                step with this one, the number column pins so you keep
+                your place while scrolling sideways, and the two fields
+                nobody edits under time pressure drop off the narrow
+                layout. Everything stays reachable on a wider screen. */}
             <tr>
-              <th className="px-4 py-3">Team</th>
+              <th className="sticky left-0 z-10 bg-surface-2 px-4 py-3 shadow-[1px_0_0_var(--line)]">Team</th>
               <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Pit</th>
-              <th className="px-4 py-3">Notebook</th>
+              <th className="hidden px-4 py-3 sm:table-cell">Pit</th>
+              <th className="hidden px-4 py-3 sm:table-cell">Notebook</th>
               <th className="px-4 py-3">Division</th>
               <th className="px-4 py-3">Judge panel</th>
+              <th className="px-4 py-3">Booked</th>
               <th className="px-4 py-3">Interview</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="divide-y divide-line">
             {shown.map((team) => {
               const req = liveRequestFor(team.id, state.requests);
               const done = state.requests.find(
                 (r) => r.team_id === team.id && r.status === "completed",
               );
+              // Any slot this team holds or held today. BookingTime counts
+              // down only while it is still "scheduled"; afterwards it just
+              // reads the time, which is what the desk asks about later. A
+              // cancelled slot is not a time anyone should turn up for, and
+              // liveRequestFor already leaves those out.
+              const booking = (req ?? done)?.kind === "slot" ? (req ?? done) : null;
               return (
-                <tr key={team.id} className="hover:bg-white/[0.02]">
-                  <td className="px-2 py-1.5">
+                <tr key={team.id} className="hover:bg-surface-2">
+                  <td className="sticky left-0 z-10 bg-canvas px-2 py-1.5 shadow-[1px_0_0_var(--line)]">
                     <EditableCell
                       value={team.number}
                       className="font-bold tabular-nums"
@@ -568,20 +602,20 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                   <td className="px-2 py-1.5">
                     <EditableCell
                       value={team.name}
-                      className="text-zinc-300"
+                      className="text-ink-muted"
                       onSave={(name) => update(team.id, { name })}
                     />
                   </td>
-                  <td className="px-2 py-1.5 w-24">
+                  <td className="hidden w-24 px-2 py-1.5 sm:table-cell">
                     <EditableCell
                       value={team.pit ?? ""}
                       placeholder="—"
                       align="center"
-                      className="tabular-nums text-zinc-400"
+                      className="tabular-nums text-ink-subtle"
                       onSave={(pit) => update(team.id, { pit: pit || null })}
                     />
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="hidden px-4 py-2.5 sm:table-cell">
                     <CategorySelect
                       value={team.category}
                       categories={state.categories}
@@ -592,11 +626,11 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                     <select
                       value={team.division}
                       onChange={(e) => update(team.id, { division: e.target.value })}
-                      className="rounded-lg bg-white/5 px-2 py-1.5 text-xs ring-1 ring-inset ring-white/10"
+                      className="rounded-lg bg-surface px-2 py-1.5 text-xs ring-1 ring-inset ring-line"
                       title="Changing division unassigns the team from its panel"
                     >
                       {state.divisions.map((d) => (
-                        <option key={d} value={d} className="bg-zinc-900">
+                        <option key={d} value={d} className="bg-surface">
                           {d}
                         </option>
                       ))}
@@ -606,9 +640,9 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                     <select
                       value={team.panel_id ?? ""}
                       onChange={(e) => update(team.id, { panelId: e.target.value || null })}
-                      className="rounded-lg bg-white/5 px-2 py-1.5 text-xs ring-1 ring-inset ring-white/10"
+                      className="rounded-lg bg-surface px-2 py-1.5 text-xs ring-1 ring-inset ring-line"
                     >
-                      <option value="" className="bg-zinc-900">
+                      <option value="" className="bg-surface">
                         — unassigned —
                       </option>
                       {/* Only panels on this team's side of the wall, and
@@ -616,7 +650,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                       {state.panels
                         .filter(
                           (p) =>
-                            p.division === team.division &&
+                            divisionsCompatible(team.division, p.division) &&
                             (!conflicted.has(`${p.id}:${team.id}`) ||
                               // A conflicted panel is dropped from the list,
                               // but never the one currently selected: a select
@@ -626,12 +660,22 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                               p.id === team.panel_id),
                         )
                         .map((p) => (
-                          <option key={p.id} value={p.id} className="bg-zinc-900">
+                          <option key={p.id} value={p.id} className="bg-surface">
                             {p.name}
                             {conflicted.has(`${p.id}:${team.id}`) ? " — conflicted" : ""}
                           </option>
                         ))}
                     </select>
+                  </td>
+                  {/* The booked time, on the overview rather than one page
+                      per team: the coordinator's question is "who is up
+                      next", which used to mean opening all 120 of them. */}
+                  <td className="px-4 py-2.5">
+                    <BookingTime
+                      slotStart={booking?.slot_start ?? null}
+                      status={booking?.status}
+                      size="sm"
+                    />
                   </td>
                   <td className="px-4 py-2.5">
                     {req || done ? (
@@ -647,20 +691,20 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                           }}
                           title="Judge Advisor override — corrects a mistake, not the normal flow"
                           aria-label={`Reset ${team.number}'s interview status`}
-                          className="rounded-md bg-white/5 px-1 py-1 text-[11px] text-zinc-500 ring-1 ring-inset ring-white/10 hover:text-zinc-300"
+                          className="rounded-md bg-surface px-1 py-1 text-[11px] text-ink-faint ring-1 ring-inset ring-line hover:text-ink-muted"
                         >
-                          <option value="" className="bg-zinc-900">
+                          <option value="" className="bg-surface">
                             reset…
                           </option>
                           {RESETTABLE_STATUSES.map((s) => (
-                            <option key={s} value={s} className="bg-zinc-900">
+                            <option key={s} value={s} className="bg-surface">
                               {STATUS_META[s].label}
                             </option>
                           ))}
                         </select>
                       </div>
                     ) : (
-                      <span className="text-xs text-zinc-600">—</span>
+                      <span className="text-xs text-ink-faint">—</span>
                     )}
                   </td>
                   <td className="px-4 py-2.5 text-right">
@@ -674,7 +718,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                           onError((e as Error).message);
                         }
                       }}
-                      className="text-xs text-zinc-600 hover:text-rose-400"
+                      className="text-xs text-ink-faint hover:text-danger-quiet"
                     >
                       remove
                     </button>
@@ -687,7 +731,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
       </div>
 
       {!shown.length ? (
-        <p className="py-8 text-center text-sm text-zinc-600">
+        <p className="py-8 text-center text-sm text-ink-faint">
           No teams match. Use the Import tab to add your roster.
         </p>
       ) : null}
@@ -793,23 +837,23 @@ function FlagsTab({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/10">
+      <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl bg-surface p-4 ring-1 ring-inset ring-line">
         {[...state.flagKinds]
           .sort((a, b) => b.severity - a.severity)
           .map((k) => (
             <div key={k.id}>
               <div className="text-2xl font-bold tabular-nums">{counts.get(k.id) ?? 0}</div>
-              <div className="text-xs text-zinc-500">{k.label}</div>
+              <div className="text-xs text-ink-faint">{k.label}</div>
             </div>
           ))}
-        <p className="w-full text-xs text-zinc-600">
+        <p className="w-full text-xs text-ink-faint">
           Recorded by referees on their own page. Judges see these against the teams they
           are judging; teams and the queue desk do not.
         </p>
       </div>
 
       {!byTeam.length ? (
-        <p className="rounded-xl px-4 py-8 text-center text-sm text-zinc-600 ring-1 ring-inset ring-white/10">
+        <p className="rounded-xl px-4 py-8 text-center text-sm text-ink-faint ring-1 ring-inset ring-line">
           No referee has flagged anything yet.
         </p>
       ) : (
@@ -821,12 +865,12 @@ function FlagsTab({
               key={team?.id ?? "gone"}
               ref={focused ? focusRef : undefined}
               className={`rounded-xl ring-1 ring-inset transition ${
-                focused ? "ring-2 ring-indigo-400 bg-indigo-500/5" : "ring-white/10"
+                focused ? "ring-2 ring-accent bg-accent/5" : "ring-line"
               }`}
             >
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-white/5 px-4 py-2.5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-4 py-2.5">
                 <span className="font-bold tabular-nums">{team?.number ?? "—"}</span>
-                <span className="min-w-0 flex-1 truncate text-sm text-zinc-400">
+                <span className="min-w-0 flex-1 truncate text-sm text-ink-subtle">
                   {team?.name ?? "team removed"}
                 </span>
                 <FlagSummary flags={flags} kinds={state.flagKinds} />
@@ -920,7 +964,9 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
      unassigned and nobody finds out until the team turns up to be judged. */
   const stranded = state.teams.filter((team) => {
     if (team.panel_id) return false;
-    const inDivision = state.panels.filter((p) => p.division === team.division);
+    const inDivision = state.panels.filter((p) =>
+      divisionsCompatible(team.division, p.division),
+    );
     if (!inDivision.length) return false;
     return inDivision.every((p) =>
       state.conflicts.some((c) => c.panel_id === p.id && c.team_id === team.id),
@@ -929,9 +975,9 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end gap-3 rounded-xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/10">
+      <div className="flex flex-wrap items-end gap-3 rounded-xl bg-surface p-4 ring-1 ring-inset ring-line">
         <label className="min-w-[9rem] flex-1">
-          <span className="mb-1 block text-xs text-zinc-400">Team number</span>
+          <span className="mb-1 block text-xs text-ink-subtle">Team number</span>
           <input
             value={pick}
             onChange={(e) => setPick(e.target.value.toUpperCase())}
@@ -940,17 +986,17 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
           />
         </label>
         <label className="min-w-[10rem] flex-1">
-          <span className="mb-1 block text-xs text-zinc-400">Judge panel</span>
+          <span className="mb-1 block text-xs text-ink-subtle">Judge panel</span>
           <select
             value={panelId}
             onChange={(e) => setPanelId(e.target.value)}
             className={`${inputClass} py-2`}
           >
-            <option value="" className="bg-zinc-900">
+            <option value="" className="bg-surface">
               — pick a panel —
             </option>
             {state.panels.map((p) => (
-              <option key={p.id} value={p.id} className="bg-zinc-900">
+              <option key={p.id} value={p.id} className="bg-surface">
                 {p.name}
               </option>
             ))}
@@ -962,9 +1008,9 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
         >
           Declare conflict
         </Button>
-        <p className="w-full text-xs text-zinc-600">
+        <p className="w-full text-xs text-ink-faint">
           {pick && !chosen ? (
-            <span className="text-amber-400">No team with that number.</span>
+            <span className="text-caution-quiet">No team with that number.</span>
           ) : (
             "A conflict takes the team off that panel and keeps it off — no interview, no notebook, no notes."
           )}
@@ -973,30 +1019,30 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
 
       {/* The Judge Advisor asks each panel once and gets a short list back,
           so take the whole list rather than one dialog per team. */}
-      <div className="space-y-3 rounded-xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/10">
-        <h3 className="text-sm font-semibold text-zinc-300">
+      <div className="space-y-3 rounded-xl bg-surface p-4 ring-1 ring-inset ring-line">
+        <h3 className="text-sm font-semibold text-ink-muted">
           Ask a panel: &ldquo;any teams you&rsquo;re affiliated with?&rdquo;
         </h3>
         <div className="flex flex-wrap items-end gap-3">
           <label className="min-w-[10rem] flex-1">
-            <span className="mb-1 block text-xs text-zinc-400">Judge panel</span>
+            <span className="mb-1 block text-xs text-ink-subtle">Judge panel</span>
             <select
               value={bulkPanel}
               onChange={(e) => setBulkPanel(e.target.value)}
               className={`${inputClass} py-2`}
             >
-              <option value="" className="bg-zinc-900">
+              <option value="" className="bg-surface">
                 — pick a panel —
               </option>
               {state.panels.map((p) => (
-                <option key={p.id} value={p.id} className="bg-zinc-900">
+                <option key={p.id} value={p.id} className="bg-surface">
                   {p.name} · {p.division}
                 </option>
               ))}
             </select>
           </label>
           <label className="min-w-[10rem] flex-1">
-            <span className="mb-1 block text-xs text-zinc-400">
+            <span className="mb-1 block text-xs text-ink-subtle">
               Which judge? (optional)
             </span>
             <input
@@ -1008,7 +1054,7 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
           </label>
         </div>
         <label className="block">
-          <span className="mb-1 block text-xs text-zinc-400">
+          <span className="mb-1 block text-xs text-ink-subtle">
             Team numbers — commas, spaces or one per line
           </span>
           <textarea
@@ -1023,32 +1069,32 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
           <Button disabled={busy || !bulkPanel || !bulkNumbers.trim()} onClick={declareBulk}>
             {busy ? "Recording…" : "Record conflicts"}
           </Button>
-          <span className="text-xs text-zinc-600">
+          <span className="text-xs text-ink-faint">
             Each of these teams comes off that panel and stays off it — including
             when you auto-assign.
           </span>
         </div>
 
         {bulkResult ? (
-          <div className="space-y-1 rounded-lg bg-black/30 p-3 text-xs">
-            <p className="text-emerald-300">
+          <div className="space-y-1 rounded-lg bg-sunken p-3 text-xs">
+            <p className="text-done-quiet">
               {bulkResult.recorded.length
                 ? `Recorded against ${bulkResult.panel}: ${bulkResult.recorded.join(", ")}`
                 : `Nothing new to record against ${bulkResult.panel}.`}
             </p>
             {bulkResult.unassigned.length ? (
-              <p className="text-amber-300">
+              <p className="text-caution-quiet">
                 Taken off {bulkResult.panel} and now needing a panel:{" "}
                 {bulkResult.unassigned.join(", ")}
               </p>
             ) : null}
             {bulkResult.unchanged.length ? (
-              <p className="text-zinc-500">
+              <p className="text-ink-faint">
                 Already declared: {bulkResult.unchanged.join(", ")}
               </p>
             ) : null}
             {bulkResult.notFound.length ? (
-              <p className="text-rose-400">
+              <p className="text-danger-quiet">
                 No team with that number — check these: {bulkResult.notFound.join(", ")}
               </p>
             ) : null}
@@ -1057,16 +1103,16 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
       </div>
 
       {stranded.length ? (
-        <div className="rounded-xl bg-rose-500/10 p-4 text-sm ring-1 ring-inset ring-rose-500/30">
-          <p className="font-semibold text-rose-200">
+        <div className="rounded-xl bg-danger/12 p-4 text-sm ring-1 ring-inset ring-danger/35">
+          <p className="font-semibold text-danger-quiet">
             {stranded.length === 1 ? "One team has" : `${stranded.length} teams have`} no
             panel left to judge them
           </p>
-          <p className="mt-1 text-xs text-rose-300/80">
+          <p className="mt-1 text-xs text-danger-quiet">
             Every panel in their division is conflicted with them, so auto-assign will
             skip them. Move a panel into the division, or withdraw a conflict.
           </p>
-          <p className="mt-2 text-xs text-rose-100">
+          <p className="mt-2 text-xs text-danger-quiet">
             {stranded.map((t) => `${t.number} (${t.division})`).join(" · ")}
           </p>
         </div>
@@ -1079,17 +1125,17 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
       {byPanel.length ? (
         <div className="space-y-4">
           {byPanel.map(({ panel, rows }) => (
-            <div key={panel?.id ?? "gone"} className="rounded-xl ring-1 ring-inset ring-white/10">
-              <div className="flex flex-wrap items-baseline gap-x-3 border-b border-white/5 px-4 py-2.5">
-                <h3 className="text-sm font-semibold text-zinc-200">
+            <div key={panel?.id ?? "gone"} className="rounded-xl ring-1 ring-inset ring-line">
+              <div className="flex flex-wrap items-baseline gap-x-3 border-b border-line px-4 py-2.5">
+                <h3 className="text-sm font-semibold text-ink">
                   {panel?.name ?? "Panel removed"}
                 </h3>
-                {panel ? <span className="text-xs text-zinc-600">{panel.division}</span> : null}
-                <span className="ml-auto text-xs text-zinc-500">
+                {panel ? <span className="text-xs text-ink-faint">{panel.division}</span> : null}
+                <span className="ml-auto text-xs text-ink-faint">
                   {rows.length} {rows.length === 1 ? "conflict" : "conflicts"}
                 </span>
               </div>
-              <ul className="divide-y divide-white/5">
+              <ul className="divide-y divide-line">
                 {rows.map((c) => {
                   const team = teamById.get(c.team_id);
                   return (
@@ -1098,22 +1144,22 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
                       className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm"
                     >
                       <span className="font-bold tabular-nums">{team?.number ?? "—"}</span>
-                      <span className="min-w-[8rem] flex-1 truncate text-zinc-400">
+                      <span className="min-w-[8rem] flex-1 truncate text-ink-subtle">
                         {team?.name ?? "team removed"}
                       </span>
                       {c.judge_name ? (
-                        <span className="text-zinc-500">{c.judge_name}</span>
+                        <span className="text-ink-faint">{c.judge_name}</span>
                       ) : null}
-                      {c.note ? <span className="text-zinc-600">{c.note}</span> : null}
+                      {c.note ? <span className="text-ink-faint">{c.note}</span> : null}
                       {team && !team.panel_id ? (
-                        <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-300">
+                        <span className="rounded-md bg-caution/15 px-2 py-0.5 text-[11px] text-caution-quiet">
                           needs a panel
                         </span>
                       ) : null}
                       <button
                         onClick={() => withdraw(c.id)}
                         disabled={busy}
-                        className="ml-auto text-xs text-zinc-500 hover:text-rose-400"
+                        className="ml-auto text-xs text-ink-faint hover:text-danger-quiet"
                       >
                         withdraw
                       </button>
@@ -1125,7 +1171,7 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
           ))}
         </div>
       ) : (
-        <p className="rounded-xl px-4 py-8 text-center text-sm text-zinc-600 ring-1 ring-inset ring-white/10">
+        <p className="rounded-xl px-4 py-8 text-center text-sm text-ink-faint ring-1 ring-inset ring-line">
           No conflicts declared. Ask each panel who they are affiliated with, and record
           the answers above.
         </p>
@@ -1207,7 +1253,7 @@ function EditableCell({
           (e.target as HTMLInputElement).blur();
         }
       }}
-      className={`w-full rounded-lg bg-transparent px-2 py-1.5 text-sm ring-1 ring-inset ring-transparent transition hover:bg-white/5 hover:ring-white/10 focus:bg-white/5 focus:ring-indigo-400 focus:outline-none disabled:opacity-50 ${
+      className={`w-full rounded-lg bg-transparent px-2 py-1.5 text-sm ring-1 ring-inset ring-transparent transition hover:bg-surface-2 hover:ring-line-strong focus:bg-surface-2 focus:ring-accent focus:outline-none disabled:opacity-50 ${
         align === "center" ? "text-center" : ""
       } ${className}`}
     />
@@ -1252,8 +1298,8 @@ function StorageHealth() {
 
   return (
     <div className="mt-8 space-y-3">
-      <p className="text-xs text-zinc-500">
-        Storing into <span className="text-zinc-300">{health.location}</span>
+      <p className="text-xs text-ink-faint">
+        Storing into <span className="text-ink-muted">{health.location}</span>
       </p>
       {health.persistent === false ? (
         <Banner kind="info">
@@ -1295,8 +1341,8 @@ function DangerZone({
   }
 
   return (
-    <details className="mt-8 rounded-xl bg-white/[0.02] p-4 ring-1 ring-inset ring-white/[0.07]">
-      <summary className="cursor-pointer text-sm text-zinc-500 hover:text-zinc-300">
+    <details className="mt-8 rounded-xl bg-surface p-4 ring-1 ring-inset ring-line">
+      <summary className="cursor-pointer text-sm text-ink-faint hover:text-ink-muted">
         Reset
       </summary>
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -1326,7 +1372,7 @@ function DangerZone({
         >
           Wipe everything
         </Button>
-        <span className="text-xs text-zinc-600">
+        <span className="text-xs text-ink-faint">
           Use &ldquo;wipe everything&rdquo; before every new event (and once to clear the demo teams).
         </span>
       </div>
@@ -1402,10 +1448,10 @@ function PanelsTab({
     <div className="space-y-5">
       <form
         onSubmit={create}
-        className="flex flex-wrap items-end gap-3 rounded-xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/10"
+        className="flex flex-wrap items-end gap-3 rounded-xl bg-surface p-4 ring-1 ring-inset ring-line"
       >
         <label className="min-w-[10rem] flex-1">
-          <span className="mb-1 block text-xs text-zinc-400">Panel name</span>
+          <span className="mb-1 block text-xs text-ink-subtle">Panel name</span>
           <input
             value={draft.name}
             onChange={(e) => setDraft({ ...draft, name: e.target.value })}
@@ -1414,21 +1460,21 @@ function PanelsTab({
           />
         </label>
         <label className="min-w-[9rem] flex-1">
-          <span className="mb-1 block text-xs text-zinc-400">Division</span>
+          <span className="mb-1 block text-xs text-ink-subtle">Division</span>
           <select
             value={draft.division || divisions[0] || ""}
             onChange={(e) => setDraft({ ...draft, division: e.target.value })}
             className={`${inputClass} py-2`}
           >
             {divisions.map((d) => (
-              <option key={d} value={d} className="bg-zinc-900">
+              <option key={d} value={d} className="bg-surface">
                 {d}
               </option>
             ))}
           </select>
         </label>
         <label className="min-w-[14rem] flex-[2]">
-          <span className="mb-1 block text-xs text-zinc-400">Judges (comma separated)</span>
+          <span className="mb-1 block text-xs text-ink-subtle">Judges (comma separated)</span>
           <input
             value={draft.judges}
             onChange={(e) => setDraft({ ...draft, judges: e.target.value })}
@@ -1455,7 +1501,7 @@ function PanelsTab({
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-white/5 pt-4">
+      <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
         <Button
           variant="ghost"
           size="sm"
@@ -1477,7 +1523,7 @@ function PanelsTab({
         >
           Add preset panels
         </Button>
-        <span className="text-xs text-zinc-600">
+        <span className="text-xs text-ink-faint">
           Creates anything in <code>config/event.json</code> that is missing. Never overwrites a
           panel you already have.
         </span>
@@ -1497,7 +1543,7 @@ function PanelsTab({
       ) : null}
 
       {!panels.length ? (
-        <p className="py-8 text-center text-sm text-zinc-600">
+        <p className="py-8 text-center text-sm text-ink-faint">
           No judge panels yet. Add one above, or load your presets — judges sign in with a panel&apos;s
           code.
         </p>
@@ -1559,7 +1605,7 @@ function DeleteAllPanels({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl bg-rose-500/[0.06] p-4 ring-1 ring-inset ring-rose-500/20">
+    <div className="flex flex-wrap items-center gap-3 rounded-xl bg-danger/8 p-4 ring-1 ring-inset ring-danger/25">
       {armed ? (
         <>
           <Button variant="danger" size="sm" disabled={busy} onClick={run}>
@@ -1568,7 +1614,7 @@ function DeleteAllPanels({
           <Button variant="ghost" size="sm" disabled={busy} onClick={() => setArmed(false)}>
             Cancel
           </Button>
-          <span className="text-xs text-rose-200">
+          <span className="text-xs text-danger-quiet">
             Every judge code stops working immediately. Your teams stay, unassigned.
           </span>
         </>
@@ -1577,7 +1623,7 @@ function DeleteAllPanels({
           <Button variant="ghost" size="sm" disabled={busy} onClick={() => setArmed(true)}>
             Delete all panels
           </Button>
-          <span className="text-xs text-zinc-600">
+          <span className="text-xs text-ink-faint">
             Clears all {assigned} panels so you can start over. Teams are kept.
           </span>
         </>
@@ -1606,15 +1652,15 @@ function PanelCard({
   const [slotStart, setSlotStart] = useState(toLocalInput(panel.slot_start_at));
 
   return (
-    <div className="space-y-3 rounded-xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/10">
+    <div className="space-y-3 rounded-xl bg-surface p-4 ring-1 ring-inset ring-line">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold">{panel.name}</h3>
-          <p className="text-xs text-zinc-500">{panel.division}</p>
+          <p className="text-xs text-ink-faint">{panel.division}</p>
         </div>
         <div className="text-right">
-          <div className="text-xs text-zinc-500">Judge code</div>
-          <code className="text-lg font-bold tracking-widest text-indigo-300">{panel.code}</code>
+          <div className="text-xs text-ink-faint">Judge code</div>
+          <code className="text-lg font-bold tracking-widest text-accent-quiet">{panel.code}</code>
         </div>
       </div>
 
@@ -1625,7 +1671,7 @@ function PanelCard({
         className={`${inputClass} py-2 text-sm`}
       />
 
-      <div className="text-xs text-zinc-400">
+      <div className="text-xs text-ink-subtle">
         <span className="mb-1 block">Interviews in</span>
         <div className="flex flex-wrap gap-2">
           {languages.map((l) => {
@@ -1642,8 +1688,8 @@ function PanelCard({
                 }
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                   on
-                    ? "bg-indigo-500 text-white"
-                    : "bg-white/5 text-zinc-500 ring-1 ring-inset ring-white/10"
+                    ? "bg-accent text-white"
+                    : "bg-surface text-ink-faint ring-1 ring-inset ring-line"
                 }`}
               >
                 {l.label}
@@ -1652,11 +1698,11 @@ function PanelCard({
           })}
         </div>
         {!panel.languages.length ? (
-          <p className="mt-1 text-zinc-600">Not stated — no request will be flagged.</p>
+          <p className="mt-1 text-ink-faint">Not stated — no request will be flagged.</p>
         ) : null}
       </div>
 
-      <label className="block text-xs text-zinc-400">
+      <label className="block text-xs text-ink-subtle">
         Division
         <select
           value={panel.division}
@@ -1675,7 +1721,7 @@ function PanelCard({
           className={`${inputClass} mt-1 py-2 text-sm`}
         >
           {divisions.map((d) => (
-            <option key={d} value={d} className="bg-zinc-900">
+            <option key={d} value={d} className="bg-surface">
               {d}
             </option>
           ))}
@@ -1683,11 +1729,11 @@ function PanelCard({
       </label>
 
       <details className="text-sm">
-        <summary className="cursor-pointer text-zinc-400 hover:text-zinc-200">
+        <summary className="cursor-pointer text-ink-subtle hover:text-ink">
           Booking slots {panel.slot_count ? `(${panel.slot_count})` : "(off)"}
         </summary>
         <div className="mt-3 space-y-2">
-          <label className="block text-xs text-zinc-400">
+          <label className="block text-xs text-ink-subtle">
             First slot starts
             <input
               type="datetime-local"
@@ -1697,7 +1743,7 @@ function PanelCard({
             />
           </label>
           <div className="flex gap-2">
-            <label className="flex-1 text-xs text-zinc-400">
+            <label className="flex-1 text-xs text-ink-subtle">
               Minutes each
               <input
                 type="number"
@@ -1708,7 +1754,7 @@ function PanelCard({
                 className={`${inputClass} mt-1 py-2 text-sm`}
               />
             </label>
-            <label className="flex-1 text-xs text-zinc-400">
+            <label className="flex-1 text-xs text-ink-subtle">
               How many
               <input
                 type="number"
@@ -1733,7 +1779,7 @@ function PanelCard({
           >
             Save slot grid
           </Button>
-          <p className="text-xs text-zinc-600">Set &ldquo;how many&rdquo; to 0 for walk-up queue only.</p>
+          <p className="text-xs text-ink-faint">Set &ldquo;how many&rdquo; to 0 for walk-up queue only.</p>
         </div>
       </details>
 
@@ -1747,7 +1793,7 @@ function PanelCard({
             onError((e as Error).message);
           }
         }}
-        className="text-xs text-zinc-600 hover:text-rose-400"
+        className="text-xs text-ink-faint hover:text-danger-quiet"
       >
         delete panel
       </button>
@@ -1830,17 +1876,17 @@ function ImportTab({
     <div className="max-w-2xl space-y-4">
       <div>
         <h2 className="text-lg font-semibold">Import your team list</h2>
-        <p className="mt-1 text-sm text-zinc-400">
-          One team per line: <code className="text-zinc-300">number, name, pit, division</code>.
-          Division is each team&apos;s own — <code className="text-zinc-300">Elementary School</code>,{" "}
-          <code className="text-zinc-300">Middle School</code>, and so on — so one paste can bring
+        <p className="mt-1 text-sm text-ink-subtle">
+          One team per line: <code className="text-ink-muted">number, name, pit, division</code>.
+          Division is each team&apos;s own — <code className="text-ink-muted">Elementary School</code>,{" "}
+          <code className="text-ink-muted">Middle School</code>, and so on — so one paste can bring
           in every division at once; a row with nothing in that column falls back to{" "}
-          {divisions[0] ? <code className="text-zinc-300">{divisions[0]}</code> : "the first configured division"}.
+          {divisions[0] ? <code className="text-ink-muted">{divisions[0]}</code> : "the first configured division"}.
           Pit is optional, and reads best as a letter and a number like{" "}
-          <code className="text-zinc-300">A1</code>, which is what puts the team on the
+          <code className="text-ink-muted">A1</code>, which is what puts the team on the
           board&apos;s pit floor plan. Team numbers may include letters —{" "}
-          <code className="text-zinc-300">9882K</code>{" "}
-          works as well as <code className="text-zinc-300">1234</code>. Notebook type isn&apos;t
+          <code className="text-ink-muted">9882K</code>{" "}
+          works as well as <code className="text-ink-muted">1234</code>. Notebook type isn&apos;t
           set here — every imported team starts as the event&apos;s default classification, and
           the Judge Advisor sorts Developing from Fully Developed during review. Paste straight
           from a spreadsheet — tabs work too, and a header row is skipped automatically.
@@ -1861,11 +1907,11 @@ function ImportTab({
           takeFile(e.dataTransfer.files?.[0]);
         }}
         className={`rounded-xl border-2 border-dashed p-4 transition ${
-          dragging ? "border-indigo-400 bg-indigo-500/10" : "border-white/10"
+          dragging ? "border-accent bg-accent/10" : "border-line"
         }`}
       >
         <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
-          <label className="cursor-pointer rounded-lg bg-white/5 px-3 py-2 text-zinc-200 ring-1 ring-inset ring-white/10 hover:bg-white/10">
+          <label className="cursor-pointer rounded-lg bg-surface px-3 py-2 text-ink ring-1 ring-inset ring-line hover:bg-surface-2">
             Choose a file
             <input
               type="file"
@@ -1877,10 +1923,10 @@ function ImportTab({
               }}
             />
           </label>
-          <span className="text-zinc-500">
-            or drag one here — <code className="text-zinc-400">.xlsx</code>,{" "}
-            <code className="text-zinc-400">.csv</code>,{" "}
-            <code className="text-zinc-400">.tsv</code>. Or just paste below.
+          <span className="text-ink-faint">
+            or drag one here — <code className="text-ink-subtle">.xlsx</code>,{" "}
+            <code className="text-ink-subtle">.csv</code>,{" "}
+            <code className="text-ink-subtle">.tsv</code>. Or just paste below.
           </span>
         </div>
 
@@ -1904,16 +1950,16 @@ function ImportTab({
       {loaded ? <Banner kind="info">{loaded}</Banner> : null}
 
       <div className="flex flex-wrap items-center gap-4">
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-muted">
           <input
             type="checkbox"
             checked={autoAssign}
             onChange={(e) => setAutoAssign(e.target.checked)}
-            className="h-4 w-4 accent-indigo-500"
+            className="h-4 w-4 accent-[var(--accent)]"
           />
           Spread across panels evenly
         </label>
-        <label className="flex items-center gap-2 text-sm text-zinc-400">
+        <label className="flex items-center gap-2 text-sm text-ink-subtle">
           max
           <input
             type="number"
@@ -1957,17 +2003,17 @@ function ActivityTab() {
   if (error) return <Banner kind="error">{error}</Banner>;
 
   return (
-    <ul className="divide-y divide-white/5 rounded-xl ring-1 ring-inset ring-white/10">
+    <ul className="divide-y divide-line rounded-xl ring-1 ring-inset ring-line">
       {rows.map((r) => (
         <li key={r.id} className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-2.5 text-sm">
-          <span className="w-20 shrink-0 text-zinc-600">{formatClock(r.created_at)}</span>
-          <span className="w-48 shrink-0 truncate text-zinc-400">{r.actor}</span>
-          <span className="text-zinc-200">{r.action}</span>
-          {r.detail ? <span className="text-zinc-500">{r.detail}</span> : null}
+          <span className="w-20 shrink-0 text-ink-faint">{formatClock(r.created_at)}</span>
+          <span className="w-48 shrink-0 truncate text-ink-subtle">{r.actor}</span>
+          <span className="text-ink">{r.action}</span>
+          {r.detail ? <span className="text-ink-faint">{r.detail}</span> : null}
         </li>
       ))}
       {!rows.length ? (
-        <li className="px-4 py-8 text-center text-sm text-zinc-600">Nothing logged yet.</li>
+        <li className="px-4 py-8 text-center text-sm text-ink-faint">Nothing logged yet.</li>
       ) : null}
     </ul>
   );

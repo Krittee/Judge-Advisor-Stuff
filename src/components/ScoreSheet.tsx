@@ -99,17 +99,17 @@ export function ScoreSheet({
       {error ? <Banner kind="error">{error}</Banner> : null}
 
       <div className="flex items-baseline justify-between">
-        <span className="text-sm text-zinc-400">
+        <span className="text-sm text-ink-subtle">
           {answered} of {rubric.criteria.length} scored
         </span>
         <span className="text-2xl font-bold tabular-nums">
           {total}
-          <span className="text-base font-normal text-zinc-500"> / {rubric.max}</span>
+          <span className="text-base font-normal text-ink-faint"> / {rubric.max}</span>
         </span>
       </div>
 
       {answered ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-rose-500/[0.06] p-3 ring-1 ring-inset ring-rose-500/20">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-danger/8 p-3 ring-1 ring-inset ring-danger/25">
           {armed ? (
             <>
               <Button variant="danger" size="sm" disabled={saving !== null} onClick={clearAll}>
@@ -118,7 +118,7 @@ export function ScoreSheet({
               <Button variant="ghost" size="sm" onClick={() => setArmed(false)}>
                 Cancel
               </Button>
-              <span className="text-xs text-rose-200">
+              <span className="text-xs text-danger-quiet">
                 {rubric.name} only — the other rubric is untouched.
               </span>
             </>
@@ -127,7 +127,7 @@ export function ScoreSheet({
               <Button variant="ghost" size="sm" onClick={() => setArmed(true)}>
                 Clear score
               </Button>
-              <span className="text-xs text-zinc-500">
+              <span className="text-xs text-ink-faint">
                 Wipes this rubric so you can start it over. Tap any single value again to clear
                 just that one.
               </span>
@@ -138,16 +138,16 @@ export function ScoreSheet({
 
       {rubric.sections.map((section) => (
         <section key={section.name}>
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
             {section.name}
           </h4>
           <ul className="space-y-2">
             {section.criteria.map((criterion) => (
               <li
                 key={criterion.id}
-                className="rounded-xl bg-white/[0.04] p-3 ring-1 ring-inset ring-white/[0.07]"
+                className="rounded-xl bg-surface p-3 ring-1 ring-inset ring-line"
               >
-                <p className="mb-2 text-sm text-zinc-200">{criterion.label}</p>
+                <p className="mb-2 text-sm text-ink">{criterion.label}</p>
                 <div className="flex flex-wrap gap-2">
                   {rubric.scale.map((point) => (
                     <ScoreButton
@@ -192,8 +192,8 @@ function ScoreButton({
       title={selected ? "Tap again to clear" : point.label}
       className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition disabled:opacity-50 ${
         selected
-          ? "bg-indigo-500 text-white ring-2 ring-indigo-300"
-          : "bg-white/5 text-zinc-300 ring-1 ring-inset ring-white/10 hover:bg-white/10"
+          ? "bg-accent text-white ring-2 ring-accent"
+          : "bg-surface text-ink-muted ring-1 ring-inset ring-line hover:bg-surface-2"
       }`}
     >
       <span className="mr-1.5 font-bold tabular-nums">{point.short}</span>

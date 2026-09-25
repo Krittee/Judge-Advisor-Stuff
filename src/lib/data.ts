@@ -50,8 +50,69 @@ export function buildSlots(
         taken && team
           ? { teamId: team.id, teamNumber: team.number, status: taken.status as Status }
           : null,
+      blocked: !taken && hasNearbyBooking(requests, panel.id, start.getTime()),
     };
   });
+}
+
+/**
+ * How long a judge needs, door to door: walk to the team plus the
+ * interview itself. Two bookings on the same panel closer together than
+ * this would need the judge in two places at once.
+ */
+export const BOOKING_GAP_MINUTES = 20;
+
+/**
+ * Whether some other live slot booking on this panel sits within the
+ * walk-and-interview window of the given start time.
+ *
+ * This is what actually keeps two bookings apart — tighter than "same
+ * exact start time" — so it also catches a panel whose own slot_minutes
+ * is configured shorter than a judge can physically walk.
+ */
+export function hasNearbyBooking(
+  requests: RequestRow[],
+  panelId: string,
+  startMs: number,
+  excludeRequestId?: string,
+): boolean {
+  const gapMs = BOOKING_GAP_MINUTES * 60_000;
+  return requests.some(
+    (r) =>
+      r.id !== excludeRequestId &&
+      r.kind === "slot" &&
+      r.panel_id === panelId &&
+      r.status !== "cancelled" &&
+      r.slot_start != null &&
+      Math.abs(new Date(r.slot_start).getTime() - startMs) < gapMs,
+  );
+}
+
+/**
+ * How long before a booked slot it starts warning.
+ *
+ * One slot length would be the tidy answer, but a panel can be re-timed
+ * to 3 minutes; a team needs long enough to walk across a hall whatever
+ * the grid says. Tune it here — this is the only place it is decided.
+ */
+export const BOOKING_SOON_MINUTES = 15;
+
+export type BookingUrgency = "later" | "soon" | "due";
+
+/**
+ * How a booked slot reads against the clock right now.
+ *
+ * "due" once the slot has started, "soon" inside the warning window,
+ * "later" otherwise. `now` is passed in rather than read here so the
+ * caller decides when it re-reads the clock — a component ticking on its
+ * own interval, a test pinning a fixed instant.
+ */
+export function bookingUrgency(slotStart: string | null, now: number): BookingUrgency {
+  if (!slotStart) return "later";
+  const start = new Date(slotStart).getTime();
+  if (Number.isNaN(start)) return "later";
+  if (start <= now) return "due";
+  return start - now <= BOOKING_SOON_MINUTES * 60_000 ? "soon" : "later";
 }
 
 /** The one request that represents a team's current state, if any. */
@@ -67,11 +128,6 @@ export function liveRequestFor(teamId: string, requests: RequestRow[]): RequestR
     .filter((r) => r.team_id === teamId && r.status === "scheduled")
     .sort((a, b) => (a.slot_start ?? "").localeCompare(b.slot_start ?? ""));
   return scheduled[0] ?? null;
-}
-
-/** Most recent request of any status, used for "already interviewed" checks. */
-export function latestRequestFor(teamId: string, requests: RequestRow[]): RequestRow | null {
-  return requests.find((r) => r.team_id === teamId) ?? null;
 }
 
 /**

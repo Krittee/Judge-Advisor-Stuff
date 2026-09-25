@@ -10,8 +10,9 @@ import type {
   Team,
 } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
-import { normalizePanelCode, randomPanelCode } from "../panelCode";
-import { DEFAULT_DIVISION, defaultCategory, presetPanels } from "../presets";
+import { randomPanelCode } from "../panelCode";
+import { divisionsCompatible, presetPanels } from "../presets";
+import { hasNearbyBooking } from "../data";
 import {
   StoreError,
   type ImportedTeam,
@@ -36,8 +37,6 @@ import {
  * here they hold even with many server instances running at once, which
  * is exactly the situation serverless hosting creates.
  */
-
-const LIVE = ["requested", "acknowledged", "interviewing"] as const;
 
 let pool: Pool | null = null;
 let connecting: Promise<Pool> | null = null;
@@ -485,6 +484,22 @@ export const postgresStore: Store = {
   },
 
   async createRequest(input: NewRequest) {
+    if (input.kind === "slot" && input.slotStart) {
+      // ponytail: check-then-insert race on the *gap* rule (the exact-time
+      // case still has the DB unique index as a backstop). Two bookings on
+      // the very same panel within the same instant is rare enough at
+      // event scale; add an advisory lock around this if it ever bites.
+      const nearby = await query<RequestRow>(
+        `select * from requests where panel_id = $1 and kind = 'slot' and status <> 'cancelled'`,
+        [input.panelId],
+      );
+      if (hasNearbyBooking(nearby, input.panelId, new Date(input.slotStart).getTime())) {
+        throw new StoreError(
+          "Someone already has a booking within 20 minutes of that time on this panel. Pick another one.",
+          409,
+        );
+      }
+    }
     try {
       return one(
         await query<RequestRow>(
@@ -516,6 +531,27 @@ export const postgresStore: Store = {
       const current = await this.findRequest(id);
       if (!current) throw new StoreError("That request no longer exists.", 404);
       return current;
+    }
+
+    // Reassigning a booked slot to another panel (or another time) is
+    // still a booking — check it the same way createRequest does.
+    if (patch.panel_id !== undefined || patch.slot_start !== undefined) {
+      const current = await this.findRequest(id);
+      if (!current) throw new StoreError("That request no longer exists.", 404);
+      const panelId = patch.panel_id ?? current.panel_id;
+      const slotStart = patch.slot_start ?? current.slot_start;
+      if (current.kind === "slot" && current.status !== "cancelled" && panelId && slotStart) {
+        const nearby = await query<RequestRow>(
+          `select * from requests where panel_id = $1 and kind = 'slot' and status <> 'cancelled' and id <> $2`,
+          [panelId, id],
+        );
+        if (hasNearbyBooking(nearby, panelId, new Date(slotStart).getTime())) {
+          throw new StoreError(
+            "Someone already has a booking within 20 minutes of that time on this panel.",
+            409,
+          );
+        }
+      }
     }
 
     const assignments = columns.map((c, i) => `${c} = $${i + 2}`).join(", ");
@@ -600,7 +636,9 @@ export const postgresStore: Store = {
    * mid-event top-up stays balanced.
    */
   async autoAssignTeams(perPanel, includeAssigned = false, division?: string) {
-    const panels = (await this.listPanels()).filter((p) => !division || p.division === division);
+    const panels = (await this.listPanels()).filter(
+      (p) => !division || divisionsCompatible(p.division, division),
+    );
     if (!panels.length) {
       throw new StoreError(
         division
@@ -612,7 +650,9 @@ export const postgresStore: Store = {
 
     const teams = await this.listTeams();
     const pending = teams.filter(
-      (t) => (includeAssigned || !t.panel_id) && (!division || t.division === division),
+      (t) =>
+        (includeAssigned || !t.panel_id) &&
+        (!division || divisionsCompatible(t.division, division)),
     );
     if (!pending.length) return 0;
 
@@ -630,10 +670,13 @@ export const postgresStore: Store = {
 
     const assignments: { teamId: string; panelId: string }[] = [];
     for (const team of pending) {
-      // The hard wall: only panels in this team's own division are eligible,
+      // The hard wall: only panels this team's division may be judged by,
+      // and a blended team clears it against every panel (see
+      // divisionsCompatible) rather than needing a panel created in the
+      // blended division before it can be judged at all.
       // and never one with a declared conflict.
       const eligible = panels.filter(
-        (p) => p.division === team.division && !barred.has(`${p.id}:${team.id}`),
+        (p) => divisionsCompatible(team.division, p.division) && !barred.has(`${p.id}:${team.id}`),
       );
       const target = eligible
         .map((p) => ({ id: p.id, count: load.get(p.id) ?? 0 }))
@@ -721,7 +764,21 @@ export const postgresStore: Store = {
     // a duplicate code, say — must never unassign a single team on its
     // way to being refused.
     if (patch.division && patch.division !== before.division) {
-      await query("update teams set panel_id = null where panel_id = $1", [id]);
+      // A team the panel may still judge after the move stays with it --
+      // a blended team belongs on either side of the wall. Filtered here
+      // with the same predicate the rest of the app uses rather than in
+      // SQL, so the two backends cannot answer this differently.
+      const moved = patch.division;
+      const held = await query<{ id: string; division: string }>(
+        "select id, division from teams where panel_id = $1",
+        [id],
+      );
+      const release = held
+        .filter((t) => !divisionsCompatible(t.division, moved))
+        .map((t) => t.id);
+      if (release.length) {
+        await query("update teams set panel_id = null where id = any($1::uuid[])", [release]);
+      }
     }
 
     return updated;

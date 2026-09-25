@@ -42,64 +42,74 @@ export type StatusMeta = {
 };
 
 export const STATUS_META: Record<Status, StatusMeta> = {
+  /* Booked, but nobody has to do anything yet. Deliberately the quietest
+     entry in the table -- it is the only status that is about the future,
+     and a board where every future booking shouts has nothing left to say
+     when one of them actually comes due. */
   scheduled: {
     label: "Scheduled",
     short: "Booked",
     teamLabel: "Your slot is booked",
-    chip: "bg-slate-500/15 text-slate-200 ring-1 ring-inset ring-slate-400/40",
-    tile: "bg-slate-800/70 ring-1 ring-slate-600",
-    fill: "bg-slate-800/70 text-slate-200",
-    dot: "bg-slate-400",
+    chip: "bg-booked text-booked-ink ring-1 ring-inset ring-line-strong",
+    tile: "bg-booked text-booked-ink ring-1 ring-inset ring-line-strong",
+    fill: "bg-booked text-booked-ink",
+    dot: "bg-booked-quiet",
     order: 1,
   },
+  /* The one that matters. A team is stood waiting and nobody has picked
+     them up: the loudest colour in the app, the only one that pulses, and
+     the reason every other status is held back from orange. */
   requested: {
     label: "Requesting a judge",
     short: "Requesting",
     teamLabel: "Judges have been notified",
-    chip: "bg-orange-500 text-orange-950 font-semibold",
-    tile: "bg-orange-500 text-orange-950 ring-2 ring-orange-300",
-    fill: "bg-orange-500 text-orange-950",
-    dot: "bg-orange-500",
+    chip: "bg-waiting text-waiting-ink font-semibold",
+    tile: "bg-waiting text-waiting-ink ring-2 ring-inset ring-waiting-quiet",
+    fill: "bg-waiting text-waiting-ink",
+    dot: "bg-waiting",
     order: 0,
   },
   acknowledged: {
     label: "Judges on their way",
     short: "On the way",
     teamLabel: "Judges are on their way to you",
-    chip: "bg-sky-500 text-sky-950 font-semibold",
-    tile: "bg-sky-500 text-sky-950 ring-2 ring-sky-300",
-    fill: "bg-sky-500 text-sky-950",
-    dot: "bg-sky-500",
+    chip: "bg-enroute text-enroute-ink font-semibold",
+    tile: "bg-enroute text-enroute-ink ring-2 ring-inset ring-enroute-quiet",
+    fill: "bg-enroute text-enroute-ink",
+    dot: "bg-enroute",
     order: 2,
   },
   interviewing: {
     label: "Interview in progress",
     short: "Interviewing",
     teamLabel: "Interview in progress",
-    chip: "bg-violet-500 text-violet-950 font-semibold",
-    tile: "bg-violet-500 text-violet-950 ring-2 ring-violet-300",
-    fill: "bg-violet-500 text-violet-950",
-    dot: "bg-violet-500",
+    chip: "bg-active text-active-ink font-semibold",
+    tile: "bg-active text-active-ink ring-2 ring-inset ring-active-quiet",
+    fill: "bg-active text-active-ink",
+    dot: "bg-active",
     order: 3,
   },
   completed: {
     label: "Interview complete",
     short: "Complete",
     teamLabel: "Interview complete — thank you!",
-    chip: "bg-emerald-500 text-emerald-950 font-semibold",
-    tile: "bg-emerald-600/85 text-emerald-50 ring-1 ring-emerald-400",
-    fill: "bg-emerald-600/85 text-emerald-50",
-    dot: "bg-emerald-500",
+    chip: "bg-done text-done-ink font-semibold",
+    tile: "bg-done text-done-ink ring-1 ring-inset ring-done-quiet",
+    fill: "bg-done text-done-ink",
+    dot: "bg-done",
     order: 4,
   },
+  /* Nothing to act on and nothing to celebrate: the only status drawn
+     without a fill, so a cancelled row reads as absent rather than as one
+     more coloured thing competing for the eye. */
   cancelled: {
     label: "Cancelled",
     short: "Cancelled",
     teamLabel: "Request cancelled",
-    chip: "bg-zinc-600/40 text-zinc-300 ring-1 ring-inset ring-zinc-500",
-    tile: "bg-zinc-800/60 text-zinc-400 ring-1 ring-zinc-700",
-    fill: "bg-zinc-800/60 text-zinc-400",
-    dot: "bg-zinc-500",
+    chip: "bg-off text-off-ink ring-1 ring-inset ring-line",
+    tile: "bg-off text-off-ink ring-1 ring-inset ring-line",
+    fill: "bg-off text-off-ink",
+    dot: "bg-off-ink",
     order: 5,
   },
 };
@@ -111,7 +121,3 @@ export const NEXT_STATUS: Partial<Record<Status, Status>> = {
   acknowledged: "interviewing",
   interviewing: "completed",
 };
-
-export function isLive(status: Status): boolean {
-  return LIVE_STATUSES.includes(status);
-}

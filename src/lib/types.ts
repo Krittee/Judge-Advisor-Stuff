@@ -194,4 +194,6 @@ export type Slot = {
   start: string;
   end: string;
   takenBy: { teamId: string; teamNumber: string; status: Status } | null;
+  /** Free, but too close to another booking for a judge to walk it in time. */
+  blocked: boolean;
 };

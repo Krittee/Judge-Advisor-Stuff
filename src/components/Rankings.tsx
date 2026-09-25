@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { call } from "./useAppState";
+import { useMemo } from "react";
 import { Banner } from "./ui";
 import { BandChip, BandLegend } from "./BandChip";
 import { CategoryChip } from "./CategoryChip";
@@ -20,6 +19,10 @@ import type { AppState, FlagRow, ScoreRow, Team, TeamCategoryView } from "@/lib/
 export function Rankings({
   teams,
   categories,
+  scores,
+  rubricList,
+  loaded = true,
+  error = null,
   panelName,
   onOpenTeam,
   flags = [],
@@ -28,6 +31,13 @@ export function Rankings({
 }: {
   teams: Team[];
   categories: TeamCategoryView[];
+  /** From useScores. Fetched by the screen, not here: the judge console
+   *  needs the same numbers on its queue cards, and asking twice for them
+   *  would be two polls of one endpoint. */
+  scores: ScoreRow[];
+  rubricList: Rubric[];
+  loaded?: boolean;
+  error?: string | null;
   panelName?: Record<string, string>;
   onOpenTeam?: (team: Team) => void;
   /** Referee flags, so conduct sits beside the scores at deliberation. */
@@ -36,26 +46,6 @@ export function Rankings({
   /** Given, the conduct cell opens that team's flags in full. */
   onOpenFlags?: (team: Team) => void;
 }) {
-  const [scores, setScores] = useState<ScoreRow[]>([]);
-  const [rubricList, setRubricList] = useState<Rubric[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    const load = () =>
-      call<{ scores: ScoreRow[]; rubrics: Rubric[] }>("/api/scores", { method: "GET" })
-        .then((d) => {
-          setScores(d.scores);
-          setRubricList(d.rubrics);
-        })
-        .catch((e) => setError((e as Error).message))
-        .finally(() => setLoaded(true));
-
-    load();
-    const t = setInterval(load, 15_000);
-    return () => clearInterval(t);
-  }, []);
-
   const fullMax = rubricList.reduce((sum, r) => sum + r.max, 0);
 
   const flagsByTeam = useMemo(() => {
@@ -99,22 +89,22 @@ export function Rankings({
   }, [teams, scores, rubricList, categories]);
 
   if (error) return <Banner kind="error">{error}</Banner>;
-  if (!loaded) return <p className="py-6 text-center text-sm text-zinc-500">Loading…</p>;
+  if (!loaded) return <p className="py-6 text-center text-sm text-ink-faint">Loading…</p>;
 
   const scoredCount = rows.filter((r) => r.scored).length;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-sm text-zinc-400">
+        <span className="text-sm text-ink-subtle">
           {scoredCount} of {rows.length} teams scored · {fullMax} points available
         </span>
         <BandLegend />
       </div>
 
-      <div className="overflow-x-auto rounded-xl ring-1 ring-inset ring-white/10">
+      <div className="overflow-x-auto rounded-xl ring-1 ring-inset ring-line">
         <table className="w-full text-sm">
-          <thead className="bg-white/[0.04] text-left text-xs uppercase tracking-wide text-zinc-500">
+          <thead className="bg-surface text-left text-xs uppercase tracking-wide text-ink-faint">
             <tr>
               <th className="px-3 py-3 w-10">#</th>
               <th className="px-3 py-3">Team</th>
@@ -130,27 +120,27 @@ export function Rankings({
               {showConduct ? <th className="px-3 py-3">Conduct</th> : null}
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="divide-y divide-line">
             {rows.map((row, i) => (
               <tr
                 key={row.team.id}
                 onClick={() => onOpenTeam?.(row.team)}
-                className={`${onOpenTeam ? "cursor-pointer" : ""} hover:bg-white/[0.03] ${
+                className={`${onOpenTeam ? "cursor-pointer" : ""} hover:bg-surface-2 ${
                   row.scored ? "" : "opacity-60"
                 }`}
               >
-                <td className="px-3 py-2.5 tabular-nums text-zinc-600">
+                <td className="px-3 py-2.5 tabular-nums text-ink-faint">
                   {row.scored ? i + 1 : "—"}
                 </td>
                 <td className="px-3 py-2.5">
                   <span className="font-bold tabular-nums">{row.team.number}</span>{" "}
-                  <span className="text-zinc-400">{row.team.name}</span>
+                  <span className="text-ink-subtle">{row.team.name}</span>
                 </td>
                 <td className="px-3 py-2.5">
                   <CategoryChip category={row.team.category} categories={categories} />
                 </td>
                 {panelName ? (
-                  <td className="px-3 py-2.5 text-xs text-zinc-500">
+                  <td className="px-3 py-2.5 text-xs text-ink-faint">
                     {row.team.panel_id ? (panelName[row.team.panel_id] ?? "—") : "—"}
                   </td>
                 ) : null}
@@ -164,14 +154,14 @@ export function Rankings({
                         title={`Not counted — this team's notebook is ${
                           categories.find((c) => c.id === row.team.category)?.label ?? "excluded"
                         }`}
-                        className="px-3 py-2.5 text-right text-xs text-zinc-600"
+                        className="px-3 py-2.5 text-right text-xs text-ink-faint"
                       >
                         n/a
                       </td>
                     );
                   }
                   return (
-                    <td key={r.id} className="px-3 py-2.5 text-right tabular-nums text-zinc-400">
+                    <td key={r.id} className="px-3 py-2.5 text-right tabular-nums text-ink-subtle">
                       {s && Object.keys(s.values ?? {}).length ? `${s.total}/${r.max}` : "—"}
                     </td>
                   );
@@ -182,7 +172,7 @@ export function Rankings({
                       <span className="text-lg font-bold">{row.total}</span>
                       {/* The denominator is not the same for every team, so
                           it is always shown rather than left to be assumed. */}
-                      <span className="text-xs text-zinc-500">/{row.max}</span>
+                      <span className="text-xs text-ink-faint">/{row.max}</span>
                     </>
                   ) : (
                     "—"
@@ -207,7 +197,7 @@ export function Rankings({
       </div>
 
       {!rows.length ? (
-        <p className="py-8 text-center text-sm text-zinc-600">No teams to score yet.</p>
+        <p className="py-8 text-center text-sm text-ink-faint">No teams to score yet.</p>
       ) : null}
     </div>
   );
@@ -232,7 +222,7 @@ function ConductCell({
   onOpen?: () => void;
 }) {
   if (!flags.length) {
-    return <span className="text-xs text-zinc-600">—</span>;
+    return <span className="text-xs text-ink-faint">—</span>;
   }
   const summary = <FlagSummary flags={flags} kinds={kinds} size="xs" />;
   if (!onOpen) return summary;
@@ -245,7 +235,7 @@ function ConductCell({
         onOpen();
       }}
       title={`See all ${flags.length} referee ${flags.length === 1 ? "flag" : "flags"}`}
-      className="rounded-lg px-1 py-0.5 ring-1 ring-inset ring-transparent transition hover:ring-indigo-400/50 focus-visible:ring-indigo-400"
+      className="rounded-lg px-1 py-0.5 ring-1 ring-inset ring-transparent transition hover:ring-accent/60 focus-visible:ring-accent"
     >
       {summary}
     </button>

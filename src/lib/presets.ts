@@ -42,6 +42,7 @@ export type Language = { id: string; label: string; short: string };
 
 type RawPreset = {
   divisions?: unknown;
+  blendedDivisions?: unknown;
   pitFloor?: unknown;
   matchTypes?: unknown;
   languages?: unknown;
@@ -63,6 +64,45 @@ export function presetDivisions(): string[] {
     ? raw.divisions.map((d) => String(d).trim()).filter(Boolean)
     : [];
   return list.length ? unique(list) : [DEFAULT_DIVISION];
+}
+
+/** A division whose name says it spans the others, e.g. "Blended". */
+const BLEND_PATTERN = /blend|mixed|combined/i;
+
+/**
+ * Divisions that span the others.
+ *
+ * A blended team competes across age groups, so it has no one age
+ * group's panel to belong to — any panel may judge it, and a blended
+ * panel may judge anyone. Without this the division wall (see
+ * divisionsCompatible) is strict equality, which leaves a Blended team
+ * assignable only to a panel someone remembered to create in the
+ * Blended division: the roster looks right and the team is simply never
+ * judged. Detected by name so the shipped config works untouched;
+ * `blendedDivisions` in config/event.json overrides that for an event
+ * calling it something else, and an empty array turns it off.
+ */
+export function blendedDivisions(): string[] {
+  const listed = Array.isArray(raw.blendedDivisions)
+    ? raw.blendedDivisions.map((d) => String(d).trim()).filter(Boolean)
+    : null;
+  return listed ?? presetDivisions().filter((d) => BLEND_PATTERN.test(d));
+}
+
+/**
+ * The division wall: whether a panel judging `panelDivision` may take a
+ * team competing in `teamDivision`.
+ *
+ * Every check of the wall goes through here — assignment, reassignment,
+ * auto-assign, and what a judge can see — so the rule cannot drift
+ * between them. Exact match is the normal answer; a blended division on
+ * either side is the exception that makes Blend a usable category
+ * instead of one that has to be lied about at the keyboard.
+ */
+export function divisionsCompatible(teamDivision: string, panelDivision: string): boolean {
+  if (teamDivision === panelDivision) return true;
+  const blended = blendedDivisions();
+  return blended.includes(teamDivision) || blended.includes(panelDivision);
 }
 
 /* ------------------------------------------------------------------ *

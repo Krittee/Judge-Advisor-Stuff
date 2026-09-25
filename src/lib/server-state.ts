@@ -1,6 +1,14 @@
 import { store } from "./db";
 import { stripCode } from "./data";
-import { languages, matchTypes, pitFloor, presetDivisions, refereeFlags, teamCategories } from "./presets";
+import {
+  divisionsCompatible,
+  languages,
+  matchTypes,
+  pitFloor,
+  presetDivisions,
+  refereeFlags,
+  teamCategories,
+} from "./presets";
 import {
   canAdminister,
   canAdvance,
@@ -62,16 +70,32 @@ export async function loadState(session: Session | null): Promise<AppState> {
       : [],
   );
 
+  // divisionsCompatible rather than `===`: a blended team competes across
+  // age groups, so it is judged by whichever panel holds it. Comparing
+  // exactly would hide a Blended team from the very panel it is assigned
+  // to -- the team would be on the roster, on the board, and missing from
+  // the only screen that could interview it.
+  const visibleTeams = !judgeSessionValid
+    ? []
+    : (division
+        ? teams.filter((t) => divisionsCompatible(t.division, division))
+        : teams
+      ).filter((t) => !barred.has(t.id));
+
+  /* Plus the panel holding any of those teams, even one across the wall.
+     A blended team is compatible with every division, so an Elementary
+     judge can see one that a Middle School panel holds -- and a team in
+     the payload whose panel is not would render as unassigned on its own
+     page, telling the team to go and ask the Judge Advisor about an
+     assignment it already has. Panel names are on the board anyway; the
+     code is stripped from all of these, and notes, scores and flags stay
+     on the narrower own-panel wall regardless. */
+  const heldPanelIds = new Set(visibleTeams.map((t) => t.panel_id).filter(Boolean));
   const visiblePanels = !judgeSessionValid
     ? []
     : division
-      ? panels.filter((p) => p.division === division)
+      ? panels.filter((p) => divisionsCompatible(p.division, division) || heldPanelIds.has(p.id))
       : panels;
-  const visibleTeams = !judgeSessionValid
-    ? []
-    : (division ? teams.filter((t) => t.division === division) : teams).filter(
-        (t) => !barred.has(t.id),
-      );
   const visiblePanelIds = new Set(visiblePanels.map((p) => p.id));
   const visibleTeamIds = new Set(visibleTeams.map((t) => t.id));
 

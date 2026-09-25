@@ -23,7 +23,7 @@ export function SignOutButton({ to = "/login" }: { to?: string } = {}) {
         await call("/api/session", { method: "DELETE" });
         router.replace(to);
       }}
-      className="text-sm text-zinc-400 hover:text-zinc-200"
+      className="text-sm text-ink-subtle hover:text-ink"
     >
       Sign out
     </button>
@@ -125,11 +125,11 @@ export function NotesDrawer({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 sm:items-center"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-sunken/80 sm:items-center"
       onClick={onClose}
     >
       <div
-        className="dialog-surface max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-t-2xl p-5 ring-1 ring-white/10 sm:rounded-2xl"
+        className="dialog-surface max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-t-2xl p-5 ring-1 ring-line sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
@@ -137,11 +137,11 @@ export function NotesDrawer({
             <h2 className="text-xl font-bold">
               {team.number} · {team.name}
             </h2>
-            <p className="text-xs text-zinc-500">Private to judges and the Judge Advisor.</p>
+            <p className="text-xs text-ink-faint">Private to judges and the Judge Advisor.</p>
             {/* Say why the denominator is smaller, rather than leaving a
                 judge to wonder whether scores went missing. */}
             {excludedLabel ? (
-              <p className="mt-1 text-xs text-amber-400/80">
+              <p className="mt-1 text-xs text-caution-quiet">
                 {excludedLabel} is not counted for this team —{" "}
                 {categories.find((c) => c.id === team.category)?.label ?? "excluded"}.
               </p>
@@ -152,26 +152,26 @@ export function NotesDrawer({
               <div className="text-right">
                 <div className="text-lg font-bold tabular-nums leading-none">
                   {grandTotal}
-                  <span className="text-xs font-normal text-zinc-500"> / {grandMax}</span>
+                  <span className="text-xs font-normal text-ink-faint"> / {grandMax}</span>
                 </div>
                 <BandChip total={grandTotal} max={grandMax} scored={anyScored} />
               </div>
             ) : null}
-            <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200">
+            <button onClick={onClose} className="text-ink-faint hover:text-ink">
               ✕
             </button>
           </div>
         </div>
 
-        <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-white/10">
+        <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-line">
           {tabs.map(([id, label]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
               className={`shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition ${
                 tab === id
-                  ? "border-indigo-400 text-indigo-300"
-                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+                  ? "border-accent text-accent-quiet"
+                  : "border-transparent text-ink-faint hover:text-ink-muted"
               }`}
             >
               {label}
@@ -207,15 +207,15 @@ export function NotesDrawer({
 
             <ul className="mt-5 space-y-3">
               {notes.map((n) => (
-                <li key={n.id} className="rounded-xl bg-white/[0.04] p-3 text-sm">
-                  <div className="mb-1 flex justify-between text-xs text-zinc-500">
+                <li key={n.id} className="rounded-xl bg-surface p-3 text-sm">
+                  <div className="mb-1 flex justify-between text-xs text-ink-faint">
                     <span>{n.author}</span>
                     <span>{formatClock(n.created_at)}</span>
                   </div>
-                  <p className="whitespace-pre-wrap text-zinc-200">{n.body}</p>
+                  <p className="whitespace-pre-wrap text-ink">{n.body}</p>
                 </li>
               ))}
-              {!notes.length ? <li className="text-sm text-zinc-600">No notes yet.</li> : null}
+              {!notes.length ? <li className="text-sm text-ink-faint">No notes yet.</li> : null}
             </ul>
           </>
         ) : null}

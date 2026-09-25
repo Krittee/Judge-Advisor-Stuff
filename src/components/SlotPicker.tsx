@@ -39,7 +39,7 @@ export function panelLoad(panelId: string, requests: RequestRow[]): PanelLoad {
 /** How busy this panel is right now, in one line. */
 export function PanelBusyLine({ load }: { load: PanelLoad }) {
   if (!load.waiting && !load.interviewing) {
-    return <span className="text-emerald-400">Panel is free right now</span>;
+    return <span className="text-done-quiet">Panel is free right now</span>;
   }
 
   const parts: string[] = [];
@@ -49,7 +49,7 @@ export function PanelBusyLine({ load }: { load: PanelLoad }) {
       `${load.waiting} already waiting${load.longestWait ? ` (longest ${load.longestWait} min)` : ""}`,
     );
   }
-  return <span className="text-amber-400">{parts.join(" · ")}</span>;
+  return <span className="text-caution-quiet">{parts.join(" · ")}</span>;
 }
 
 export function SlotPicker({
@@ -75,9 +75,9 @@ export function SlotPicker({
 
   if (!slots.length) {
     return (
-      <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-200 ring-1 ring-inset ring-amber-500/30">
+      <div className="rounded-xl bg-caution/12 px-4 py-3 text-sm text-caution-quiet ring-1 ring-inset ring-caution/35">
         <strong>{panel.name} has no bookable times set up yet.</strong>
-        <p className="mt-1 text-amber-200/80">
+        <p className="mt-1 text-caution-quiet/80">
           Use <strong>Interview now</strong> instead, or ask the Judge Advisor to add times:
           Admin → Panels → {panel.name} → Booking slots.
         </p>
@@ -86,12 +86,14 @@ export function SlotPicker({
   }
 
   const now = Date.now();
-  const free = slots.filter((s) => !s.takenBy && new Date(s.end).getTime() > now).length;
+  const free = slots.filter(
+    (s) => !s.takenBy && !s.blocked && new Date(s.end).getTime() > now,
+  ).length;
 
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-xs">
-        <span className="text-zinc-400">
+        <span className="text-ink-subtle">
           {free
             ? `${free} of ${slots.length} slots open`
             : `All ${slots.length} slots are taken — nothing left to book`}
@@ -132,9 +134,9 @@ function SlotButton({
 
   if (isMine) {
     return (
-      <div className="rounded-xl bg-emerald-500/20 px-2 py-2.5 text-center ring-1 ring-inset ring-emerald-400/50">
-        <div className="text-sm font-semibold text-emerald-200">{time}</div>
-        <div className="text-[11px] text-emerald-300/90">yours</div>
+      <div className="rounded-xl bg-done/20 px-2 py-2.5 text-center ring-1 ring-inset ring-done/50">
+        <div className="text-sm font-semibold text-done-quiet">{time}</div>
+        <div className="text-[11px] text-done-quiet">yours</div>
       </div>
     );
   }
@@ -143,11 +145,11 @@ function SlotButton({
     const meta = STATUS_META[slot.takenBy.status];
     return (
       <div
-        className="rounded-xl bg-white/[0.03] px-2 py-2.5 text-center ring-1 ring-inset ring-white/10"
+        className="rounded-xl bg-surface px-2 py-2.5 text-center ring-1 ring-inset ring-line"
         title={`Taken by team ${slot.takenBy.teamNumber} — ${meta.label}`}
       >
-        <div className="text-sm font-medium text-zinc-500 line-through">{time}</div>
-        <div className="flex items-center justify-center gap-1 text-[11px] text-zinc-400">
+        <div className="text-sm font-medium text-ink-faint line-through">{time}</div>
+        <div className="flex items-center justify-center gap-1 text-[11px] text-ink-subtle">
           <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
           {slot.takenBy.teamNumber}
         </div>
@@ -157,9 +159,21 @@ function SlotButton({
 
   if (past) {
     return (
-      <div className="rounded-xl bg-white/[0.02] px-2 py-2.5 text-center ring-1 ring-inset ring-white/[0.06]">
-        <div className="text-sm text-zinc-600 line-through">{time}</div>
-        <div className="text-[11px] text-zinc-700">gone</div>
+      <div className="rounded-xl bg-surface px-2 py-2.5 text-center ring-1 ring-inset ring-line">
+        <div className="text-sm text-ink-faint line-through">{time}</div>
+        <div className="text-[11px] text-ink-faint">gone</div>
+      </div>
+    );
+  }
+
+  if (slot.blocked) {
+    return (
+      <div
+        className="rounded-xl bg-surface px-2 py-2.5 text-center ring-1 ring-inset ring-line"
+        title="Too close to another team's booking on this panel — judges need 20 minutes to walk between interviews"
+      >
+        <div className="text-sm text-ink-faint line-through">{time}</div>
+        <div className="text-[11px] text-ink-faint">too close</div>
       </div>
     );
   }
@@ -168,7 +182,7 @@ function SlotButton({
     <button
       disabled={disabled}
       onClick={() => onPick(slot)}
-      className="rounded-xl bg-white/5 px-2 py-2.5 text-center ring-1 ring-inset ring-white/10 transition hover:bg-indigo-500 hover:text-white disabled:opacity-40"
+      className="rounded-xl bg-surface px-2 py-2.5 text-center ring-1 ring-inset ring-line transition hover:bg-accent hover:text-white disabled:opacity-40"
     >
       <div className="text-sm font-semibold">{time}</div>
       <div className="text-[11px] opacity-70">free</div>
@@ -178,15 +192,15 @@ function SlotButton({
 
 function Legend() {
   return (
-    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-zinc-600">
+    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ink-faint">
       <span className="flex items-center gap-1">
-        <span className="h-2 w-2 rounded-sm bg-white/20" /> free
+        <span className="h-2 w-2 rounded-sm bg-surface-2" /> free
       </span>
       <span className="flex items-center gap-1">
-        <span className="h-2 w-2 rounded-sm bg-zinc-600" /> taken
+        <span className="h-2 w-2 rounded-sm bg-line-strong" /> taken
       </span>
       <span className="flex items-center gap-1">
-        <span className="h-2 w-2 rounded-sm bg-emerald-500/60" /> yours
+        <span className="h-2 w-2 rounded-sm bg-done/60" /> yours
       </span>
     </span>
   );
