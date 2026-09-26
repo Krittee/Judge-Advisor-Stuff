@@ -593,16 +593,26 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
               return (
                 <tr key={team.id} className="hover:bg-surface-2">
                   <td className="sticky left-0 z-10 bg-canvas px-2 py-1.5 shadow-[1px_0_0_var(--line)]">
+                    {/* Fixed at a team number's actual width -- left to the
+                        browser's default input size, this alone ate almost
+                        half a phone screen regardless of the 4-6 characters
+                        actually in it. */}
                     <EditableCell
                       value={team.number}
                       className="font-bold tabular-nums"
+                      style={{ width: "4.5rem" }}
                       onSave={(number) => update(team.id, { number })}
                     />
                   </td>
                   <td className="px-2 py-1.5">
+                    {/* Same fix, plus truncation -- a long team name still
+                        fits in the space the columns after it need to be
+                        visible on a phone without scrolling. Tapping it to
+                        edit still shows the full value. */}
                     <EditableCell
                       value={team.name}
-                      className="text-ink-muted"
+                      className="text-ink-muted truncate"
+                      style={{ width: "9rem" }}
                       onSave={(name) => update(team.id, { name })}
                     />
                   </td>
@@ -1206,12 +1216,21 @@ function EditableCell({
   placeholder,
   className = "",
   align = "left",
+  style,
 }: {
   value: string;
   onSave: (next: string) => Promise<void>;
   placeholder?: string;
   className?: string;
   align?: "left" | "center";
+  /**
+   * Overrides the input's width. A plain width utility in `className`
+   * cannot be trusted to beat the `w-full` baked in below -- Tailwind
+   * orders same-specificity utilities by its own internal scale, not by
+   * where they appear in the class list -- so a real column width goes
+   * through inline style, which always wins.
+   */
+  style?: React.CSSProperties;
 }) {
   const [draft, setDraft] = useState(value);
   const [busy, setBusy] = useState(false);
@@ -1253,6 +1272,7 @@ function EditableCell({
           (e.target as HTMLInputElement).blur();
         }
       }}
+      style={style}
       className={`w-full rounded-lg bg-transparent px-2 py-1.5 text-sm ring-1 ring-inset ring-transparent transition hover:bg-surface-2 hover:ring-line-strong focus:bg-surface-2 focus:ring-accent focus:outline-none disabled:opacity-50 ${
         align === "center" ? "text-center" : ""
       } ${className}`}
