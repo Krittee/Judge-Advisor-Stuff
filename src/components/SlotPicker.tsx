@@ -59,6 +59,7 @@ export function SlotPicker({
   teamId,
   disabled,
   onPick,
+  excludeRequestId,
 }: {
   panel: PublicPanel;
   requests: RequestRow[];
@@ -67,10 +68,13 @@ export function SlotPicker({
   teamId: string | null;
   disabled?: boolean;
   onPick: (slot: Slot) => void;
+  /** Set while rescheduling a booking, so its own current time does not
+   *  block the slots around it (see buildSlots). */
+  excludeRequestId?: string;
 }) {
   const slots = useMemo(
-    () => buildSlots(panel, requests, teams),
-    [panel, requests, teams],
+    () => buildSlots(panel, requests, teams, excludeRequestId),
+    [panel, requests, teams, excludeRequestId],
   );
 
   if (!slots.length) {

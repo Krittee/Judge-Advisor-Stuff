@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { actorLabel, canAdvance, canCancel, getSession, mayActOnPanel } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
+import { isRealSlot } from "@/lib/data";
 import { NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
 import { CONFLICT_MESSAGE, isConflicted } from "@/lib/conflicts";
 import { divisionsCompatible } from "@/lib/presets";
@@ -8,7 +9,7 @@ import type { RequestRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-type Action = "advance" | "cancel" | "reopen" | "set-status" | "reassign";
+type Action = "advance" | "cancel" | "reopen" | "set-status" | "reassign" | "reschedule";
 
 /** Move a request along, cancel it, or hand it to a different panel. */
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -23,10 +24,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   // ---- permission gate -------------------------------------------------
-  if (action === "cancel") {
+  if (action === "cancel" || action === "reschedule") {
+    // Moving a booking to a new time is a cancel-and-rebook that never
+    // leaves the slot empty in between -- so it needs exactly the
+    // permission cancelling that same booking already needs, no more.
     if (!canCancel(session, current.status, current.created_by)) {
       return NextResponse.json(
-        { error: "You do not have permission to cancel this request." },
+        {
+          error:
+            action === "reschedule"
+              ? "You do not have permission to reschedule this booking."
+              : "You do not have permission to cancel this request.",
+        },
         { status: 403 },
       );
     }
@@ -132,6 +141,54 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     patch.finished_at = null;
     patch.cancelled_at = null;
     logLine = "reopened";
+  } else if (action === "reschedule") {
+    // A booking, not yet acted on -- once judges have it, "reschedule"
+    // is no longer the right tool (the desk would want set-status/reopen
+    // to correct a mistake, not a new time for one that already ran).
+    if (current.kind !== "slot") {
+      return NextResponse.json(
+        { error: "Only a booked slot can be rescheduled." },
+        { status: 400 },
+      );
+    }
+    if (current.status !== "scheduled") {
+      return NextResponse.json(
+        { error: "This booking is already underway and can no longer be rescheduled." },
+        { status: 409 },
+      );
+    }
+
+    const start = new Date(String(body.slotStart ?? ""));
+    const end = new Date(String(body.slotEnd ?? ""));
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return NextResponse.json({ error: "That time slot is not valid." }, { status: 400 });
+    }
+
+    // Checked against the panel's current grid, exactly as a new booking
+    // is in POST /api/requests -- a stale page must not move this to a
+    // time the panel no longer offers.
+    const panel = (await store().listPanels()).find((p) => p.id === current.panel_id);
+    if (!panel) {
+      return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
+    }
+    if (!isRealSlot(panel, start, end)) {
+      return NextResponse.json(
+        {
+          error:
+            `That is not one of ${panel.name}'s slots — their times may have changed. ` +
+            `Refresh and pick again.`,
+        },
+        { status: 409 },
+      );
+    }
+
+    // The 20-minute walking-gap check against every other live booking on
+    // this panel (excluding this request's own current slot) happens
+    // inside store().updateRequest itself -- the same check createRequest
+    // runs for a brand new booking.
+    patch.slot_start = start.toISOString();
+    patch.slot_end = end.toISOString();
+    logLine = `rescheduled to ${start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
   } else {
     const target: Status | undefined =
       action === "set-status"

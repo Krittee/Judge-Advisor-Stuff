@@ -21,7 +21,7 @@ import { CategoryChip } from "@/components/CategoryChip";
 import { LanguageCover, LanguageTag } from "@/components/Language";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
 import type { Session } from "@/lib/auth";
-import type { Slot } from "@/lib/types";
+import type { RequestRow, Slot } from "@/lib/types";
 
 type Mode = "now" | "book";
 
@@ -42,6 +42,10 @@ export default function QueuePage() {
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [bookLanguage, setBookLanguage] = useState("");
+  /** A booking being moved to a new time, not cancelled and rebooked from
+   *  scratch -- set from either the "Booked later" list or the banner
+   *  that appears when the entered team already holds a slot. */
+  const [reschedule, setReschedule] = useState<RequestRow | null>(null);
 
   useEffect(() => {
     call<{ session: Session | null }>("/api/session", { method: "GET" })
@@ -76,6 +80,14 @@ export default function QueuePage() {
   const booking = existing?.status === "scheduled" ? existing : null;
   const alreadyQueued = existing && existing.status !== "scheduled" ? existing : null;
   const load = panel ? panelLoad(panel.id, state.requests) : null;
+
+  // True only while the team number on screen is the one actually being
+  // rescheduled -- entering a different number (or the booking finishing
+  // or being cancelled elsewhere) drops back to a normal new booking.
+  const isRescheduling = Boolean(reschedule && booking && reschedule.id === booking.id);
+  useEffect(() => {
+    if (reschedule && (!booking || booking.id !== reschedule.id)) setReschedule(null);
+  }, [reschedule, booking]);
 
   const live = useMemo(
     () =>
@@ -160,6 +172,49 @@ export default function QueuePage() {
       `Team ${normalizeTeamNumber(number)} booked for ${formatClock(slot.start)}.`,
     );
 
+  /**
+   * Move a team asking to reschedule straight to a new time, in one
+   * request. What used to be here was cancel, then re-enter the team
+   * number, then book again -- three chances to mistype or to leave the
+   * team's old slot cancelled with nothing booked in its place.
+   */
+  function startReschedule(booked: RequestRow, teamNumber: string) {
+    setMode("book");
+    setNumber(teamNumber);
+    setMessage("");
+    setReschedule(booked);
+    setError(null);
+    setOk(null);
+    // Clicked from the "Booked later" list further down the page; the
+    // banner and slot picker that actually do the rescheduling are up top.
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelReschedule() {
+    setReschedule(null);
+  }
+
+  async function doReschedule(slot: Slot) {
+    if (!reschedule) return;
+    setBusy(true);
+    setError(null);
+    setOk(null);
+    try {
+      await call(`/api/requests/${reschedule.id}`, {
+        method: "PATCH",
+        body: { action: "reschedule", slotStart: slot.start, slotEnd: slot.end },
+      });
+      setOk(`Team ${normalizeTeamNumber(number)} moved to ${formatClock(slot.start)}.`);
+      setReschedule(null);
+      clear();
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function undo(id: string) {
     setError(null);
     try {
@@ -198,6 +253,7 @@ export default function QueuePage() {
               key={id}
               onClick={() => {
                 setMode(id);
+                setReschedule(null);
                 setError(null);
                 setOk(null);
               }}
@@ -261,14 +317,38 @@ export default function QueuePage() {
           </Banner>
         ) : null}
 
-        {booking ? (
+        {booking && !isRescheduling ? (
           <Banner kind="info">
             <strong>
               Team {team?.number} is already booked for {formatClock(booking.slot_start)}.
             </strong>{" "}
-            {mode === "now"
-              ? "Queueing them now will release that slot for someone else."
-              : "Cancel that booking below before booking them a different time."}
+            {mode === "now" ? (
+              "Queueing them now will release that slot for someone else."
+            ) : (
+              <>
+                Asking to move it?{" "}
+                <button
+                  onClick={() => startReschedule(booking, team!.number)}
+                  className="font-medium underline underline-offset-2"
+                >
+                  Reschedule
+                </button>{" "}
+                instead of cancelling and booking again.
+              </>
+            )}
+          </Banner>
+        ) : null}
+
+        {isRescheduling && booking ? (
+          <Banner kind="info">
+            <strong>
+              Rescheduling team {team?.number}&apos;s {formatClock(booking.slot_start)} slot.
+            </strong>{" "}
+            Pick a new time below —{" "}
+            <button onClick={cancelReschedule} className="font-medium underline underline-offset-2">
+              never mind
+            </button>
+            .
           </Banner>
         ) : null}
 
@@ -320,6 +400,18 @@ export default function QueuePage() {
               <p className="rounded-xl bg-surface px-4 py-3 text-sm text-caution-quiet">
                 This team has no judge panel yet, so there is nothing to book.
               </p>
+            ) : isRescheduling ? (
+              // Only the time changes here -- language and any note stay
+              // exactly as they were on the original booking.
+              <SlotPicker
+                panel={panel}
+                requests={state.requests}
+                teams={state.teams}
+                teamId={team.id}
+                excludeRequestId={reschedule!.id}
+                disabled={busy}
+                onPick={doReschedule}
+              />
             ) : (
               <>
                 <input
@@ -419,6 +511,13 @@ export default function QueuePage() {
                     <span className="min-w-0 flex-1 truncate text-ink-subtle">
                       {t.name} · {panelById.get(r.panel_id ?? "")?.name ?? "—"}
                     </span>
+                    <button
+                      onClick={() => startReschedule(r, t.number)}
+                      className="text-xs text-ink-subtle hover:text-ink"
+                      title="Move this team to a different time instead of cancelling and booking again"
+                    >
+                      reschedule
+                    </button>
                     <button
                       onClick={() => undo(r.id)}
                       className="text-xs text-ink-faint hover:text-danger-quiet"
