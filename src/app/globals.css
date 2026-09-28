@@ -318,6 +318,24 @@ h3,
   letter-spacing: -0.02em;
 }
 
+/* A tile-scoped container, so the number on it can shrink to its own box
+   instead of only the viewport. --board-number alone reads fine for a
+   short number, but a longer one (team numbers are not all the same
+   length) can be wider than the tile at that same viewport-scaled size --
+   min() below picks whichever is smaller. */
+.board-tile {
+  container-type: inline-size;
+}
+
+.board-tile .board-number {
+  /* Measured against this font at font-stretch 112%/weight 700/-0.02em
+     tracking: a character averages ~0.68em wide. 128cqw / len keeps the
+     rendered width at roughly 87% of the tile's content box (1 / 0.68 *
+     0.87 ≈ 128), leaving a margin instead of an exact-fit line that a
+     sub-pixel rounding difference could tip into clipping again. */
+  font-size: min(var(--board-number), calc(128cqw / var(--num-len, 5)));
+}
+
 .board-name {
   font-size: var(--board-name);
   line-height: 1.2;
