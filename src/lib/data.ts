@@ -27,6 +27,14 @@ export function buildSlots(
   panel: Pick<PublicPanel, "id" | "slot_start_at" | "slot_minutes" | "slot_count">,
   requests: RequestRow[],
   teams: Team[],
+  /**
+   * A booking being rescheduled, not a new one — its own slot must not
+   * count against itself when deciding which nearby slots are "too
+   * close". Without this, every slot within 20 minutes of a booking's
+   * current time would read as blocked by that same booking while
+   * picking where to move it to.
+   */
+  excludeRequestId?: string,
 ): Slot[] {
   if (!panel.slot_start_at || panel.slot_count <= 0) return [];
 
@@ -50,7 +58,7 @@ export function buildSlots(
         taken && team
           ? { teamId: team.id, teamNumber: team.number, status: taken.status as Status }
           : null,
-      blocked: !taken && hasNearbyBooking(requests, panel.id, start.getTime()),
+      blocked: !taken && hasNearbyBooking(requests, panel.id, start.getTime(), excludeRequestId),
     };
   });
 }
