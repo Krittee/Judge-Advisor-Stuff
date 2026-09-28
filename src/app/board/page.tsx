@@ -179,7 +179,7 @@ function TeamTile({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg px-[0.7vw] py-[0.5vw] ${
+      className={`board-tile relative overflow-hidden rounded-lg px-[0.7vw] py-[0.5vw] ${
         meta
           ? meta.tile
           : /* Not in the queue yet: present but idle. Kept a step brighter
@@ -188,7 +188,17 @@ function TeamTile({
             "bg-surface-2 text-ink-subtle ring-1 ring-inset ring-line"
       } ${status === "requested" ? "pulse-waiting" : ""}`}
     >
-      <div className="board-number">{team.number}</div>
+      {/* --num-len drives the fit-to-tile shrink in .board-tile .board-number
+          (globals.css) -- a plain vw-based size reads a 4-digit number fine
+          but clips a longer one (a real 6-character number was clipped to
+          its first five characters, hiding the letter that told two teams
+          apart) against this tile's own width. */}
+      <div
+        className="board-number"
+        style={{ "--num-len": team.number.length } as React.CSSProperties}
+      >
+        {team.number}
+      </div>
       <div className="mt-0.5 flex items-center gap-1.5">
         {/* A dot, not a stripe down the edge. The notebook category is the
             least urgent thing on this tile and it used to be the only one
