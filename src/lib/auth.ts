@@ -36,16 +36,33 @@ function isProductionLike(): boolean {
 /** Warn once per process rather than on every single request. */
 let warnedAboutSecret = false;
 
+/**
+ * `.env.example` ships `change-me-to-something-random-and-long` as the
+ * SESSION_SECRET. At 40 characters it sails past the length check below,
+ * so copying the file and forgetting to edit that line would deploy a
+ * signing key that is printed in the repo. This matches that exact
+ * placeholder and anything else shaped like one ("changeme", "Change-Me…").
+ *
+ * Mirrored in scripts/doctor.mjs, which cannot import TypeScript -- keep
+ * the two in step.
+ */
+const PLACEHOLDER_SECRET = /change-?me/i;
+
 function secret(): Uint8Array {
   const value = process.env.SESSION_SECRET;
 
-  if (!value || value.length < 16) {
+  // The length floor is deliberately still 16, not higher: a secret of
+  // 16-31 characters that is already deployed must keep working, because
+  // refusing it would take a live event down at startup. `npm run check`
+  // warns below 32 instead.
+  if (!value || value.length < 16 || (isProductionLike() && PLACEHOLDER_SECRET.test(value))) {
     // Zero-setup has to mean zero setup, so development gets a working
     // fallback. A real deployment does not: a known signing key would let
     // anyone mint themselves a Judge Advisor cookie.
     if (isProductionLike()) {
       throw new Error(
-        "SESSION_SECRET must be set to a random string of 16+ characters before deploying. " +
+        "SESSION_SECRET must be set to a random string of 16+ characters before deploying, " +
+          "and it cannot be the placeholder from .env.example. " +
           "Generate one with: openssl rand -base64 32",
       );
     }
@@ -240,14 +257,35 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
  * pretended away. It still fully protects the single long-running
  * process the file-store deployment is built around, and narrows the
  * window on every other one.
+ *
+ * "Keyed by caller" is only as honest as the thing identifying the
+ * caller. X-Forwarded-For is a header the CLIENT writes unless a proxy we
+ * control overwrites it, so trusting it unconditionally let an attacker
+ * mint a fresh bucket per guess just by changing the header. See
+ * clientKeyFor: with no trusted proxy there is exactly one bucket.
  * ------------------------------------------------------------------ */
 
 type LoginAttempts = { count: number; windowStart: number; lockedUntil: number };
 
 const LOGIN_WINDOW_MS = 60_000;
+
+/** Per-address limits, used only when a trusted proxy tells us who is calling. */
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_MS = 5 * 60_000;
-/** Stop an attacker from growing this without bound by cycling fake keys. */
+
+/**
+ * The one bucket everybody shares when there is no trusted proxy (a LAN
+ * event, a bare `next start`). Every staff member on the venue wifi lands
+ * in it, so a few honest mistypes must not lock the whole team out: it
+ * tolerates 20 failures a minute and only locks for two. That is still a
+ * hard ceiling on guessing -- about 20 tries per 3 minutes, for the
+ * whole network -- against codes an attacker has to hit exactly.
+ */
+const SHARED_KEY = "shared";
+const SHARED_MAX_ATTEMPTS = 20;
+const SHARED_LOCKOUT_MS = 2 * 60_000;
+
+/** The map never holds more than this many callers, however they arrive. */
 const LOGIN_MAP_PRUNE_AT = 5_000;
 
 const loginAttempts = new Map<string, LoginAttempts>();
@@ -258,6 +296,14 @@ function pruneLoginAttempts(now: number): void {
     if (entry.lockedUntil < now && now - entry.windowStart > LOGIN_WINDOW_MS) {
       loginAttempts.delete(key);
     }
+  }
+  // Expiry alone cannot bound this: entries that are all still inside
+  // their window never expire, so a flood of distinct keys would grow the
+  // map regardless. Make room by dropping the oldest -- a Map iterates in
+  // insertion order -- so memory is capped even if the keys are fake.
+  for (const key of loginAttempts.keys()) {
+    if (loginAttempts.size < LOGIN_MAP_PRUNE_AT) break;
+    loginAttempts.delete(key);
   }
 }
 
@@ -282,9 +328,10 @@ export function recordLoginFailure(key: string): void {
     return;
   }
 
+  const shared = key === SHARED_KEY;
   entry.count += 1;
-  if (entry.count >= LOGIN_MAX_ATTEMPTS) {
-    entry.lockedUntil = now + LOGIN_LOCKOUT_MS;
+  if (entry.count >= (shared ? SHARED_MAX_ATTEMPTS : LOGIN_MAX_ATTEMPTS)) {
+    entry.lockedUntil = now + (shared ? SHARED_LOCKOUT_MS : LOGIN_LOCKOUT_MS);
   }
 }
 
@@ -294,14 +341,35 @@ export function recordLoginSuccess(key: string): void {
   loginAttempts.delete(key);
 }
 
-/** Best-effort caller identity for rate limiting -- a proxy header when one
- *  is present, or one shared bucket when the app has no proxy in front of
- *  it (a LAN event running the file store, its primary deployment shape). */
+/**
+ * Whether a proxy we control is in front of this app and writes the
+ * client-address headers itself.
+ *
+ * Vercel sets VERCEL and overwrites x-forwarded-for / x-real-ip on every
+ * request, so the header is the real caller. Anywhere else the app has no
+ * way to know -- set TRUST_PROXY=1 only if your own reverse proxy
+ * overwrites or appends to x-forwarded-for; with no proxy, or one that
+ * passes the client's header through untouched, setting it hands the
+ * attacker back the bypass.
+ */
+function behindTrustedProxy(): boolean {
+  return Boolean(process.env.VERCEL) || process.env.TRUST_PROXY === "1";
+}
+
+/** Caller identity for rate limiting: the proxy-reported address when a
+ *  trusted proxy is in front, otherwise one shared bucket (a LAN event
+ *  running the file store, its primary deployment shape). */
 export function clientKeyFor(request: Request): string {
-  const headers = request.headers;
-  const forwarded = headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return headers.get("x-real-ip") ?? "shared";
+  if (!behindTrustedProxy()) return SHARED_KEY;
+
+  // The LAST x-forwarded-for entry, not the first: a proxy that appends
+  // puts the address it saw at the end, while everything before it is
+  // whatever the client chose to claim. On Vercel there is only one.
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",").pop()?.trim();
+  const address = forwarded || request.headers.get("x-real-ip")?.trim();
+  // Prefixed so a header can never spell the shared bucket's key and so
+  // borrow its more forgiving limits.
+  return address ? `ip:${address.slice(0, 64)}` : SHARED_KEY;
 }
 
 /* ------------------------------------------------------------------ *
@@ -402,4 +470,18 @@ export function actorLabel(s: Session | null): string {
   if (s.role === "queuer") return `queuer:${s.name}`;
   if (s.role === "referee") return `referee:${s.name}`;
   return `admin:${s.name}`;
+}
+
+/**
+ * Whether two sign-in names are the same person for the purpose of owning
+ * a report.
+ *
+ * A referee's name is typed by hand on a phone, so "dana", "Dana " and
+ * "DANA" are one person -- comparing exactly would lock a referee out of
+ * their own flag over a capital letter. This is a stopgap, not identity:
+ * two referees who type the same name are still the same author until
+ * referees get individual codes.
+ */
+export function sameAuthor(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
 }

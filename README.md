@@ -46,8 +46,9 @@ cp .env.example .env.local     # then edit the codes
 | `ADMIN_CODE` | `JA2026` | First Judge Advisor. Full control. |
 | `ADMIN_CODE_2`–`ADMIN_CODE_4` | unset | Optional codes for up to three more Judge Advisors. |
 | `QUEUER_CODE` | `DESK01` | Queue desk. Can only add teams to the queue. |
-| `REFEREE_CODE` | `REF001` | Referees. Can only flag what they saw on the field. |
+| `REFEREE_CODE` | `REF001` | Referees. Can only flag what they saw on the field. Referees must enter their name to sign in; flags are recorded under it. |
 | `SESSION_SECRET` | insecure key | Signs the login cookie. `openssl rand -base64 32` |
+| `TRUST_PROXY` | unset | Set to `1` only if a reverse proxy **you control** sits in front of the app and sets `X-Forwarded-For` itself. See below. |
 | `DATABASE_URL` | unset | Set it to use Postgres; unset uses the JSON file. |
 | `DATA_FILE` | `.data/state.json` | Where the file store keeps its data. |
 | `SEED_DEMO` | on in dev, off in production | `true`/`false` to force it either way. |
@@ -55,10 +56,21 @@ cp .env.example .env.local     # then edit the codes
 **Those defaults are development-only and cannot be used in production.** A
 production build refuses to sign anyone in with an unset code, refuses the codes
 published in these docs even when you set them deliberately, and refuses to
-start at all without a real `SESSION_SECRET` — a code printed in a README is not
+start at all without a real `SESSION_SECRET` (the `change-me…` placeholder in
+`.env.example` counts as not set) — a code printed in a README is not
 an access code, and a known signing key would let anyone mint themselves a Judge
 Advisor cookie. Production also never seeds demo teams. In development it warns
 on the console instead, so a fresh clone still just runs.
+
+**Sign-in attempts are rate limited.** The `X-Forwarded-For` header is written by
+whoever sends the request, so by default the app ignores it and counts every
+failed attempt in one bucket shared by everybody (20 failures a minute, then a
+two-minute lock — loose enough that a few honest typos at the venue do not lock
+the team out). On Vercel the app trusts the address Vercel reports and limits
+each address separately. Behind your own reverse proxy, set `TRUST_PROXY=1` to
+get the same — but only if that proxy overwrites or appends to `X-Forwarded-For`
+(the app uses the last entry). If it passes the client's header through, leave
+it unset.
 
 Judge panel codes are **not** environment variables. Each panel gets its own,
 generated in the admin console under **Panels** — so you can add a panel

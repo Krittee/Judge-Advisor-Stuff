@@ -29,7 +29,12 @@ import type { AppState, ViewerCapabilities } from "./types";
  *   judge   their own division only — the wall applies to what they can
  *           see, not only to what they can touch
  *   queuer  everything, including the notes teams leave for judges
- *   team    everything, minus those notes
+ *   referee everything the board shows, minus those notes — a referee
+ *           files flags; nothing about their job involves what a team
+ *           wrote to its judges
+ *   team    the same, and without the staff names on each request
+ *           (who created, acknowledged or interviewed it, and the
+ *           outcome) — the big board never shows them
  *
  * Team numbers, names and statuses are public by design: they are on the
  * big board on the wall. The private things are judging notes, panel
@@ -115,8 +120,17 @@ export async function loadState(session: Session | null): Promise<AppState> {
       ).filter((r) => !barred.has(r.team_id));
 
   // The note a team types for its judges is free text, and has no
-  // business being readable by the other 119 teams polling this.
-  const includeMessages = session !== null;
+  // business being readable by the other 119 teams polling this -- nor by
+  // a referee, who is signed in but has no part in an interview. It goes
+  // to the people who run one: the judges and Judge Advisor, and the desk
+  // that may have typed it in on a team's behalf.
+  const includeMessages = canAdvance(session) || session?.role === "queuer";
+
+  // Who created, acknowledged and interviewed a request, and how it came
+  // out, is staff metadata. The board and team pages show none of it, so
+  // an anonymous caller (anyone on the venue wifi) gets it nulled rather
+  // than a roster of who was working which desk.
+  const includeStaffFields = session !== null;
 
   const divisions = [
     ...new Set([
@@ -129,9 +143,13 @@ export async function loadState(session: Session | null): Promise<AppState> {
   return {
     panels: visiblePanels.map(stripCode),
     teams: visibleTeams,
-    requests: includeMessages
-      ? visibleRequests
-      : visibleRequests.map((r) => ({ ...r, message: null })),
+    requests: visibleRequests.map((r) => ({
+      ...r,
+      message: includeMessages ? r.message : null,
+      ...(includeStaffFields
+        ? {}
+        : { created_by: null, acknowledged_by: null, interviewer: null, outcome: null }),
+    })),
     divisions: !judgeSessionValid ? [] : division ? [division] : divisions,
     categories: teamCategories(),
     languages: languages(),

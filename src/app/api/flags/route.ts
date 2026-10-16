@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { actorLabel, canAdminister, canFlag, canReadFlags, getSession } from "@/lib/auth";
+import {
+  actorLabel,
+  canAdminister,
+  canFlag,
+  canReadFlags,
+  getSession,
+  sameAuthor,
+} from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { parseFlagFields } from "@/lib/flagValidation";
 import type { FlagEdit } from "@/lib/db/types";
@@ -128,7 +135,11 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "That flag no longer exists." }, { status: 404 });
   }
 
-  if (!canAdminister(session) && existing.author !== session!.name) {
+  // Case-insensitive and trimmed: the author is a hand-typed sign-in name,
+  // and "dana" must still be able to correct the flag "Dana" raised. The
+  // name is required at sign-in now (see POST /api/session), so this no
+  // longer collapses every nameless referee into one "Referee" author.
+  if (!canAdminister(session) && !sameAuthor(existing.author, session!.name)) {
     return NextResponse.json(
       { error: "Only the referee who raised this flag, or the Judge Advisor, can correct it." },
       { status: 403 },
@@ -141,6 +152,16 @@ export async function PATCH(request: Request) {
   // route was written around.
   const teamId = existing.team_id;
   const previousKind = existing.kind;
+  // Every field a correction can change, as it reads now. Snapshotted for
+  // the same reason as previousKind: by the time the log line is built,
+  // `existing` may already be the new values.
+  const before = {
+    kind: previousKind,
+    match: `${existing.match_type ?? ""}${existing.match_number ?? ""}`,
+    field: existing.field,
+    body: existing.body,
+    rule: existing.rule,
+  };
 
   const parsed = parseFlagFields(body, {
     allowLegacyRulelessKind: existing.rule ? null : existing.kind,
@@ -163,11 +184,24 @@ export async function PATCH(request: Request) {
 
   const team = (await store().listTeams()).find((t) => t.id === teamId);
   const changedKind = previousKind !== kind;
+
+  // Before → after for each field that actually changed. A correction can
+  // rewrite what a referee reported (the severity, the rule cited, the
+  // description), so the log has to say what it used to read -- the flag
+  // itself no longer does.
+  const after = { kind, match: `${matchType}${matchNumber}`, field, body: text, rule };
+  const show = (v: string | null) => (v ? `"${v}"` : "none");
+  const changes = (Object.keys(after) as (keyof typeof after)[])
+    .filter((k) => (before[k] ?? "") !== (after[k] ?? ""))
+    .map((k) => `${k}: ${show(before[k])} → ${show(after[k])}`);
+
   await store().logActivity({
     teamId,
     actor: actorLabel(session),
     action: changedKind ? `corrected a flag: ${previousKind} → ${kind}` : "corrected a flag",
-    detail: `Team ${team?.number ?? "?"} · ${matchType}${matchNumber} · ${field}`,
+    detail: [`Team ${team?.number ?? "?"}`, ...(changes.length ? changes : ["nothing changed"])].join(
+      " · ",
+    ),
   });
 
   return NextResponse.json({ flag });

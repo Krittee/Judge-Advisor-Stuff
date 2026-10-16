@@ -40,6 +40,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That code was not recognised." }, { status: 401 });
   }
 
+  // A flag's author is just this name (see PATCH /api/flags), so a referee
+  // who signs in without one would be "Referee" -- the same author as
+  // every other nameless referee, free to rewrite each other's reports.
+  // Enforced here rather than in the form because the form is a courtesy;
+  // and after the code check because only the code says who is signing in.
+  // The code was right, so this is not a failed guess and is not counted
+  // against the caller's throttle.
+  if (session.role === "referee" && !name.trim()) {
+    return NextResponse.json(
+      { error: "Enter your name. Each flag you file is recorded under it." },
+      { status: 400 },
+    );
+  }
+
   recordLoginSuccess(key);
   await createSession(session);
   return NextResponse.json({ session });

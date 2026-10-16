@@ -24,6 +24,31 @@ const warn = (m, fix) => {
   warnings.push({ m, fix });
 };
 
+/* ---- Environment ---------------------------------------------------
+ *
+ * The app reads .env.local / .env through Next, so this has to as well:
+ * looking only at process.env reported "no DATABASE_URL" and "no codes
+ * set" for a deployment that had both, and then said all good.
+ * Loaded the way Next does it, in the same precedence, via the loader
+ * Next itself uses. Dynamic and guarded because this script exists to
+ * explain a broken install, so it must still run when node_modules is
+ * missing -- check 2 reports that.
+ */
+const forStart = process.argv.includes("--for-start");
+try {
+  const { default: nextEnv } = await import("@next/env");
+  const isDev = !forStart && process.env.NODE_ENV !== "production";
+  nextEnv.loadEnvConfig(process.cwd(), isDev, { info() {}, error: console.error });
+} catch {
+  /* dependencies are not installed; check 2 says so */
+}
+
+/* Mirrors isProductionLike() in src/lib/auth.ts: NODE_ENV or a database
+   URL. `npm start` runs this BEFORE next start sets NODE_ENV, so
+   --for-start counts too. */
+const productionLike =
+  forStart || process.env.NODE_ENV === "production" || Boolean(process.env.DATABASE_URL);
+
 console.log("\nChecking whether this app can run here…\n");
 
 /* ---- 1. Node ------------------------------------------------------ */
@@ -161,14 +186,95 @@ if (process.env.DATABASE_URL) {
   }
 }
 
+/* Judge sign-in and every interview hang off a panel. A fresh production
+   file store starts with none, and nothing else complains: the app runs,
+   the board loads, and judging is silently impossible. Read-only. */
+if (process.env.DATABASE_URL) {
+  console.log("  - Not checking for judge panels: they live in Postgres, not a file.");
+} else {
+  // Same rule as the file store's first load: demo data (which has
+  // panels) unless it is production or SEED_DEMO says otherwise.
+  const seedsDemo =
+    process.env.SEED_DEMO === "true" ||
+    (process.env.SEED_DEMO !== "false" && !(forStart || process.env.NODE_ENV === "production"));
+  let panelCount = null;
+  if (existsSync(dataFile)) {
+    try {
+      const saved = JSON.parse(readFileSync(dataFile, "utf8"));
+      panelCount = Array.isArray(saved.panels) ? saved.panels.length : 0;
+    } catch {
+      /* unreadable: the app recovers on its own, and that is not this check's job */
+    }
+  } else if (!seedsDemo) {
+    panelCount = 0;
+  }
+  if (panelCount === 0) {
+    warn(
+      "No judge panels yet — judging is unusable until you add one",
+      "Sign in as the Judge Advisor, open the Panels tab, and add one.",
+    );
+  }
+}
+
 /* ---- 6. Secrets ---------------------------------------------------- */
 const hasEnvFile = existsSync(".env.local") || existsSync(".env");
-if (process.env.NODE_ENV === "production") {
-  for (const key of ["SESSION_SECRET", "ADMIN_CODE"]) {
+
+/* The codes printed in this repo's docs. MIRRORS PUBLISHED_CODES in
+   src/lib/auth.ts, which this script cannot import (it is TypeScript) --
+   tests/authHardening.test.ts fails if the two lists drift apart. */
+const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "REF001", "ALPHA1", "BRAVO2", "CHARLIE3"]);
+
+if (productionLike) {
+  const found = problems.length + warnings.length;
+
+  // Same rules as secret() in src/lib/auth.ts. The app refuses < 16 and
+  // the placeholder; 16-31 still works, so that is a note, not a failure.
+  const secret = process.env.SESSION_SECRET ?? "";
+  if (!secret) {
+    bad("SESSION_SECRET is not set, and production refuses to run without it", "Set SESSION_SECRET and restart.");
+  } else if (secret.length < 16) {
+    bad(
+      `SESSION_SECRET is only ${secret.length} characters, and production refuses anything under 16`,
+      "Set it to something long and random:  openssl rand -base64 32",
+    );
+  } else if (/change-?me/i.test(secret)) {
+    bad(
+      "SESSION_SECRET is still the placeholder from .env.example, and production refuses it",
+      "Set it to something long and random:  openssl rand -base64 32",
+    );
+  } else if (secret.length < 32) {
+    warn(
+      `SESSION_SECRET is only ${secret.length} characters — 32 or more is recommended`,
+      "It works, so nothing is broken. To strengthen it, set a new one (openssl rand -base64 32); " +
+        "everyone signed in will have to sign in again.",
+    );
+  }
+
+  if (!process.env.ADMIN_CODE) {
+    bad("ADMIN_CODE is not set, and production refuses to run without it", "Set ADMIN_CODE and restart.");
+  }
+  for (const key of ["QUEUER_CODE", "REFEREE_CODE"]) {
     if (!process.env[key]) {
-      bad(`${key} is not set, and production refuses to run without it`, `Set ${key} and restart.`);
+      warn(
+        `${key} is not set, so that role cannot sign in`,
+        `Set ${key} if you need it. Production has no fallback code.`,
+      );
     }
   }
+
+  // Production refuses these even when set on purpose, which leaves that
+  // role locked out; say so here rather than on event day.
+  for (const key of ["ADMIN_CODE", "ADMIN_CODE_2", "ADMIN_CODE_3", "ADMIN_CODE_4", "QUEUER_CODE", "REFEREE_CODE"]) {
+    const code = (process.env[key] ?? "").trim().toUpperCase();
+    if (PUBLISHED_CODES.has(code)) {
+      bad(
+        `${key} is "${code}", a code printed in this project's documentation`,
+        `Anyone can read it, so production refuses it and that role cannot sign in. Choose your own ${key} and restart.`,
+      );
+    }
+  }
+
+  if (problems.length + warnings.length === found) ok("Session secret and access codes are set");
 } else if (hasEnvFile) {
   ok("Found your .env.local settings");
 } else {
