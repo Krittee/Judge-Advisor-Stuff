@@ -1,61 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-/* Mirrors src/lib/pit.ts. A pit is a letter and a number — the letter is
-   the row, the number the position along it — which is what lets the
-   board draw a floor plan nobody had to lay out by hand. */
+/* Runs against the real src/lib/pit.ts rather than a copy of it. A pit is a
+   letter and a number -- the letter is the row, the number the position
+   along it -- which is what lets the board draw a floor plan nobody had to
+   lay out by hand. */
 
-const PIT = /^([A-Z])\s*0*(\d{1,3})$/;
-
-function normalizePit(input) {
-  const raw = String(input ?? "").replace(/\s+/g, "").toUpperCase().replace(/^PIT/, "");
-  if (!raw) return null;
-  const match = PIT.exec(raw);
-  if (!match) return raw.slice(0, 12);
-  const [, row, position] = match;
-  return `${row}${Number(position)}`;
-}
-
-function parsePit(pit) {
-  if (!pit) return null;
-  const match = PIT.exec(pit.toUpperCase());
-  if (!match) return null;
-  const [, row, position] = match;
-  return { row, position: Number(position), label: `${row}${Number(position)}` };
-}
-
-function comparePits(a, b) {
-  const pa = parsePit(a);
-  const pb = parsePit(b);
-  if (!pa && !pb) return (a ?? "").localeCompare(b ?? "");
-  if (!pa) return 1;
-  if (!pb) return -1;
-  return pa.row.localeCompare(pb.row) || pa.position - pb.position;
-}
-
-function buildFloorPlan(items, pitOf) {
-  const placed = new Map();
-  let widest = 0;
-  for (const item of items) {
-    const pit = parsePit(pitOf(item));
-    if (!pit) continue;
-    const row = placed.get(pit.row) ?? new Map();
-    row.set(pit.position, item);
-    placed.set(pit.row, row);
-    widest = Math.max(widest, pit.position);
-  }
-  return [...placed.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([row, cells]) => {
-      const taken = [...cells.keys()].sort((a, b) => a - b);
-      return {
-        row,
-        cells: Array.from({ length: widest }, (_, i) => cells.get(i + 1) ?? null),
-        from: taken[0],
-        to: taken[taken.length - 1],
-      };
-    });
-}
+import { buildFloorPlan, comparePits, normalizePit, parsePit } from "../src/lib/pit";
 
 test("a pit code is a letter and a number", () => {
   assert.deepEqual(parsePit("A1"), { row: "A", position: 1, label: "A1" });
@@ -86,7 +37,7 @@ test("unplaceable pits sort to the end", () => {
   assert.deepEqual(sorted, ["A1", "B1", "TABLE3"]);
 });
 
-test("rows line up: every row is as wide as the widest one", () => {
+test("each row is drawn across its own span, not the width of the whole floor", () => {
   const teams = [
     { n: "1", pit: "A1" },
     { n: "2", pit: "A5" },
@@ -95,8 +46,8 @@ test("rows line up: every row is as wide as the widest one", () => {
   const plan = buildFloorPlan(teams, (t) => t.pit);
 
   assert.deepEqual(plan.map((r) => r.row), ["A", "B"]);
-  assert.equal(plan[0].cells.length, 5, "A5 sets the width");
-  assert.equal(plan[1].cells.length, 5, "B matches it, so columns align");
+  assert.equal(plan[0].cells.length, 5, "A runs A1 to A5");
+  assert.equal(plan[1].cells.length, 1, "B has only B1, so it draws nothing past it");
 });
 
 test("a gap stays a gap instead of shifting the row along", () => {
@@ -106,9 +57,9 @@ test("a gap stays a gap instead of shifting the row along", () => {
   ];
   const [rowA] = buildFloorPlan(teams, (t) => t.pit);
 
-  assert.equal(rowA.cells[0].n, "1");
-  assert.equal(rowA.cells[1], null, "A2 is empty and must read as empty");
-  assert.equal(rowA.cells[2].n, "3", "A3 stays in the third column");
+  assert.equal(rowA.cells[0][0].n, "1");
+  assert.deepEqual(rowA.cells[1], [], "A2 is empty and must read as empty");
+  assert.equal(rowA.cells[2][0].n, "3", "A3 stays in the third column");
 });
 
 test("teams with no placeable pit are left off the plan entirely", () => {
@@ -120,23 +71,27 @@ test("teams with no placeable pit are left off the plan entirely", () => {
   const plan = buildFloorPlan(teams, (t) => t.pit);
 
   assert.equal(plan.length, 1);
-  assert.equal(plan[0].cells.filter(Boolean).length, 1, "only A1 is placed");
+  assert.equal(plan[0].cells.flat().length, 1, "only A1 is placed");
 });
 
 test("an empty roster produces an empty plan rather than throwing", () => {
   assert.deepEqual(buildFloorPlan([], (t) => t.pit), []);
 });
 
-test("two teams cannot occupy one cell — the later one wins predictably", () => {
+test("two teams on one pit are both kept in that cell, neither overwriting the other", () => {
   const teams = [
     { n: "first", pit: "A1" },
     { n: "second", pit: "A1" },
   ];
   const [rowA] = buildFloorPlan(teams, (t) => t.pit);
-  assert.equal(rowA.cells[0].n, "second", "last write wins, and nothing is dropped silently");
+  assert.deepEqual(
+    rowA.cells[0].map((t) => t.n),
+    ["first", "second"],
+    "a Map keyed by pit used to keep only the last team; both must stay findable",
+  );
 });
 
-test("each row reports the span it actually occupies", () => {
+test("each row reports the span it actually occupies, and draws only that span", () => {
   const teams = [
     { n: "1", pit: "C5" },
     { n: "2", pit: "C6" },
@@ -147,12 +102,8 @@ test("each row reports the span it actually occupies", () => {
 
   assert.equal(rowC.from, 5);
   assert.equal(rowC.to, 6);
-  assert.equal(rowC.cells.length, 6, "still full width, so rows line up");
-  assert.equal(
-    rowC.cells[0],
-    null,
-    "C1 is blank here, but from=5 marks it as somebody else's pit rather than a free one",
-  );
+  assert.equal(rowC.cells.length, 2, "C1 to C4 are not drawn, so they cannot read as free pits");
+  assert.equal(rowC.cells[0][0].n, "1", "the first cell is C5, not C1");
 });
 
 test("a gap inside the span is still a real empty pit", () => {
@@ -164,5 +115,10 @@ test("a gap inside the span is still a real empty pit", () => {
 
   assert.equal(rowA.from, 2);
   assert.equal(rowA.to, 4);
-  assert.equal(rowA.cells[2], null, "A3 sits inside the span, so it is genuinely free");
+  assert.deepEqual(rowA.cells[1], [], "A3 sits inside the span, so it is genuinely free");
+});
+
+test("a row never stretches past its own last team", () => {
+  const plan = buildFloorPlan([{ n: "1", pit: "A3" }], (t) => t.pit);
+  assert.deepEqual([plan[0].from, plan[0].to, plan[0].cells.length], [3, 3, 1]);
 });

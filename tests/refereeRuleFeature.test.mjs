@@ -60,16 +60,19 @@ test("the selector remains one searchable control between observation and action
   const selector = pageSrc.indexOf("Rule violated");
   const actions = pageSrc.indexOf("{kinds.map((k) => {");
   assert.ok(observation < selector && selector < actions);
-  assert.equal(pageSrc.match(/placeholder="Search: SG6/g)?.length, 1);
+  assert.equal(flagsSrc.match(/placeholder="Search: SG6/g)?.length, 1);
+  assert.ok(pageSrc.includes("<RulePicker"), "the raise form no longer uses the shared rule picker");
   assert.ok(!pageSrc.includes("choose category"));
-  assert.ok(pageSrc.includes("break-words"));
-  assert.ok(pageSrc.includes("overflow-y-auto"));
+  assert.ok(flagsSrc.includes("break-words"));
+  assert.ok(flagsSrc.includes("overflow-y-auto"));
 });
 
 test("field selection combines the event division prefix (plus Skills) and field number", () => {
-  assert.ok(pageSrc.includes('const FIELD_PREFIXES = ["ES", "MS", "HS", "BL", "SK"]'));
-  assert.ok(pageSrc.includes("value={fieldPrefix}"));
-  assert.ok(pageSrc.includes("value={fieldNumber}"));
+  const validatorSrc = readFileSync(new URL("../src/lib/flagValidation.ts", import.meta.url), "utf8");
+  assert.ok(validatorSrc.includes('export const FIELD_PREFIXES = ["ES", "MS", "HS", "BL", "SK"]'));
+  assert.ok(flagsSrc.includes("value={prefix}"));
+  assert.ok(flagsSrc.includes("value={number}"));
+  assert.ok(pageSrc.includes("<FieldPicker"));
   assert.ok(pageSrc.includes("normalizeField(`${fieldPrefix}${fieldNumber}`)"));
 });
 
@@ -89,9 +92,9 @@ test("Flagged Today renders each complete report and legacy null rules remain gu
   assert.ok(flagsSrc.includes("matchReference(f.match_type, f.match_number) ?"));
 });
 
-test("correction UI carries the existing rule and blocks unsafe rule-less severity changes", () => {
-  assert.ok(flagsSrc.includes("rule: f.rule"));
-  assert.match(flagsSrc, /k\.requiresRule && !f\.rule && k\.id !== f\.kind/);
+test("correction UI sends the rule it shows and blocks unsafe rule-less severity changes", () => {
+  assert.ok(flagsSrc.includes("rule: draftRule"));
+  assert.match(flagsSrc, /k\.requiresRule && !draftRule && !legacyKeep/);
 });
 
 test("the app's existing full wipe remains the active-event boundary", () => {

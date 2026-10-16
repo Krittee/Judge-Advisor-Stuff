@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { isValidFieldPick, parseFlagFields, splitField } from "../src/lib/flagValidation";
 
 /* Referee flags. A referee records what they saw on the field and the
    judges read it before they interview the team. Two things must not go
@@ -197,7 +198,7 @@ test("the API route requires match type, match number and field, and rejects rat
   const src = readFileSync(new URL("../src/lib/flagValidation.ts", import.meta.url), "utf8");
   assert.ok(src.includes("isValidMatchType(matchType)"), "match type is no longer validated");
   assert.ok(src.includes("isValidMatchNumber(matchNumber)"), "match number is no longer validated");
-  assert.ok(src.includes("isValidField(field)"), "field is no longer validated");
+  assert.ok(src.includes("isValidFieldPick(field)"), "field is no longer validated as a division and number");
   const route = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
   assert.ok(route.indexOf("parseFlagFields(body") < route.indexOf("store().createFlag"));
 });
@@ -377,4 +378,51 @@ test("PATCH captures the previous kind before updateFlag runs, not after", () =>
     !/existing\.kind\s*!==/.test(fn),
     "the comparison reads existing.kind directly again, after updateFlag has already run",
   );
+});
+
+/* ---- the field: a division and a number, the same shape for both forms -- */
+
+test("a field is a division prefix and a number, the only shape the form can produce", () => {
+  for (const ok of ["ES2", "MS10", "HS1", "BL3", "SK4", "SK0"]) {
+    assert.ok(isValidFieldPick(ok), `${ok} should be a valid field`);
+  }
+  for (const bad of ["", "ES", "2", "Field 2", "es2", "XX2", "ES 2", "ES12345", "ESX"]) {
+    assert.ok(!isValidFieldPick(bad), `"${bad}" should not be a valid field`);
+  }
+});
+
+test("a stored field splits back into the form's two boxes, and legacy text is not guessed at", () => {
+  assert.deepEqual(splitField("SK10"), { prefix: "SK", number: "10" });
+  assert.deepEqual(splitField("Field 2"), { prefix: "", number: "" }, "free text is re-picked, not guessed");
+  assert.deepEqual(splitField(null), { prefix: "", number: "" });
+});
+
+test("a correction with free-text or empty field is refused, and a picked field is stored uppercased", () => {
+  const report = { kind: "warning", body: "", matchType: "Q", matchNumber: "23", rule: null };
+  assert.equal(parseFlagFields({ ...report, field: "Field 2" }).ok, false);
+  assert.equal(parseFlagFields({ ...report, field: "" }).ok, false);
+  const picked = parseFlagFields({ ...report, field: "es2" });
+  assert.equal(picked.ok, true);
+  if (picked.ok) assert.equal(picked.field, "ES2");
+});
+
+test("a correction can change the rule, not only keep the one already on record", () => {
+  const edit = parseFlagFields({
+    kind: "minor",
+    body: "",
+    matchType: "Q",
+    matchNumber: "23",
+    field: "ES2",
+    rule: "sg7",
+  });
+  assert.equal(edit.ok && edit.rule, "SG7");
+});
+
+test("the correction form offers the same field and rule pickers as the raise form", () => {
+  const flags = readFileSync(new URL("../src/components/Flags.tsx", import.meta.url), "utf8");
+  const page = readFileSync(new URL("../src/app/referee/page.tsx", import.meta.url), "utf8");
+  assert.ok(flags.includes("<FieldPicker") && flags.includes("<RulePicker"), "the correction form lost a picker");
+  assert.ok(page.includes("<FieldPicker") && page.includes("<RulePicker"), "the raise form lost a picker");
+  assert.ok(!/draftField\b/.test(flags), "the correction form has a free-text field box again");
+  assert.ok(flags.includes("rule: draftRule"), "the correction form no longer sends the rule it shows");
 });
