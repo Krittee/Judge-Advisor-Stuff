@@ -15,6 +15,7 @@ import { divisionsCompatible, presetPanels } from "../presets";
 import { hasNearbyBooking } from "../data";
 import {
   StoreError,
+  STALE_STATUS_MESSAGE,
   type ImportedTeam,
   type NewActivity,
   type NewNote,
@@ -525,11 +526,12 @@ export const postgresStore: Store = {
     }
   },
 
-  async updateRequest(id, patch) {
+  async updateRequest(id, patch, ifStatus) {
     const columns = Object.keys(patch);
     if (!columns.length) {
       const current = await this.findRequest(id);
       if (!current) throw new StoreError("That request no longer exists.", 404);
+      if (ifStatus && current.status !== ifStatus) throw new StoreError(STALE_STATUS_MESSAGE, 409);
       return current;
     }
 
@@ -540,7 +542,14 @@ export const postgresStore: Store = {
       if (!current) throw new StoreError("That request no longer exists.", 404);
       const panelId = patch.panel_id ?? current.panel_id;
       const slotStart = patch.slot_start ?? current.slot_start;
-      if (current.kind === "slot" && current.status !== "cancelled" && panelId && slotStart) {
+      // Judged by the kind the row ends up as: "ready now" turns a booking
+      // into a walk-up request, which holds no slot to check.
+      if (
+        (patch.kind ?? current.kind) === "slot" &&
+        current.status !== "cancelled" &&
+        panelId &&
+        slotStart
+      ) {
         const nearby = await query<RequestRow>(
           `select * from requests where panel_id = $1 and kind = 'slot' and status <> 'cancelled' and id <> $2`,
           [panelId, id],
@@ -555,14 +564,27 @@ export const postgresStore: Store = {
     }
 
     const assignments = columns.map((c, i) => `${c} = $${i + 2}`).join(", ");
+    const values = [id, ...columns.map((c) => (patch as Record<string, unknown>)[c])];
+    // Compare-and-set: the status the caller read is part of the WHERE, so
+    // the database applies the change only if the row is still in it. That
+    // is one atomic statement -- unlike a read followed by a write, nothing
+    // another screen does can land between the two.
+    const guard = ifStatus ? ` and status = $${values.push(ifStatus)}` : "";
     try {
       const updated = one(
         await query<RequestRow>(
-          `update requests set ${assignments}, updated_at = now() where id = $1 returning *`,
-          [id, ...columns.map((c) => (patch as Record<string, unknown>)[c])],
+          `update requests set ${assignments}, updated_at = now() where id = $1${guard} returning *`,
+          values,
         ),
       );
-      if (!updated) throw new StoreError("That request no longer exists.", 404);
+      if (!updated) {
+        // No row matched: either it is gone, or it is no longer in the
+        // status the caller expected. Only a second look can tell which.
+        if (ifStatus && (await this.findRequest(id))) {
+          throw new StoreError(STALE_STATUS_MESSAGE, 409);
+        }
+        throw new StoreError("That request no longer exists.", 404);
+      }
       return updated;
     } catch (e) {
       if (e instanceof StoreError) throw e;

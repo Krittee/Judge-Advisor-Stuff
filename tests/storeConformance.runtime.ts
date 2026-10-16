@@ -201,6 +201,99 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     );
   });
 
+  /* ---- compare-and-set: updateRequest's ifStatus --------------------- */
+
+  /* BUG-011. The route reads a request's status, decides what to do from
+     it, and writes -- and between the read and the write another screen
+     can have moved it. ifStatus is what makes the write refuse to land
+     on a row that is no longer in the status the decision was made from. */
+
+  it("updateRequest with a stale ifStatus is a 409 and writes nothing", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+
+    const req = await store.createRequest(requestInput(team.id, panel.id));
+    await store.updateRequest(req.id, { status: "acknowledged" }, "requested");
+
+    // A second screen, still looking at "requested", tries to advance it.
+    await assert.rejects(
+      () =>
+        store.updateRequest(
+          req.id,
+          { status: "interviewing", started_at: "2026-09-01T14:00:00.000Z" },
+          "requested",
+        ),
+      (e: unknown) =>
+        e instanceof StoreError && e.status === 409 && /changed on another screen/.test(e.message),
+      "a stale ifStatus must be a 409 that says the request moved",
+    );
+
+    const after = await store.findRequest(req.id);
+    assert.equal(after?.status, "acknowledged", "the stale write must not change the status");
+    assert.equal(after?.started_at, null, "...nor any other column of the patch");
+  });
+
+  it("updateRequest with a matching ifStatus applies, and without one is unconditional", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+
+    const req = await store.createRequest(requestInput(team.id, panel.id));
+    const moved = await store.updateRequest(req.id, { status: "acknowledged" }, "requested");
+    assert.equal(moved.status, "acknowledged");
+
+    // No ifStatus: every existing caller (and admin tooling) keeps working.
+    const forced = await store.updateRequest(req.id, { status: "interviewing" });
+    assert.equal(forced.status, "interviewing");
+  });
+
+  it("updateRequest with ifStatus on a request that is gone is a 404, not a 409", async (store) => {
+    await assert.rejects(
+      () => store.updateRequest("00000000-0000-4000-8000-000000000000", { status: "cancelled" }, "requested"),
+      (e: unknown) => e instanceof StoreError && e.status === 404,
+      "a vanished request and a moved one are different problems and must read differently",
+    );
+  });
+
+  it("a booking becomes a walk-up request in place and gives its slot back", async (store) => {
+    /* BUG-016. "Ready now" used to cancel the booking and then create a
+       second request; this is the one-row conversion that replaces it. */
+    const panel = await store.createPanel(panelInput({ slot_count: 8, slot_start_at: SLOT_A }));
+    await store.upsertTeams([teamInput("1001"), teamInput("1002")]);
+    const a = await store.findTeamByNumber("1001");
+    const b = await store.findTeamByNumber("1002");
+    assert.ok(a && b);
+
+    const booking = await store.createRequest(
+      requestInput(a.id, panel.id, { kind: "slot", slotStart: SLOT_A, slotEnd: SLOT_B }),
+    );
+    const now = "2026-09-01T13:00:00.000Z";
+    const converted = await store.updateRequest(
+      booking.id,
+      { kind: "queue", status: "requested", slot_start: null, slot_end: null, requested_at: now },
+      "scheduled",
+    );
+
+    assert.equal(converted.id, booking.id, "the same row, not a replacement");
+    assert.equal(converted.kind, "queue");
+    assert.equal(converted.status, "requested");
+    assert.equal(converted.slot_start, null);
+    assert.equal(converted.slot_end, null);
+    assert.equal(new Date(converted.requested_at).toISOString(), now);
+
+    const mine = (await store.listRequests()).filter((r) => r.team_id === a.id);
+    assert.equal(mine.length, 1, "one row for the team -- nothing cancelled, nothing duplicated");
+    assert.equal(mine[0].status, "requested");
+
+    // The slot it held is free for someone else.
+    await store.createRequest(
+      requestInput(b.id, panel.id, { kind: "slot", slotStart: SLOT_A, slotEnd: SLOT_B }),
+    );
+  });
+
   /* ---- cascades: what a delete takes with it ------------------------- */
 
   it("deleting a team takes everything hanging off it", async (store) => {

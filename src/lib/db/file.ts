@@ -32,6 +32,7 @@ import {
 } from "../presets";
 import {
   StoreError,
+  STALE_STATUS_MESSAGE,
   type ImportedTeam,
   type NewActivity,
   type NewNote,
@@ -414,9 +415,21 @@ function createRequest(input: NewRequest): RequestRow {
   return row;
 }
 
-function updateRequest(id: string, patch: Partial<RequestRow>): RequestRow {
+function updateRequest(
+  id: string,
+  patch: Partial<RequestRow>,
+  ifStatus?: RequestRow["status"],
+): RequestRow {
   const row = state().requests.find((r) => r.id === id);
   if (!row) throw new StoreError("That request no longer exists.", 404);
+
+  // Compare-and-set. The caller read this row's status a moment ago and
+  // decided what to do from it; if another screen has moved it since, the
+  // decision is stale and must not be written over their change. Checked
+  // here, in the same synchronous block as the write below, so nothing can
+  // slip in between -- and before anything is touched, so a refusal leaves
+  // the row exactly as it was.
+  if (ifStatus && row.status !== ifStatus) throw new StoreError(STALE_STATUS_MESSAGE, 409);
 
   // Re-opening must not create a second live request for the same team.
   if (patch.status && LIVE.includes(patch.status) && !LIVE.includes(row.status)) {
@@ -429,8 +442,10 @@ function updateRequest(id: string, patch: Partial<RequestRow>): RequestRow {
   // Reassigning a booked slot to another panel (or another time) is
   // still a booking — it must not land within another team's walking
   // window on the panel it moves to.
+  // (Judged by the kind the row ends up as: "ready now" turns a booking
+  // into a walk-up request, which holds no slot to check.)
   if (
-    row.kind === "slot" &&
+    (patch.kind ?? row.kind) === "slot" &&
     row.status !== "cancelled" &&
     (patch.panel_id !== undefined || patch.slot_start !== undefined)
   ) {
@@ -1033,7 +1048,7 @@ export const fileStore: Store = {
   findRequest: async (id) => findRequest(id),
 
   createRequest: async (input) => createRequest(input),
-  updateRequest: async (id, patch) => updateRequest(id, patch),
+  updateRequest: async (id, patch, ifStatus) => updateRequest(id, patch, ifStatus),
 
   upsertTeams: async (rows) => upsertTeams(rows),
   updateTeam: async (id, patch) => updateTeam(id, patch),

@@ -1,17 +1,31 @@
 import { NextResponse } from "next/server";
 import { actorLabel, canAdvance, canCancel, getSession, mayActOnPanel } from "@/lib/auth";
-import { store, StoreError } from "@/lib/db";
+import { store, StoreError, STALE_STATUS_MESSAGE } from "@/lib/db";
 import { isRealSlot } from "@/lib/data";
-import { NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
+import { canTransition, NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
 import { CONFLICT_MESSAGE, isConflicted } from "@/lib/conflicts";
-import { divisionsCompatible } from "@/lib/presets";
+import { divisionsCompatible, resolveLanguage } from "@/lib/presets";
 import type { RequestRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-type Action = "advance" | "cancel" | "reopen" | "set-status" | "reassign" | "reschedule";
+type Action =
+  | "advance"
+  | "cancel"
+  | "reopen"
+  | "set-status"
+  | "reassign"
+  | "reschedule"
+  | "ready-now";
 
-/** Move a request along, cancel it, or hand it to a different panel. */
+/**
+ * Move a request along, cancel it, or hand it to a different panel.
+ *
+ * The body may carry `from`: the status the caller's screen was showing
+ * when its button was pressed. A screen left open while someone else moved
+ * the request is acting on a request that is no longer the one it drew, so
+ * a `from` that no longer matches is refused (409) rather than applied.
+ */
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const session = await getSession();
@@ -24,17 +38,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   // ---- permission gate -------------------------------------------------
-  if (action === "cancel" || action === "reschedule") {
-    // Moving a booking to a new time is a cancel-and-rebook that never
-    // leaves the slot empty in between -- so it needs exactly the
-    // permission cancelling that same booking already needs, no more.
-    if (!canCancel(session, current.status, current.created_by)) {
+  if (action === "cancel" || action === "reschedule" || action === "ready-now") {
+    // Moving a booking to a new time, or into the queue right now, is a
+    // cancel-and-rebook that never leaves the slot empty in between -- so
+    // each needs exactly the permission cancelling that same booking
+    // already needs, no more.
+    if (!canCancel(session, current.status)) {
       return NextResponse.json(
         {
           error:
             action === "reschedule"
               ? "You do not have permission to reschedule this booking."
-              : "You do not have permission to cancel this request.",
+              : action === "ready-now"
+                ? "You do not have permission to move this booking into the queue."
+                : "You do not have permission to cancel this request.",
         },
         { status: 403 },
       );
@@ -76,10 +93,33 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     );
   }
 
+  // Stale screen: it drew this request in one status and it has since moved
+  // on. Refused after the permission checks above so a caller who may not
+  // touch the request is still told that, not just that it changed.
+  if (body.from != null && String(body.from) !== current.status) {
+    return NextResponse.json({ error: STALE_STATUS_MESSAGE }, { status: 409 });
+  }
+
+  // The transition table (status.ts): cancel only what is still open,
+  // reopen only what is finished, ready-now only a booking.
+  if (!canTransition(action, current.status)) {
+    return NextResponse.json(
+      {
+        error: `A ${current.status} request can't be ${
+          action === "reopen" ? "reopened" : action === "ready-now" ? "moved into the queue" : "cancelled"
+        }.`,
+      },
+      { status: 409 },
+    );
+  }
+
   const now = new Date().toISOString();
   const actor = actorLabel(session);
   const patch: Partial<RequestRow> = {};
   let logLine: string = action;
+  // The team follows its request to the new panel -- but only after the
+  // request itself has moved (see where this is used below).
+  let moveTeam: { id: string; panelId: string } | null = null;
 
   if (action === "reassign") {
     const panelId = String(body.panelId ?? "");
@@ -125,7 +165,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     // request says one panel, the team still says another, and the
     // judge this was reassigned to may not even see it. Reassigning a
     // request IS reassigning the team; keep them as one operation.
-    if (team) await db.updateTeam(team.id, { panel_id: panelId });
+    //
+    // The team is moved AFTER the request, not here: updating the request
+    // can still be refused (the 20-minute booking gap on the new panel),
+    // and a team already moved by then is stranded on the new panel with
+    // its request still on the old one. Everything that can be checked
+    // up front has been, above; the one write that can still fail goes first.
+    if (team) moveTeam = { id: team.id, panelId };
 
     patch.panel_id = panelId;
     logLine = `reassigned to ${target.name}`;
@@ -133,6 +179,23 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     patch.status = "cancelled";
     patch.cancelled_at = now;
     logLine = "cancelled";
+  } else if (action === "ready-now") {
+    // The booking becomes a walk-up request in place -- one write, so a
+    // failure leaves the booking exactly as it was. (The page used to
+    // cancel it and then create a new request, and a failure in between
+    // lost the team its slot.) It stays a live row throughout, so the
+    // one-live-request-per-team rule is never in play.
+    patch.kind = "queue";
+    patch.status = "requested";
+    patch.slot_start = null;
+    patch.slot_end = null;
+    patch.requested_at = now;
+    // What the team or desk filled in alongside the button, as a new
+    // request would have carried it.
+    if (body.language) patch.language = resolveLanguage(body.language);
+    const message = String(body.message ?? "").trim().slice(0, 280);
+    if (message) patch.message = message;
+    logLine = "ready now";
   } else if (action === "reopen") {
     patch.status = "requested";
     patch.requested_at = now;
@@ -181,6 +244,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         { status: 409 },
       );
     }
+    // A real slot can still be one that is over; a page left open since
+    // the morning offers it, and so does anything posting straight here.
+    if (end.getTime() <= Date.now()) {
+      return NextResponse.json({ error: "That slot has already passed." }, { status: 409 });
+    }
 
     // The 20-minute walking-gap check against every other live booking on
     // this panel (excluding this request's own current slot) happens
@@ -218,6 +286,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
 
     patch.status = target;
+    if (target === "requested") {
+      // Only the Judge Advisor's override gets here: a live request stepped
+      // back to the queue. Drop the stale timestamps exactly as reopen does,
+      // or the board would time the wait from when it was acknowledged.
+      patch.acknowledged_at = null;
+      patch.started_at = null;
+      patch.finished_at = null;
+      patch.cancelled_at = null;
+    }
     if (target === "acknowledged") {
       patch.acknowledged_at = now;
       patch.acknowledged_by = session?.name ?? actor;
@@ -233,11 +310,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       const outcome = String(body.outcome ?? "").trim().slice(0, 280);
       if (outcome) patch.outcome = outcome;
     }
+    // The admin override for cancelling a completed request (the table only
+    // lets "cancel" take open ones) still has to say when it happened.
+    if (target === "cancelled") patch.cancelled_at = now;
     logLine = `→ ${STATUS_META[target].label}`;
   }
 
   try {
-    const updated = await store().updateRequest(id, patch);
+    // current.status is the status every decision above was made from;
+    // handing it to the store makes the write conditional on it still
+    // being true, so a second screen acting at the same moment gets a 409
+    // instead of silently overwriting (or double-advancing) the first.
+    const updated = await store().updateRequest(id, patch, current.status);
+
+    if (moveTeam) await store().updateTeam(moveTeam.id, { panel_id: moveTeam.panelId });
 
     await store().logActivity({
       requestId: id,

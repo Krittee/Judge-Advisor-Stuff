@@ -169,8 +169,10 @@ Judges *do* drive the colour flow for their own teams — that is what makes the
 board change without you touching it. If you would rather they could not, one
 line in `canAdvance()` in [`src/lib/auth.ts`](src/lib/auth.ts) turns it off.
 
-The queue desk can also **undo** an entry it just made, but only while the
-request is still orange. Once judges acknowledge it, it is out of their hands.
+The queue desk can also **cancel, reschedule or mark "ready now"** any request
+that is still early (*requested* or *scheduled*), whoever made it — a team that
+booked from its phone and then walks up to the desk is who the desk is for. Once
+judges acknowledge it, it is out of their hands.
 
 ---
 
@@ -797,6 +799,16 @@ keeps the bad copy as `state.json.corrupt-<timestamp>` and starts empty — empt
 rather than demo data, so a real event never finds itself with invented teams.
 
 **Back it up** by copying `.data/state.json`. That is the entire database.
+
+---
+
+## Known limitations
+
+- **Anyone on the network can cancel or reschedule an early request.** A team
+  needs no login to cancel its own request, and request ids are public (they are
+  in `/api/state`), so anyone who can reach the app can cancel or move any
+  *requested* or *scheduled* request. Accepted for a LAN event; there are
+  deliberately no per-request tokens.
 
 ---
 

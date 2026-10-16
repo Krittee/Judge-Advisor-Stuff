@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { liveRequestFor } from "@/lib/data";
 import { divisionsCompatible } from "@/lib/presets";
 import { TabBar, type TabItem } from "@/components/nav";
-import { NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
+import { canTransition, NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
 import { call, useAppState, useScores } from "@/components/useAppState";
 import {
   Banner,
@@ -214,7 +214,11 @@ function FloorTab({
     setBusy(request.id);
     onError(null);
     try {
-      await call(`/api/requests/${request.id}`, { method: "PATCH", body: { action, ...extra } });
+      // `from`: the status this row is showing, so a stale screen is refused.
+      await call(`/api/requests/${request.id}`, {
+        method: "PATCH",
+        body: { action, from: request.status, ...extra },
+      });
       await refresh();
     } catch (e) {
       onError((e as Error).message);
@@ -428,17 +432,27 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
    * clears the stale acknowledged/started/finished timestamps a
    * completed or cancelled request is still carrying (set-status alone
    * does not), and "cancel" is what actually stamps cancelled_at.
-   * set-status covers the rest, and is unrestricted for an admin
-   * session — this whole page is admin-only already (see the redirect
-   * on load), so nothing further needs to gate this by role.
+   * Those two are held to the transition table (status.ts): reopen only
+   * a finished request, cancel only an open one. Where the table would
+   * refuse -- stepping a live request back to "requested", or cancelling
+   * one that already completed -- set-status covers it, and is
+   * unrestricted for an admin session — this whole page is admin-only
+   * already (see the redirect on load), so nothing further needs to gate
+   * this by role.
    */
-  async function resetRequestStatus(requestId: string, status: Status) {
+  async function resetRequestStatus(request: RequestRow, status: Status) {
     onError(null);
     try {
-      const action = status === "requested" ? "reopen" : status === "cancelled" ? "cancel" : "set-status";
-      await call(`/api/requests/${requestId}`, {
+      const action =
+        status === "requested" && canTransition("reopen", request.status)
+          ? "reopen"
+          : status === "cancelled" && canTransition("cancel", request.status)
+            ? "cancel"
+            : "set-status";
+      await call(`/api/requests/${request.id}`, {
         method: "PATCH",
-        body: action === "set-status" ? { action, status } : { action },
+        // `from`: the status the row is showing, so a stale screen is refused.
+        body: { action, from: request.status, ...(action === "set-status" ? { status } : {}) },
       });
       await refresh();
     } catch (e) {
@@ -696,7 +710,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                           onChange={(e) => {
                             const status = e.target.value as Status;
                             if (!status) return;
-                            resetRequestStatus((req ?? done)!.id, status);
+                            resetRequestStatus((req ?? done)!, status);
                             e.target.value = "";
                           }}
                           title="Judge Advisor override — corrects a mistake, not the normal flow"

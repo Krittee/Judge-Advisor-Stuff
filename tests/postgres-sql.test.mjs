@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 
 /* A parameterised query whose $N placeholders and argument list disagree
    typecheck cleanly, build cleanly, and then fail at runtime against a real
@@ -151,4 +152,127 @@ test("insert column lists match their value lists", () => {
         `but supplies ${supplied.items.length} values`,
     );
   }
+});
+
+/* ---- updateRequest's compare-and-set (BUG-011) ------------------------
+
+   updateRequest builds its UPDATE from the patch's column names, so the
+   scanner above skips it (it interpolates a fragment) and none of the
+   conformance suite runs without a database. Its status predicate is the
+   whole of the Postgres half of the fix, and the one place a hard-coded
+   "$3" would be wrong for every patch that is not exactly one column wide.
+   So the real store is run here against a recording stand-in for the
+   driver: the statement it sends, the parameters that go with it, and how
+   it reads the answer are all checked. What this cannot show is that
+   Postgres accepts the statement -- but it is the existing UPDATE with one
+   `and status = $n` appended and its parameter pushed last. */
+
+const ROW = { id: "r1", status: "requested", kind: "queue", panel_id: "p1", slot_start: null };
+const calls = [];
+let answer = () => [];
+
+class FakePool {
+  on() {}
+  async query(sql, params) {
+    calls.push({ sql: sql.replace(/\s+/g, " ").trim(), params });
+    return { rows: answer(sql.replace(/\s+/g, " ").trim(), params) };
+  }
+}
+
+const nodeRequire = createRequire(import.meta.url);
+const pgPath = nodeRequire.resolve("pg");
+nodeRequire.cache[pgPath] = { id: pgPath, filename: pgPath, loaded: true, exports: { Pool: FakePool } };
+process.env.DATABASE_URL = "postgres://localhost/judge_queue_test";
+const { postgresStore } = await import("../src/lib/db/postgres");
+
+/** Run `fn` against the stand-in, with `rows(sql)` answering each query. Returns the requests-table statements it sent, and what it threw. */
+async function run(rows, fn) {
+  calls.length = 0;
+  answer = rows;
+  const error = await fn().then(
+    () => undefined,
+    (e) => e,
+  );
+  return { sent: calls.filter((c) => /^(update|select \*) .*requests/.test(c.sql)), error };
+}
+
+test("updateRequest with ifStatus appends the status predicate, numbered after every patch column", async () => {
+  const { sent } = await run(
+    (sql) => (sql.startsWith("update requests") ? [{ ...ROW, status: "acknowledged" }] : []),
+    () => postgresStore.updateRequest("r1", { status: "acknowledged", acknowledged_at: "t" }, "requested"),
+  );
+  const update = sent.find((c) => c.sql.startsWith("update requests"));
+  assert.equal(
+    update.sql,
+    "update requests set status = $2, acknowledged_at = $3, updated_at = now() where id = $1 and status = $4 returning *",
+  );
+  assert.deepEqual(update.params, ["r1", "acknowledged", "t", "requested"]);
+});
+
+test("updateRequest without ifStatus stays unconditional", async () => {
+  const { sent } = await run(
+    (sql) => (sql.startsWith("update requests") ? [ROW] : []),
+    () => postgresStore.updateRequest("r1", { status: "acknowledged" }),
+  );
+  const update = sent.find((c) => c.sql.startsWith("update requests"));
+  assert.equal(
+    update.sql,
+    "update requests set status = $2, updated_at = now() where id = $1 returning *",
+  );
+  assert.deepEqual(update.params, ["r1", "acknowledged"]);
+});
+
+test("zero rows with ifStatus: a request that still exists is a 409, one that is gone is a 404", async () => {
+  // The predicate missed. A second look at the row says which kind of miss it was.
+  const moved = await run(
+    (sql) => (sql.startsWith("select * from requests where id") ? [ROW] : []),
+    () => postgresStore.updateRequest("r1", { status: "acknowledged" }, "scheduled"),
+  );
+  assert.equal(moved.error?.status, 409);
+  assert.match(moved.error.message, /changed on another screen/);
+
+  const gone = await run(
+    () => [],
+    () => postgresStore.updateRequest("r1", { status: "acknowledged" }, "scheduled"),
+  );
+  assert.equal(gone.error?.status, 404);
+});
+
+test("an empty patch still honours ifStatus, as the file store does", async () => {
+  const { error } = await run(
+    (sql) => (sql.startsWith("select * from requests where id") ? [ROW] : []),
+    () => postgresStore.updateRequest("r1", {}, "scheduled"),
+  );
+  assert.equal(error?.status, 409);
+});
+
+test("a booking turned into a walk-up request skips the booking-gap lookup; an ordinary slot move still runs it", async () => {
+  const booking = { ...ROW, status: "scheduled", kind: "slot", slot_start: "2099-01-01T14:00:00.000Z" };
+  const rows = (sql) =>
+    sql.startsWith("update requests") ? [ROW] : sql.startsWith("select * from requests where id") ? [booking] : [];
+
+  // ready now: it is a slot only until this write lands, and it is giving the slot up.
+  let { sent } = await run(rows, () =>
+    postgresStore.updateRequest(
+      "r1",
+      { kind: "queue", status: "requested", slot_start: null, slot_end: null, requested_at: "t" },
+      "scheduled",
+    ),
+  );
+  assert.ok(
+    !sent.some((c) => c.sql.includes("kind = 'slot'")),
+    "converting a booking to a queue request should not check the slot it is giving up against its neighbours",
+  );
+  const update = sent.find((c) => c.sql.startsWith("update requests"));
+  assert.match(update.sql, /where id = \$1 and status = \$7 returning \*$/);
+  assert.equal(update.params.at(-1), "scheduled");
+
+  // Moving a booking to another time is still a booking, and still checked.
+  ({ sent } = await run(rows, () =>
+    postgresStore.updateRequest("r1", { slot_start: "2099-01-01T14:20:00.000Z" }, "scheduled"),
+  ));
+  assert.ok(
+    sent.some((c) => c.sql.includes("kind = 'slot'")),
+    "a slot move must still be checked against the panel's other bookings",
+  );
 });

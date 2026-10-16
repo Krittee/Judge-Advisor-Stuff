@@ -2,9 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 
+import { canCancel } from "../src/lib/auth";
+import { ACTION_FROM, STATUSES, TERMINAL_STATUSES, canTransition } from "../src/lib/status";
+
 /* Mirrors the scope rules in src/lib/auth.ts and the division wall in the
    stores. These are the rules that decide who can see and touch what, so
-   they are worth pinning down separately from the UI that displays them. */
+   they are worth pinning down separately from the UI that displays them.
+   (canCancel is the exception: it is the real function, imported, because
+   its rule has been changed on purpose and a copy would just agree with
+   itself.) */
 
 const JA = { role: "admin", name: "Krittee" };
 const JUDGE_A = { role: "judge", name: "Dana", panelId: "panel-a", panelName: "Panel A" };
@@ -19,14 +25,6 @@ const canAdminister = (s) => s?.role === "admin";
 function mayActOnPanel(s, panelId) {
   if (s?.role === "admin") return true;
   if (s?.role === "judge") return panelId !== null && panelId === s.panelId;
-  return false;
-}
-
-function canCancel(s, status, createdBy) {
-  if (s?.role === "admin" || s?.role === "judge") return true;
-  const early = status === "requested" || status === "scheduled";
-  if (!s) return early;
-  if (s.role === "queuer") return early && createdBy?.startsWith("queuer:") === true;
   return false;
 }
 
@@ -63,11 +61,11 @@ test("the Judge Advisor may act on any panel", () => {
   for (const p of ["panel-a", "panel-c", null]) assert.ok(mayActOnPanel(JA, p));
 });
 
-test("the queue desk can undo its own entry only before judges see it, and only its own entry", () => {
-  assert.ok(canCancel(QUEUER, "requested", "queuer:Desk"));
-  assert.ok(canCancel(QUEUER, "scheduled", "queuer:Desk"));
-  for (const s of ["acknowledged", "interviewing", "completed"]) {
-    assert.ok(!canCancel(QUEUER, s, "queuer:Desk"), `queuer must not cancel a ${s} interview`);
+test("the queue desk can cancel an early request, and nothing the judges have taken", () => {
+  assert.ok(canCancel(QUEUER, "requested"));
+  assert.ok(canCancel(QUEUER, "scheduled"));
+  for (const s of ["acknowledged", "interviewing", "completed", "cancelled"]) {
+    assert.ok(!canCancel(QUEUER, s), `queuer must not cancel a ${s} interview`);
   }
 });
 
@@ -80,32 +78,63 @@ test("the queue desk can undo its own entry only before judges see it, and only 
    created cannot need one either. A team's own request is always
    createdBy "team", so the null-session branch never has to consult it. */
 test("a team with no login can cancel their own request while it is still early, same as the queue desk", () => {
-  assert.ok(canCancel(TEAM, "requested", "team"), "a team must be able to cancel their own live request");
-  assert.ok(canCancel(TEAM, "scheduled", "team"), "a team must be able to give up their own booking");
+  assert.ok(canCancel(TEAM, "requested"), "a team must be able to cancel their own live request");
+  assert.ok(canCancel(TEAM, "scheduled"), "a team must be able to give up their own booking");
   for (const s of ["acknowledged", "interviewing", "completed"]) {
-    assert.ok(!canCancel(TEAM, s, "team"), `a team must not cancel a ${s} interview out from under a judge`);
+    assert.ok(!canCancel(TEAM, s), `a team must not cancel a ${s} interview out from under a judge`);
   }
 });
 
-/* Regression: the comment above canCancel has always described the queue
-   desk as undoing "their own mis-entry", but the check never actually
-   looked at who created the request -- any queuer session could cancel
-   any team-created request too, in any status the check let through. */
-test("a queuer cannot cancel a request it did not create, even while early", () => {
-  assert.ok(!canCancel(QUEUER, "requested", "team"), "a queuer must not cancel a team's own request");
-  assert.ok(!canCancel(QUEUER, "scheduled", "team"), "a queuer must not cancel a team's own booking");
-  assert.ok(!canCancel(QUEUER, "requested", "admin"), "a queuer must not cancel an admin-created request");
-  assert.ok(!canCancel(QUEUER, "requested", null), "a queuer must not cancel a request with no recorded creator");
+/* Product decision D1: the queue desk works ANY request that is still
+   early, whoever created it. canCancel used to require the request's
+   createdBy to start with "queuer:", which made the desk's cancel,
+   reschedule and "ready now" buttons 403 for every booking a team made
+   from its own phone -- the very teams that walk up to the desk. */
+test("a queuer can cancel an early request whoever created it", () => {
+  for (const createdBy of ["team", "admin:Krittee", "queuer:Someone Else", null]) {
+    for (const status of ["requested", "scheduled"]) {
+      // The request's creator is not an input to canCancel; passing one anyway
+      // makes a version that goes back to consulting it fail here.
+      assert.ok(canCancel(QUEUER, status, createdBy), `a queuer must cancel a ${status} request made by ${createdBy}`);
+    }
+  }
 });
 
-test("the real canCancel in src/lib/auth.ts carries the same team exemption and queuer ownership check as the mirror above", () => {
-  const src = readFileSync(new URL("../src/lib/auth.ts", import.meta.url), "utf8");
-  const fn = src.slice(src.indexOf("export function canCancel"), src.indexOf("\n}", src.indexOf("export function canCancel")));
-  assert.ok(fn.includes("if (!s) return early;"), "canCancel no longer exempts a team with no session");
-  assert.ok(
-    fn.includes('createdBy?.startsWith("queuer:") === true'),
-    "canCancel no longer restricts a queuer to requests the desk itself created",
-  );
+test("only the roles that touch interviews may cancel at all", () => {
+  const REFEREE = { role: "referee", name: "Ref" };
+  assert.ok(!canCancel(REFEREE, "requested"), "a referee has no part in the queue");
+  assert.ok(canCancel(JA, "completed"), "the Judge Advisor's reach is unchanged here (the transition table narrows it)");
+  assert.ok(canCancel(JUDGE_A, "interviewing"));
+});
+
+/* ---- the status transition table (BUG-011) ------------------------- */
+
+test("cancel is allowed from every status that is still open, and from no finished one", () => {
+  for (const s of STATUSES) {
+    assert.equal(canTransition("cancel", s), !TERMINAL_STATUSES.includes(s), `cancel from ${s}`);
+  }
+  assert.ok(!canTransition("cancel", "completed"), "a completed interview must not be cancellable");
+  assert.ok(!canTransition("cancel", "cancelled"));
+});
+
+test("reopen is allowed only from a finished status", () => {
+  for (const s of STATUSES) {
+    assert.equal(canTransition("reopen", s), TERMINAL_STATUSES.includes(s), `reopen from ${s}`);
+  }
+  for (const s of ["scheduled", "requested", "acknowledged", "interviewing"]) {
+    assert.ok(!canTransition("reopen", s), `reopen must not accept a ${s} request`);
+  }
+});
+
+test("ready-now is allowed only from a scheduled booking", () => {
+  for (const s of STATUSES) assert.equal(canTransition("ready-now", s), s === "scheduled", `ready-now from ${s}`);
+});
+
+test("actions the table does not name are not restricted by it", () => {
+  for (const action of ["advance", "set-status", "reassign", "reschedule"]) {
+    assert.equal(ACTION_FROM[action], undefined, `${action} unexpectedly entered the table`);
+    for (const s of STATUSES) assert.ok(canTransition(action, s), `${action} from ${s}`);
+  }
 });
 
 test("the route's panel-scope wall exempts a team with no login, the same way it exempts the queue desk", () => {

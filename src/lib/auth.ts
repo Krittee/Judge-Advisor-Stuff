@@ -380,10 +380,12 @@ export function clientKeyFor(request: Request): string {
  * do, but hiding is not the control.
  *
  *                    create   advance     cancel        notes       admin
- *   team (no login)   own       no       own request     no          no
- *   queuer            any       no       un-seen only    no          no
+ *   team (no login)   own       no       any early (!)   no          no
+ *   queuer            any       no       any early       no          no
  *   judge             own      own panel own panel      own panel    no
  *   admin             any       any       any            any         yes
+ *
+ * (!) not tied to the team's own request -- see the risk noted on canCancel.
  *
  * "own panel" is the load-bearing part: a judge may only advance, cancel,
  * read or write against teams assigned to the panel whose code they
@@ -441,25 +443,36 @@ export function mayActOnPanel(s: Session | null, panelId: string | null): boolea
 }
 
 /**
- * The queuer is allowed to undo their own mis-entry, but only while the
- * request is still untouched, and only an entry the desk itself made —
- * `createdBy` reads "queuer:Name" for those (see actorLabel below).
- * Once judges have acknowledged it, it is out of their hands. Drop the
- * "queuer" branch to make the role create-only.
+ * Whether this caller may cancel a request -- and, because they are the
+ * same cancel-and-rebook with the slot never left empty, reschedule a
+ * booking or move it into the queue ("ready now").
+ *
+ * The queue desk may do all three to ANY request that is still early
+ * (requested or scheduled), whoever created it: a team that booked from
+ * its own phone and then walks up to the desk is exactly who the desk is
+ * there for. Once judges have acknowledged it, it is out of their hands.
+ * Drop the "queuer" branch to make the role create-only.
  *
  * A team with no session at all is a separate case, not a queuer acting
  * without a login: creating a request needs no login (see POST
- * /api/requests), so cancelling the one they just created — the "Cancel
- * this request" / "Cancel this booking" button on their own team page —
+ * /api/requests), so cancelling the one they just created -- the "Cancel
+ * this request" / "Cancel this booking" button on their own team page --
  * cannot need one either, or that button is dead on arrival for every
- * team, every time. A team's own request is always createdBy "team", so
- * this branch never has to consult it.
+ * team, every time.
+ *
+ * KNOWN, ACCEPTED RISK (decided by the product owner for a LAN event app):
+ * that anonymous branch proves nothing about WHOSE request it is. Request
+ * ids are public (they are in /api/state), so anyone on the network who
+ * can read an id can cancel or reschedule any early request. There is
+ * deliberately no per-request token. Do not add a check on `createdBy`
+ * here to "fix" this -- it would only break the team page for the people
+ * it is meant to serve. See "Known limitations" in the README.
  */
-export function canCancel(s: Session | null, status: string, createdBy: string | null): boolean {
+export function canCancel(s: Session | null, status: string): boolean {
   if (s?.role === "admin" || s?.role === "judge") return true;
   const early = status === "requested" || status === "scheduled";
   if (!s) return early;
-  if (s.role === "queuer") return early && createdBy?.startsWith("queuer:") === true;
+  if (s.role === "queuer") return early;
   return false;
 }
 
