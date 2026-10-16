@@ -1,6 +1,14 @@
 import { isValidMatchNumber, normalizeField, normalizeMatchNumber } from "./match";
 import { isValidMatchType, matchTypes, refereeFlags, resolveFlagKind } from "./presets";
-import { isValidRuleId } from "./rules";
+import {
+  DEFAULT_RULESET_ID,
+  getRuleset,
+  isValidRuleId,
+  isValidRulesetId,
+  joinRuleList,
+  MAX_FLAG_RULES,
+  parseRuleList,
+} from "./rules";
 
 /**
  * A field is a division prefix and a number, "ES2" -- the same shape the
@@ -23,13 +31,43 @@ export function splitField(field: string | null | undefined): { prefix: string; 
   return match ? { prefix: match[1], number: match[2] } : { prefix: "", number: "" };
 }
 
+/** The kind id for a disqualification. Nothing in the app ever suggests it:
+ *  it is recorded only when a referee taps it. */
+export const DISQUALIFIED_KIND = "dq";
+
+/** Only these kinds can be marked as having affected the match. */
+export const MATCH_AFFECTING_KINDS: readonly string[] = ["minor", "major"];
+
+/**
+ * What the browser sends to POST and PATCH /api/flags. `rules` is the list
+ * the picker holds; the server also still accepts the old single `rule`
+ * string, and never reads a manual version from the client.
+ */
+export type FlagReport = {
+  kind: string;
+  body: string;
+  matchType: string;
+  matchNumber: string;
+  field: string;
+  ruleset: string;
+  rules: string[];
+  matchAffecting: boolean;
+};
+
 export type ParsedFlagFields = {
   kind: string;
   text: string;
   matchType: string;
   matchNumber: string;
   field: string;
+  /** The rule ids comma-joined for storage, or null. */
   rule: string | null;
+  /** The rule ids as a list, validated against `ruleset`. */
+  rules: string[];
+  ruleset: string;
+  /** Set here from the ruleset, so a client can never claim an edition. */
+  manualVersion: string | null;
+  matchAffecting: boolean;
 };
 
 export type FlagFieldParseResult =
@@ -43,12 +81,16 @@ type ParseOptions = {
    * rule-requiring kind without supplying a real rule.
    */
   allowLegacyRulelessKind?: string | null;
+  /** The ruleset to assume when the request names none. A correction passes
+   *  the flag's own, so an older client cannot silently move a V5RC flag to
+   *  IQ; a new flag has none and falls back to VEX IQ. */
+  defaultRuleset?: string | null;
 };
 
 /** Validate and normalize every referee-editable report field. */
 export function parseFlagFields(
   body: Record<string, unknown>,
-  { allowLegacyRulelessKind = null }: ParseOptions = {},
+  { allowLegacyRulelessKind = null, defaultRuleset = null }: ParseOptions = {},
 ): FlagFieldParseResult {
   const kind = resolveFlagKind(body.kind);
   // Optional: match, severity and (where required) rule are enough to
@@ -76,15 +118,32 @@ export function parseFlagFields(
     return { ok: false, status: 400, error: "Pick which field this was — a division and a number, like ES2." };
   }
 
-  const rawRule = String(body.rule ?? "").trim().toUpperCase();
-  if (rawRule && !isValidRuleId(rawRule)) {
-    return { ok: false, status: 400, error: "That's not a recognised rule." };
+  // The ruleset decides which ids are real, so it is checked first. Missing
+  // means "not told" (VEX IQ, or the flag's own on a correction); a name
+  // that is present but unknown is a bad request, not a guess.
+  const rawRuleset = String(body.ruleset ?? "").trim();
+  if (rawRuleset && !isValidRulesetId(rawRuleset)) {
+    return { ok: false, status: 400, error: "That's not a recognised ruleset." };
+  }
+  const ruleset = getRuleset(rawRuleset || defaultRuleset || DEFAULT_RULESET_ID);
+
+  // `rules` is the list; a bare `rule` string is the legacy single-rule shape.
+  const requested = parseRuleList(
+    Array.isArray(body.rules) ? body.rules.map((r) => String(r)).join(",") : String(body.rule ?? ""),
+  );
+  if (requested.length > MAX_FLAG_RULES) {
+    return { ok: false, status: 400, error: `Pick at most ${MAX_FLAG_RULES} rules.` };
+  }
+  const unknown = requested.find((r) => !isValidRuleId(r, ruleset.id));
+  if (unknown) {
+    return { ok: false, status: 400, error: `${unknown} is not a recognised ${ruleset.label} rule.` };
   }
 
   // Good Conduct describes positive behavior, not a violated rule. Drop a
   // valid but stale selector value rather than allowing it to contaminate
   // repeated-violation history.
-  const rule = kind === "good" ? null : rawRule || null;
+  const rules = kind === "good" ? [] : requested;
+  const rule = joinRuleList(rules);
 
   if (!rule) {
     const kindMeta = refereeFlags().find((k) => k.id === kind);
@@ -97,5 +156,21 @@ export function parseFlagFields(
     }
   }
 
-  return { ok: true, kind, text, matchType, matchNumber, field, rule };
+  // Meaningful only for the kinds that can affect a match; anything else is
+  // stored false so a stale tick can never ride along.
+  const matchAffecting = body.matchAffecting === true && MATCH_AFFECTING_KINDS.includes(kind);
+
+  return {
+    ok: true,
+    kind,
+    text,
+    matchType,
+    matchNumber,
+    field,
+    rule,
+    rules,
+    ruleset: ruleset.id,
+    manualVersion: ruleset.manualVersion,
+    matchAffecting,
+  };
 }

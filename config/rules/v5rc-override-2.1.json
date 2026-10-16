@@ -1,0 +1,685 @@
+{
+ "_comment": "VEX V5 Robotics Competition — Override, Game Manual v2.1 (October 2026). Titles transcribed verbatim from the official manual's rule headings (curly quotes straightened). Event-specific TS rules live in event-specials.json and are added to every ruleset.",
+ "id": "v5rc",
+ "program": "V5RC",
+ "game": "Override",
+ "label": "V5RC Override",
+ "manualVersion": "2.1",
+ "commonRuleIds": [
+  "SG6",
+  "SG7",
+  "SG9",
+  "GG4",
+  "GG14",
+  "GG17",
+  "SG2",
+  "SG3",
+  "S1"
+ ],
+ "rules": [
+  {
+   "id": "SC1",
+   "category": "Scoring Rules",
+   "officialTitle": "All scoring statuses are evaluated after the Match ends",
+   "searchKeywords": []
+  },
+  {
+   "id": "SC2",
+   "category": "Scoring Rules",
+   "officialTitle": "Placed Scoring Object criteria",
+   "searchKeywords": []
+  },
+  {
+   "id": "SC3",
+   "category": "Scoring Rules",
+   "officialTitle": "Scored Pin Half criteria",
+   "searchKeywords": []
+  },
+  {
+   "id": "SC4",
+   "category": "Scoring Rules",
+   "officialTitle": "A Toggle is considered set to a color when it meets all of the following criteria",
+   "searchKeywords": []
+  },
+  {
+   "id": "SC5",
+   "category": "Scoring Rules",
+   "officialTitle": "Ownership of Yellow Pin Halves",
+   "searchKeywords": []
+  },
+  {
+   "id": "SC6",
+   "category": "Scoring Rules",
+   "officialTitle": "Robot Midfield criteria",
+   "searchKeywords": []
+  },
+  {
+   "id": "SC7",
+   "category": "Scoring Rules",
+   "officialTitle": "Autonomous Bonus criteria",
+   "searchKeywords": []
+  },
+  {
+   "id": "SC8",
+   "category": "Scoring Rules",
+   "officialTitle": "Autonomous Win Point criteria",
+   "searchKeywords": []
+  },
+  {
+   "id": "SG1",
+   "category": "Specific Game Rules",
+   "officialTitle": "Starting a Match",
+   "searchKeywords": []
+  },
+  {
+   "id": "SG2",
+   "category": "Specific Game Rules",
+   "officialTitle": "Horizontal expansion is limited",
+   "searchKeywords": [
+    "expansion",
+    "size"
+   ]
+  },
+  {
+   "id": "SG3",
+   "category": "Specific Game Rules",
+   "officialTitle": "Vertical expansion is limited",
+   "searchKeywords": [
+    "expansion",
+    "height"
+   ]
+  },
+  {
+   "id": "SG4",
+   "category": "Specific Game Rules",
+   "officialTitle": "Keep Scoring Objects in the Field",
+   "searchKeywords": []
+  },
+  {
+   "id": "SG5",
+   "category": "Specific Game Rules",
+   "officialTitle": "Each Robot gets one Pin as a Preload",
+   "searchKeywords": []
+  },
+  {
+   "id": "SG6",
+   "category": "Specific Game Rules",
+   "officialTitle": "Possession is limited to a maximum of one Pin and one Cup",
+   "searchKeywords": [
+    "pin",
+    "cup",
+    "possession limit"
+   ]
+  },
+  {
+   "id": "SG7",
+   "category": "Specific Game Rules",
+   "officialTitle": "Don't cross the Autonomous Line, and don't interfere with your opponents' actions",
+   "searchKeywords": []
+  },
+  {
+   "id": "SG8",
+   "category": "Specific Game Rules",
+   "officialTitle": "Engage with the Midfield and Autonomous Line during the Autonomous Period at your own risk",
+   "searchKeywords": []
+  },
+  {
+   "id": "SG9",
+   "category": "Specific Game Rules",
+   "officialTitle": "Alliance Goals are protected",
+   "searchKeywords": [
+    "alliance goal",
+    "protected"
+   ]
+  },
+  {
+   "id": "SG10",
+   "category": "Specific Game Rules",
+   "officialTitle": "Scoring Objects may not be removed from neutral Goals",
+   "searchKeywords": []
+  },
+  {
+   "id": "SG11",
+   "category": "Specific Game Rules",
+   "officialTitle": "Match Loads may be introduced during the Match under certain conditions",
+   "searchKeywords": []
+  },
+  {
+   "id": "SG12",
+   "category": "Specific Game Rules",
+   "officialTitle": "Some rules change during the Endgame period",
+   "searchKeywords": []
+  },
+  {
+   "id": "SG13",
+   "category": "Specific Game Rules",
+   "officialTitle": "Load Zones are protected during the Driver Controlled Period of the Match",
+   "searchKeywords": []
+  },
+  {
+   "id": "S1",
+   "category": "Safety Rules",
+   "officialTitle": "Be safe out there",
+   "searchKeywords": [
+    "unsafe",
+    "safety"
+   ]
+  },
+  {
+   "id": "S2",
+   "category": "Safety Rules",
+   "officialTitle": "Students must be accompanied by an Adult",
+   "searchKeywords": []
+  },
+  {
+   "id": "S3",
+   "category": "Safety Rules",
+   "officialTitle": "Each Student Team member must have a completed participant release form on file",
+   "searchKeywords": []
+  },
+  {
+   "id": "S4",
+   "category": "Safety Rules",
+   "officialTitle": "Stay inside the Field",
+   "searchKeywords": []
+  },
+  {
+   "id": "S5",
+   "category": "Safety Rules",
+   "officialTitle": "Wear safety glasses",
+   "searchKeywords": []
+  },
+  {
+   "id": "G1",
+   "category": "General Rules",
+   "officialTitle": "Participants must follow the Code of Conduct",
+   "searchKeywords": []
+  },
+  {
+   "id": "G2",
+   "category": "General Rules",
+   "officialTitle": "Participants must follow the Student Centered Policy",
+   "searchKeywords": []
+  },
+  {
+   "id": "G3",
+   "category": "General Rules",
+   "officialTitle": "Use common sense",
+   "searchKeywords": []
+  },
+  {
+   "id": "G4",
+   "category": "General Rules",
+   "officialTitle": "Students must meet the Student Eligibility Policy requirements",
+   "searchKeywords": []
+  },
+  {
+   "id": "G5",
+   "category": "General Rules",
+   "officialTitle": "There is a difference between accidentally and willfully violating a Robot rule",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG1",
+   "category": "General Game Rules",
+   "officialTitle": "Only Drive Team Members, and only in the Alliance Station",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG2",
+   "category": "General Game Rules",
+   "officialTitle": "A Team's Robot should attend every Match",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG3",
+   "category": "General Game Rules",
+   "officialTitle": "Robots on the Field must be ready to play",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG4",
+   "category": "General Game Rules",
+   "officialTitle": "Hands out of the Field",
+   "searchKeywords": [
+    "hands",
+    "touch"
+   ]
+  },
+  {
+   "id": "GG5",
+   "category": "General Game Rules",
+   "officialTitle": "Match replays are allowed, but rare",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG6",
+   "category": "General Game Rules",
+   "officialTitle": "Disqualifications",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG7",
+   "category": "General Game Rules",
+   "officialTitle": "Time-outs",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG8",
+   "category": "General Game Rules",
+   "officialTitle": "Keep your Robots together",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG9",
+   "category": "General Game Rules",
+   "officialTitle": "Don't hook your Robot to the Field, and don't get Entangled",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG10",
+   "category": "General Game Rules",
+   "officialTitle": "The red Alliance may choose to place last",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG11",
+   "category": "General Game Rules",
+   "officialTitle": "Controllers must stay connected to the Field",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG12",
+   "category": "General Game Rules",
+   "officialTitle": "Autonomous means \"no humans\"",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG13",
+   "category": "General Game Rules",
+   "officialTitle": "All rules still apply in the Autonomous Period",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG14",
+   "category": "General Game Rules",
+   "officialTitle": "Don't destroy other Robots. But, be prepared to encounter defense",
+   "searchKeywords": [
+    "damage",
+    "destroy",
+    "defense"
+   ]
+  },
+  {
+   "id": "GG15",
+   "category": "General Game Rules",
+   "officialTitle": "Offensive Robots get the \"benefit of the doubt\" when judgment calls are required",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG16",
+   "category": "General Game Rules",
+   "officialTitle": "You can't force an opponent into a penalty",
+   "searchKeywords": []
+  },
+  {
+   "id": "GG17",
+   "category": "General Game Rules",
+   "officialTitle": "No Holding for more than a 3-count",
+   "searchKeywords": [
+    "trap",
+    "lift",
+    "3 count",
+    "three count"
+   ]
+  },
+  {
+   "id": "GG18",
+   "category": "General Game Rules",
+   "officialTitle": "Use Scoring Objects to play the game",
+   "searchKeywords": []
+  },
+  {
+   "id": "RSC1",
+   "category": "Robot Skills Challenge Rules",
+   "officialTitle": "Standard rules apply in most cases",
+   "searchKeywords": []
+  },
+  {
+   "id": "RSC2",
+   "category": "Robot Skills Challenge Rules",
+   "officialTitle": "Match play is different in Robot Skills Matches",
+   "searchKeywords": []
+  },
+  {
+   "id": "RSC3",
+   "category": "Robot Skills Challenge Rules",
+   "officialTitle": "Scoring Robot Skills Matches",
+   "searchKeywords": []
+  },
+  {
+   "id": "RSC4",
+   "category": "Robot Skills Challenge Rules",
+   "officialTitle": "Field setup for Robot Skills Matches",
+   "searchKeywords": []
+  },
+  {
+   "id": "RSC5",
+   "category": "Robot Skills Challenge Rules",
+   "officialTitle": "Skills Stop Time",
+   "searchKeywords": []
+  },
+  {
+   "id": "R1",
+   "category": "Robot Rules",
+   "officialTitle": "One Robot per Team",
+   "searchKeywords": []
+  },
+  {
+   "id": "R2",
+   "category": "Robot Rules",
+   "officialTitle": "Robots must pass inspection",
+   "searchKeywords": []
+  },
+  {
+   "id": "R3",
+   "category": "Robot Rules",
+   "officialTitle": "Robots must fit within an 18\" x 18\" x 18\" volume",
+   "searchKeywords": []
+  },
+  {
+   "id": "R4",
+   "category": "Robot Rules",
+   "officialTitle": "Officially registered Team numbers must be displayed on Robot License Plates",
+   "searchKeywords": []
+  },
+  {
+   "id": "R5",
+   "category": "Robot Rules",
+   "officialTitle": "Let go of Scoring Objects after the Match",
+   "searchKeywords": []
+  },
+  {
+   "id": "R6",
+   "category": "Robot Rules",
+   "officialTitle": "Robots have one Brain",
+   "searchKeywords": []
+  },
+  {
+   "id": "R7",
+   "category": "Robot Rules",
+   "officialTitle": "Keep the power button or battery connection accessible",
+   "searchKeywords": []
+  },
+  {
+   "id": "R8",
+   "category": "Robot Rules",
+   "officialTitle": "Firmware up to date",
+   "searchKeywords": []
+  },
+  {
+   "id": "R9",
+   "category": "Robot Rules",
+   "officialTitle": "Use a \"Competition Template\" for programming",
+   "searchKeywords": []
+  },
+  {
+   "id": "R10",
+   "category": "Robot Rules",
+   "officialTitle": "Motors are limited",
+   "searchKeywords": []
+  },
+  {
+   "id": "R11",
+   "category": "Robot Rules",
+   "officialTitle": "Subsystems 1 & 2 have a combined motor limit",
+   "searchKeywords": []
+  },
+  {
+   "id": "R12",
+   "category": "Robot Rules",
+   "officialTitle": "Electrical power comes from VEX batteries only",
+   "searchKeywords": []
+  },
+  {
+   "id": "R13",
+   "category": "Robot Rules",
+   "officialTitle": "Robots use VEXnet",
+   "searchKeywords": []
+  },
+  {
+   "id": "R14",
+   "category": "Robot Rules",
+   "officialTitle": "Give the radio some space",
+   "searchKeywords": []
+  },
+  {
+   "id": "R15",
+   "category": "Robot Rules",
+   "officialTitle": "One or two Controllers per Robot",
+   "searchKeywords": []
+  },
+  {
+   "id": "R16",
+   "category": "Robot Rules",
+   "officialTitle": "Robots are built from the VEX V5 system",
+   "searchKeywords": []
+  },
+  {
+   "id": "R17",
+   "category": "Robot Rules",
+   "officialTitle": "New VEX parts are legal",
+   "searchKeywords": []
+  },
+  {
+   "id": "R18",
+   "category": "Robot Rules",
+   "officialTitle": "Prohibited Items",
+   "searchKeywords": []
+  },
+  {
+   "id": "R19",
+   "category": "Robot Rules",
+   "officialTitle": "Certain non-VEX components are allowed",
+   "searchKeywords": []
+  },
+  {
+   "id": "R20",
+   "category": "Robot Rules",
+   "officialTitle": "Custom V5 Smart Cables are allowed",
+   "searchKeywords": []
+  },
+  {
+   "id": "R21",
+   "category": "Robot Rules",
+   "officialTitle": "A limited amount of tape is allowed",
+   "searchKeywords": []
+  },
+  {
+   "id": "R22",
+   "category": "Robot Rules",
+   "officialTitle": "Certain non-VEX fasteners are allowed",
+   "searchKeywords": []
+  },
+  {
+   "id": "R23",
+   "category": "Robot Rules",
+   "officialTitle": "Visual decorations are allowed",
+   "searchKeywords": []
+  },
+  {
+   "id": "R24",
+   "category": "Robot Rules",
+   "officialTitle": "A limited amount of custom plastic is allowed",
+   "searchKeywords": []
+  },
+  {
+   "id": "R25",
+   "category": "Robot Rules",
+   "officialTitle": "Pneumatics are limited",
+   "searchKeywords": []
+  },
+  {
+   "id": "R26",
+   "category": "Robot Rules",
+   "officialTitle": "The VEX Pressure Gauge is a required part if a Robot includes pneumatics",
+   "searchKeywords": []
+  },
+  {
+   "id": "R27",
+   "category": "Robot Rules",
+   "officialTitle": "Most modifications to non-electrical components are allowed",
+   "searchKeywords": []
+  },
+  {
+   "id": "R28",
+   "category": "Robot Rules",
+   "officialTitle": "No modifications to electronic or pneumatic components are allowed",
+   "searchKeywords": []
+  },
+  {
+   "id": "T1",
+   "category": "Tournament Rules",
+   "officialTitle": "Head Referees have ultimate and final authority on all gameplay and Robot ruling decisions",
+   "searchKeywords": []
+  },
+  {
+   "id": "T2",
+   "category": "Tournament Rules",
+   "officialTitle": "Head Referees must be qualified",
+   "searchKeywords": []
+  },
+  {
+   "id": "T3",
+   "category": "Tournament Rules",
+   "officialTitle": "Drive Team Members are permitted to immediately appeal a Head Referee's ruling",
+   "searchKeywords": []
+  },
+  {
+   "id": "T4",
+   "category": "Tournament Rules",
+   "officialTitle": "The Event Partner has ultimate authority regarding all non-gameplay decisions",
+   "searchKeywords": []
+  },
+  {
+   "id": "T5",
+   "category": "Tournament Rules",
+   "officialTitle": "Be prepared for minor Field variance",
+   "searchKeywords": []
+  },
+  {
+   "id": "T6",
+   "category": "Tournament Rules",
+   "officialTitle": "Fields may be repaired at the Event Partner's discretion",
+   "searchKeywords": []
+  },
+  {
+   "id": "T7",
+   "category": "Tournament Rules",
+   "officialTitle": "Fields at an event must be consistent with each other",
+   "searchKeywords": []
+  },
+  {
+   "id": "T8",
+   "category": "Tournament Rules",
+   "officialTitle": "There are three types of Field control that may be used",
+   "searchKeywords": []
+  },
+  {
+   "id": "T9",
+   "category": "Tournament Rules",
+   "officialTitle": "There are two types of Field Perimeter that may be used",
+   "searchKeywords": []
+  },
+  {
+   "id": "T10",
+   "category": "Tournament Rules",
+   "officialTitle": "Qualification Matches follow the Match Schedule",
+   "searchKeywords": []
+  },
+  {
+   "id": "T11",
+   "category": "Tournament Rules",
+   "officialTitle": "Each Team will have at least six Qualification Matches",
+   "searchKeywords": []
+  },
+  {
+   "id": "T12",
+   "category": "Tournament Rules",
+   "officialTitle": "Qualification Matches contribute to a Team's ranking for Alliance Selection",
+   "searchKeywords": []
+  },
+  {
+   "id": "T13",
+   "category": "Tournament Rules",
+   "officialTitle": "Qualification Matches tiebreakers",
+   "searchKeywords": []
+  },
+  {
+   "id": "T14",
+   "category": "Tournament Rules",
+   "officialTitle": "Small Tournaments have fewer Alliances",
+   "searchKeywords": []
+  },
+  {
+   "id": "T15",
+   "category": "Tournament Rules",
+   "officialTitle": "Send a Student representative to Alliance Selection",
+   "searchKeywords": []
+  },
+  {
+   "id": "T16",
+   "category": "Tournament Rules",
+   "officialTitle": "Each Team may only be invited once to join one Alliance",
+   "searchKeywords": []
+  },
+  {
+   "id": "T17",
+   "category": "Tournament Rules",
+   "officialTitle": "Elimination Matches follow the Elimination Bracket",
+   "searchKeywords": []
+  },
+  {
+   "id": "T18",
+   "category": "Tournament Rules",
+   "officialTitle": "Elimination Matches are a blend of \"Best of 1\" and \"Best of 3\"",
+   "searchKeywords": []
+  },
+  {
+   "id": "T19",
+   "category": "Tournament Rules",
+   "officialTitle": "Ties in Elimination Matches lead to limited rematches",
+   "searchKeywords": []
+  },
+  {
+   "id": "T20",
+   "category": "Tournament Rules",
+   "officialTitle": "Skills Match Schedule",
+   "searchKeywords": []
+  },
+  {
+   "id": "T21",
+   "category": "Tournament Rules",
+   "officialTitle": "Skills Challenge Fields do not require the same modifications as the Head-to-Head Fields",
+   "searchKeywords": []
+  },
+  {
+   "id": "T22",
+   "category": "Tournament Rules",
+   "officialTitle": "Skills Rankings at events",
+   "searchKeywords": []
+  },
+  {
+   "id": "T23",
+   "category": "Tournament Rules",
+   "officialTitle": "Skills Rankings globally",
+   "searchKeywords": []
+  },
+  {
+   "id": "T24",
+   "category": "Tournament Rules",
+   "officialTitle": "Robot Skills at League Events",
+   "searchKeywords": []
+  }
+ ]
+}

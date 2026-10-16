@@ -180,12 +180,16 @@ function migrate(data: Data): Data {
   data.scores ??= [];
   data.conflicts ??= [];
   data.flags ??= [];
-  // Match and field arrived after the first flags did; rule after that.
+  // Match and field arrived after the first flags did; rule after that,
+  // then the ruleset it belongs to. A flag with no ruleset is a VEX IQ one.
   for (const f of data.flags) {
     f.match_type ??= null;
     f.match_number ??= null;
     f.field ??= null;
     f.rule ??= null;
+    f.ruleset ??= null;
+    f.manual_version ??= null;
+    f.match_affecting ??= false;
   }
 
   // Languages and panel language cover arrived after the first rosters.
@@ -808,6 +812,9 @@ function createFlag(input: NewFlag): FlagRow {
     match_number: input.matchNumber,
     field: input.field,
     rule: input.rule,
+    ruleset: input.ruleset,
+    manual_version: input.manualVersion,
+    match_affecting: input.matchAffecting,
     created_at: new Date().toISOString(),
   };
   state().flags.push(row);
@@ -825,6 +832,9 @@ function updateFlag(id: string, edit: FlagEdit): FlagRow {
   row.match_number = edit.matchNumber;
   row.field = edit.field;
   row.rule = edit.rule;
+  row.ruleset = edit.ruleset;
+  row.manual_version = edit.manualVersion;
+  row.match_affecting = edit.matchAffecting;
   save();
   return row;
 }

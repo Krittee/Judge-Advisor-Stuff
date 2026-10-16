@@ -6,15 +6,23 @@ import { call, useAppState } from "@/components/useAppState";
 import { Banner, inputClass, TopBar } from "@/components/ui";
 import { TabBar } from "@/components/nav";
 import { SignOutButton } from "@/components/judging";
-import { FieldPicker, FlagList, FlagSummary, flagsOnDay, kindOf, RulePicker } from "@/components/Flags";
+import {
+  FieldPicker,
+  FlagList,
+  FlagSummary,
+  flagsOnDay,
+  kindOf,
+  MatchAffectingCheck,
+  RulePicker,
+  RulesetPicker,
+} from "@/components/Flags";
 import { toneSolid } from "@/lib/tone";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
 import { filterMatchNumberInput, isValidMatchNumber, matchReference, normalizeField } from "@/lib/match";
-import { isValidFieldPick } from "@/lib/flagValidation";
+import { DISQUALIFIED_KIND, isValidFieldPick, type FlagReport } from "@/lib/flagValidation";
 import { refereeHistory } from "@/lib/refereeHistory";
-import { ruleDisplayLabel } from "@/lib/rules";
+import { DEFAULT_RULESET_ID, isValidRulesetId, ruleDisplayLabel } from "@/lib/rules";
 import type { Session } from "@/lib/auth";
-import type { FlagEdit } from "@/lib/db/types";
 import type { FlagRow, Team } from "@/lib/types";
 
 /**
@@ -34,6 +42,9 @@ export default function RefereePage() {
     </Suspense>
   );
 }
+
+/** localStorage key for the ruleset this device last used. */
+const RULESET_STORAGE_KEY = "judge-queue-referee-ruleset";
 
 function Referee() {
   const router = useRouter();
@@ -58,13 +69,36 @@ function Referee() {
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Which rule this was against. Cleared on a successful submit (see
-  // record() below) so it can never accidentally carry over to the next
-  // report the way match/field deliberately do.
-  const [rule, setRule] = useState<string | null>(null);
-  // Bumped on a successful submit to remount the rule picker, which holds
-  // its own search text and open state.
-  const [ruleKey, setRuleKey] = useState(0);
+  // Which rules this was against, from the ruleset below. Cleared on a
+  // successful submit (see record() below) so they can never accidentally
+  // carry over to the next report the way match/field deliberately do.
+  const [rules, setRules] = useState<string[]>([]);
+  const [matchAffecting, setMatchAffecting] = useState(false);
+
+  // Which ruleset the event's referee is working from. Remembered per
+  // device -- a referee on the IQ fields stays on IQ all day -- so unlike
+  // the rules below it is NOT cleared after a flag. Read in an effect, not
+  // the initializer, so the server render and first client render agree.
+  const [rulesetId, setRulesetId] = useState(DEFAULT_RULESET_ID);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(RULESET_STORAGE_KEY);
+      if (isValidRulesetId(saved)) setRulesetId(saved as string);
+    } catch {
+      // Storage blocked: stay on the default.
+    }
+  }, []);
+
+  function chooseRuleset(id: string) {
+    setRulesetId(id);
+    // A rule id means nothing outside the ruleset it was picked from.
+    setRules([]);
+    try {
+      localStorage.setItem(RULESET_STORAGE_KEY, id);
+    } catch {
+      // Remembering is a convenience; the choice still applies this session.
+    }
+  }
 
   /* Arriving from the all-teams list, which passes the team it picked.
      Only seeds the box: typing over it afterwards is the point of the
@@ -120,24 +154,26 @@ function Referee() {
   // is exactly the kind of thing that cannot be tracked back later.
   const matchReady = Boolean(matchType) && isValidMatchNumber(matchNumber) && isValidFieldPick(field);
 
-  // Highest-severity kind gets the escalation highlight — derived from
-  // severity rather than a hardcoded "major" id, the same way the button
-  // order above is.
-  const maxSeverity = kinds.length ? Math.max(...kinds.map((k) => k.severity)) : 0;
+  // The most serious kind short of Disqualified gets the escalation
+  // highlight — derived from severity rather than a hardcoded "major" id,
+  // the same way the button order above is. Disqualified is left out on
+  // purpose: a repeated Minor may prompt a review, but nothing on this page
+  // ever steers a referee toward a DQ.
+  const maxSeverity = Math.max(0, ...kinds.filter((k) => k.id !== DISQUALIFIED_KIND).map((k) => k.severity));
 
   /* Repeated-violation detection is a pure calculation over the current
      event store. It excludes Good Conduct and never selects or changes a
      severity; the Head Referee still makes that decision. */
   const history = useMemo(
-    () => refereeHistory(state.flags, team?.id, rule, matchType, matchNumber),
-    [state.flags, team?.id, rule, matchType, matchNumber],
+    () => refereeHistory(state.flags, team?.id, rules, matchType, matchNumber, rulesetId),
+    [state.flags, team?.id, rules, matchType, matchNumber, rulesetId],
   );
-  const sameRuleHistory = history.sameRule;
-  const sameMatchSameRule = history.sameMatchSameRule;
+  // Only the cited rules the team already has a record for.
+  const repeatedRules = history.byRule.filter((h) => h.sameRule.length > 0);
   const eventTotalsForTeam = history.eventTotals;
   const escalationReviewRequired = history.escalationReviewRequired;
 
-  async function correctFlag(id: string, edit: FlagEdit) {
+  async function correctFlag(id: string, edit: FlagReport) {
     await call(`/api/flags`, { method: "PATCH", body: { id, ...edit } });
     await refresh();
   }
@@ -146,13 +182,13 @@ function Referee() {
     if (!team || !matchReady) return;
     // Defence in depth: the button is already disabled for this case, but
     // the request must never depend on the UI alone to enforce it.
-    if (kindOf(kind, state.flagKinds)?.requiresRule && !rule) return;
+    if (kindOf(kind, state.flagKinds)?.requiresRule && !rules.length) return;
     setBusy(true);
     setError(null);
     setSaved(null);
     try {
       await call("/api/flags", {
-        body: { teamId: team.id, kind, body, matchType, matchNumber, field, rule },
+        body: { teamId: team.id, kind, body, matchType, matchNumber, field, ruleset: rulesetId, rules, matchAffecting },
       });
       const label = state.flagKinds.find((k) => k.id === kind)?.label ?? kind;
       setSaved(
@@ -160,10 +196,10 @@ function Referee() {
           `The judges will see it.`,
       );
       setBody("");
-      // Rule is cleared on success so it never silently carries over to
-      // the next report — unlike match/matchNumber/field, which stay.
-      setRule(null);
-      setRuleKey((k) => k + 1);
+      // Rules are cleared on success so they never silently carry over to
+      // the next report — unlike match/matchNumber/field/ruleset, which stay.
+      setRules([]);
+      setMatchAffecting(false);
       await refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -205,6 +241,11 @@ function Referee() {
         {saved ? <Banner kind="success">{saved}</Banner> : null}
 
         <div className="space-y-3 rounded-2xl bg-surface p-4 ring-1 ring-inset ring-line">
+          {/* Which manual the rules below come from. Set once and remembered
+              on this device, so it sits out of the way at the top rather than
+              between the team and the severity buttons. */}
+          <RulesetPicker value={rulesetId} onChange={chooseRuleset} />
+
           <label className="block">
             <span className="mb-1 block text-xs text-ink-subtle">Team number</span>
             <input
@@ -296,44 +337,58 @@ function Referee() {
                 />
               </label>
 
-              {/* Required for Minor/Major, optional for Warning, not shown
+              {/* Required for Minor/Major/DQ, optional for Warning, not shown
                   as required for Good conduct — enforced by the button
                   disabling below and, server-side, by the API. One
-                  searchable selector, not a category-then-rule pair: a
-                  referee searches "plow" or "SG6" or "6" and gets there in
-                  one tap. */}
+                  searchable multi-select, not a category-then-rule pair: a
+                  referee searches "holding" or "SG6" and gets there in one
+                  tap, and a single incident can cite more than one rule. */}
               <div className="block">
-                <span className="mb-1 block text-xs text-ink-subtle">Rule violated</span>
-                <RulePicker key={ruleKey} value={rule} onChange={setRule} />
+                <span className="mb-1 block text-xs text-ink-subtle">Rules violated</span>
+                <RulePicker rulesetId={rulesetId} value={rules} onChange={setRules} />
               </div>
+
+              {/* Counts only for Minor and Major (the server stores false for
+                  anything else). Shown once a rule is picked because the
+                  severity buttons save on tap -- there is no chosen severity
+                  yet -- and every kind that can use it requires a rule. */}
+              {rules.length ? (
+                <MatchAffectingCheck checked={matchAffecting} onChange={setMatchAffecting} />
+              ) : null}
 
               {/* Repeated-violation warning. Display only — never selects
                   or creates anything. The Head Referee reads this and
-                  still chooses Minor or Major themselves. */}
-              {team && rule && sameRuleHistory.length ? (
-                <div className="space-y-1.5 rounded-xl bg-caution/12 p-3 ring-1 ring-inset ring-caution/35">
+                  still chooses Minor or Major themselves. One block per
+                  cited rule that this team already has a record for, in
+                  this ruleset. */}
+              {team && repeatedRules.length ? (
+                <div className="space-y-3 rounded-xl bg-caution/12 p-3 ring-1 ring-inset ring-caution/35">
                   <p className="text-sm font-semibold text-caution-quiet">⚠ Repeated violation</p>
-                  <p className="text-sm text-ink">{ruleDisplayLabel(rule)}</p>
-                  <p className="text-xs text-ink-subtle">
-                    {sameRuleHistory.length} previous{" "}
-                    {sameRuleHistory.length === 1 ? "report" : "reports"} for this rule.
-                  </p>
-                  <ul className="space-y-0.5 text-xs text-ink-faint">
-                    {sameRuleHistory.map((f) => (
-                      <li key={f.id}>
-                        {matchReference(f.match_type, f.match_number) ?? "—"} —{" "}
-                        {kindOf(f.kind, state.flagKinds)?.short ?? f.kind}
-                      </li>
-                    ))}
-                  </ul>
+                  {repeatedRules.map(({ rule, sameRule, sameMatchSameRule }) => (
+                    <div key={rule} className="space-y-1.5">
+                      <p className="break-words text-sm text-ink">{ruleDisplayLabel(rule, rulesetId)}</p>
+                      <p className="text-xs text-ink-subtle">
+                        {sameRule.length} previous {sameRule.length === 1 ? "report" : "reports"} for
+                        this rule.
+                      </p>
+                      <ul className="space-y-0.5 text-xs text-ink-faint">
+                        {sameRule.map((f) => (
+                          <li key={f.id}>
+                            {matchReference(f.match_type, f.match_number) ?? "—"} —{" "}
+                            {kindOf(f.kind, state.flagKinds)?.short ?? f.kind}
+                          </li>
+                        ))}
+                      </ul>
 
-                  {sameMatchSameRule.length && matchReference(matchType, matchNumber) ? (
-                    <p className="text-xs font-medium text-waiting-quiet">
-                      ⚠ {ruleDisplayLabel(rule)} already recorded {sameMatchSameRule.length}{" "}
-                      {sameMatchSameRule.length === 1 ? "time" : "times"} in this Match (
-                      {matchReference(matchType, matchNumber)}).
-                    </p>
-                  ) : null}
+                      {sameMatchSameRule.length && matchReference(matchType, matchNumber) ? (
+                        <p className="text-xs font-medium text-waiting-quiet">
+                          ⚠ {rule} already recorded {sameMatchSameRule.length}{" "}
+                          {sameMatchSameRule.length === 1 ? "time" : "times"} in this Match (
+                          {matchReference(matchType, matchNumber)}).
+                        </p>
+                      ) : null}
+                    </div>
+                  ))}
 
                   {escalationReviewRequired ? (
                     <p className="text-xs font-medium text-caution-quiet">
@@ -359,7 +414,7 @@ function Referee() {
                   label says it too, so nobody taps "Major" meaning "Good". */}
               <div className="grid gap-2">
                 {kinds.map((k) => {
-                  const missingRule = k.requiresRule && !rule;
+                  const missingRule = k.requiresRule && !rules.length;
                   // Highlight only the highest-severity kind, and only as
                   // a visual nudge — this never selects or submits it.
                   const highlight = escalationReviewRequired && k.severity === maxSeverity;
@@ -382,9 +437,9 @@ function Referee() {
                   Pick the match, the match number and the field first — that is what lets this
                   be traced back later.
                 </p>
-              ) : !rule && kinds.some((k) => k.requiresRule) ? (
+              ) : !rules.length && kinds.some((k) => k.requiresRule) ? (
                 <p className="text-center text-xs text-ink-faint">
-                  Minor and Major violations need a rule picked first.
+                  Minor, Major and Disqualified need at least one rule picked first.
                 </p>
               ) : null}
 

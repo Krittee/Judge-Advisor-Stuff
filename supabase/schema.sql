@@ -156,16 +156,19 @@ create index conflicts_team_idx  on conflicts (team_id);
 -- flag be traced back to the moment it happened.
 -- ---------------------------------------------------------------------
 create table flags (
-  id           uuid primary key default gen_random_uuid(),
-  team_id      uuid not null references teams(id) on delete cascade,
-  kind         text not null,
-  body         text not null,
-  author       text not null,
-  match_type   text,
-  match_number text,
-  field        text,
-  rule         text,                          -- Quick Reference rule id, e.g. 'SG6'
-  created_at   timestamptz not null default now()
+  id              uuid primary key default gen_random_uuid(),
+  team_id         uuid not null references teams(id) on delete cascade,
+  kind            text not null,
+  body            text not null,
+  author          text not null,
+  match_type      text,
+  match_number    text,
+  field           text,
+  rule            text,                       -- rule id(s), comma-joined: 'SG6' or 'GG17,SG9'
+  ruleset         text,                       -- 'viqrc' / 'v5rc'; null = recorded before rulesets = VEX IQ
+  manual_version  text,                       -- manual edition of that ruleset, set by the server
+  match_affecting boolean not null default false,
+  created_at      timestamptz not null default now()
 );
 
 -- ---------------------------------------------------------------------

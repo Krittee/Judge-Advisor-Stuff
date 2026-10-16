@@ -3,10 +3,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AppState, FlagRow } from "@/lib/types";
 import { tone, toneSolid } from "@/lib/tone";
-import type { FlagEdit } from "@/lib/db/types";
 import { filterMatchNumberInput, matchReference, normalizeField } from "@/lib/match";
-import { commonFieldRules, RULE_CATEGORIES, ruleDisplayLabel, searchRules, type Rule } from "@/lib/rules";
-import { FIELD_PREFIXES, splitField } from "@/lib/flagValidation";
+import {
+  commonFieldRules,
+  DEFAULT_OPEN_RULE_CATEGORIES,
+  getRuleset,
+  groupRulesByCategory,
+  isCategoryOpen,
+  manualLabel,
+  MAX_FLAG_RULES,
+  parseRuleList,
+  RULESETS,
+  ruleDisplayLabel,
+  searchRules,
+  toggleRule,
+  type Rule,
+} from "@/lib/rules";
+import { FIELD_PREFIXES, MATCH_AFFECTING_KINDS, splitField, type FlagReport } from "@/lib/flagValidation";
 import { inputClass } from "@/components/ui";
 
 export type FlagKind = AppState["flagKinds"][number];
@@ -83,130 +96,312 @@ export function FieldPicker({
   );
 }
 
-/** The one searchable rule selector, shared by the raise form and the
- *  correction form. Owns only its own open and search state: the chosen
- *  rule belongs to the caller. Common Field Rules appear as a shortcut
- *  section while the search box is empty -- the same Rule objects as the
- *  grouped list, never a duplicate copy. */
-export function RulePicker({
+/** The ruleset dropdown, with the manual edition under it. Shared by the
+ *  raise form and the correction form. The caller owns the value and clears
+ *  its chosen rules when it changes: a rule id means nothing outside the
+ *  ruleset it was picked from. */
+export function RulesetPicker({
   value,
   onChange,
+  disabled,
 }: {
-  value: string | null;
-  onChange: (rule: string | null) => void;
+  value: string;
+  onChange: (rulesetId: string) => void;
+  disabled?: boolean;
 }) {
-  const [ruleQuery, setRuleQuery] = useState("");
-  const [ruleOpen, setRuleOpen] = useState(false);
-  const ruleBoxRef = useRef<HTMLDivElement>(null);
+  const ruleset = getRuleset(value);
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs text-ink-subtle">Ruleset</span>
+      <select
+        value={ruleset.id}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className={`${inputClass} py-2`}
+      >
+        {RULESETS.map((r) => (
+          <option key={r.id} value={r.id} className="bg-surface">
+            {r.label}
+          </option>
+        ))}
+      </select>
+      {/* Only when the data records an edition: for IQ it would just repeat
+          the dropdown. */}
+      {ruleset.manualVersion ? (
+        <span className="mt-1 block text-xs text-ink-faint">{manualLabel(ruleset)}</span>
+      ) : null}
+    </label>
+  );
+}
 
-  // Close the rule dropdown on an outside pointer press. Option buttons use
-  // ordinary click events so touch, mouse and keyboard activation all work.
+/** Only Minor and Major can be match affecting (the server stores false for
+ *  anything else), but a severity button saves the report the moment it is
+ *  tapped, so there is no chosen severity to key off. Callers show this once
+ *  a rule is picked -- every kind that can use it requires one. */
+export function MatchAffectingCheck({
+  checked,
+  onChange,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <label className="flex min-h-11 items-center gap-3 text-sm text-ink">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        disabled={disabled}
+        className="h-5 w-5 shrink-0 accent-[var(--accent)]"
+      />
+      <span>
+        Match affecting <span className="text-ink-faint">(Minor / Major)</span>
+      </span>
+    </label>
+  );
+}
+
+/** One tappable rule: the code, an em dash, the manual's own title. */
+function RuleRow({
+  rule,
+  selected,
+  locked,
+  onToggle,
+}: {
+  rule: Rule;
+  selected: boolean;
+  /** At the cap: unselected rows cannot be added until one is removed. */
+  locked: boolean;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(rule.id)}
+      aria-pressed={selected}
+      disabled={locked && !selected}
+      className={`flex min-h-11 w-full items-start gap-3 px-4 py-2.5 text-left text-sm text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40 ${
+        selected ? "bg-accent/10" : ""
+      }`}
+    >
+      <span
+        aria-hidden
+        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs ${
+          selected ? "border-accent bg-accent text-accent-ink" : "border-line-strong"
+        }`}
+      >
+        {selected ? "✓" : ""}
+      </span>
+      <span className="min-w-0 break-words">
+        <span className="font-semibold text-accent-quiet">{rule.displayId}</span> — {rule.officialTitle}
+      </span>
+    </button>
+  );
+}
+
+/** The one searchable, multi-select rule picker for a ruleset, shared by the
+ *  raise form and the correction form. Owns only its own open, search and
+ *  section state: the chosen rules belong to the caller. Selected rules sit
+ *  above as removable chips; Common Field Rules appear as a shortcut section
+ *  while the search box is empty -- the same Rule objects as the grouped
+ *  list, never a duplicate copy. Categories collapse (the three a referee
+ *  uses most start open) but all open while a search is typed, so a hit is
+ *  never hidden inside a closed section. */
+export function RulePicker(props: {
+  rulesetId: string;
+  value: string[];
+  onChange: (rules: string[]) => void;
+  disabled?: boolean;
+  /** Open on first paint instead of waiting for a tap. */
+  startOpen?: boolean;
+}) {
+  // Keyed on the ruleset so switching it starts the picker clean -- no stale
+  // search text or open sections from the other manual.
+  return <RulePickerBody key={getRuleset(props.rulesetId).id} {...props} />;
+}
+
+function RulePickerBody({
+  rulesetId,
+  value,
+  onChange,
+  disabled,
+  startOpen = false,
+}: {
+  rulesetId: string;
+  value: string[];
+  onChange: (rules: string[]) => void;
+  disabled?: boolean;
+  startOpen?: boolean;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(startOpen);
+  const [openCategories, setOpenCategories] = useState(() => new Set(DEFAULT_OPEN_RULE_CATEGORIES));
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  function close() {
+    setOpen(false);
+    setQuery("");
+  }
+
+  // Close on an outside pointer press. Option buttons use ordinary click
+  // events so touch, mouse and keyboard activation all work.
   useEffect(() => {
-    if (!ruleOpen) return;
+    if (!open) return;
     function onPointerDown(e: PointerEvent) {
-      if (ruleBoxRef.current && !ruleBoxRef.current.contains(e.target as Node)) {
-        setRuleOpen(false);
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
       }
     }
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [ruleOpen]);
+  }, [open]);
 
-  // The rule list, filtered by what's typed and grouped by category in
-  // the Quick Reference's own order.
-  const commonRules = useMemo(() => commonFieldRules(), []);
-  const ruleMatches = useMemo(() => searchRules(ruleQuery), [ruleQuery]);
-  const ruleGroups = useMemo(() => {
-    const byCategory = new Map<string, Rule[]>();
-    for (const r of ruleMatches) byCategory.set(r.category, [...(byCategory.get(r.category) ?? []), r]);
-    return RULE_CATEGORIES.map((category) => ({ category, rules: byCategory.get(category) ?? [] })).filter(
-      (g) => g.rules.length > 0,
-    );
-  }, [ruleMatches]);
+  const searching = query.trim() !== "";
+  const commonRules = useMemo(() => commonFieldRules(rulesetId), [rulesetId]);
+  const groups = useMemo(
+    () => groupRulesByCategory(searchRules(query, rulesetId)),
+    [query, rulesetId],
+  );
 
-  function choose(rule: string | null) {
-    onChange(rule);
-    setRuleOpen(false);
-    setRuleQuery("");
+  const atCap = value.length >= MAX_FLAG_RULES;
+
+  function toggle(id: string) {
+    onChange(toggleRule(value, id));
+  }
+
+  function toggleCategory(category: string) {
+    setOpenCategories((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(category)) next.add(category);
+      return next;
+    });
   }
 
   return (
-    <div ref={ruleBoxRef} className="relative block">
+    <div ref={boxRef} className="relative block">
+      {value.length ? (
+        <ul className="mb-2 flex flex-wrap gap-1.5">
+          {value.map((id) => (
+            <li key={id}>
+              <button
+                type="button"
+                onClick={() => toggle(id)}
+                disabled={disabled}
+                aria-label={`Remove ${id}`}
+                title={ruleDisplayLabel(id, rulesetId) ?? id}
+                className="inline-flex min-h-11 items-center rounded-full bg-accent/12 px-4 text-sm font-semibold text-accent-quiet ring-1 ring-inset ring-accent/40 hover:bg-accent/20 disabled:opacity-50"
+              >
+                {`${id} ×`}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
       <button
         type="button"
-        onClick={() => setRuleOpen((o) => !o)}
-        className={`${inputClass} flex items-center justify-between py-2 text-left`}
+        onClick={() => (open ? close() : setOpen(true))}
+        disabled={disabled}
+        aria-expanded={open}
+        className={`${inputClass} flex min-h-11 items-center justify-between py-2 text-left`}
       >
-        <span className={`min-w-0 break-words ${value ? "" : "text-ink-faint"}`}>
-          {value ? ruleDisplayLabel(value) : "— select/search rule —"}
+        <span className={`min-w-0 break-words ${value.length ? "" : "text-ink-faint"}`}>
+          {value.length ? "Add or change rules" : "— select/search rules —"}
         </span>
         <span aria-hidden className="shrink-0 text-ink-faint">
           ▾
         </span>
       </button>
 
-      {ruleOpen ? (
+      {open ? (
         <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl bg-surface shadow-xl ring-1 ring-inset ring-line">
           <input
             autoFocus
-            value={ruleQuery}
-            onChange={(e) => setRuleQuery(e.target.value)}
-            placeholder="Search: SG6, 6, possession, plow…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search: SG6, holding, autonomous…"
             autoComplete="off"
-            className="w-full border-b border-line bg-transparent px-4 py-2.5 text-sm text-ink outline-none placeholder:text-ink-faint"
+            className="w-full border-b border-line bg-transparent px-4 py-3 text-sm text-ink outline-none placeholder:text-ink-faint"
           />
-          <div className="max-h-[min(18rem,50vh)] overflow-y-auto py-1">
-            {value ? (
-              <button
-                type="button"
-                onClick={() => choose(null)}
-                className="block min-h-11 w-full px-4 py-2.5 text-left text-sm text-danger-quiet hover:bg-surface-2"
-              >
-                Clear rule
-              </button>
-            ) : null}
-
-            {!ruleQuery.trim() && commonRules.length ? (
+          <div className="max-h-[min(20rem,50vh)] overflow-y-auto py-1">
+            {!searching && commonRules.length ? (
               <div>
                 <p className="px-4 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-ink-faint">
                   COMMON FIELD RULES
                 </p>
                 {commonRules.map((r) => (
-                  <button
+                  <RuleRow
                     key={`common-${r.id}`}
-                    type="button"
-                    onClick={() => choose(r.id)}
-                    className="block min-h-11 w-full break-words px-4 py-2.5 text-left text-sm text-ink hover:bg-surface-2"
-                  >
-                    <span className="font-semibold text-accent-quiet">{r.displayId}</span>{" "}
-                    {r.shortLabel}
-                  </button>
+                    rule={r}
+                    selected={value.includes(r.id)}
+                    locked={atCap}
+                    onToggle={toggle}
+                  />
                 ))}
               </div>
             ) : null}
 
-            {ruleGroups.length ? (
-              ruleGroups.map((group) => (
-                <div key={group.category}>
-                  <p className="px-4 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-ink-faint">
-                    {group.category.toUpperCase()}
-                  </p>
-                  {group.rules.map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => choose(r.id)}
-                      className="block min-h-11 w-full break-words px-4 py-2.5 text-left text-sm text-ink hover:bg-surface-2"
-                    >
-                      <span className="font-semibold text-accent-quiet">{r.displayId}</span>{" "}
-                      {r.shortLabel}
-                    </button>
-                  ))}
-                </div>
-              ))
+            {groups.length ? (
+              groups.map(({ category, rules }) => {
+                const expanded = isCategoryOpen(category, query, openCategories);
+                const chosen = rules.filter((r) => value.includes(r.id)).length;
+                return (
+                  <section key={category}>
+                    {searching ? (
+                      <p className="px-4 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-ink-faint">
+                        {category.toUpperCase()}
+                      </p>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => toggleCategory(category)}
+                        aria-expanded={expanded}
+                        className="flex min-h-11 w-full items-center justify-between gap-2 px-4 text-left text-[11px] font-semibold tracking-wide text-ink-subtle hover:bg-surface-2"
+                      >
+                        <span className="min-w-0 break-words">
+                          {category.toUpperCase()}{" "}
+                          <span className="font-normal text-ink-faint">
+                            ({rules.length}
+                            {chosen ? ` · ${chosen} selected` : ""})
+                          </span>
+                        </span>
+                        <span aria-hidden className="shrink-0 text-ink-faint">
+                          {expanded ? "▾" : "▸"}
+                        </span>
+                      </button>
+                    )}
+                    {expanded
+                      ? rules.map((r) => (
+                          <RuleRow
+                            key={r.id}
+                            rule={r}
+                            selected={value.includes(r.id)}
+                            locked={atCap}
+                            onToggle={toggle}
+                          />
+                        ))
+                      : null}
+                  </section>
+                );
+              })
             ) : (
               <p className="px-4 py-3 text-sm text-ink-faint">No rule matches that.</p>
             )}
+          </div>
+          <div className="flex items-center justify-between gap-2 border-t border-line px-4 py-1">
+            <span className="text-xs text-ink-faint">
+              {value.length} of {MAX_FLAG_RULES} selected
+            </span>
+            <button
+              type="button"
+              onClick={close}
+              className="min-h-11 px-3 text-sm font-semibold text-accent hover:text-accent-quiet"
+            >
+              Done
+            </button>
           </div>
         </div>
       ) : null}
@@ -301,7 +496,7 @@ export function FlagList({
    * this is offered wherever raising a flag is, not only where removing
    * one is.
    */
-  onEdit?: (id: string, edit: FlagEdit) => Promise<void>;
+  onEdit?: (id: string, edit: FlagReport) => Promise<void>;
 }) {
   if (!flags.length) {
     return <p className="text-sm text-ink-faint">Nothing flagged by a referee.</p>;
@@ -333,15 +528,19 @@ function FlagListItem({
   kinds: FlagKind[];
   matchTypes: MatchType[];
   onRemove?: (id: string) => void;
-  onEdit?: (id: string, edit: FlagEdit) => Promise<void>;
+  onEdit?: (id: string, edit: FlagReport) => Promise<void>;
 }) {
+  const ruleIds = parseRuleList(f.rule);
+  const ruleset = getRuleset(f.ruleset);
   const [editing, setEditing] = useState(false);
   const [draftBody, setDraftBody] = useState(f.body);
   const [draftMatchType, setDraftMatchType] = useState(f.match_type ?? "");
   const [draftMatchNumber, setDraftMatchNumber] = useState(f.match_number ?? "");
   const [draftFieldPrefix, setDraftFieldPrefix] = useState(splitField(f.field).prefix);
   const [draftFieldNumber, setDraftFieldNumber] = useState(splitField(f.field).number);
-  const [draftRule, setDraftRule] = useState<string | null>(f.rule ?? null);
+  const [draftRuleset, setDraftRuleset] = useState(getRuleset(f.ruleset).id);
+  const [draftRules, setDraftRules] = useState<string[]>(parseRuleList(f.rule));
+  const [draftMatchAffecting, setDraftMatchAffecting] = useState(f.match_affecting);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -352,7 +551,9 @@ function FlagListItem({
     const parts = splitField(f.field);
     setDraftFieldPrefix(parts.prefix);
     setDraftFieldNumber(parts.number);
-    setDraftRule(f.rule ?? null);
+    setDraftRuleset(getRuleset(f.ruleset).id);
+    setDraftRules(parseRuleList(f.rule));
+    setDraftMatchAffecting(f.match_affecting);
     setError(null);
     setEditing(true);
   }
@@ -360,9 +561,9 @@ function FlagListItem({
   // Tapping a severity button submits the whole correction, the same way
   // it does when a flag is first raised — a referee re-selecting "Minor"
   // instead of "Major" is doing exactly the gesture they did the first
-  // time, not filling in a separate form. The field and rule are picked
-  // the same way too, so a correction can only produce a value the raise
-  // form could have produced.
+  // time, not filling in a separate form. The field, ruleset and rules are
+  // picked the same way too, so a correction can only produce a value the
+  // raise form could have produced.
   async function save(kind: string) {
     if (!onEdit) return;
     setBusy(true);
@@ -374,7 +575,9 @@ function FlagListItem({
         matchType: draftMatchType,
         matchNumber: draftMatchNumber,
         field: normalizeField(`${draftFieldPrefix}${draftFieldNumber}`),
-        rule: draftRule,
+        ruleset: draftRuleset,
+        rules: draftRules,
+        matchAffecting: draftMatchAffecting,
       });
       setEditing(false);
     } catch (e) {
@@ -405,16 +608,12 @@ function FlagListItem({
             {f.field ? ` · ${f.field}` : ""}
           </span>
         ) : null}
-        {/* Which rule this was against, when there is one -- never shown
-            for Good Conduct, an optional-rule Warning, or a flag recorded
-            before this existed (f.rule is null either way, so there is
-            nothing to tell apart here and nothing renders). */}
-        {ruleDisplayLabel(f.rule) ? (
+        {f.match_affecting ? (
           <span
-            title="Rule violated"
-            className="rounded-md bg-surface px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-accent-quiet"
+            title="Marked as affecting the match"
+            className="rounded-md bg-caution/18 px-1.5 py-0.5 text-[11px] font-medium text-caution-quiet ring-1 ring-inset ring-caution/40"
           >
-            {ruleDisplayLabel(f.rule)}
+            Match affecting
           </span>
         ) : null}
         <span className="ml-auto flex items-center gap-3">
@@ -436,6 +635,26 @@ function FlagListItem({
           ) : null}
         </span>
       </div>
+
+      {/* Which rules this was against, when there are any -- never shown for
+          Good Conduct, an optional-rule Warning, or a flag recorded before
+          this existed (f.rule is null in each, so nothing renders). Under
+          the header row rather than in it: V5RC titles are whole sentences. */}
+      {ruleIds.length ? (
+        <div title="Rules violated" className="mt-1.5 space-y-1">
+          <p className="text-[11px] text-ink-faint">
+            {ruleset.label}
+            {f.manual_version ? ` · v${f.manual_version}` : ""}
+          </p>
+          <ul className="space-y-1">
+            {ruleIds.map((id) => (
+              <li key={id} className="break-words text-xs font-medium text-accent-quiet">
+                {ruleDisplayLabel(id, f.ruleset) ?? id}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {editing ? (
         <div className="mt-2 space-y-2 rounded-lg bg-sunken/60 p-2.5 ring-1 ring-inset ring-line">
@@ -480,20 +699,35 @@ function FlagListItem({
             disabled={busy}
             className="w-full rounded-lg bg-surface px-2 py-1.5 text-xs ring-1 ring-inset ring-line disabled:opacity-50"
           />
+          <RulesetPicker
+            value={draftRuleset}
+            onChange={(id) => {
+              setDraftRuleset(id);
+              setDraftRules([]);
+            }}
+            disabled={busy}
+          />
           <div>
-            <span className="mb-1 block text-xs text-ink-subtle">Rule violated</span>
-            <RulePicker value={draftRule} onChange={setDraftRule} />
+            <span className="mb-1 block text-xs text-ink-subtle">Rules violated</span>
+            <RulePicker rulesetId={draftRuleset} value={draftRules} onChange={setDraftRules} disabled={busy} />
           </div>
+          {draftRules.length || MATCH_AFFECTING_KINDS.includes(f.kind) ? (
+            <MatchAffectingCheck
+              checked={draftMatchAffecting}
+              onChange={setDraftMatchAffecting}
+              disabled={busy}
+            />
+          ) : null}
           <div className="flex flex-wrap gap-1.5">
             {kinds.map((k) => {
               // Minor and Major need a rule, except a legacy flag that has
               // none may be corrected in its own kind -- the same allowance
               // the server makes.
-              const legacyKeep = k.id === f.kind && !f.rule;
+              const legacyKeep = k.id === f.kind && !ruleIds.length;
               return (
                 <button
                   key={k.id}
-                  disabled={busy || (k.requiresRule && !draftRule && !legacyKeep)}
+                  disabled={busy || (k.requiresRule && !draftRules.length && !legacyKeep)}
                   onClick={() => save(k.id)}
                   className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
                     k.id === f.kind ? "ring-2 ring-ink/60" : ""

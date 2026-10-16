@@ -323,9 +323,9 @@ test("a flag edit logs before -> after for every field it changed", () => {
 
   const beforeBlock = patch.slice(snapshot, patch.indexOf("};", snapshot));
   const afterBlock = patch.slice(patch.search(/const after\s*=\s*\{/), patch.indexOf("};", patch.search(/const after\s*=\s*\{/)));
-  for (const field of ["kind", "match", "field", "body", "rule"]) {
-    assert.match(beforeBlock, new RegExp(`\\b${field}:`), `before is missing ${field}`);
-    assert.match(afterBlock, new RegExp(`\\b${field}\\b`), `after is missing ${field}`);
+  for (const field of ["kind", "match", "field", "body", "rules", "ruleset", '"match affecting"']) {
+    assert.ok(beforeBlock.includes(field), `before is missing ${field}`);
+    assert.ok(afterBlock.includes(field), `after is missing ${field}`);
   }
 
   assert.match(patch, /\$\{show\(before\[k\]\)\} → \$\{show\(after\[k\]\)\}/, "the detail no longer shows before → after");

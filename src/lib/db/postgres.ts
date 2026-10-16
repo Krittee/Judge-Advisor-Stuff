@@ -337,8 +337,15 @@ async function migrate(): Promise<void> {
       alter table flags add column if not exists match_number text;
       alter table flags add column if not exists field text;
 
-      -- Which Quick Reference rule a violation flag was against.
+      -- Which Quick Reference rule(s) a violation flag was against (comma-joined).
       alter table flags add column if not exists rule text;
+
+      -- Which ruleset those rules belong to and its manual edition (null
+      -- ruleset = recorded before rulesets existed = VEX IQ), and whether
+      -- the referee marked the violation as match-affecting.
+      alter table flags add column if not exists ruleset text;
+      alter table flags add column if not exists manual_version text;
+      alter table flags add column if not exists match_affecting boolean not null default false;
     end $$;
   `);
 }
@@ -884,8 +891,9 @@ export const postgresStore: Store = {
   async createFlag(input: NewFlag) {
     return one(
       await query<FlagRow>(
-        `insert into flags (team_id, kind, body, author, match_type, match_number, field, rule)
-         values ($1, $2, $3, $4, $5, $6, $7, $8)
+        `insert into flags (team_id, kind, body, author, match_type, match_number, field, rule,
+                            ruleset, manual_version, match_affecting)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          returning *`,
         [
           input.teamId,
@@ -896,6 +904,9 @@ export const postgresStore: Store = {
           input.matchNumber,
           input.field,
           input.rule,
+          input.ruleset,
+          input.manualVersion,
+          input.matchAffecting,
         ],
       ),
     )!;
@@ -904,10 +915,22 @@ export const postgresStore: Store = {
   async updateFlag(id, edit) {
     const updated = one(
       await query<FlagRow>(
-        `update flags set kind = $2, body = $3, match_type = $4, match_number = $5, field = $6, rule = $7
+        `update flags set kind = $2, body = $3, match_type = $4, match_number = $5, field = $6, rule = $7,
+                          ruleset = $8, manual_version = $9, match_affecting = $10
          where id = $1
          returning *`,
-        [id, edit.kind, edit.body, edit.matchType, edit.matchNumber, edit.field, edit.rule],
+        [
+          id,
+          edit.kind,
+          edit.body,
+          edit.matchType,
+          edit.matchNumber,
+          edit.field,
+          edit.rule,
+          edit.ruleset,
+          edit.manualVersion,
+          edit.matchAffecting,
+        ],
       ),
     );
     if (!updated) throw new StoreError("That flag no longer exists.", 404);

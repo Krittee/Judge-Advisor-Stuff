@@ -1,16 +1,24 @@
-import rulesFile from "../../config/rules.json";
+import viqrcFile from "../../config/rules/viqrc.json";
+import v5rcFile from "../../config/rules/v5rc-override-2.1.json";
+import specialsFile from "../../config/rules/event-specials.json";
 
 /**
- * The VIQRC Level Up Quick Reference rule list, read from config/rules.json.
+ * The rulesets a referee can cite, read from config/rules/*.json.
  *
- * A referee searches this by id, number or plain-English keyword to pick
- * what a violation was against. The data lives in config, the same way
- * rubrics.json does, so tests can read the real ruleset directly rather
- * than a hand-mirrored copy -- this repo's tests run under plain
- * `node --test` with no TypeScript loader (see tests/flags.test.mjs).
- * The season's ruleset is fixed by VEX, not something an event organizer
- * customizes per event, so unlike refereeFlags/matchTypes in
- * config/event.json there is no admin UI over this file.
+ * The event runs VEX IQ and V5RC side by side, so a flag names a RULESET
+ * first and then one or more rules from it. Each ruleset is one JSON file
+ * (id, program, game, label, manual version, common-rule shortcuts and the
+ * rules themselves); this module is the only place those files are read.
+ * The data lives in config, the same way rubrics.json does, so tests can
+ * read the real rulesets directly rather than a hand-mirrored copy -- this
+ * repo's tests run under plain `node --test` via tsx. A season's rules are
+ * fixed by VEX, not something an event organizer customizes per event, so
+ * unlike refereeFlags/matchTypes in config/event.json there is no admin UI
+ * over these files.
+ *
+ * To add a new manual version: drop its JSON in config/rules/, import it
+ * here and add it to RULESET_FILES. Titles are the official wording and are
+ * never edited.
  */
 
 export type Rule = {
@@ -18,13 +26,27 @@ export type Rule = {
   /** "<SG6>" -- how the id reads on screen. */
   displayId: string;
   category: string;
-  /** The Quick Reference's own wording. Kept apart from shortLabel so the
-   *  referee-friendly label never has to be the whole sentence. */
+  /** The manual's own wording, verbatim. */
   officialTitle: string;
-  /** What a referee actually reads day to day: "<SG6> Possession / Plowing". */
-  shortLabel: string;
+  /** A short referee-friendly label. Optional: only the IQ data has them,
+   *  V5RC rules are shown by code and official title alone. */
+  shortLabel?: string;
   /** Lowercase terms a referee might type. Partial, case-insensitive match. */
   searchKeywords: string[];
+};
+
+export type Ruleset = {
+  /** Stable id stored on a flag ("viqrc", "v5rc"). */
+  id: string;
+  program: string;
+  game: string;
+  /** What the dropdown says: "VEX IQ", "V5RC Override". */
+  label: string;
+  /** The manual edition the rule titles come from; null when not recorded. */
+  manualVersion: string | null;
+  /** Shortcut ids shown at the top of the picker. */
+  commonRuleIds: string[];
+  rules: Rule[];
 };
 
 /** The official Quick Reference categories, kept independently testable. */
@@ -45,12 +67,15 @@ export const RULE_CATEGORIES = [
   "Tournament Special",
 ] as const;
 
-/**
- * Shortcuts shown at the top of the selector. Reference the same Rule
- * objects as the full list -- never a duplicate copy -- so correcting a
- * rule's wording in one place can never leave the other stale.
- */
-export const COMMON_FIELD_RULE_IDS = ["SG6", "SG7", "GG4", "GG10", "GG12", "SG2", "S1"] as const;
+/** The categories the picker opens expanded; the rest start collapsed. */
+export const DEFAULT_OPEN_RULE_CATEGORIES: readonly string[] = [
+  "Scoring Rules",
+  "Specific Game Rules",
+  "General Game Rules",
+];
+
+/** More than this on one flag is a mis-tap or a wall of text, not a report. */
+export const MAX_FLAG_RULES = 5;
 
 /** A malformed entry is dropped rather than thrown -- a typo in the data
  *  file should not stop the app from starting on event morning. */
@@ -63,7 +88,7 @@ function parseRules(raw: unknown): Rule[] {
       const category = String(o.category ?? "").trim();
       const officialTitle = String(o.officialTitle ?? "").trim();
       const shortLabel = String(o.shortLabel ?? "").trim();
-      if (!id || !category || !officialTitle || !shortLabel) return null;
+      if (!id || !category || !officialTitle) return null;
 
       const searchKeywords = Array.isArray(o.searchKeywords)
         ? o.searchKeywords.map((k) => String(k).trim().toLowerCase()).filter(Boolean)
@@ -74,50 +99,162 @@ function parseRules(raw: unknown): Rule[] {
         displayId: `<${id}>`,
         category,
         officialTitle,
-        shortLabel,
+        ...(shortLabel ? { shortLabel } : {}),
         searchKeywords: [...new Set([id.toLowerCase(), ...searchKeywords])],
       };
     })
     .filter((r): r is Rule => r !== null);
 }
 
-export const RULES: Rule[] = parseRules(rulesFile);
+/** Event specials (TS1-TS3) go after the official categories of EVERY
+ *  ruleset, so a sportsmanship report is available whichever is selected. */
+const EVENT_SPECIALS = parseRules((specialsFile as { rules?: unknown }).rules);
 
-const BY_ID = new Map(RULES.map((r) => [r.id, r]));
+function parseRuleset(raw: unknown): Ruleset | null {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const id = String(o.id ?? "").trim();
+  const label = String(o.label ?? "").trim();
+  if (!id || !label) return null;
 
-function findRule(id: string | null | undefined): Rule | null {
+  const version = String(o.manualVersion ?? "").trim();
+  const rules = [...parseRules(o.rules), ...EVENT_SPECIALS];
+  const known = new Set(rules.map((r) => r.id));
+
+  return {
+    id,
+    program: String(o.program ?? "").trim(),
+    game: String(o.game ?? "").trim(),
+    label,
+    manualVersion: version || null,
+    // A shortcut to a rule that is not in the file would render as nothing
+    // useful, so it is dropped here rather than at every call site.
+    commonRuleIds: (Array.isArray(o.commonRuleIds) ? o.commonRuleIds : [])
+      .map((r) => String(r).trim().toUpperCase())
+      .filter((r) => known.has(r)),
+    rules,
+  };
+}
+
+const RULESET_FILES: unknown[] = [viqrcFile, v5rcFile];
+
+export const RULESETS: Ruleset[] = RULESET_FILES.map(parseRuleset).filter(
+  (r): r is Ruleset => r !== null,
+);
+
+/** Flags recorded before rulesets existed have none, and they ARE IQ. */
+export const DEFAULT_RULESET_ID = "viqrc";
+
+const INDEX = new Map(RULESETS.map((rs) => [rs.id, new Map(rs.rules.map((r) => [r.id, r]))]));
+
+/** Unknown or missing resolves to VEX IQ, never throws. */
+export function getRuleset(id?: string | null): Ruleset {
+  return RULESETS.find((r) => r.id === id) ?? RULESETS.find((r) => r.id === DEFAULT_RULESET_ID) ?? RULESETS[0];
+}
+
+/** True only for an id that names a real ruleset (the API rejects the rest). */
+export function isValidRulesetId(id: unknown): boolean {
+  return typeof id === "string" && RULESETS.some((r) => r.id === id);
+}
+
+/** "Override Manual v2.1"; just the label when no version is recorded.
+ *  The version comes from the data file, never from a component. */
+export function manualLabel(ruleset: Ruleset): string {
+  return ruleset.manualVersion ? `${ruleset.game} Manual v${ruleset.manualVersion}` : ruleset.label;
+}
+
+function findRule(id: string | null | undefined, rulesetId?: string | null): Rule | null {
   if (!id) return null;
-  return BY_ID.get(String(id).trim().toUpperCase()) ?? null;
+  return INDEX.get(getRuleset(rulesetId).id)?.get(String(id).trim().toUpperCase()) ?? null;
 }
 
-export function isValidRuleId(id: unknown): boolean {
-  return typeof id === "string" && BY_ID.has(id.trim().toUpperCase());
+export function isValidRuleId(id: unknown, rulesetId?: string | null): boolean {
+  return typeof id === "string" && findRule(id, rulesetId) !== null;
 }
 
-/** "<SG6> Possession / Plowing", or null when there is no rule to show. */
-export function ruleDisplayLabel(id: string | null | undefined): string | null {
-  const found = findRule(id);
-  return found ? `${found.displayId} ${found.shortLabel}` : null;
+/** "<SG6> — Possession is limited to …": the code, an em dash, then the
+ *  manual's own title. Null when there is no rule to show. */
+export function ruleDisplayLabel(id: string | null | undefined, rulesetId?: string | null): string | null {
+  const found = findRule(id, rulesetId);
+  return found ? `${found.displayId} — ${found.officialTitle}` : null;
 }
 
-export function commonFieldRules(): Rule[] {
-  return COMMON_FIELD_RULE_IDS.map((id) => BY_ID.get(id)).filter((r): r is Rule => Boolean(r));
+export function commonFieldRules(rulesetId?: string | null): Rule[] {
+  return getRuleset(rulesetId)
+    .commonRuleIds.map((id) => findRule(id, rulesetId))
+    .filter((r): r is Rule => r !== null);
 }
 
 /**
  * Search by id, display id, short label, official title or keyword.
- * Partial and case-insensitive throughout -- "plow" must find SG6, "hand"
- * must find every hands-related rule.
+ * Partial and case-insensitive throughout -- "SG" lists every Specific Game
+ * rule (the id carries the prefix), "holding" finds GG17, "plow" finds
+ * IQ's SG6.
  */
-export function searchRules(query: string): Rule[] {
+export function searchRules(query: string, rulesetId?: string | null): Rule[] {
+  const rules = getRuleset(rulesetId).rules;
   const q = query.trim().toLowerCase();
-  if (!q) return RULES;
-  return RULES.filter(
+  if (!q) return rules;
+  return rules.filter(
     (r) =>
       r.id.toLowerCase().includes(q) ||
       r.displayId.toLowerCase().includes(q) ||
-      r.shortLabel.toLowerCase().includes(q) ||
       r.officialTitle.toLowerCase().includes(q) ||
+      (r.shortLabel ?? "").toLowerCase().includes(q) ||
       r.searchKeywords.some((k) => k.includes(q)),
   );
+}
+
+/**
+ * Group rules by category in the manual's order. A category a future manual
+ * adds that is not in RULE_CATEGORIES still appears, after the known ones,
+ * rather than vanishing from the picker.
+ */
+export function groupRulesByCategory(rules: Rule[]): { category: string; rules: Rule[] }[] {
+  const byCategory = new Map<string, Rule[]>();
+  for (const r of rules) byCategory.set(r.category, [...(byCategory.get(r.category) ?? []), r]);
+  const rank = (category: string) => {
+    const i = (RULE_CATEGORIES as readonly string[]).indexOf(category);
+    return i === -1 ? RULE_CATEGORIES.length : i;
+  };
+  return [...byCategory.entries()]
+    .sort((a, b) => rank(a[0]) - rank(b[0]))
+    .map(([category, list]) => ({ category, rules: list }));
+}
+
+/** Whether a category's rules show: a search opens every section so a hit is
+ *  never hidden inside a closed one; otherwise the referee's own toggles rule. */
+export function isCategoryOpen(category: string, query: string, open: ReadonlySet<string>): boolean {
+  return query.trim() !== "" || open.has(category);
+}
+
+/** Tap a rule: removes it when selected, adds it at the end otherwise, and
+ *  ignores an add past MAX_FLAG_RULES. */
+export function toggleRule(selected: string[], id: string): string[] {
+  if (selected.includes(id)) return selected.filter((r) => r !== id);
+  return selected.length >= MAX_FLAG_RULES ? selected : [...selected, id];
+}
+
+/* ------------------------------------------------------------------ *
+ * A flag stores its rules as one comma-joined text column ("GG17,SG9"),
+ * so the column type did not have to change for multi-rule flags and a
+ * legacy single-rule flag is already a valid one-item list.
+ * ------------------------------------------------------------------ */
+
+/** "GG17, sg9,GG17" -> ["GG17", "SG9"]: trimmed, uppercased, de-duplicated. */
+export function parseRuleList(rule: string | null | undefined): string[] {
+  if (!rule) return [];
+  return [
+    ...new Set(
+      rule
+        .split(",")
+        .map((r) => r.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+/** The inverse of parseRuleList; null when there is nothing to store. */
+export function joinRuleList(ids: string[]): string | null {
+  const joined = parseRuleList(ids.join(","));
+  return joined.length ? joined.join(",") : null;
 }

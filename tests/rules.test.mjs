@@ -1,12 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import {
+  commonFieldRules,
+  getRuleset,
+  isValidRuleId,
+  isValidRulesetId,
+  joinRuleList,
+  manualLabel,
+  parseRuleList,
+  ruleDisplayLabel,
+  RULESETS,
+  searchRules,
+} from "../src/lib/rules";
 
-/* The VIQRC Level Up Quick Reference rule list. Reads the real data file
-   (JSON, so no TS loader needed) and mirrors src/lib/rules.ts's parsing
-   and search logic, the way the other lib tests mirror their .ts source. */
-
-const raw = JSON.parse(readFileSync(new URL("../config/rules.json", import.meta.url)));
+/* The rulesets a referee cites: VEX IQ and V5RC Override. These run against
+   the real src/lib/rules.ts (tsx resolves the TypeScript and the JSON in
+   config/rules/), not a hand-mirrored copy, so a change to the module or to
+   the data files is what these tests see. */
 
 const RULE_CATEGORIES = [
   "Scoring Rules",
@@ -20,65 +31,39 @@ const RULE_CATEGORIES = [
   "Tournament Special",
 ];
 
-const COMMON_FIELD_RULE_IDS = ["SG6", "SG7", "GG4", "GG10", "GG12", "SG2", "S1"];
-
-function parseRules(list) {
-  return list
-    .map((entry) => {
-      const o = entry ?? {};
-      const id = String(o.id ?? "").trim().toUpperCase();
-      const category = String(o.category ?? "").trim();
-      const officialTitle = String(o.officialTitle ?? "").trim();
-      const shortLabel = String(o.shortLabel ?? "").trim();
-      if (!id || !category || !officialTitle || !shortLabel) return null;
-      const searchKeywords = Array.isArray(o.searchKeywords)
-        ? o.searchKeywords.map((k) => String(k).trim().toLowerCase()).filter(Boolean)
-        : [];
-      return {
-        id,
-        displayId: `<${id}>`,
-        category,
-        officialTitle,
-        shortLabel,
-        searchKeywords: [...new Set([id.toLowerCase(), ...searchKeywords])],
-      };
-    })
-    .filter((r) => r !== null);
-}
-
-const RULES = parseRules(raw);
-const BY_ID = new Map(RULES.map((r) => [r.id, r]));
-
-function isValidRuleId(id) {
-  return typeof id === "string" && BY_ID.has(id.trim().toUpperCase());
-}
-
-function ruleDisplayLabel(id) {
-  const found = id ? BY_ID.get(String(id).trim().toUpperCase()) : null;
-  return found ? `${found.displayId} ${found.shortLabel}` : null;
-}
-
-function searchRules(query) {
-  const q = query.trim().toLowerCase();
-  if (!q) return RULES;
-  return RULES.filter(
-    (r) =>
-      r.id.toLowerCase().includes(q) ||
-      r.displayId.toLowerCase().includes(q) ||
-      r.shortLabel.toLowerCase().includes(q) ||
-      r.officialTitle.toLowerCase().includes(q) ||
-      r.searchKeywords.some((k) => k.includes(q)),
-  );
-}
+const IQ = getRuleset("viqrc");
+const V5 = getRuleset("v5rc");
+/** The rules a ruleset ships itself, without the shared event specials. */
+const official = (rs) => rs.rules.filter((r) => r.category !== "Tournament Special");
 
 /* ---- the catalog itself ------------------------------------------------ */
 
-test("official categories are followed by the event's Tournament Special category", () => {
-  const seen = [...new Set(RULES.map((r) => r.category))];
-  assert.deepEqual(seen, RULE_CATEGORIES);
+test("two rulesets are offered, VEX IQ first, and each says which program and manual it is", () => {
+  assert.deepEqual(RULESETS.map((r) => r.id), ["viqrc", "v5rc"]);
+  assert.equal(IQ.label, "VEX IQ");
+  assert.equal(IQ.manualVersion, null, "the IQ data records no manual edition");
+  assert.equal(V5.label, "V5RC Override");
+  assert.equal(V5.game, "Override");
+  assert.equal(V5.manualVersion, "2.1");
 });
 
-test("every rule id is in the required order and assigned to its exact category", () => {
+test("rulesets resolve by id, and anything unknown or missing is VEX IQ", () => {
+  assert.equal(getRuleset("v5rc").id, "v5rc");
+  assert.equal(getRuleset("viqrc").id, "viqrc");
+  for (const unknown of [undefined, null, "", "nope", "V5RC "]) {
+    assert.equal(getRuleset(unknown).id, "viqrc", `${JSON.stringify(unknown)} should fall back to IQ`);
+  }
+  assert.ok(isValidRulesetId("v5rc") && isValidRulesetId("viqrc"));
+  for (const bad of [undefined, null, "", "nope", 5]) assert.ok(!isValidRulesetId(bad));
+});
+
+test("each ruleset lists its categories in the manual's order, Tournament Special last", () => {
+  for (const rs of [IQ, V5]) {
+    assert.deepEqual([...new Set(rs.rules.map((r) => r.category))], RULE_CATEGORIES, rs.id);
+  }
+});
+
+test("IQ ids are in the required order and assigned to their exact categories", () => {
   const groups = [
     ["Scoring Rules", "SC", 5],
     ["Specific Game Rules", "SG", 7],
@@ -93,28 +78,54 @@ test("every rule id is in the required order and assigned to its exact category"
   const expected = groups.flatMap(([category, prefix, count]) =>
     Array.from({ length: count }, (_, index) => ({ id: `${prefix}${index + 1}`, category })),
   );
-  assert.deepEqual(RULES.map(({ id, category }) => ({ id, category })), expected);
+  assert.deepEqual(IQ.rules.map(({ id, category }) => ({ id, category })), expected);
 });
 
-test("every rule id is unique", () => {
-  const ids = RULES.map((r) => r.id);
-  assert.equal(new Set(ids).size, ids.length, "a rule id is duplicated");
+test("V5RC ids are in the required order and assigned to their exact categories", () => {
+  const groups = [
+    ["Scoring Rules", "SC", 8],
+    ["Specific Game Rules", "SG", 13],
+    ["Safety Rules", "S", 5],
+    ["General Rules", "G", 5],
+    ["General Game Rules", "GG", 18],
+    ["Robot Skills Challenge Rules", "RSC", 5],
+    ["Robot Rules", "R", 28],
+    ["Tournament Rules", "T", 24],
+    ["Tournament Special", "TS", 3],
+  ];
+  const expected = groups.flatMap(([category, prefix, count]) =>
+    Array.from({ length: count }, (_, index) => ({ id: `${prefix}${index + 1}`, category })),
+  );
+  assert.deepEqual(V5.rules.map(({ id, category }) => ({ id, category })), expected);
 });
 
-test("every rule has an official title, a short label and at least one keyword", () => {
-  for (const r of RULES) {
-    assert.ok(r.officialTitle.length > 2, `${r.id} has no official title`);
-    assert.ok(r.shortLabel.length > 1, `${r.id} has no short label`);
-    assert.ok(r.searchKeywords.length > 0, `${r.id} has no search keywords`);
-    assert.equal(r.displayId, `<${r.id}>`, `${r.id}'s displayId is not <${r.id}>`);
+test("rule ids are unique within each ruleset", () => {
+  for (const rs of RULESETS) {
+    const ids = rs.rules.map((r) => r.id);
+    assert.equal(new Set(ids).size, ids.length, `${rs.id} repeats a rule id`);
   }
 });
 
-test("the 78 official rules and three Tournament Special rules are present", () => {
-  assert.equal(RULES.length, 81);
+test("every rule has an official title and at least one keyword; IQ also has short labels", () => {
+  for (const rs of RULESETS) {
+    for (const r of rs.rules) {
+      assert.ok(r.officialTitle.length > 2, `${rs.id} ${r.id} has no official title`);
+      assert.ok(r.searchKeywords.length > 0, `${rs.id} ${r.id} has no search keywords`);
+      assert.equal(r.displayId, `<${r.id}>`, `${r.id}'s displayId is not <${r.id}>`);
+    }
+  }
+  for (const r of official(IQ)) assert.ok(r.shortLabel && r.shortLabel.length > 1, `${r.id} has no short label`);
+  for (const r of official(V5)) assert.equal(r.shortLabel, undefined, `V5 ${r.id} should have no short label`);
 });
 
-test("every official title exactly preserves the supplied Quick Reference wording", () => {
+test("IQ keeps its 78 official rules and V5RC its 106, each plus three Tournament Special", () => {
+  assert.equal(official(IQ).length, 78);
+  assert.equal(IQ.rules.length, 81);
+  assert.equal(official(V5).length, 106);
+  assert.equal(V5.rules.length, 109);
+});
+
+test("every IQ official title exactly preserves the supplied Quick Reference wording", () => {
   const expected = {
     SC1: "All scoring statuses are evaluated after the Match ends",
     SC2: "All scoring statuses are evaluated visually by a Head Referee",
@@ -197,144 +208,194 @@ test("every official title exactly preserves the supplied Quick Reference wordin
   };
 
   assert.deepEqual(
-    Object.fromEntries(
-      RULES.filter((rule) => rule.category !== "Tournament Special").map((rule) => [rule.id, rule.officialTitle]),
-    ),
+    Object.fromEntries(official(IQ).map((rule) => [rule.id, rule.officialTitle])),
     expected,
   );
 });
 
-test("Tournament Special preserves TS1-TS3 and their event-specific titles", () => {
-  assert.deepEqual(
-    RULES.filter((rule) => rule.category === "Tournament Special").map(
-      ({ id, officialTitle }) => ({ id, officialTitle }),
-    ),
-    [
-      {
-        id: "TS1",
-        officialTitle:
-          "Teams and individuals are expected to display good sportsmanship toward opponents, officials and volunteers at all times",
-      },
-      {
-        id: "TS2",
-        officialTitle:
-          "Unsportsmanlike conduct by a Team or individual is a violation and may be penalized",
-      },
-      {
-        id: "TS3",
-        officialTitle: "A Team may help another Team reset the Field between Matches",
-      },
-    ],
-  );
+test("V5RC titles are the manual's wording, spot-checked, and the IQ-only ids are absent", () => {
+  const byId = Object.fromEntries(V5.rules.map((r) => [r.id, r.officialTitle]));
+  assert.equal(byId.SG6, "Possession is limited to a maximum of one Pin and one Cup");
+  assert.equal(byId.GG17, "No Holding for more than a 3-count");
+  assert.equal(byId.GG4, "Hands out of the Field");
+  assert.equal(byId.SG9, "Alliance Goals are protected");
+  assert.equal(byId.RSC6, undefined, "RSC6 exists only in IQ");
+  assert.equal(byId.RSC8, undefined, "RSC8 exists only in IQ");
+});
 
-  for (const [query, id] of [
-    ["TS1", "TS1"],
-    ["sportsmanship", "TS1"],
-    ["TS2", "TS2"],
-    ["unsportsmanlike", "TS2"],
-    ["TS3", "TS3"],
-    ["help reset", "TS3"],
-  ]) {
-    assert.ok(searchRules(query).some((rule) => rule.id === id), `${query} missed ${id}`);
+test("Tournament Special TS1-TS3 are present, identical, in BOTH rulesets", () => {
+  const specials = (rs) =>
+    rs.rules
+      .filter((rule) => rule.category === "Tournament Special")
+      .map(({ id, officialTitle }) => ({ id, officialTitle }));
+
+  assert.deepEqual(specials(IQ), [
+    {
+      id: "TS1",
+      officialTitle:
+        "Teams and individuals are expected to display good sportsmanship toward opponents, officials and volunteers at all times",
+    },
+    {
+      id: "TS2",
+      officialTitle:
+        "Unsportsmanlike conduct by a Team or individual is a violation and may be penalized",
+    },
+    { id: "TS3", officialTitle: "A Team may help another Team reset the Field between Matches" },
+  ]);
+  assert.deepEqual(specials(V5), specials(IQ));
+
+  for (const rulesetId of ["viqrc", "v5rc"]) {
+    for (const [query, id] of [
+      ["TS1", "TS1"],
+      ["sportsmanship", "TS1"],
+      ["TS2", "TS2"],
+      ["unsportsmanlike", "TS2"],
+      ["TS3", "TS3"],
+      ["help reset", "TS3"],
+    ]) {
+      assert.ok(searchRules(query, rulesetId).some((rule) => rule.id === id), `${rulesetId}: ${query} missed ${id}`);
+      assert.ok(isValidRuleId(id, rulesetId), `${id} is not valid under ${rulesetId}`);
+    }
   }
 });
 
 /* ---- common field rule shortcuts --------------------------------------- */
 
-test("every common field rule shortcut references a real rule -- not a duplicate object", () => {
-  for (const id of COMMON_FIELD_RULE_IDS) {
-    assert.ok(BY_ID.has(id), `${id} is listed as a common field rule but is not in the catalog`);
+test("every common field rule shortcut references a real rule of ITS ruleset", () => {
+  for (const rs of [IQ, V5]) {
+    assert.ok(rs.commonRuleIds.length > 0, `${rs.id} has no shortcuts`);
+    const shortcuts = commonFieldRules(rs.id);
+    assert.deepEqual(shortcuts.map((r) => r.id), rs.commonRuleIds, `${rs.id} lost a shortcut`);
+    for (const r of shortcuts) {
+      // The very same object as the full list, never a duplicate copy.
+      assert.equal(rs.rules.find((x) => x.id === r.id), r, `${rs.id} ${r.id} is a copy`);
+    }
   }
-  // Exactly one entry per id in the whole catalog: a "duplicate object"
-  // bug would show up here as more than one match.
-  for (const id of COMMON_FIELD_RULE_IDS) {
-    assert.equal(RULES.filter((r) => r.id === id).length, 1, `${id} appears more than once`);
+  assert.ok(V5.commonRuleIds.includes("GG17"), "V5RC's shortcuts include the 3-count holding rule");
+  assert.ok(!IQ.commonRuleIds.includes("GG17"), "IQ has no GG17");
+});
+
+/* ---- search ------------------------------------------------------------- */
+
+test("V5RC search: SG6, holding and autonomous each find their rules", () => {
+  assert.deepEqual(searchRules("SG6", "v5rc").map((r) => r.id), ["SG6"]);
+  assert.ok(searchRules("holding", "v5rc").some((r) => r.id === "GG17"), "\"holding\" missed GG17");
+
+  const expected = V5.rules
+    .filter((r) => r.officialTitle.toLowerCase().includes("autonomous"))
+    .map((r) => r.id);
+  assert.ok(expected.length >= 5, "the data should have several autonomous rules");
+  assert.deepEqual(searchRules("autonomous", "v5rc").map((r) => r.id).filter((id) => expected.includes(id)), expected);
+  for (const id of ["SC7", "SC8", "SG7", "SG8", "GG12", "GG13"]) {
+    assert.ok(expected.includes(id), `${id} has autonomous in its title`);
   }
 });
 
-/* ---- search: the mandated SG6 queries ---------------------------------- */
+test("search is per-ruleset: an IQ query does not return V5 rules and vice versa", () => {
+  assert.ok(searchRules("plow", "viqrc").some((r) => r.id === "SG6"), "IQ SG6 is Possession / Plowing");
+  assert.ok(!searchRules("plow", "v5rc").some((r) => r.id === "SG6"), "V5 SG6 has no plowing");
+  assert.ok(searchRules("cup", "v5rc").some((r) => r.id === "SG6"));
+  assert.ok(!searchRules("cup", "viqrc").some((r) => r.id === "SG6"));
+  // No ruleset given is IQ, the same as a legacy flag.
+  assert.deepEqual(searchRules("plow").map((r) => r.id), searchRules("plow", "viqrc").map((r) => r.id));
+});
 
-test("SG6 is found by id, bracketed id, number, and every given keyword", () => {
+test("IQ keeps finding the rules it always did by id, number and keyword", () => {
   for (const query of ["SG6", "<SG6>", "sg6", "6", "possession", "plow", "plowing", "bean bag"]) {
-    const hit = searchRules(query).some((r) => r.id === "SG6");
-    assert.ok(hit, `"${query}" did not find SG6`);
+    assert.ok(searchRules(query, "viqrc").some((r) => r.id === "SG6"), `"${query}" did not find SG6`);
   }
-});
-
-test("SG7 is found by load-related terms", () => {
   for (const query of ["SG7", "7", "load", "loading", "loader", "load zone"]) {
-    assert.ok(searchRules(query).some((r) => r.id === "SG7"), `"${query}" did not find SG7`);
+    assert.ok(searchRules(query, "viqrc").some((r) => r.id === "SG7"), `"${query}" did not find SG7`);
   }
-});
-
-test("GG4 is found by hand-related terms, and \"hand\" also surfaces other handling rules", () => {
   for (const query of ["GG4", "4", "hand", "hands", "touch", "touching"]) {
-    assert.ok(searchRules(query).some((r) => r.id === "GG4"), `"${query}" did not find GG4`);
-  }
-  // "hand" is deliberately broad -- GG10's "Robot Handling" and RSC5's
-  // "Autonomous Robot Handling" both legitimately contain it.
-  const handMatches = searchRules("hand").map((r) => r.id);
-  assert.ok(handMatches.includes("GG10"), "\"hand\" should also surface GG10 (Robot Handling)");
-});
-
-test("GG10, GG12 and SG2 are found by their given keywords", () => {
-  for (const query of ["GG10", "10", "handling", "robot reset"]) {
-    assert.ok(searchRules(query).some((r) => r.id === "GG10"), `"${query}" did not find GG10`);
+    assert.ok(searchRules(query, "viqrc").some((r) => r.id === "GG4"), `"${query}" did not find GG4`);
   }
   for (const query of ["GG12", "12", "timer", "early", "late", "timing"]) {
-    assert.ok(searchRules(query).some((r) => r.id === "GG12"), `"${query}" did not find GG12`);
+    assert.ok(searchRules(query, "viqrc").some((r) => r.id === "GG12"), `"${query}" did not find GG12`);
   }
-  for (const query of ["SG2", "2", "horizontal", "expansion", "24"]) {
-    assert.ok(searchRules(query).some((r) => r.id === "SG2"), `"${query}" did not find SG2`);
-  }
-});
-
-test("S1 is found by safety-related terms", () => {
   for (const query of ["S1", "safety", "unsafe", "damage", "field damage"]) {
-    assert.ok(searchRules(query).some((r) => r.id === "S1"), `"${query}" did not find S1`);
+    assert.ok(searchRules(query, "viqrc").some((r) => r.id === "S1"), `"${query}" did not find S1`);
   }
 });
 
-test("a query with no matches returns an empty list, not everything", () => {
-  assert.deepEqual(searchRules("xyznonsense"), []);
-});
-
-test("an empty query returns the whole catalog", () => {
-  assert.equal(searchRules("").length, RULES.length);
-  assert.equal(searchRules("   ").length, RULES.length);
+test("a query with no matches returns an empty list; an empty query returns the whole ruleset", () => {
+  for (const id of ["viqrc", "v5rc"]) {
+    assert.deepEqual(searchRules("xyznonsense", id), []);
+    assert.equal(searchRules("", id).length, getRuleset(id).rules.length);
+    assert.equal(searchRules("   ", id).length, getRuleset(id).rules.length);
+  }
 });
 
 test("search is case-insensitive and matches partial terms", () => {
-  assert.ok(searchRules("PLOW").some((r) => r.id === "SG6"));
-  assert.ok(searchRules("plo").some((r) => r.id === "SG6"));
+  assert.ok(searchRules("PLOW", "viqrc").some((r) => r.id === "SG6"));
+  assert.ok(searchRules("plo", "viqrc").some((r) => r.id === "SG6"));
+  assert.ok(searchRules("HOLDING", "v5rc").some((r) => r.id === "GG17"));
+  // The prefix is part of the id: "sg" lists the Specific Game rules.
+  assert.equal(searchRules("sg", "v5rc").filter((r) => r.id.startsWith("SG")).length, 13);
 });
 
 /* ---- validation and display -------------------------------------------- */
 
-test("isValidRuleId accepts a real id in any case, and rejects garbage", () => {
+test("isValidRuleId accepts a real id in any case, per ruleset, and rejects garbage", () => {
   assert.ok(isValidRuleId("SG6"));
-  assert.ok(isValidRuleId("sg6"));
+  assert.ok(isValidRuleId("sg6", "v5rc"));
   for (const junk of ["", "SG99", "not-a-rule", null, undefined, 6]) {
     assert.ok(!isValidRuleId(junk), `"${junk}" should not be a valid rule id`);
   }
+  // Ids that exist in only one manual.
+  assert.ok(isValidRuleId("RSC8", "viqrc"));
+  assert.ok(!isValidRuleId("RSC8", "v5rc"), "RSC8 is an IQ-only rule");
+  assert.ok(isValidRuleId("GG17", "v5rc"));
+  assert.ok(!isValidRuleId("GG17", "viqrc"), "GG17 is a V5RC-only rule");
 });
 
-test("ruleDisplayLabel reads \"<ID> Short Label\", and is null with nothing to show", () => {
-  assert.equal(ruleDisplayLabel("SG6"), "<SG6> Possession / Plowing");
-  assert.equal(ruleDisplayLabel("sg6"), "<SG6> Possession / Plowing");
+test("ruleDisplayLabel reads \"<ID> — official title\" for both rulesets, null with nothing to show", () => {
+  assert.equal(
+    ruleDisplayLabel("SG6", "v5rc"),
+    "<SG6> — Possession is limited to a maximum of one Pin and one Cup",
+  );
+  assert.equal(
+    ruleDisplayLabel("sg6", "viqrc"),
+    "<SG6> — Possession / Plowing is limited to a maximum of one (1) Bean Bag",
+  );
+  assert.equal(ruleDisplayLabel("SG6"), ruleDisplayLabel("SG6", "viqrc"), "no ruleset is IQ");
+  assert.equal(ruleDisplayLabel("RSC8", "v5rc"), null, "an id from the other manual is not shown as a rule");
   assert.equal(ruleDisplayLabel(null), null);
   assert.equal(ruleDisplayLabel(undefined), null);
   assert.equal(ruleDisplayLabel(""), null);
   assert.equal(ruleDisplayLabel("not-a-rule"), null);
 });
 
-/* ---- the module really does read config/rules.json, not an inline copy - */
+test("manualLabel comes from the data, and is just the label when no version is recorded", () => {
+  assert.equal(manualLabel(V5), "Override Manual v2.1");
+  assert.equal(manualLabel(IQ), "VEX IQ");
+  assert.equal(manualLabel({ ...V5, manualVersion: "3.0" }), "Override Manual v3.0");
+});
 
-test("src/lib/rules.ts sources its data from config/rules.json", () => {
+/* ---- a flag stores its rules as one comma-joined list ------------------- */
+
+test("parseRuleList trims, uppercases and de-duplicates, keeping the first-seen order", () => {
+  assert.deepEqual(parseRuleList("GG17,SG9"), ["GG17", "SG9"]);
+  assert.deepEqual(parseRuleList(" gg17 , sg9,GG17 ,, "), ["GG17", "SG9"]);
+  assert.deepEqual(parseRuleList("SG6"), ["SG6"], "a legacy single-rule flag is a one-item list");
+  for (const none of [null, undefined, "", "  ", ",,"]) assert.deepEqual(parseRuleList(none), []);
+});
+
+test("joinRuleList is the inverse, and null when there is nothing to store", () => {
+  assert.equal(joinRuleList(["GG17", "SG9"]), "GG17,SG9");
+  assert.equal(joinRuleList(["gg17", "GG17", " sg9"]), "GG17,SG9");
+  assert.equal(joinRuleList([]), null);
+  assert.deepEqual(parseRuleList(joinRuleList(["SG9", "GG17"])), ["SG9", "GG17"]);
+});
+
+/* ---- the module really does read config/rules, not an inline copy ------- */
+
+test("src/lib/rules.ts sources its data from the files in config/rules", () => {
   const src = readFileSync(new URL("../src/lib/rules.ts", import.meta.url), "utf8");
-  assert.ok(
-    src.includes('import rulesFile from "../../config/rules.json"'),
-    "rules.ts no longer reads config/rules.json -- SG6 in Common Field Rules and SG6 under " +
-      "Specific Game Rules must reference the same underlying data",
-  );
+  for (const file of ["viqrc.json", "v5rc-override-2.1.json", "event-specials.json"]) {
+    assert.ok(
+      src.includes(`../../config/rules/${file}`),
+      `rules.ts no longer reads config/rules/${file} -- the data files are the single source of the rules`,
+    );
+  }
 });

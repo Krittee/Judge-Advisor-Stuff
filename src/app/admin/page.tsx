@@ -26,7 +26,7 @@ import { LanguageCover, LanguageTag } from "@/components/Language";
 import { FlagList, FlagSummary } from "@/components/Flags";
 import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
-import type { FlagEdit } from "@/lib/db/types";
+import type { FlagReport } from "@/lib/flagValidation";
 import type { ActivityRow, FlagRow, Panel, RequestRow, Team } from "@/lib/types";
 
 type Tab = "floor" | "scores" | "teams" | "panels" | "conflicts" | "flags" | "import" | "log";
@@ -814,7 +814,7 @@ function FlagsTab({
     }
   }
 
-  async function edit(id: string, patch: FlagEdit) {
+  async function edit(id: string, patch: FlagReport) {
     onError(null);
     try {
       await call(`/api/flags`, { method: "PATCH", body: { id, ...patch } });
