@@ -22,9 +22,6 @@ function filterMatchNumberInput(input) {
 function normalizeField(input) {
   return String(input ?? "").trim().replace(/\s+/g, " ").slice(0, MAX_FIELD_LENGTH);
 }
-function isValidField(value) {
-  return value.length > 0 && value.length <= MAX_FIELD_LENGTH;
-}
 function matchReference(matchType, matchNumber) {
   if (!matchType || !matchNumber) return null;
   return `${matchType}${matchNumber}`;
@@ -72,13 +69,6 @@ test("a field is trimmed and its internal whitespace collapsed", () => {
 test("a field longer than the cap is trimmed to it, not silently accepted whole", () => {
   const long = "x".repeat(80);
   assert.equal(normalizeField(long).length, MAX_FIELD_LENGTH);
-});
-
-test("an empty field is invalid; anything with content is valid", () => {
-  assert.equal(isValidField(""), false);
-  assert.equal(isValidField("   ".trim()), false);
-  assert.equal(isValidField("A"), true);
-  assert.equal(isValidField("Field 2"), true);
 });
 
 test("the match reference combines type and number, and only when both exist", () => {

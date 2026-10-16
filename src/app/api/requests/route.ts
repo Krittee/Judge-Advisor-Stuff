@@ -70,6 +70,13 @@ export async function POST(request: Request) {
       );
     }
 
+    // A slot on the grid can still be one that is over -- a page left open
+    // since the morning offers it, and anything posting straight here can
+    // name it. A booking that can never be kept is no booking.
+    if (end.getTime() <= Date.now()) {
+      return NextResponse.json({ error: "That slot has already passed." }, { status: 409 });
+    }
+
     slotStart = start.toISOString();
     slotEnd = end.toISOString();
   }

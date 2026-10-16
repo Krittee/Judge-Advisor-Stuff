@@ -18,13 +18,14 @@ test("this event runs right to left, bottom to top", () => {
 function draw(plan, { columns, rows }) {
   const facing = columns === "right-to-left" ? [...plan].reverse() : plan;
   return facing.map((col) => {
-    const numbered = col.cells.map((cell, i) => ({ cell, position: i + 1 }));
+    const numbered = col.cells.map((cell, i) => ({ cell, position: col.from + i }));
     return { row: col.row, cells: rows === "bottom-to-top" ? numbered.reverse() : numbered };
   });
 }
 
 const plan = ["A", "B", "C"].map((row) => ({
   row,
+  from: 1,
   cells: [1, 2, 3].map((n) => `${row}${n}`),
 }));
 

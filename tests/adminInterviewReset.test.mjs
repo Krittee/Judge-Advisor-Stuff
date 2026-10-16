@@ -19,21 +19,29 @@ test("the reset control is scoped to the admin-only page, no extra role check ne
   );
 });
 
-test("resetting to 'requested' reopens (clearing stale timestamps), not a bare set-status", () => {
+test("resetting a finished request to 'requested' reopens it (clearing stale timestamps), not a bare set-status", () => {
   const fn = src.slice(src.indexOf("async function resetRequestStatus"), src.indexOf("\n  }", src.indexOf("async function resetRequestStatus")));
   assert.ok(
-    fn.includes('status === "requested" ? "reopen"'),
-    "resetting to requested no longer routes through reopen -- set-status alone leaves " +
-      "acknowledged_at/started_at/finished_at stale even though the status reads requested again",
+    fn.includes('status === "requested" && canTransition("reopen", request.status)\n          ? "reopen"'),
+    "resetting a finished request to requested no longer routes through reopen -- set-status alone " +
+      "leaves finished_at/cancelled_at stale even though the status reads requested again",
+  );
+  // The transition table refuses a reopen of a live request (status.ts), so
+  // the override must not send one: it falls through to set-status, which
+  // the route clears the timestamps for itself.
+  assert.ok(
+    fn.includes('canTransition("reopen", request.status)') && fn.includes(': "set-status"'),
+    "the reset control must consult the transition table, or stepping a live request back to " +
+      "requested would be refused by the server",
   );
 });
 
-test("resetting to 'cancelled' routes through cancel (which stamps cancelled_at)", () => {
+test("resetting an open request to 'cancelled' routes through cancel (which stamps cancelled_at)", () => {
   const fn = src.slice(src.indexOf("async function resetRequestStatus"), src.indexOf("\n  }", src.indexOf("async function resetRequestStatus")));
   assert.ok(
-    fn.includes('status === "cancelled" ? "cancel"'),
-    "resetting to cancelled no longer routes through the cancel action -- set-status alone " +
-      "never sets cancelled_at",
+    fn.includes('status === "cancelled" && canTransition("cancel", request.status)\n            ? "cancel"'),
+    "resetting an open request to cancelled no longer routes through the cancel action -- " +
+      "set-status alone never sets cancelled_at (a completed one cannot be cancelled: status.ts)",
   );
 });
 
@@ -41,7 +49,7 @@ test("every other target status still goes through set-status, with the status f
   const fn = src.slice(src.indexOf("async function resetRequestStatus"), src.indexOf("\n  }", src.indexOf("async function resetRequestStatus")));
   assert.ok(fn.includes(': "set-status"'), "the fallback action is no longer set-status");
   assert.ok(
-    fn.includes('action === "set-status" ? { action, status }'),
+    fn.includes('action === "set-status" ? { status } : {}'),
     "set-status is no longer sent with the target status",
   );
 });

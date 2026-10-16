@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { call } from "@/components/useAppState";
 import { Banner, Button, Field, inputClass } from "@/components/ui";
@@ -36,6 +36,13 @@ export function SignInForm({
   placeholder?: string;
 }) {
   const router = useRouter();
+  /* A referee's name is what each flag they file is recorded under, and
+     the only thing that stops them correcting a colleague's, so the server
+     refuses a referee without one. This form cannot know the role before
+     the code is checked, so it goes by which door they came through: a
+     referee who types their code at /login instead still gets the server's
+     message in the banner. */
+  const nameRequired = usePathname()?.startsWith("/referee") ?? false;
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -75,19 +82,32 @@ export function SignInForm({
           />
         </Field>
 
-        <Field label="Your name" hint="Shown to the Judge Advisor on the activity log.">
+        <Field
+          label={nameRequired ? "Your name (required)" : "Your name"}
+          hint={
+            nameRequired
+              ? "Every flag you file is recorded under this name, and only you or the Judge Advisor can correct it."
+              : "Shown to the Judge Advisor on the activity log."
+          }
+        >
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Dana"
             autoComplete="name"
+            required={nameRequired}
             className={inputClass}
           />
         </Field>
 
         {error ? <Banner kind="error">{error}</Banner> : null}
 
-        <Button type="submit" size="lg" className="w-full" disabled={busy || !code.trim()}>
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full"
+          disabled={busy || !code.trim() || (nameRequired && !name.trim())}
+        >
           {busy ? "Checking…" : "Sign in"}
         </Button>
       </form>

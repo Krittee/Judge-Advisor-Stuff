@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { FlagList, type FlagKind } from "../src/components/Flags";
+import { FlagList, flagsOnDay, type FlagKind } from "../src/components/Flags";
 import type { FlagRow } from "../src/lib/types";
 
 const kinds: FlagKind[] = [
@@ -63,4 +64,26 @@ test("Good Conduct and legacy reports without rule information render no broken 
   assert.match(markup, /Helped reset the Field\./);
   assert.match(markup, /Legacy report/);
   assert.doesNotMatch(markup, /undefined|null|Rule violated/);
+});
+
+test("Flagged Today counts only reports from the referee's own calendar day", () => {
+  // Built in local time, so the test means "the same day on this device" in any timezone.
+  const day = new Date(2026, 8, 9, 14, 0);
+  const kept = flagsOnDay(
+    [
+      report({ id: "earlyToday", created_at: new Date(2026, 8, 9, 0, 5).toISOString() }),
+      report({ id: "lateYesterday", created_at: new Date(2026, 8, 8, 23, 55).toISOString() }),
+      report({ id: "tomorrow", created_at: new Date(2026, 8, 10, 0, 1).toISOString() }),
+    ],
+    day,
+  );
+  assert.deepEqual(kept.map((f) => f.id), ["earlyToday"]);
+});
+
+test("the referee page builds Flagged Today from today's flags, not the whole retained history", () => {
+  const src = readFileSync(new URL("../src/app/referee/page.tsx", import.meta.url), "utf8");
+  assert.ok(
+    src.includes("flagsOnDay(state.flags, new Date())"),
+    "Flagged Today is no longer filtered to the current day",
+  );
 });

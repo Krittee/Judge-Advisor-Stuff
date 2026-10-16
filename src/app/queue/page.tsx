@@ -110,12 +110,15 @@ export default function QueuePage() {
     setMessage("");
   }
 
-  async function submit(body: Record<string, unknown>, done: string) {
+  /** `bookingId`: turn that booking into the request in place, rather than creating a second one. */
+  async function submit(body: Record<string, unknown>, done: string, bookingId?: string) {
     setBusy(true);
     setError(null);
     setOk(null);
     try {
-      await call("/api/requests", { body });
+      await (bookingId
+        ? call(`/api/requests/${bookingId}`, { method: "PATCH", body: { action: "ready-now", ...body } })
+        : call("/api/requests", { body }));
       setOk(done);
       clear();
       await refresh();
@@ -129,33 +132,19 @@ export default function QueuePage() {
   /**
    * Queue the team now.
    *
-   * If they already hold a later slot, release it first — a team being
-   * seen now does not also need a booking at 2pm, and leaving one behind
-   * makes the schedule lie about how full it is.
+   * If they already hold a later slot, that booking becomes the queue
+   * request in place — a team being seen now does not also need a booking
+   * at 2pm, and leaving one behind makes the schedule lie about how full it
+   * is. One call rather than cancel-then-create: if the second step failed,
+   * the team was left with neither the slot nor a place in line.
    */
-  async function interviewNow(language: string) {
-    if (booking) {
-      setBusy(true);
-      setError(null);
-      try {
-        await call(`/api/requests/${booking.id}`, {
-          method: "PATCH",
-          body: { action: "cancel" },
-        });
-        await refresh();
-      } catch (e) {
-        setError((e as Error).message);
-        setBusy(false);
-        return;
-      }
-      setBusy(false);
-    }
-
-    await submit(
+  function interviewNow(language: string) {
+    return submit(
       { teamNumber: number, kind: "queue", language, message: message.trim() || undefined },
       booking
         ? `Team ${normalizeTeamNumber(number)} queued now; their ${formatClock(booking.slot_start)} slot is free again.`
         : `Team ${normalizeTeamNumber(number)} added to the queue.`,
+      booking?.id,
     );
   }
 

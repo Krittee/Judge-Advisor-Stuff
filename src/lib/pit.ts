@@ -55,39 +55,41 @@ export function comparePits(a: string | null, b: string | null): number {
 /**
  * Lay the pits out as rows.
  *
- * Every row runs from 1 to the widest position anywhere on the floor, so
- * the columns line up between rows and a gap reads as a gap rather than
- * shifting everything after it along.
+ * Each row is drawn across its own span only, from its first position to
+ * its last. Positions outside that span belong to somebody else: drawing
+ * them as empty pits would say a pit is free when another division is
+ * standing in it. A gap inside the span is still a real empty pit.
+ *
+ * Two teams on one pit are both kept, in the same cell, so neither can
+ * silently disappear from the plan.
  */
 export function buildFloorPlan<T>(
   items: T[],
   pitOf: (item: T) => string | null,
-): { row: string; cells: (T | null)[]; from: number; to: number }[] {
-  const placed = new Map<string, Map<number, T>>();
-  let widest = 0;
+): { row: string; cells: T[][]; from: number; to: number }[] {
+  const placed = new Map<string, Map<number, T[]>>();
 
   for (const item of items) {
     const pit = parsePit(pitOf(item));
     if (!pit) continue;
 
-    const row = placed.get(pit.row) ?? new Map<number, T>();
-    row.set(pit.position, item);
+    const row = placed.get(pit.row) ?? new Map<number, T[]>();
+    row.set(pit.position, [...(row.get(pit.position) ?? []), item]);
     placed.set(pit.row, row);
-    widest = Math.max(widest, pit.position);
   }
 
   return [...placed.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([row, cells]) => {
       const taken = [...cells.keys()].sort((a, b) => a - b);
+      const from = taken[0];
+      const to = taken[taken.length - 1];
       return {
         row,
-        cells: Array.from({ length: widest }, (_, i) => cells.get(i + 1) ?? null),
-        // The span this row actually occupies. Positions outside it belong
-        // to somebody else — drawing them as empty pits would say a pit is
-        // free when another division is standing in it.
-        from: taken[0],
-        to: taken[taken.length - 1],
+        // An empty array is a pit nobody is on; more than one entry is a clash.
+        cells: Array.from({ length: to - from + 1 }, (_, i) => cells.get(from + i) ?? []),
+        from,
+        to,
       };
     });
 }

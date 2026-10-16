@@ -121,3 +121,28 @@ export const NEXT_STATUS: Partial<Record<Status, Status>> = {
   acknowledged: "interviewing",
   interviewing: "completed",
 };
+
+/** Nothing left to do: the interview ran, or the request was dropped. */
+export const TERMINAL_STATUSES: Status[] = ["completed", "cancelled"];
+
+/**
+ * Where each action that names no target status may start from.
+ *
+ * `advance` is already pinned down by NEXT_STATUS above, and a judge's
+ * `set-status` is held to that same table by the route (the Judge Advisor's
+ * is the deliberate manual override). The three below had nothing behind
+ * them at all, so a stale screen could cancel an interview that had already
+ * run or "reopen" one still under way. The route reads this, and the
+ * stores' ifStatus check closes the gap between reading it and writing.
+ */
+export const ACTION_FROM: Partial<Record<string, Status[]>> = {
+  cancel: STATUSES.filter((s) => !TERMINAL_STATUSES.includes(s)),
+  reopen: TERMINAL_STATUSES,
+  // A booking turned into a walk-up request; nothing else has a slot to give up.
+  "ready-now": ["scheduled"],
+};
+
+/** Whether `action` may start from `from`. Actions not in the table are not restricted here. */
+export function canTransition(action: string, from: Status): boolean {
+  return ACTION_FROM[action]?.includes(from) ?? true;
+}

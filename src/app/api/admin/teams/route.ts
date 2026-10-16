@@ -44,6 +44,13 @@ export async function POST(request: Request) {
     );
   }
 
+  // Refuse before anything is written. Auto-assign has no panels to deal
+  // into and throws, but by then upsertTeams has already saved the roster:
+  // the caller gets a 400 while the teams stay imported (BUG-015).
+  if (autoAssign && !(await store().listPanels()).length) {
+    return NextResponse.json({ error: "Add at least one judge panel first." }, { status: 400 });
+  }
+
   try {
     await store().upsertTeams(teams);
     const assigned = autoAssign ? await store().autoAssignTeams(perPanel) : 0;

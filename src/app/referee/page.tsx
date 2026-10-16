@@ -1,32 +1,21 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { call, useAppState } from "@/components/useAppState";
 import { Banner, inputClass, TopBar } from "@/components/ui";
 import { TabBar } from "@/components/nav";
 import { SignOutButton } from "@/components/judging";
-import { FlagList, FlagSummary, kindOf } from "@/components/Flags";
+import { FieldPicker, FlagList, FlagSummary, flagsOnDay, kindOf, RulePicker } from "@/components/Flags";
 import { toneSolid } from "@/lib/tone";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
-import {
-  filterMatchNumberInput,
-  isValidField,
-  isValidMatchNumber,
-  matchReference,
-  normalizeField,
-} from "@/lib/match";
+import { filterMatchNumberInput, isValidMatchNumber, matchReference, normalizeField } from "@/lib/match";
+import { isValidFieldPick } from "@/lib/flagValidation";
 import { refereeHistory } from "@/lib/refereeHistory";
-import { RULE_CATEGORIES, commonFieldRules, ruleDisplayLabel, searchRules, type Rule } from "@/lib/rules";
+import { ruleDisplayLabel } from "@/lib/rules";
 import type { Session } from "@/lib/auth";
 import type { FlagEdit } from "@/lib/db/types";
 import type { FlagRow, Team } from "@/lib/types";
-
-/** Division shorthand for the field name, so a referee picks it instead
- *  of typing it out — "ES2" rather than "Elementary School Field 2".
- *  "SK" is the Skills field(s), which run alongside the other matches
- *  rather than belonging to any one division. */
-const FIELD_PREFIXES = ["ES", "MS", "HS", "BL", "SK"] as const;
 
 /**
  * The referee's page.
@@ -73,9 +62,9 @@ function Referee() {
   // record() below) so it can never accidentally carry over to the next
   // report the way match/field deliberately do.
   const [rule, setRule] = useState<string | null>(null);
-  const [ruleQuery, setRuleQuery] = useState("");
-  const [ruleOpen, setRuleOpen] = useState(false);
-  const ruleBoxRef = useRef<HTMLDivElement>(null);
+  // Bumped on a successful submit to remount the rule picker, which holds
+  // its own search text and open state.
+  const [ruleKey, setRuleKey] = useState(0);
 
   /* Arriving from the all-teams list, which passes the team it picked.
      Only seeds the box: typing over it afterwards is the point of the
@@ -97,19 +86,6 @@ function Referee() {
       .catch(() => router.replace("/referee/login"));
   }, [router]);
 
-  // Close the rule dropdown on an outside pointer press. Option buttons use
-  // ordinary click events so touch, mouse and keyboard activation all work.
-  useEffect(() => {
-    if (!ruleOpen) return;
-    function onPointerDown(e: PointerEvent) {
-      if (ruleBoxRef.current && !ruleBoxRef.current.contains(e.target as Node)) {
-        setRuleOpen(false);
-      }
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [ruleOpen]);
-
   const teamByNumber = useMemo(
     () => new Map(state.teams.map((t) => [t.number, t])),
     [state.teams],
@@ -122,26 +98,13 @@ function Referee() {
     [state.flagKinds],
   );
 
-  // The rule list, filtered by what's typed and grouped by category in
-  // the Quick Reference's own order. Common Field Rules only appear as a
-  // shortcut section while the search box is empty — they're the same
-  // Rule objects as below, never a duplicate copy.
-  const commonRules = useMemo(() => commonFieldRules(), []);
-  const ruleMatches = useMemo(() => searchRules(ruleQuery), [ruleQuery]);
-  const ruleGroups = useMemo(() => {
-    const byCategory = new Map<string, Rule[]>();
-    for (const r of ruleMatches) byCategory.set(r.category, [...(byCategory.get(r.category) ?? []), r]);
-    return RULE_CATEGORIES.map((category) => ({ category, rules: byCategory.get(category) ?? [] })).filter(
-      (g) => g.rules.length > 0,
-    );
-  }, [ruleMatches]);
-
   const flagsFor = (teamId: string) => state.flags.filter((f) => f.team_id === teamId);
 
-  /** Teams flagged today, worst first, so a referee can see the pattern. */
+  /** Teams flagged today, worst first, so a referee can see the pattern.
+   *  Only today's reports are listed; older ones stay on each team's record. */
   const flagged = useMemo(() => {
     const byTeam = new Map<string, FlagRow[]>();
-    for (const f of state.flags) {
+    for (const f of flagsOnDay(state.flags, new Date())) {
       byTeam.set(f.team_id, [...(byTeam.get(f.team_id) ?? []), f]);
     }
     return [...byTeam.entries()]
@@ -155,7 +118,7 @@ function Referee() {
   // What a head referee needs to trace this back to a moment. Required
   // the same way "what did you see" is — a flag with no match reference
   // is exactly the kind of thing that cannot be tracked back later.
-  const matchReady = Boolean(matchType) && isValidMatchNumber(matchNumber) && isValidField(field);
+  const matchReady = Boolean(matchType) && isValidMatchNumber(matchNumber) && isValidFieldPick(field);
 
   // Highest-severity kind gets the escalation highlight — derived from
   // severity rather than a hardcoded "major" id, the same way the button
@@ -200,8 +163,7 @@ function Referee() {
       // Rule is cleared on success so it never silently carries over to
       // the next report — unlike match/matchNumber/field, which stay.
       setRule(null);
-      setRuleQuery("");
-      setRuleOpen(false);
+      setRuleKey((k) => k + 1);
       await refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -313,36 +275,12 @@ function Referee() {
                 </label>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <label className="min-w-[7rem] flex-1">
-                  <span className="mb-1 block text-xs text-ink-subtle">Field</span>
-                  <select
-                    value={fieldPrefix}
-                    onChange={(e) => setFieldPrefix(e.target.value)}
-                    className={`${inputClass} py-2`}
-                  >
-                    <option value="" className="bg-surface">
-                      — division —
-                    </option>
-                    {FIELD_PREFIXES.map((prefix) => (
-                      <option key={prefix} value={prefix} className="bg-surface">
-                        {prefix}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="min-w-[4.5rem] flex-1">
-                  <span className="mb-1 block text-xs text-ink-subtle">Field #</span>
-                  <input
-                    value={fieldNumber}
-                    onChange={(e) => setFieldNumber(filterMatchNumberInput(e.target.value))}
-                    placeholder="1"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    className={`${inputClass} py-2 text-center`}
-                  />
-                </label>
-              </div>
+              <FieldPicker
+                prefix={fieldPrefix}
+                number={fieldNumber}
+                onPrefix={setFieldPrefix}
+                onNumber={setFieldNumber}
+              />
 
               <label className="block">
                 <span className="mb-1 block text-xs text-ink-subtle">
@@ -364,97 +302,9 @@ function Referee() {
                   searchable selector, not a category-then-rule pair: a
                   referee searches "plow" or "SG6" or "6" and gets there in
                   one tap. */}
-              <div ref={ruleBoxRef} className="relative block">
+              <div className="block">
                 <span className="mb-1 block text-xs text-ink-subtle">Rule violated</span>
-                <button
-                  type="button"
-                  onClick={() => setRuleOpen((o) => !o)}
-                  className={`${inputClass} flex items-center justify-between py-2 text-left`}
-                >
-                  <span className={`min-w-0 break-words ${rule ? "" : "text-ink-faint"}`}>
-                    {rule ? ruleDisplayLabel(rule) : "— select/search rule —"}
-                  </span>
-                  <span aria-hidden className="shrink-0 text-ink-faint">
-                    ▾
-                  </span>
-                </button>
-
-                {ruleOpen ? (
-                  <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl bg-surface shadow-xl ring-1 ring-inset ring-line">
-                    <input
-                      autoFocus
-                      value={ruleQuery}
-                      onChange={(e) => setRuleQuery(e.target.value)}
-                      placeholder="Search: SG6, 6, possession, plow…"
-                      autoComplete="off"
-                      className="w-full border-b border-line bg-transparent px-4 py-2.5 text-sm text-ink outline-none placeholder:text-ink-faint"
-                    />
-                    <div className="max-h-[min(18rem,50vh)] overflow-y-auto py-1">
-                      {rule ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRule(null);
-                            setRuleOpen(false);
-                          }}
-                          className="block min-h-11 w-full px-4 py-2.5 text-left text-sm text-danger-quiet hover:bg-surface-2"
-                        >
-                          Clear rule
-                        </button>
-                      ) : null}
-
-                      {!ruleQuery.trim() && commonRules.length ? (
-                        <div>
-                          <p className="px-4 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-ink-faint">
-                            COMMON FIELD RULES
-                          </p>
-                          {commonRules.map((r) => (
-                            <button
-                              key={`common-${r.id}`}
-                              type="button"
-                              onClick={() => {
-                                setRule(r.id);
-                                setRuleOpen(false);
-                                setRuleQuery("");
-                              }}
-                              className="block min-h-11 w-full break-words px-4 py-2.5 text-left text-sm text-ink hover:bg-surface-2"
-                            >
-                              <span className="font-semibold text-accent-quiet">{r.displayId}</span>{" "}
-                              {r.shortLabel}
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-
-                      {ruleGroups.length ? (
-                        ruleGroups.map((group) => (
-                          <div key={group.category}>
-                            <p className="px-4 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-ink-faint">
-                              {group.category.toUpperCase()}
-                            </p>
-                            {group.rules.map((r) => (
-                              <button
-                                key={r.id}
-                                type="button"
-                                onClick={() => {
-                                  setRule(r.id);
-                                  setRuleOpen(false);
-                                  setRuleQuery("");
-                                }}
-                                className="block min-h-11 w-full break-words px-4 py-2.5 text-left text-sm text-ink hover:bg-surface-2"
-                              >
-                                <span className="font-semibold text-accent-quiet">{r.displayId}</span>{" "}
-                                {r.shortLabel}
-                              </button>
-                            ))}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="px-4 py-3 text-sm text-ink-faint">No rule matches that.</p>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
+                <RulePicker key={ruleKey} value={rule} onChange={setRule} />
               </div>
 
               {/* Repeated-violation warning. Display only — never selects

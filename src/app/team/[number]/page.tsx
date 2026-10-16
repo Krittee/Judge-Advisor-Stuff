@@ -54,11 +54,14 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
     [panel, state.requests],
   );
 
-  async function act(body: Record<string, unknown>) {
+  /** `bookingId`: turn that held booking into the request in place, rather than creating a second one. */
+  async function act(body: Record<string, unknown>, bookingId?: string) {
     setBusy(true);
     setError(null);
     try {
-      await call("/api/requests", { body });
+      await (bookingId
+        ? call(`/api/requests/${bookingId}`, { method: "PATCH", body: { action: "ready-now", ...body } })
+        : call("/api/requests", { body }));
       setMessage("");
       await refresh();
     } catch (e) {
@@ -68,22 +71,13 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
     }
   }
 
-  /** Ready early: give up any held slot so it does not sit there unused. */
-  async function readyNow(language: string) {
-    if (booking) {
-      setBusy(true);
-      setError(null);
-      try {
-        await call(`/api/requests/${booking.id}`, { method: "PATCH", body: { action: "cancel" } });
-        await refresh();
-      } catch (e) {
-        setError((e as Error).message);
-        setBusy(false);
-        return;
-      }
-      setBusy(false);
-    }
-    await act({ teamNumber: team!.number, kind: "queue", language, message });
+  /**
+   * Ready early: a held slot becomes the queue request, so it does not sit
+   * there unused. One call, not cancel-then-create -- if that second step
+   * failed the team was left with neither the slot nor a place in line.
+   */
+  function readyNow(language: string) {
+    return act({ teamNumber: team!.number, kind: "queue", language, message }, booking?.id);
   }
 
   async function cancel() {
@@ -101,7 +95,15 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
   }
 
   if (!loaded) {
-    return <CenteredNote>Loading…</CenteredNote>;
+    // Nothing has come back yet, so there is no roster to look the team up
+    // in. If the first fetch failed, say so: "not on the list" would send a
+    // team off to hunt for a Judge Advisor over a bad wifi signal. The poll
+    // keeps going, so this clears by itself once the server answers.
+    return (
+      <CenteredNote>
+        {online ? "Loading…" : "Can't reach the server — retrying…"}
+      </CenteredNote>
+    );
   }
 
   if (!team) {

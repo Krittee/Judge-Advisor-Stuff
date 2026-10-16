@@ -36,10 +36,6 @@ export function normalizeField(input: unknown): string {
     .slice(0, MAX_FIELD_LENGTH);
 }
 
-export function isValidField(value: string): boolean {
-  return value.length > 0 && value.length <= MAX_FIELD_LENGTH;
-}
-
 /**
  * "Q23" — the compact reference a referee, a judge and a head referee all
  * read the same way. The match type's own id doubles as its short code,

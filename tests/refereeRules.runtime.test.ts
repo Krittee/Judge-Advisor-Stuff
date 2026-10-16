@@ -17,7 +17,7 @@ const validReport = {
   body: "Robot contacted a second Bean Bag.",
   matchType: "Q",
   matchNumber: "23",
-  field: "Field 2",
+  field: "ES2",
   rule: null,
 };
 

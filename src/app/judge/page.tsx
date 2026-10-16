@@ -126,7 +126,10 @@ export default function JudgePage() {
     try {
       await call(`/api/requests/${request.id}`, {
         method: "PATCH",
-        body: { action, ...extra },
+        // `from`: the status this card is showing. If another screen has
+        // moved the request on since, the server refuses (409) rather than
+        // advancing it a second time from under whoever got there first.
+        body: { action, from: request.status, ...extra },
       });
       await refresh();
     } catch (e) {

@@ -4,10 +4,12 @@
 -- Delete everything later with:  truncate panels, teams cascade;
 -- =====================================================================
 
+-- Divisions must match the first two in config/event.json (the file store's
+-- demo uses the same ones). Change them here if you rename the divisions there.
 insert into panels (name, code, division, judges, languages, sort_order, slot_minutes, slot_count, slot_start_at) values
-  ('Panel A', 'ALPHA1',   'Division 1', '{"Dana Ruiz","Sam Okafor","Priya Nair"}', '{"en"}',      1, 20, 8, now() + interval '30 minutes'),
-  ('Panel B', 'BRAVO2',   'Division 1', '{"Chris Lin","Morgan Bell"}',             '{"en"}',      2, 20, 8, now() + interval '30 minutes'),
-  ('Panel C', 'CHARLIE3', 'Division 2', '{"Alex Tran","Jamie Fox","Rae Mensah"}',  '{"en","th"}', 3, 20, 5, now() + interval '30 minutes');
+  ('Panel A', 'ALPHA1',   'Elementary School', '{"Dana Ruiz","Sam Okafor","Priya Nair"}', '{"en"}',      1, 20, 8, now() + interval '30 minutes'),
+  ('Panel B', 'BRAVO2',   'Elementary School', '{"Chris Lin","Morgan Bell"}',             '{"en"}',      2, 20, 8, now() + interval '30 minutes'),
+  ('Panel C', 'CHARLIE3', 'Middle School',     '{"Alex Tran","Jamie Fox","Rae Mensah"}',  '{"en","th"}', 3, 20, 5, now() + interval '30 minutes');
 
 insert into teams (number, name, panel_id, division, category, pit)
 select

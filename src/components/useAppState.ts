@@ -31,12 +31,55 @@ const EMPTY: AppState = {
   serverTime: "",
 };
 
+/** How one trip to /api/state ended. */
+export type StateFetch =
+  | { kind: "state"; state: AppState; etag: string | null }
+  | { kind: "unchanged" }
+  | { kind: "failed" };
+
+/**
+ * One trip to /api/state, with the ETag handling and the failure cases in
+ * one place so they can be checked without a browser.
+ *
+ * The ETag is handed back with the state it belongs to, never before it:
+ * remembering the tag of a body that then failed to parse made every later
+ * poll come back 304 against state the screen never received, so a team
+ * page that had failed its first load stayed on "Loading…" for good.
+ */
+export async function fetchState(
+  etag: string | null,
+  fetchImpl: typeof fetch = fetch,
+): Promise<StateFetch> {
+  try {
+    const headers: HeadersInit = {};
+    if (etag) headers["If-None-Match"] = etag;
+
+    const res = await fetchImpl("/api/state", { headers, cache: "no-store" });
+    if (res.status === 304) return { kind: "unchanged" };
+    if (!res.ok) return { kind: "failed" };
+
+    return {
+      kind: "state",
+      state: (await res.json()) as AppState,
+      etag: res.headers.get("ETag"),
+    };
+  } catch {
+    return { kind: "failed" };
+  }
+}
+
 /**
  * Poll /api/state and hand the result to whichever screen asked for it.
  *
  * Polling rather than websockets is a deliberate choice: it survives flaky
  * venue wifi, reconnects with no special handling, and an unchanged board
  * costs a 304. Tabs that are not visible stop polling entirely.
+ *
+ * `loaded` means real state has arrived at least once, not that a request
+ * has finished. A first fetch that fails leaves it false with `online`
+ * false, so a screen can tell "the server could not be reached" from "the
+ * server answered and this really is empty" -- the team page used to take
+ * the first for the second and tell a team they were not on the list.
  */
 export function useAppState(intervalMs = 4000) {
   const [state, setState] = useState<AppState>(EMPTY);
@@ -46,30 +89,17 @@ export function useAppState(intervalMs = 4000) {
   const inFlight = useRef<Promise<void> | null>(null);
 
   const poll = useCallback(async () => {
-    try {
-      const headers: HeadersInit = {};
-      if (etag.current) headers["If-None-Match"] = etag.current;
-
-      const res = await fetch("/api/state", { headers, cache: "no-store" });
-
-      if (res.status === 304) {
-        setOnline(true);
-        return;
-      }
-      if (!res.ok) {
-        setOnline(false);
-        return;
-      }
-
-      const tag = res.headers.get("ETag");
-      if (tag) etag.current = tag;
-      setState((await res.json()) as AppState);
-      setOnline(true);
-    } catch {
+    const result = await fetchState(etag.current);
+    if (result.kind === "failed") {
       setOnline(false);
-    } finally {
+      return;
+    }
+    if (result.kind === "state") {
+      if (result.etag) etag.current = result.etag;
+      setState(result.state);
       setLoaded(true);
     }
+    setOnline(true);
   }, []);
 
   /**

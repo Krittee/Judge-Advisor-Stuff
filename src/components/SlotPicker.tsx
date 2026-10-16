@@ -36,6 +36,19 @@ export function panelLoad(panelId: string, requests: RequestRow[]): PanelLoad {
   };
 }
 
+/**
+ * The line shown when no slot is open. A slot that has already ended is not
+ * "taken", so say which it is: staff who read "all taken" go looking for a
+ * booking clash that does not exist (BUG-031).
+ */
+export function noSlotsLeftLine(slots: Slot[], now: number): string {
+  const ended = (s: Slot) => new Date(s.end).getTime() <= now;
+  const passed = slots.filter((s) => ended(s) && !s.takenBy).length;
+  if (passed === slots.length) return "No slots left today — the rest have already passed";
+  if (passed === 0) return `All ${slots.length} slots are taken — nothing left to book`;
+  return `No slots left — ${slots.length - passed} taken, ${passed} already passed`;
+}
+
 /** How busy this panel is right now, in one line. */
 export function PanelBusyLine({ load }: { load: PanelLoad }) {
   if (!load.waiting && !load.interviewing) {
@@ -100,7 +113,7 @@ export function SlotPicker({
         <span className="text-ink-subtle">
           {free
             ? `${free} of ${slots.length} slots open`
-            : `All ${slots.length} slots are taken — nothing left to book`}
+            : noSlotsLeftLine(slots, now)}
         </span>
         <Legend />
       </div>

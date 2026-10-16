@@ -2,7 +2,7 @@ import { fileStore } from "./file";
 import { postgresStore } from "./postgres";
 import type { Store } from "./types";
 
-export { StoreError } from "./types";
+export { StoreError, STALE_STATUS_MESSAGE } from "./types";
 export type { Store } from "./types";
 
 /**

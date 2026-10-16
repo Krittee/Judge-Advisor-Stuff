@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { liveRequestFor } from "@/lib/data";
 import { divisionsCompatible } from "@/lib/presets";
 import { TabBar, type TabItem } from "@/components/nav";
-import { NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
+import { canTransition, NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
 import { call, useAppState, useScores } from "@/components/useAppState";
 import {
   Banner,
@@ -27,7 +27,7 @@ import { FlagList, FlagSummary } from "@/components/Flags";
 import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
 import type { FlagEdit } from "@/lib/db/types";
-import type { ActivityRow, Panel, RequestRow, Team } from "@/lib/types";
+import type { ActivityRow, FlagRow, Panel, RequestRow, Team } from "@/lib/types";
 
 type Tab = "floor" | "scores" | "teams" | "panels" | "conflicts" | "flags" | "import" | "log";
 
@@ -214,7 +214,11 @@ function FloorTab({
     setBusy(request.id);
     onError(null);
     try {
-      await call(`/api/requests/${request.id}`, { method: "PATCH", body: { action, ...extra } });
+      // `from`: the status this row is showing, so a stale screen is refused.
+      await call(`/api/requests/${request.id}`, {
+        method: "PATCH",
+        body: { action, from: request.status, ...extra },
+      });
       await refresh();
     } catch (e) {
       onError((e as Error).message);
@@ -428,17 +432,27 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
    * clears the stale acknowledged/started/finished timestamps a
    * completed or cancelled request is still carrying (set-status alone
    * does not), and "cancel" is what actually stamps cancelled_at.
-   * set-status covers the rest, and is unrestricted for an admin
-   * session — this whole page is admin-only already (see the redirect
-   * on load), so nothing further needs to gate this by role.
+   * Those two are held to the transition table (status.ts): reopen only
+   * a finished request, cancel only an open one. Where the table would
+   * refuse -- stepping a live request back to "requested", or cancelling
+   * one that already completed -- set-status covers it, and is
+   * unrestricted for an admin session — this whole page is admin-only
+   * already (see the redirect on load), so nothing further needs to gate
+   * this by role.
    */
-  async function resetRequestStatus(requestId: string, status: Status) {
+  async function resetRequestStatus(request: RequestRow, status: Status) {
     onError(null);
     try {
-      const action = status === "requested" ? "reopen" : status === "cancelled" ? "cancel" : "set-status";
-      await call(`/api/requests/${requestId}`, {
+      const action =
+        status === "requested" && canTransition("reopen", request.status)
+          ? "reopen"
+          : status === "cancelled" && canTransition("cancel", request.status)
+            ? "cancel"
+            : "set-status";
+      await call(`/api/requests/${request.id}`, {
         method: "PATCH",
-        body: action === "set-status" ? { action, status } : { action },
+        // `from`: the status the row is showing, so a stale screen is refused.
+        body: { action, from: request.status, ...(action === "set-status" ? { status } : {}) },
       });
       await refresh();
     } catch (e) {
@@ -696,7 +710,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                           onChange={(e) => {
                             const status = e.target.value as Status;
                             if (!status) return;
-                            resetRequestStatus((req ?? done)!.id, status);
+                            resetRequestStatus((req ?? done)!, status);
                             e.target.value = "";
                           }}
                           title="Judge Advisor override — corrects a mistake, not the normal flow"
@@ -814,7 +828,7 @@ function FlagsTab({
   /* Grouped by team, worst first: the question this screen answers is
      "who has been flagged, and how badly", not "what happened at 2:14". */
   const byTeam = useMemo(() => {
-    const groups = new Map<string, typeof state.flags>();
+    const groups = new Map<string, FlagRow[]>();
     for (const f of state.flags) groups.set(f.team_id, [...(groups.get(f.team_id) ?? []), f]);
     return [...groups.entries()]
       .map(([teamId, flags]) => ({
@@ -2013,7 +2027,12 @@ function ActivityTab() {
   useEffect(() => {
     const load = () =>
       call<{ activity: ActivityRow[] }>("/api/admin/activity", { method: "GET" })
-        .then(({ activity }) => setRows(activity))
+        .then(({ activity }) => {
+          setRows(activity);
+          // A later success is the recovery; without this the banner from
+          // one dropped poll stayed up, hiding the log, for good.
+          setError(null);
+        })
         .catch((e) => setError((e as Error).message));
     load();
     const t = setInterval(load, 10_000);

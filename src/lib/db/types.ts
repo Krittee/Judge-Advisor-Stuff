@@ -19,6 +19,10 @@ export class StoreError extends Error {
   }
 }
 
+/** What a caller reads when a status-guarded write (`ifStatus`) lost the race. */
+export const STALE_STATUS_MESSAGE =
+  "This request changed on another screen — refresh and try again.";
+
 export type NewRequest = {
   teamId: string;
   panelId: string;
@@ -130,7 +134,17 @@ export type Store = {
   findRequest(id: string): Promise<RequestRow | null>;
 
   createRequest(input: NewRequest): Promise<RequestRow>;
-  updateRequest(id: string, patch: Partial<RequestRow>): Promise<RequestRow>;
+  /**
+   * `ifStatus` makes the write a compare-and-set: it applies only if the
+   * request is still in that status, else throws StoreError(409) and writes
+   * nothing (404 if the request is gone altogether). The route passes the
+   * status it just read, so two screens acting on the same row cannot both win.
+   */
+  updateRequest(
+    id: string,
+    patch: Partial<RequestRow>,
+    ifStatus?: RequestRow["status"],
+  ): Promise<RequestRow>;
 
   upsertTeams(rows: ImportedTeam[]): Promise<number>;
   updateTeam(id: string, patch: Partial<Team>): Promise<Team>;

@@ -28,10 +28,12 @@ import {
   DEFAULT_DIVISION,
   defaultCategory,
   defaultLanguage,
+  presetDivisions,
   presetPanels,
 } from "../presets";
 import {
   StoreError,
+  STALE_STATUS_MESSAGE,
   type ImportedTeam,
   type NewActivity,
   type NewNote,
@@ -99,8 +101,11 @@ let pendingWrite: ReturnType<typeof setTimeout> | null = null;
  */
 function state(): Data {
   if (!loaded) {
-    loaded = load();
+    // Claim before reading. A second copy must be refused before it can
+    // touch the file; if it is refused, `loaded` stays null, so the next
+    // call asks again rather than quietly running without the lock.
     claimLock();
+    loaded = load();
     installShutdownFlush();
   }
   return loaded;
@@ -253,47 +258,85 @@ function installShutdownFlush(): void {
  * copy in memory, and whichever saves last silently erases the other's
  * work. That is a horrible way to lose an event.
  *
- * The lock heartbeats every 5s and is treated as stale after 15s, so a
- * crashed process can never block the next start. It warns rather than
- * refuses: an inexperienced operator on event day is far better served
- * by an app that runs than by one that will not.
+ * The lock heartbeats every 5s and is treated as stale after 15s, or at
+ * once if its pid is no longer running, so a crashed process can never
+ * block the next start. A live copy is REFUSED, not warned about: two
+ * copies writing one snapshot silently erase each other's work (BUG-028),
+ * and a clear error on startup is far better than that on event day.
+ *
+ * The lock is created with "wx" (exclusive), so two copies starting in the
+ * same instant cannot both win. The same pid always gets through, which is
+ * what a `next dev` hot reload looks like from here.
  * ------------------------------------------------------------------ */
 
 const LOCK = `${FILE}.lock`;
 const STALE_AFTER_MS = 15_000;
 
-function claimLock(): void {
+/** Write our pid and a fresh heartbeat. "wx" fails if the lock already exists. */
+function writeLock(exclusive: boolean): void {
+  mkdirSync(dirname(LOCK), { recursive: true });
+  writeFileSync(LOCK, JSON.stringify({ pid: process.pid, heartbeat: Date.now() }), {
+    encoding: "utf8",
+    flag: exclusive ? "wx" : "w",
+  });
+}
+
+function readLock(): { pid: number; heartbeat: number } | null {
   try {
-    if (existsSync(LOCK)) {
-      const held = JSON.parse(readFileSync(LOCK, "utf8")) as { pid: number; heartbeat: number };
-      const age = Date.now() - held.heartbeat;
-      if (held.pid !== process.pid && age < STALE_AFTER_MS) {
-        console.warn(
-          `\n${"!".repeat(72)}\n` +
-            `[store] ANOTHER COPY OF THIS APP IS ALREADY RUNNING (process ${held.pid}).\n\n` +
-            `        Both are using ${FILE}\n` +
-            `        and they WILL overwrite each other's state().\n\n` +
-            `        Stop this one with Ctrl+C and use the copy that is already\n` +
-            `        running. If you meant to restart, stop the other one first.\n` +
-            `${"!".repeat(72)}\n`,
-        );
-      }
-    }
+    return JSON.parse(readFileSync(LOCK, "utf8")) as { pid: number; heartbeat: number };
   } catch {
-    // An unreadable lock is not worth failing over.
+    return null; // missing or unreadable: nothing to defer to
+  }
+}
+
+/** Does this pid belong to a running process? Signal 0 sends nothing; EPERM means it exists under another user. */
+function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+function claimLock(): void {
+  for (;;) {
+    try {
+      writeLock(true);
+      break;
+    } catch (e) {
+      // Anything but "already exists" is a read-only disk: carry on without a lock.
+      if ((e as NodeJS.ErrnoException).code !== "EEXIST") return;
+    }
+
+    const held = readLock();
+    if (
+      held &&
+      held.pid !== process.pid &&
+      isRunning(held.pid) &&
+      Date.now() - held.heartbeat < STALE_AFTER_MS
+    ) {
+      throw new Error(
+        `Another copy of the app is already using ${FILE} (pid ${held.pid}). ` +
+          "Stop it first, or point DATA_FILE somewhere else.",
+      );
+    }
+
+    // Our own leftover (a hot reload in this process), or a crashed copy's.
+    try {
+      rmSync(LOCK, { force: true });
+    } catch {
+      return; // cannot remove it: carry on without a lock
+    }
   }
 
-  const beat = () => {
+  setInterval(() => {
     try {
-      mkdirSync(dirname(LOCK), { recursive: true });
-      writeFileSync(LOCK, JSON.stringify({ pid: process.pid, heartbeat: Date.now() }), "utf8");
+      writeLock(false);
     } catch {
-      /* read-only disk: carry on without a lock */
+      /* read-only disk: carry on without a heartbeat */
     }
-  };
-
-  beat();
-  setInterval(beat, 5_000).unref?.();
+  }, 5_000).unref?.();
 }
 
 function releaseLock(): void {
@@ -414,9 +457,21 @@ function createRequest(input: NewRequest): RequestRow {
   return row;
 }
 
-function updateRequest(id: string, patch: Partial<RequestRow>): RequestRow {
+function updateRequest(
+  id: string,
+  patch: Partial<RequestRow>,
+  ifStatus?: RequestRow["status"],
+): RequestRow {
   const row = state().requests.find((r) => r.id === id);
   if (!row) throw new StoreError("That request no longer exists.", 404);
+
+  // Compare-and-set. The caller read this row's status a moment ago and
+  // decided what to do from it; if another screen has moved it since, the
+  // decision is stale and must not be written over their change. Checked
+  // here, in the same synchronous block as the write below, so nothing can
+  // slip in between -- and before anything is touched, so a refusal leaves
+  // the row exactly as it was.
+  if (ifStatus && row.status !== ifStatus) throw new StoreError(STALE_STATUS_MESSAGE, 409);
 
   // Re-opening must not create a second live request for the same team.
   if (patch.status && LIVE.includes(patch.status) && !LIVE.includes(row.status)) {
@@ -429,8 +484,10 @@ function updateRequest(id: string, patch: Partial<RequestRow>): RequestRow {
   // Reassigning a booked slot to another panel (or another time) is
   // still a booking — it must not land within another team's walking
   // window on the panel it moves to.
+  // (Judged by the kind the row ends up as: "ready now" turns a booking
+  // into a walk-up request, which holds no slot to check.)
   if (
-    row.kind === "slot" &&
+    (patch.kind ?? row.kind) === "slot" &&
     row.status !== "cancelled" &&
     (patch.panel_id !== undefined || patch.slot_start !== undefined)
   ) {
@@ -506,6 +563,11 @@ function updateTeam(id: string, patch: Partial<Team>): Team {
 }
 
 function deleteTeam(id: string): void {
+  // Postgres cascades activity rows whose request_id is one of the requests
+  // about to go (activity.request_id is on delete cascade). Match that here,
+  // or the log keeps rows pointing at requests that no longer exist (BUG-023).
+  const goneRequests = new Set(state().requests.filter((r) => r.team_id === id).map((r) => r.id));
+  state().activity = state().activity.filter((a) => !a.request_id || !goneRequests.has(a.request_id));
   state().teams = state().teams.filter((t) => t.id !== id);
   state().requests = state().requests.filter((r) => r.team_id !== id);
   state().notes = state().notes.filter((n) => n.team_id !== id);
@@ -873,6 +935,8 @@ function resetDay(): void {
 
 /** Wipes the active event, including its roster, panels and referee flags. */
 function resetAll(): void {
+  // Going through state() first claims the file, so a second copy cannot wipe it.
+  state();
   loaded = empty();
   save();
 }
@@ -887,11 +951,15 @@ function demoData(): Data {
   const now = Date.now();
   const iso = (offsetMinutes: number) => new Date(now + offsetMinutes * 60_000).toISOString();
 
-  // Two divisions, so the demo exercises the wall rather than hiding it.
+  // Two divisions, so the demo exercises the wall rather than hiding it. They
+  // are the first two the event config lists, so the demo runs on divisions the
+  // event really has (BUG-030): a made-up name would sit in state beside them
+  // and could hide an assignment error.
+  const [first, second = first] = presetDivisions();
   const panelNames: [string, string, string, string[]][] = [
-    ["Panel A", "ALPHA1", "Division 1", ["Dana Ruiz", "Sam Okafor", "Priya Nair"]],
-    ["Panel B", "BRAVO2", "Division 1", ["Chris Lin", "Morgan Bell"]],
-    ["Panel C", "CHARLIE3", "Division 2", ["Alex Tran", "Jamie Fox", "Rae Mensah"]],
+    ["Panel A", "ALPHA1", first, ["Dana Ruiz", "Sam Okafor", "Priya Nair"]],
+    ["Panel B", "BRAVO2", first, ["Chris Lin", "Morgan Bell"]],
+    ["Panel C", "CHARLIE3", second, ["Alex Tran", "Jamie Fox", "Rae Mensah"]],
   ];
 
   const panels: Panel[] = panelNames.map(([name, code, division, judges], i) => ({
@@ -1033,7 +1101,7 @@ export const fileStore: Store = {
   findRequest: async (id) => findRequest(id),
 
   createRequest: async (input) => createRequest(input),
-  updateRequest: async (id, patch) => updateRequest(id, patch),
+  updateRequest: async (id, patch, ifStatus) => updateRequest(id, patch, ifStatus),
 
   upsertTeams: async (rows) => upsertTeams(rows),
   updateTeam: async (id, patch) => updateTeam(id, patch),

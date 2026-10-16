@@ -367,3 +367,18 @@ test("a panel's slots hold a different team in each", () => {
   assert.equal(starts.size, 12, "12 distinct start times");
   assert.equal(teams.size, 12, "12 distinct teams, all on the one panel");
 });
+
+test("a team import with auto-assign refuses before it writes when there are no panels (BUG-015)", () => {
+  /* The route cannot be called from here (it needs a live request for the
+     session cookie), so the order of its statements is what is checked. The
+     guard has to come before the upsert: auto-assign throws with no panels,
+     and by then the roster is already saved while the caller sees a 400. */
+  const src = readFileSync(new URL("../src/app/api/admin/teams/route.ts", import.meta.url), "utf8");
+  const post = src.slice(src.indexOf("export async function POST"), src.indexOf("export async function PATCH"));
+  const guard = post.indexOf("Add at least one judge panel first.");
+  assert.ok(guard > 0, "the no-panels check is gone from the import route");
+  assert.ok(
+    guard < post.indexOf("store().upsertTeams("),
+    "a refused import must not have already written the teams",
+  );
+});

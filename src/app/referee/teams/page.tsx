@@ -9,6 +9,7 @@ import { SignOutButton } from "@/components/judging";
 import { FlagSummary } from "@/components/Flags";
 import { compareTeamNumbers } from "@/lib/teamNumber";
 import type { Session } from "@/lib/auth";
+import type { FlagRow } from "@/lib/types";
 
 /**
  * Every team, to scroll and pick from.
@@ -41,7 +42,7 @@ export default function RefereeTeamsPage() {
   }, [router]);
 
   const flagsByTeam = useMemo(() => {
-    const m = new Map<string, typeof state.flags>();
+    const m = new Map<string, FlagRow[]>();
     for (const f of state.flags) m.set(f.team_id, [...(m.get(f.team_id) ?? []), f]);
     return m;
   }, [state.flags]);

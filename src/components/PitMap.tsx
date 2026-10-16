@@ -68,18 +68,16 @@ export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean
     const plan = buildFloorPlan(placed, (p) => p.team.pit);
     const facing = state.pitFloor.columns === "right-to-left" ? [...plan].reverse() : plan;
 
-    if (state.pitFloor.rows === "bottom-to-top") {
-      // Reverse the cells but keep each one's real position, so the tile
-      // still says A1 wherever A1 has ended up on screen.
-      return facing.map((col) => ({
+    // Number each cell from the row's own first position, then reverse for
+    // bottom-to-top. The cell keeps its real position either way, so the
+    // tile still says A5 wherever A5 has ended up on screen.
+    return facing.map((col) => {
+      const numbered = col.cells.map((cell, i) => ({ cell, position: col.from + i }));
+      return {
         ...col,
-        numbered: col.cells.map((cell, i) => ({ cell, position: i + 1 })).reverse(),
-      }));
-    }
-    return facing.map((col) => ({
-      ...col,
-      numbered: col.cells.map((cell, i) => ({ cell, position: i + 1 })),
-    }));
+        numbered: state.pitFloor.rows === "bottom-to-top" ? numbered.reverse() : numbered,
+      };
+    });
   }, [placed, state.pitFloor]);
 
   const mapped = placed.filter((p) => isMappablePit(p.team.pit));
@@ -179,13 +177,13 @@ function PitCell({
 }: {
   row: string;
   position: number;
-  cell: Placed | null;
+  cell: Placed[];
   divisions: string[];
   hideDone: boolean;
 }) {
   // A pit number nobody occupies. With one grid across the whole floor,
   // a blank really is a blank.
-  if (!cell) {
+  if (!cell.length) {
     return (
       <div className="flex h-[3.25rem] items-center justify-center rounded-md border border-dashed border-line">
         <span className="text-[10px] text-ink-faint">
@@ -196,9 +194,31 @@ function PitCell({
     );
   }
 
-  const { team, status } = cell;
-  const show = status && !(hideDone && status === "completed") ? status : null;
-  const meta = show ? STATUS_META[show] : null;
+  // Hide completed removes the tile itself. An empty box of the same height
+  // keeps every other tile where it was.
+  const shown = hideDone ? cell.filter((p) => p.status !== "completed") : cell;
+  if (!shown.length) return <div aria-hidden className="h-[3.25rem]" />;
+
+  // Two teams on one pit: both numbers, so neither is hidden behind the other.
+  if (shown.length > 1) {
+    return (
+      <div
+        title={shown.map((p) => `${p.team.number} ${p.team.name} · ${p.team.division}`).join("\n")}
+        className="flex h-[3.25rem] flex-col justify-center overflow-hidden rounded-md px-1 text-center bg-surface text-ink-muted ring-2 ring-caution"
+      >
+        <div className="text-[10px] font-medium text-caution-quiet">
+          {row}
+          {position} · {shown.length} teams
+        </div>
+        <div className="truncate text-xs font-bold tabular-nums leading-tight">
+          {shown.map((p) => p.team.number).join(" / ")}
+        </div>
+      </div>
+    );
+  }
+
+  const { team, status } = shown[0];
+  const meta = status ? STATUS_META[status] : null;
   const tone = divisionTone(team.division, divisions);
 
   return (
@@ -209,7 +229,7 @@ function PitCell({
       className={`flex h-[3.25rem] flex-col justify-center overflow-hidden rounded-md px-1 text-center ring-2 ${
         tone.ring
       } ${meta ? meta.fill : "bg-surface text-ink-muted"} ${
-        show === "requested" ? "pulse-waiting" : ""
+        status === "requested" ? "pulse-waiting" : ""
       }`}
     >
       <div className="text-[10px] font-medium opacity-70">
