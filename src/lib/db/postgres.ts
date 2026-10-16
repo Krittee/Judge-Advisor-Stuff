@@ -253,6 +253,32 @@ async function migrate(): Promise<void> {
     -- alone -- its where clause is part of its identity -- so an
     -- already-deployed database's narrower index is dropped first.
     drop index if exists requests_one_live_per_team;
+
+    -- The index cannot be created while a team holds two live rows, which an
+    -- older database can (the index used to leave 'scheduled' out). Left as
+    -- is, the create fails and every request after it fails too. So first
+    -- cancel every live row beyond the one that counts: the most advanced
+    -- status, then the earliest request. With no duplicates this touches
+    -- nothing.
+    update requests set status = 'cancelled', cancelled_at = now(), updated_at = now()
+     where id in (
+       select id from (
+         select id, row_number() over (
+           partition by team_id
+           order by case status
+                      when 'interviewing' then 1
+                      when 'acknowledged' then 2
+                      when 'requested'    then 3
+                      else 4
+                    end,
+                    requested_at, id
+         ) as rn
+         from requests
+         where status in ('requested', 'acknowledged', 'interviewing', 'scheduled')
+       ) ranked
+       where ranked.rn > 1
+     );
+
     create unique index if not exists requests_one_live_per_team
       on requests (team_id)
       where status in ('requested', 'acknowledged', 'interviewing', 'scheduled');

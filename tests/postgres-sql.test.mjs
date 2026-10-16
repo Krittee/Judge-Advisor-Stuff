@@ -276,3 +276,24 @@ test("a booking turned into a walk-up request skips the booking-gap lookup; an o
     "a slot move must still be checked against the panel's other bookings",
   );
 });
+
+/* ---- the live-request index can be created on an old database (NEW-B3) ----
+
+   A database that predates 'scheduled' in the index may already hold two live
+   rows for one team. Creating the unique index then fails, and every request
+   fails with it. migrate() must cancel the extras first. This checks the
+   order of the statements in migrate(); the database itself is not available
+   here, so what Postgres makes of the UPDATE is not shown. */
+test("migrate() cancels duplicate live requests before it creates the one-live-per-team index", () => {
+  const body = src.slice(src.indexOf("async function migrate()"));
+  const create = body.indexOf("create unique index if not exists requests_one_live_per_team");
+  const cancel = body.indexOf("update requests set status = 'cancelled'");
+  assert.ok(create > 0, "the one-live-per-team index is gone from migrate()");
+  assert.ok(cancel > 0, "nothing cancels the duplicate live requests an old database can hold");
+  assert.ok(cancel < create, "the cancel must run before the index, or the create fails on that database");
+  assert.match(
+    body.slice(cancel, create),
+    /row_number\(\) over \(\s*partition by team_id/,
+    "the extra rows are picked per team, keeping one",
+  );
+});
