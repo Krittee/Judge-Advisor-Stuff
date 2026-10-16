@@ -101,7 +101,15 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
   }
 
   if (!loaded) {
-    return <CenteredNote>Loading…</CenteredNote>;
+    // Nothing has come back yet, so there is no roster to look the team up
+    // in. If the first fetch failed, say so: "not on the list" would send a
+    // team off to hunt for a Judge Advisor over a bad wifi signal. The poll
+    // keeps going, so this clears by itself once the server answers.
+    return (
+      <CenteredNote>
+        {online ? "Loading…" : "Can't reach the server — retrying…"}
+      </CenteredNote>
+    );
   }
 
   if (!team) {

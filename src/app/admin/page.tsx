@@ -27,7 +27,7 @@ import { FlagList, FlagSummary } from "@/components/Flags";
 import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
 import type { FlagEdit } from "@/lib/db/types";
-import type { ActivityRow, Panel, RequestRow, Team } from "@/lib/types";
+import type { ActivityRow, FlagRow, Panel, RequestRow, Team } from "@/lib/types";
 
 type Tab = "floor" | "scores" | "teams" | "panels" | "conflicts" | "flags" | "import" | "log";
 
@@ -814,7 +814,7 @@ function FlagsTab({
   /* Grouped by team, worst first: the question this screen answers is
      "who has been flagged, and how badly", not "what happened at 2:14". */
   const byTeam = useMemo(() => {
-    const groups = new Map<string, typeof state.flags>();
+    const groups = new Map<string, FlagRow[]>();
     for (const f of state.flags) groups.set(f.team_id, [...(groups.get(f.team_id) ?? []), f]);
     return [...groups.entries()]
       .map(([teamId, flags]) => ({
@@ -2013,7 +2013,12 @@ function ActivityTab() {
   useEffect(() => {
     const load = () =>
       call<{ activity: ActivityRow[] }>("/api/admin/activity", { method: "GET" })
-        .then(({ activity }) => setRows(activity))
+        .then(({ activity }) => {
+          setRows(activity);
+          // A later success is the recovery; without this the banner from
+          // one dropped poll stayed up, hiding the log, for good.
+          setError(null);
+        })
         .catch((e) => setError((e as Error).message));
     load();
     const t = setInterval(load, 10_000);
