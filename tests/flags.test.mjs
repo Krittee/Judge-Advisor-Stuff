@@ -13,9 +13,27 @@ const kinds = event.refereeFlags;
 
 /* ---- the kinds themselves -------------------------------------------- */
 
-test("the config offers praise and three weights of violation", () => {
+test("the config offers praise, three weights of violation and Disqualified", () => {
   const ids = kinds.map((k) => k.id);
-  assert.deepEqual(ids, ["good", "warning", "minor", "major"]);
+  assert.deepEqual(ids, ["good", "warning", "minor", "major", "dq"]);
+});
+
+test("Disqualified is the most severe kind and, like Minor and Major, needs a rule", () => {
+  const dq = kinds.find((k) => k.id === "dq");
+  assert.equal(dq.label, "Disqualified");
+  assert.equal(dq.short, "DQ");
+  assert.equal(dq.requiresRule, true);
+  assert.ok(dq.severity > Math.max(...kinds.filter((k) => k.id !== "dq").map((k) => k.severity)));
+});
+
+test("every colour a kind uses is one the tone map actually renders", () => {
+  const tone = readFileSync(new URL("../src/lib/tone.ts", import.meta.url), "utf8");
+  for (const { id, color } of kinds) {
+    for (const map of ["TONES", "SOLIDS", "RAILS"]) {
+      const block = tone.slice(tone.indexOf(`const ${map}`), tone.indexOf("};", tone.indexOf(`const ${map}`)));
+      assert.ok(new RegExp(`\\b${color}:`).test(block), `${id}'s colour "${color}" is missing from ${map} in tone.ts`);
+    }
+  }
 });
 
 test("severity orders them, with praise at the bottom", () => {
@@ -23,7 +41,7 @@ test("severity orders them, with praise at the bottom", () => {
   assert.equal(good.severity, 0, "praise must not outrank a violation");
   const violations = kinds.filter((k) => k.id !== "good");
   const ordered = [...violations].sort((a, b) => a.severity - b.severity).map((k) => k.id);
-  assert.deepEqual(ordered, ["warning", "minor", "major"]);
+  assert.deepEqual(ordered, ["warning", "minor", "major", "dq"]);
 });
 
 test("every kind has its own colour and reads without one", () => {
@@ -306,7 +324,17 @@ test("the file store's updateFlag only assigns the correctable fields", () => {
   assert.ok(assigned.length > 0, "updateFlag does not assign anything -- did it move?");
   assert.deepEqual(
     new Set(assigned),
-    new Set(["kind", "body", "match_type", "match_number", "field", "rule"]),
+    new Set([
+      "kind",
+      "body",
+      "match_type",
+      "match_number",
+      "field",
+      "rule",
+      "ruleset",
+      "manual_version",
+      "match_affecting",
+    ]),
     "updateFlag assigns a field beyond the correctable ones -- id, team_id, author and " +
       "created_at must stay fixed",
   );
@@ -316,7 +344,7 @@ test("the Postgres store's updateFlag only sets the correctable columns", () => 
   const src = readFileSync(new URL("../src/lib/db/postgres.ts", import.meta.url), "utf8");
   const signature = src.indexOf("async updateFlag(");
   assert.ok(signature !== -1, "updateFlag is missing from postgres.ts");
-  const fn = src.slice(signature, signature + 700);
+  const fn = src.slice(signature, signature + 1000);
 
   // Read the SET clause specifically -- "where id = $1" is a lookup
   // condition, not a column being written, and must not be mistaken for
@@ -326,7 +354,17 @@ test("the Postgres store's updateFlag only sets the correctable columns", () => 
   const columns = [...setClause[1].matchAll(/(\w+)\s*=\s*\$\d/g)].map((m) => m[1]);
   assert.deepEqual(
     new Set(columns),
-    new Set(["kind", "body", "match_type", "match_number", "field", "rule"]),
+    new Set([
+      "kind",
+      "body",
+      "match_type",
+      "match_number",
+      "field",
+      "rule",
+      "ruleset",
+      "manual_version",
+      "match_affecting",
+    ]),
     "updateFlag's SET clause writes a column beyond the correctable ones -- id, team_id, " +
       "author and created_at must stay fixed",
   );
@@ -424,5 +462,8 @@ test("the correction form offers the same field and rule pickers as the raise fo
   assert.ok(flags.includes("<FieldPicker") && flags.includes("<RulePicker"), "the correction form lost a picker");
   assert.ok(page.includes("<FieldPicker") && page.includes("<RulePicker"), "the raise form lost a picker");
   assert.ok(!/draftField\b/.test(flags), "the correction form has a free-text field box again");
-  assert.ok(flags.includes("rule: draftRule"), "the correction form no longer sends the rule it shows");
+  assert.ok(flags.includes("rules: draftRules"), "the correction form no longer sends the rules it shows");
+  assert.ok(flags.includes("ruleset: draftRuleset"), "the correction form no longer sends its ruleset");
+  assert.ok(flags.includes("matchAffecting: draftMatchAffecting"), "the correction form lost match affecting");
+  assert.ok(flags.includes("<RulesetPicker"), "the correction form lost the ruleset dropdown");
 });

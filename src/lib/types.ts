@@ -107,9 +107,18 @@ export type FlagRow = {
   match_type: string | null;
   match_number: string | null;
   field: string | null;
-  /** A Rule id from src/lib/rules.ts (e.g. "SG6"). Null for Good Conduct,
-   *  an optional-rule Warning, or a flag recorded before this existed. */
+  /** Rule ids from src/lib/rules.ts, comma-joined ("GG17,SG9"; one rule is
+   *  just "SG6"). Null for Good Conduct, an optional-rule Warning, or a flag
+   *  recorded before this existed. Read it with parseRuleList. */
   rule: string | null;
+  /** Which ruleset `rule` belongs to ("viqrc", "v5rc"). Null on a flag
+   *  recorded before rulesets existed -- those ARE VEX IQ. */
+  ruleset: string | null;
+  /** The manual edition the ruleset was at when this was recorded (set by
+   *  the server from the ruleset, never by the client). Null for IQ. */
+  manual_version: string | null;
+  /** The referee marked this Minor/Major as having affected the match. */
+  match_affecting: boolean;
   created_at: string;
 };
 

@@ -1,9 +1,18 @@
 import { normalizeMatchNumber } from "./match";
+import { getRuleset, parseRuleList } from "./rules";
 import type { FlagRow } from "./types";
 
-export type RefereeHistory = {
+/** What the team's record already says about ONE of the rules being cited. */
+export type RuleHistory = {
+  rule: string;
   sameRule: FlagRow[];
   sameMatchSameRule: FlagRow[];
+};
+
+export type RefereeHistory = {
+  /** One entry per rule being cited, in the order given -- including rules
+   *  with no history, so the caller never has to guess which were checked. */
+  byRule: RuleHistory[];
   eventTotals: Map<string, number>;
   escalationReviewRequired: boolean;
 };
@@ -15,33 +24,44 @@ export type RefereeHistory = {
  * new event means using the existing "Wipe everything" operation before the
  * new roster is imported. Team ids then form the event boundary without
  * adding a second event/database architecture.
+ *
+ * A prior flag counts toward rule X only when it is the same team, the same
+ * ruleset (a flag with none is VEX IQ) and X is one of the rules it cites:
+ * IQ's SG6 and V5RC's SG6 are different rules that happen to share a code,
+ * and a flag can cite several.
  */
 export function refereeHistory(
   flags: FlagRow[],
   teamId: string | null | undefined,
-  rule: string | null,
+  rules: string[],
   matchType: string,
   matchNumber: string,
+  rulesetId?: string | null,
 ): RefereeHistory {
   if (!teamId) {
-    return {
-      sameRule: [],
-      sameMatchSameRule: [],
-      eventTotals: new Map(),
-      escalationReviewRequired: false,
-    };
+    return { byRule: [], eventTotals: new Map(), escalationReviewRequired: false };
   }
 
   // Good Conduct is deliberately absent: it is praise, not a prior
   // violation, even if an old or malformed record happens to carry a rule.
   const teamViolations = flags.filter((f) => f.team_id === teamId && f.kind !== "good");
-  const sameRule = rule ? teamViolations.filter((f) => f.rule === rule) : [];
-  const normalizedCurrentMatch = normalizeMatchNumber(matchNumber);
-  const sameMatchSameRule = sameRule.filter(
-    (f) =>
-      f.match_type === matchType &&
-      normalizeMatchNumber(f.match_number) === normalizedCurrentMatch,
+  const sameRuleset = teamViolations.filter(
+    (f) => getRuleset(f.ruleset).id === getRuleset(rulesetId).id,
   );
+  const normalizedCurrentMatch = normalizeMatchNumber(matchNumber);
+
+  const byRule = parseRuleList(rules.join(",")).map((rule): RuleHistory => {
+    const sameRule = sameRuleset.filter((f) => parseRuleList(f.rule).includes(rule));
+    return {
+      rule,
+      sameRule,
+      sameMatchSameRule: sameRule.filter(
+        (f) =>
+          f.match_type === matchType &&
+          normalizeMatchNumber(f.match_number) === normalizedCurrentMatch,
+      ),
+    };
+  });
 
   const eventTotals = new Map<string, number>();
   for (const f of teamViolations) {
@@ -49,9 +69,8 @@ export function refereeHistory(
   }
 
   return {
-    sameRule,
-    sameMatchSameRule,
+    byRule,
     eventTotals,
-    escalationReviewRequired: sameRule.some((f) => f.kind === "minor"),
+    escalationReviewRequired: byRule.some((h) => h.sameRule.some((f) => f.kind === "minor")),
   };
 }

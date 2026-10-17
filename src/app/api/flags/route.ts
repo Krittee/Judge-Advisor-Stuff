@@ -10,6 +10,7 @@ import {
 import { store, StoreError } from "@/lib/db";
 import { parseFlagFields } from "@/lib/flagValidation";
 import type { FlagEdit } from "@/lib/db/types";
+import { getRuleset } from "@/lib/rules";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +69,8 @@ export async function POST(request: Request) {
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   }
-  const { kind, text, matchType, matchNumber, field, rule } = parsed;
+  const { kind, text, matchType, matchNumber, field, rule, ruleset, manualVersion, matchAffecting } =
+    parsed;
 
   const flag = await store().createFlag({
     teamId,
@@ -79,6 +81,9 @@ export async function POST(request: Request) {
     matchNumber,
     field,
     rule,
+    ruleset,
+    manualVersion,
+    matchAffecting,
   });
 
   await store().logActivity({
@@ -160,18 +165,34 @@ export async function PATCH(request: Request) {
     match: `${existing.match_type ?? ""}${existing.match_number ?? ""}`,
     field: existing.field,
     body: existing.body,
-    rule: existing.rule,
+    rules: existing.rule,
+    // A flag recorded before rulesets existed is a VEX IQ one; reading it
+    // as that keeps a correction from logging a phantom "none → viqrc".
+    ruleset: getRuleset(existing.ruleset).id,
+    "match affecting": existing.match_affecting ? "yes" : "no",
   };
 
   const parsed = parseFlagFields(body, {
     allowLegacyRulelessKind: existing.rule ? null : existing.kind,
+    defaultRuleset: existing.ruleset,
   });
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   }
-  const { kind, text, matchType, matchNumber, field, rule } = parsed;
+  const { kind, text, matchType, matchNumber, field, rule, ruleset, manualVersion, matchAffecting } =
+    parsed;
 
-  const edit: FlagEdit = { kind, body: text, matchType, matchNumber, field, rule };
+  const edit: FlagEdit = {
+    kind,
+    body: text,
+    matchType,
+    matchNumber,
+    field,
+    rule,
+    ruleset,
+    manualVersion,
+    matchAffecting,
+  };
   let flag;
   try {
     flag = await store().updateFlag(id, edit);
@@ -189,7 +210,15 @@ export async function PATCH(request: Request) {
   // rewrite what a referee reported (the severity, the rule cited, the
   // description), so the log has to say what it used to read -- the flag
   // itself no longer does.
-  const after = { kind, match: `${matchType}${matchNumber}`, field, body: text, rule };
+  const after = {
+    kind,
+    match: `${matchType}${matchNumber}`,
+    field,
+    body: text,
+    rules: rule,
+    ruleset,
+    "match affecting": matchAffecting ? "yes" : "no",
+  };
   const show = (v: string | null) => (v ? `"${v}"` : "none");
   const changes = (Object.keys(after) as (keyof typeof after)[])
     .filter((k) => (before[k] ?? "") !== (after[k] ?? ""))

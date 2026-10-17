@@ -65,6 +65,14 @@
       "color": "rose",
       "severity": 3,
       "requiresRule": true
+    },
+    {
+      "id": "dq",
+      "label": "Disqualified",
+      "short": "DQ",
+      "color": "black",
+      "severity": 4,
+      "requiresRule": true
     }
   ],
   "matchTypes": [

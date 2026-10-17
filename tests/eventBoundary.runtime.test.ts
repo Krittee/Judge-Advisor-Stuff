@@ -33,6 +33,9 @@ test("day reset retains event-wide flags while full wipe starts a clean event", 
     matchNumber: "23",
     field: "Field 2",
     rule: "SG6",
+    ruleset: "viqrc",
+    manualVersion: null,
+    matchAffecting: false,
   });
   await fileStore.createFlag({
     teamId: team.id,
@@ -43,6 +46,9 @@ test("day reset retains event-wide flags while full wipe starts a clean event", 
     matchNumber: "23",
     field: "Field 2",
     rule: "SG6",
+    ruleset: "viqrc",
+    manualVersion: null,
+    matchAffecting: false,
   });
 
   const beforeReset = await fileStore.listFlags(team.id);

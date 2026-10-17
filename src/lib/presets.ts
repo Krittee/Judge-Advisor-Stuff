@@ -129,6 +129,7 @@ const FLAG_FALLBACK: FlagKind[] = [
   { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
   { id: "minor", label: "Minor violation", short: "Minor", color: "orange", severity: 2, requiresRule: true },
   { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3, requiresRule: true },
+  { id: "dq", label: "Disqualified", short: "DQ", color: "black", severity: 4, requiresRule: true },
 ];
 
 /** The kinds of flag a referee may record. Always at least one. */

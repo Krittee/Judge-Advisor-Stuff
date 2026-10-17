@@ -30,6 +30,10 @@ const TONES: Record<string, string> = {
   rose: "bg-danger/18 text-danger-quiet ring-danger/40",
   fuchsia: "bg-active/18 text-active-quiet ring-active/40",
   teal: "bg-done/18 text-done-quiet ring-done/40",
+  // The ink colour itself -- near-black on the light theme, near-white on
+  // the dark one -- so it is the one tone no queue status or red can be
+  // mistaken for. Used by the Disqualified flag.
+  black: "bg-ink/12 text-ink ring-ink/50",
   zinc: "bg-off text-off-ink ring-line",
 };
 
@@ -43,6 +47,7 @@ const SOLIDS: Record<string, string> = {
   rose: "bg-danger text-danger-ink hover:bg-danger-quiet",
   fuchsia: "bg-active text-active-ink hover:bg-active-quiet",
   teal: "bg-done text-done-ink hover:bg-done-quiet",
+  black: "bg-ink text-canvas hover:bg-ink-muted",
   zinc: "bg-surface-2 text-ink-muted hover:bg-surface",
 };
 
@@ -56,6 +61,7 @@ const RAILS: Record<string, string> = {
   rose: "bg-danger",
   fuchsia: "bg-active",
   teal: "bg-done",
+  black: "bg-ink",
   zinc: "bg-line-strong",
 };
 

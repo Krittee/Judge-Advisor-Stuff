@@ -71,8 +71,13 @@ export type NewFlag = {
   matchType: string;
   matchNumber: string;
   field: string;
-  /** A Rule id from src/lib/rules.ts, or null when none was picked. */
+  /** Rule ids from src/lib/rules.ts, comma-joined, or null when none was picked. */
   rule: string | null;
+  /** Which ruleset those ids belong to. */
+  ruleset: string | null;
+  /** Taken from the ruleset by the server, never from the request. */
+  manualVersion: string | null;
+  matchAffecting: boolean;
 };
 
 /**
@@ -90,9 +95,11 @@ export type FlagEdit = {
   matchType: string;
   matchNumber: string;
   field: string;
-  /** A Rule id from src/lib/rules.ts, or null. Carried through unchanged
-   *  by the correction UI -- see FlagListItem's save() in Flags.tsx. */
+  /** Rule ids from src/lib/rules.ts, comma-joined, or null. */
   rule: string | null;
+  ruleset: string | null;
+  manualVersion: string | null;
+  matchAffecting: boolean;
 };
 
 export type NewActivity = {

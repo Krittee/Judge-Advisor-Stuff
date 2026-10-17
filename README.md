@@ -353,11 +353,13 @@ months later when someone asks why a panel never saw a particular team.
 Referees work the field, not the judging room, and what they see there is
 often the thing a judge most needs to know. `/referee` is their page:
 
+0. Once per device: pick the **ruleset** (VEX IQ or V5RC Override) at the
+   top of the form. It is remembered on that device.
 1. Find the team — **type the number** if you can read it off the robot,
    or **All teams** to scroll and pick one.
 2. Say which match — **P / Q / F** and the match number — and which
    **field**.
-3. Say what happened.
+3. Pick the **rule(s)** broken, and say what happened if it needs saying.
 4. Tap how serious it was.
 
 The **All teams** page searches by number, name *or* pit (`9882`, `nova`
@@ -366,7 +368,7 @@ have already been flagged. Picking one hands it to the flagging page
 rather than repeating the form there, so a flag is still only ever
 written in one place.
 
-Four kinds, each its own colour, ordered least to most serious so the
+Five kinds, each its own colour, ordered least to most serious so the
 sharpest button is not the one under your thumb:
 
 | | |
@@ -375,6 +377,10 @@ sharpest button is not the one under your thumb:
 | **Warning** | amber |
 | **Minor violation** | orange |
 | **Major violation** | red |
+| **Disqualified** | black (white in the dark theme) — needs a rule, like Minor and Major |
+
+Disqualified is only ever recorded by a referee tapping it. Nothing in the
+app suggests, highlights or escalates to it.
 
 **Colour never carries it alone.** Every flag also reads its own name, so
 anyone who cannot separate amber from orange still knows which is which.
@@ -399,14 +405,51 @@ every team would work against the whole point of tracking it. Change the
 dropdown or the number the moment you move to a different match; there is
 nothing that resets them for you.
 
-**Rule violated** is one searchable list containing the complete Level Up
-Quick Reference plus this event's TS1–TS3 Tournament Special rules. It accepts
-rule ids (with or without angle brackets), title words and common field terms.
-A rule is required for Minor and Major, optional for Warning, and never
-attached to Good Conduct. The referee page shows
-same-rule, same-match and overall active-event history. Prior Minor violations
-only prompt an escalation review: they never select Major or disqualify a team.
-The Head Referee always chooses the outcome.
+### Rulesets and rules
+
+The event runs VEX IQ and V5RC side by side, so a flag names a **ruleset**
+first (the dropdown at the top of the referee form, with the manual edition
+underneath — "Override Manual v2.1"), then **one or more rules** from it
+(up to 5). Switching ruleset clears the rules you had picked, because a rule
+id means nothing outside its own manual.
+
+The **Rules violated** picker is one searchable, multi-select list:
+
+- Search by id (`SG6`), title words (`holding`, `autonomous`) or number.
+- Rules are grouped by the manual's categories in collapsible sections —
+  Scoring, Specific Game and General Game open, the rest collapsed; every
+  section opens while you are searching. Each row reads
+  `<SG6> — <the manual's own title>`.
+- Common field rules sit at the top as shortcuts; picked rules show above as
+  removable chips (`SG9 ×`).
+- TS1–TS3 (this event's Tournament Special rules) are in **every** ruleset.
+
+A rule is required for Minor, Major and Disqualified, optional for Warning,
+and never attached to Good Conduct. **Match affecting** can be ticked for a
+Minor or Major (the server stores it only for those two). The referee page
+shows same-rule, same-match and overall active-event history — per rule
+picked, and only against flags from the **same ruleset** (V5RC `SG6` and IQ
+`SG6` are different rules; a flag recorded before rulesets existed counts as
+IQ). Prior Minor violations only prompt an escalation review: they never
+select Major or disqualify a team. The Head Referee always chooses the
+outcome.
+
+Each flag stores its ruleset, its rules (comma-joined, `GG17,SG9`) and the
+manual edition. The edition is filled in **by the server** from the ruleset's
+data, never trusted from the browser. Existing flags are untouched: no
+ruleset means IQ.
+
+**Where the rules live.** One JSON file per ruleset in `config/rules/`
+(`viqrc.json`, `v5rc-override-2.1.json`) plus `event-specials.json` for
+TS1–TS3. `src/lib/rules.ts` is the only code that reads them. Titles are the
+official wording — correct a typo in the data, never "improve" the wording.
+
+**Adding a new manual version** (say Override 2.2): copy
+`config/rules/v5rc-override-2.1.json` to a new file, update `manualVersion`
+and any rules that changed, then import it in `src/lib/rules.ts` and add it to
+`RULESET_FILES`. Give it a new `id` if it should sit beside the old one in the
+dropdown. Flags already recorded keep the ruleset id and edition they were
+saved with.
 
 This application has one active event per data store. **Clear today's
 requests** deliberately keeps referee flags so repeat history spans a multi-day
@@ -481,7 +524,7 @@ They live in `config/event.json` and are yours to change:
 
 `severity` does the ordering and decides a team's worst flag; `short` is
 what fits on a chip. Colours are `emerald`, `amber`, `orange`, `rose`,
-`sky` and `zinc`.
+`black`, `sky` and `zinc`.
 
 The match types are separate, in the same file:
 

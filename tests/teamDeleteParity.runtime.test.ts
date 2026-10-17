@@ -63,6 +63,9 @@ test("deleting a team clears its flags and request-linked activity, and nulls th
     matchNumber: "23",
     field: "Field 2",
     rule: "SG6",
+    ruleset: "viqrc",
+    manualVersion: null,
+    matchAffecting: false,
   });
   // Team-only activity survives the delete with its team nulled.
   await fileStore.logActivity({ teamId: team.id, actor: "queuer:Desk", action: "note" });
