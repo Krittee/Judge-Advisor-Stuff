@@ -258,3 +258,13 @@ test("the referee styles sit after the landing block, scoped under .referee, wit
   assert.ok(css.includes(':root[data-theme="light"] .referee {'));
   assert.ok(css.includes("--rf-field-line: oklch(0.640 0.012 265)"), "the light field outline keeps 3:1 against the surface");
 });
+
+test("every pinned primary button outside the Record bar has a fill, so it reads as a button", () => {
+  // A bare rf-prim has no background: the Record bar adds its severity tone,
+  // everything else needs rf-prim--accent. Event setup once shipped without it.
+  for (const file of ["src/components/referee/EventSetup.tsx", "src/components/referee/MatchSheet.tsx"]) {
+    const classes = [...read(file).matchAll(/className="(rf-prim[^"]*)"/g)].map((m) => m[1]);
+    assert.ok(classes.length, `${file} has a primary button`);
+    for (const c of classes) assert.match(c, /rf-prim--accent/, `${file}: "${c}"`);
+  }
+});

@@ -125,7 +125,7 @@ export function EventSetup({
 
       <div className="rf-abar">
         <p className="rf-by">Set by {name} · applies to all referees</p>
-        <button type="submit" className="rf-prim" disabled={!ruleset || busy}>
+        <button type="submit" className="rf-prim rf-prim--accent" disabled={!ruleset || busy}>
           {busy ? "Saving…" : "Start refereeing"}
         </button>
         {onCancel ? (
