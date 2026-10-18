@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { call, useAppState } from "@/components/useAppState";
 import { Banner } from "@/components/ui";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { FlagList, FlagSummary, flagsOnDay, kindOf } from "@/components/Flags";
 import { AllRulesPicker } from "@/components/AllRulesPicker";
 import { EventSetup } from "@/components/referee/EventSetup";
@@ -88,6 +89,7 @@ function Referee() {
   const [editingSetup, setEditingSetup] = useState(false);
   const [setupBusy, setSetupBusy] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
+  const { ask, dialog } = useConfirm();
 
   // The program and field count are the event's, not this device's: one setup
   // that every referee works from. Before there is one (which the gate below
@@ -234,7 +236,7 @@ function Referee() {
 
   async function saveSetup(nextRuleset: string, count: number) {
     const question = setupChangeQuestion(setup, { ruleset: nextRuleset, fieldCount: count }, today);
-    if (question && !confirm(question)) return;
+    if (question && !(await ask(question, { confirmLabel: "Change for everyone" }))) return;
     setSetupBusy(true);
     setSetupError(null);
     try {
@@ -280,6 +282,7 @@ function Referee() {
           onSave={saveSetup}
           onCancel={needsEventSetup(setup, today) ? undefined : () => setEditingSetup(false)}
         />
+        {dialog}
       </RefereeFrame>
     );
   }
@@ -542,10 +545,6 @@ function Referee() {
           setSheetOpen(false);
         }}
         onClose={() => setSheetOpen(false)}
-        onChangeProgram={() => {
-          setSheetOpen(false);
-          setEditingSetup(true);
-        }}
       />
       <AllRulesPicker
         open={rulesOpen}
@@ -554,6 +553,7 @@ function Referee() {
         onChange={setRules}
         onClose={() => setRulesOpen(false)}
       />
+      {dialog}
     </RefereeFrame>
   );
 }

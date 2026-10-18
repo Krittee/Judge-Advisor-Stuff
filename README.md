@@ -360,9 +360,8 @@ often the thing a judge most needs to know. `/referee` is their page:
    phone. The screen comes back once a day pre-filled with yesterday's
    choice (a multi-day event is one tap), and a change to a setup other
    referees are already using asks first. Any referee can change it later
-   from the match sheet's *Change* link or the *Event setup* row at the foot
-   of the page (there is no head-referee role); every save is logged in the
-   Activity log.
+   from the *Event setup* row at the foot of the page (there is no
+   head-referee role); every save is logged in the Activity log.
 1. **Set the match** — the pinned *Current match* bar (`QF 2-1 · Field 2`,
    with the program as a read-only tag) opens the *Set the match* sheet:
    **Teamwork** or **Skills**, the match type and number, and the field.

@@ -2,7 +2,6 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { MatchFields } from "@/components/MatchFields";
-import { getRuleset } from "@/lib/rules";
 import { matchIsSet, type CurrentMatch } from "./logic";
 
 /**
@@ -23,7 +22,6 @@ export function MatchSheet({
   value,
   onUse,
   onClose,
-  onChangeProgram,
 }: {
   open: boolean;
   rulesetId: string;
@@ -32,8 +30,6 @@ export function MatchSheet({
   value: CurrentMatch;
   onUse: (match: CurrentMatch) => void;
   onClose: () => void;
-  /** The program line's "Change": the event setup, not something to pick here. */
-  onChangeProgram: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -69,7 +65,6 @@ export function MatchSheet({
           value={value}
           onUse={onUse}
           onClose={onClose}
-          onChangeProgram={onChangeProgram}
         />
       ) : null}
     </dialog>
@@ -83,7 +78,6 @@ function Body({
   value,
   onUse,
   onClose,
-  onChangeProgram,
 }: {
   titleId: string;
   rulesetId: string;
@@ -91,7 +85,6 @@ function Body({
   value: CurrentMatch;
   onUse: (match: CurrentMatch) => void;
   onClose: () => void;
-  onChangeProgram: () => void;
 }) {
   const [draft, setDraft] = useState(value);
   const ready = matchIsSet(draft, rulesetId, fieldCount);
@@ -105,15 +98,6 @@ function Body({
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
-        </button>
-      </div>
-
-      <div className="rf-prog">
-        <p>
-          Program: <b>{getRuleset(rulesetId).program}</b> · set for this event
-        </p>
-        <button type="button" className="rf-lnk" onClick={onChangeProgram}>
-          Change
         </button>
       </div>
 

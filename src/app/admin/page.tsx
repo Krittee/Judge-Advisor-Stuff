@@ -21,6 +21,7 @@ import {
 import { NotesDrawer, SignOutButton } from "@/components/judging";
 import { Rankings } from "@/components/Rankings";
 import { ConflictDialog } from "@/components/ConflictDialog";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { CategoryChip, CategorySelect } from "@/components/CategoryChip";
 import { LanguageCover, LanguageTag } from "@/components/Language";
 import { FlagList, FlagSummary } from "@/components/Flags";
@@ -385,6 +386,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
   const [division, setDivision] = useState<string>("");
   const [category, setCategory] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const { ask, dialog } = useConfirm();
 
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -481,6 +483,7 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
 
   return (
     <div className="space-y-4">
+      {dialog}
       <div className="flex flex-wrap items-end gap-3">
         <input
           value={filter}
@@ -734,7 +737,14 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
                   <td className="px-4 py-2.5 text-right">
                     <button
                       onClick={async () => {
-                        if (!confirm(`Remove team ${team.number} and all its requests?`)) return;
+                        if (
+                          !(await ask(`Remove team ${team.number} and all its requests?`, {
+                            confirmLabel: "Remove team",
+                            danger: true,
+                          }))
+                        ) {
+                          return;
+                        }
                         try {
                           await call(`/api/admin/teams?teamId=${team.id}`, { method: "DELETE" });
                           await refresh();
@@ -797,11 +807,19 @@ function FlagsTab({
   focusTeamId,
 }: TabProps & { focusTeamId?: string | null }) {
   const [busy, setBusy] = useState(false);
+  const { ask, dialog } = useConfirm();
 
   const teamById = useMemo(() => new Map(state.teams.map((t) => [t.id, t])), [state.teams]);
 
   async function remove(id: string) {
-    if (!confirm("Remove this flag? The judges will stop seeing it.")) return;
+    if (
+      !(await ask("Remove this flag? The judges will stop seeing it.", {
+        confirmLabel: "Remove flag",
+        danger: true,
+      }))
+    ) {
+      return;
+    }
     setBusy(true);
     onError(null);
     try {
@@ -861,6 +879,7 @@ function FlagsTab({
 
   return (
     <div className="space-y-5">
+      {dialog}
       <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl bg-surface p-4 ring-1 ring-inset ring-line">
         {[...state.flagKinds]
           .sort((a, b) => b.severity - a.severity)
@@ -926,11 +945,17 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
   const [bulkNumbers, setBulkNumbers] = useState("");
   const [bulkJudge, setBulkJudge] = useState("");
   const [bulkResult, setBulkResult] = useState<BulkConflictResult | null>(null);
+  const { ask, dialog } = useConfirm();
 
   const teamById = useMemo(() => new Map(state.teams.map((t) => [t.id, t])), [state.teams]);
 
   async function withdraw(id: string) {
-    if (!confirm("Withdraw this conflict? The panel will be able to judge the team again.")) {
+    if (
+      !(await ask("Withdraw this conflict? The panel will be able to judge the team again.", {
+        confirmLabel: "Withdraw",
+        danger: true,
+      }))
+    ) {
       return;
     }
     setBusy(true);
@@ -999,6 +1024,7 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
 
   return (
     <div className="space-y-5">
+      {dialog}
       <div className="flex flex-wrap items-end gap-3 rounded-xl bg-surface p-4 ring-1 ring-inset ring-line">
         <label className="min-w-[9rem] flex-1">
           <span className="mb-1 block text-xs text-ink-subtle">Team number</span>
@@ -1359,9 +1385,11 @@ function DangerZone({
   onError: (m: string | null) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const { ask, dialog } = useConfirm();
 
   async function reset(action: "resetDay" | "resetAll", confirmText: string) {
-    if (!confirm(confirmText)) return;
+    const confirmLabel = action === "resetAll" ? "Wipe everything" : "Clear today";
+    if (!(await ask(confirmText, { confirmLabel, danger: true }))) return;
     setBusy(true);
     onError(null);
     try {
@@ -1410,6 +1438,7 @@ function DangerZone({
           Use &ldquo;wipe everything&rdquo; before every new event (and once to clear the demo teams).
         </span>
       </div>
+      {dialog}
     </details>
   );
 }
@@ -1684,9 +1713,11 @@ function PanelCard({
   const [slotCount, setSlotCount] = useState(panel.slot_count);
   const [slotMinutes, setSlotMinutes] = useState(panel.slot_minutes);
   const [slotStart, setSlotStart] = useState(toLocalInput(panel.slot_start_at));
+  const { ask, dialog } = useConfirm();
 
   return (
     <div className="space-y-3 rounded-xl bg-surface p-4 ring-1 ring-inset ring-line">
+      {dialog}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold">{panel.name}</h3>
@@ -1740,17 +1771,21 @@ function PanelCard({
         Division
         <select
           value={panel.division}
-          onChange={(e) => {
+          onChange={async (e) => {
+            // Read it now: the select snaps back to the panel's division while
+            // the question is open, so e.target.value is stale by the answer.
+            const division = e.target.value;
             if (
-              !confirm(
-                `Move ${panel.name} to ${e.target.value}?\n\n` +
+              !(await ask(
+                `Move ${panel.name} to ${division}?\n\n` +
                   "Its current teams stay in their own division and become " +
                   "unassigned, so you will need to give them to another panel.",
-              )
+                { confirmLabel: "Move division", danger: true },
+              ))
             ) {
               return;
             }
-            onPatch(panel.id, { division: e.target.value });
+            onPatch(panel.id, { division });
           }}
           className={`${inputClass} mt-1 py-2 text-sm`}
         >
@@ -1819,7 +1854,14 @@ function PanelCard({
 
       <button
         onClick={async () => {
-          if (!confirm(`Delete ${panel.name}? Its teams become unassigned.`)) return;
+          if (
+            !(await ask(`Delete ${panel.name}? Its teams become unassigned.`, {
+              confirmLabel: "Delete panel",
+              danger: true,
+            }))
+          ) {
+            return;
+          }
           try {
             await call(`/api/admin/panels?id=${panel.id}`, { method: "DELETE" });
             await onReload();

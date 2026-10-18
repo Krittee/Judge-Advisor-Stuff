@@ -38,18 +38,18 @@ test("the Event setup screen shows once loaded when there is no setup for today,
   assert.ok(pageSrc.includes("onCancel={needsEventSetup(setup, today) ? undefined : () => setEditingSetup(false)}"));
 });
 
-test("saving the setup is a PUT with the device's date, behind the app's confirm for a change", () => {
+test("saving the setup is a PUT with the device's date, behind the in-page confirm for a change", () => {
   assert.match(
     pageSrc,
     /call\("\/api\/referee-setup", \{ method: "PUT", body: setupRequest\(nextRuleset, count, today\) \}\)/,
   );
   const save = pageSrc.slice(pageSrc.indexOf("async function saveSetup"), pageSrc.indexOf("if (session === undefined)"));
-  assert.ok(save.indexOf("setupChangeQuestion(") < save.indexOf("confirm(question)"));
-  assert.ok(save.indexOf("confirm(question)") < save.indexOf("await call("), "the question comes before the save");
+  assert.ok(save.indexOf("setupChangeQuestion(") < save.indexOf("await ask(question"));
+  assert.ok(save.indexOf("await ask(question") < save.indexOf("await call("), "the question comes before the save");
 });
 
-test("the setup is reachable later from the match sheet's Change link and from a menu row", () => {
-  assert.match(pageSrc, /onChangeProgram=\{\(\) => \{\s*setSheetOpen\(false\);\s*setEditingSetup\(true\);/);
+test("the setup is reachable later from the Event setup row, not from the match sheet", () => {
+  assert.ok(!pageSrc.includes("onChangeProgram") && !sheetSrc.includes("onChangeProgram"));
   assert.match(pageSrc, /className="rf-setup-link" onClick=\{\(\) => setEditingSetup\(true\)\}/);
 });
 
@@ -111,9 +111,12 @@ test("Set the match is a real modal dialog that closes on Escape and the backdro
   assert.match(sheetSrc, /e\.target === e\.currentTarget/, "a click on the backdrop closes it");
   assert.ok(sheetSrc.includes("onClose={() =>"), "Escape is reported to the caller");
   assert.ok(sheetSrc.includes("<MatchFields"), "the controls are the shared ones");
-  for (const text of ["Set the match", "set for this event", "Use this match", "Stays set for every team you flag until you change it."]) {
+  for (const text of ["Set the match", "Use this match", "Stays set for every team you flag until you change it."]) {
     assert.ok(sheetSrc.includes(text), `the sheet lost "${text}"`);
   }
+  // The program is the event's: it is the bar's read-only tag, not a line in the sheet.
+  assert.ok(!sheetSrc.includes("set for this event") && !sheetSrc.includes("onChangeProgram"));
+  assert.ok(!css.includes(".rf-prog") && !css.includes(".rf-lnk"), "its styles went with it");
   // The sheet edits a copy: backing out leaves the match as it was.
   assert.ok(sheetSrc.includes("useState(value)") && sheetSrc.includes("onUse(draft)"));
 });

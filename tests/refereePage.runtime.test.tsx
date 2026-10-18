@@ -91,17 +91,15 @@ const sheet = (open: boolean, rulesetId = "v5rc") =>
       value={{ matchType: "QF", matchNumber: "2-1", field: "2" }}
       onUse={noop}
       onClose={noop}
-      onChangeProgram={noop}
     />,
   );
 
-test("the open sheet names the event's program, offers the shared match controls and the confirm", () => {
+test("the open sheet offers the shared match controls and the confirm, with no program line", () => {
   const markup = sheet(true);
   assert.match(markup, /<dialog[^>]*aria-modal="true"[^>]*aria-labelledby=/);
   assert.match(markup, /Set the match/);
-  assert.match(markup, /Program: <b>V5RC<\/b>/);
-  assert.match(markup, /set for this event/);
-  assert.match(markup, />Change</, "the program line links to the event setup");
+  assert.doesNotMatch(markup, /Program:|set for this event/, "the program is the event's, shown on the bar");
+  assert.doesNotMatch(markup, />Change</, "and changed from Event setup, not from the sheet");
   assert.match(markup, /aria-label="Match group"/, "Teamwork | Skills");
   assert.match(markup, /aria-label="Round of 16 \(R16\)"/, "V5RC's bracket types");
   assert.match(markup, /3 fields · set in event setup/);
@@ -111,9 +109,8 @@ test("the open sheet names the event's program, offers the shared match controls
   assert.match(markup, /id="rf-sheet-bracket"[^>]*value="2"/);
 });
 
-test("the sheet's program line follows the event: VIQRC has no eliminations", () => {
+test("the sheet's match types follow the event's program: VIQRC has no eliminations", () => {
   const markup = sheet(true, "viqrc");
-  assert.match(markup, /Program: <b>VIQRC<\/b>/);
   assert.doesNotMatch(markup, /Round of 16/);
 });
 
@@ -132,7 +129,6 @@ test("Use this match is off until the match is complete", () => {
       value={{ matchType: "Q", matchNumber: "", field: "" }}
       onUse={noop}
       onClose={noop}
-      onChangeProgram={noop}
     />,
   );
   assert.match(incomplete, /<button[^>]*disabled=""[^>]*>Use this match/);

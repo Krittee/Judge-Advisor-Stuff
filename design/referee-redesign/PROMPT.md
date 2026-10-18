@@ -177,8 +177,8 @@ as today apart from the new fields.
 2. **Pinned "Current match" bar:** shows e.g. "QF 2-1 · Field 2", a small
    read-only program tag ("V5RC"), and a Change button that opens the **Set
    the match** bottom sheet:
-   - **Program line:** "Program: V5RC · set for this event", read-only, with
-     a "Change" link to the Event setup screen.
+   - **No program line:** the program is shown only as the bar's read-only
+     tag and is changed from Event setup (the row at the foot of Report).
    - **Group:** a "Teamwork | Skills" segmented control.
    - **Teamwork:** the program's type chips. A number stepper for single
      numbers, or "Bracket" + "Match" inputs for V5RC eliminations.
