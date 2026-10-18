@@ -296,9 +296,18 @@ function Referee() {
           <b>{matchReference(matchType, matchNumber) ?? "Not set"}</b>
         </div>
         {fieldLabel(field) ? <span className="rf-mchip">{fieldLabel(field)}</span> : null}
-        <span className="rf-ptag" title="The program for this event">
+        <button
+          type="button"
+          className="rf-ptag"
+          aria-label={`Event setup: ${ruleset.program}, ${fieldCount} ${fieldCount === 1 ? "field" : "fields"}`}
+          title="Event setup"
+          onClick={() => setEditingSetup(true)}
+        >
           {ruleset.program}
-        </span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
         <button type="button" className="rf-chg" onClick={() => setSheetOpen(true)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />

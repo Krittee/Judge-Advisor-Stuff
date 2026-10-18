@@ -98,7 +98,17 @@ test("the current-match bar shows the match, the field and the read-only program
   assert.ok(bar.includes('aria-label="Current match"'));
   assert.ok(bar.includes("matchReference(matchType, matchNumber)") && bar.includes("fieldLabel(field)"));
   assert.ok(bar.includes("{ruleset.program}"));
-  assert.ok(!/<button[^>]*>\s*\{ruleset\.program\}/.test(bar), "the program tag is not a control");
+  // The program tag is a button that opens Event setup (reachable from the top, not only the Report footer).
+  const tag = bar.slice(bar.lastIndexOf("<button", bar.indexOf('className="rf-ptag"')), bar.indexOf("</button>", bar.indexOf('className="rf-ptag"')));
+  assert.ok(tag.includes('<button') && tag.includes('type="button"'), "the program tag is a button");
+  assert.ok(tag.includes("aria-label={`Event setup: ${ruleset.program}, ${fieldCount}"));
+  assert.ok(tag.includes("onClick={() => setEditingSetup(true)}"));
+  assert.ok(tag.includes("{ruleset.program}") && tag.includes('aria-hidden="true"'));
+  const css = read("src/app/globals.css");
+  const ptag = css.match(/\.rf-ptag::before \{([^}]*)\}/)?.[1] ?? "";
+  const [vy, vx] = (ptag.match(/inset:\s*(-?\d+)px\s+(-?\d+)px/) ?? []).slice(1).map(Number);
+  assert.ok(24 + 2 * -vy >= 44, "the 24px pill keeps a >= 44px tall hit area");
+  assert.ok(-vx <= 8, "the hit area stays inside the bar's 8px gap so it never reaches Change");
   assert.ok(bar.includes("setSheetOpen(true)"));
 });
 

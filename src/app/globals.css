@@ -1051,7 +1051,10 @@ body:has(.referee) > .theme-toggle:hover {
 .rf-mm span { margin-bottom: 3px; color: var(--ink-subtle); font-weight: 500; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
 .rf-mm b { font-weight: 700; font-size: 28px; line-height: 1; letter-spacing: -0.01em; }
 .rf-mchip { display: inline-flex; height: 28px; align-items: center; padding: 0 10px; border-radius: 8px; background: var(--rf-ref-tint); color: var(--rf-ref); font-weight: 500; font-size: 13px; white-space: nowrap; }
-.rf-ptag { display: inline-flex; height: 24px; align-items: center; padding: 0 7px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink-subtle); font-weight: 500; font-size: 12px; letter-spacing: 0.04em; white-space: nowrap; }
+/* The program tag opens Event setup. The pill stays 24px; the ::before grows the hit area to 44px (inside the bar's 8px gap, so it never reaches Change). */
+.rf-ptag { position: relative; display: inline-flex; height: 24px; align-items: center; gap: 3px; padding: 0 5px 0 7px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--ink-subtle); font-weight: 500; font-size: 12px; letter-spacing: 0.04em; white-space: nowrap; cursor: pointer; }
+.rf-ptag::before { content: ""; position: absolute; inset: -10px -6px; }
+.rf-ptag:hover, .rf-ptag:focus-visible { border-color: var(--accent); color: var(--ink); }
 .rf-chg {
   display: flex; min-height: 44px; align-items: center; gap: 6px; margin-left: auto; padding: 0 12px;
   border: 1.5px solid var(--rf-field-line); border-radius: 12px; background: transparent; font-weight: 500; font-size: 14px;
