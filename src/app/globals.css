@@ -548,7 +548,9 @@ textarea {
  * or tiles elsewhere.
  * ------------------------------------------------------------------ */
 
-.signin {
+/* The team landing page (.landing) shares these tokens and this full-height column. */
+.signin,
+.landing {
   --si-accent-hover: oklch(0.730 0.125 258);
   --si-danger-text: oklch(0.800 0.110 18);
   --si-danger-tint: oklch(0.555 0.200 18 / 0.16);
@@ -577,7 +579,8 @@ textarea {
   color: var(--ink);
 }
 
-:root[data-theme="light"] .signin {
+:root[data-theme="light"] .signin,
+:root[data-theme="light"] .landing {
   --si-accent-hover: oklch(0.455 0.160 258);
   --si-danger-text: oklch(0.470 0.180 18);
   --si-danger-tint: oklch(0.560 0.200 18 / 0.08);
@@ -615,12 +618,14 @@ textarea {
 
 /* The app's one floating theme toggle, docked into the pass's top row
    here: floating bottom-right it would sit on top of the Sign in button. */
-body:has(.signin) > .theme-toggle {
+body:has(.signin) > .theme-toggle,
+body:has(.landing) > .theme-toggle {
   position: absolute; top: 6px; right: 8px; bottom: auto;
   width: 44px; height: 44px; border: 0; border-radius: 12px;
   background: transparent; box-shadow: none; color: var(--ink-subtle);
 }
-body:has(.signin) > .theme-toggle:hover {
+body:has(.signin) > .theme-toggle:hover,
+body:has(.landing) > .theme-toggle:hover {
   transform: none; color: var(--ink);
   background: color-mix(in oklch, var(--accent) 12%, transparent);
 }
@@ -779,6 +784,120 @@ body:has(.signin) > .theme-toggle:hover {
   .si-body { padding: 32px 44px 28px; }
   .si-title { font-size: 30px; }
   .si-form { gap: 18px; margin-top: 18px; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Team landing page ("Pit ticket", design/landing-redesign/)
+ *
+ * Reuses the sign-in tokens above (.landing is listed beside .signin),
+ * plus .si-alert and .si-btn for the banner and button.
+ * ------------------------------------------------------------------ */
+
+.landing {
+  --lp-judge-tint: oklch(0.680 0.140 258 / 0.12);
+  --lp-judge-line: oklch(0.680 0.140 258 / 0.45);
+  --lp-tile: oklch(0.955 0.005 265 / 0.08);
+}
+:root[data-theme="light"] .landing {
+  --lp-judge-tint: oklch(0.510 0.160 258 / 0.07);
+  --lp-judge-line: oklch(0.510 0.160 258 / 0.35);
+  --lp-tile: oklch(0.225 0.016 265 / 0.06);
+}
+
+.lp-top { display: flex; flex: none; height: 44px; align-items: center; padding: 6px 8px 6px 16px; }
+body:has(.landing) > .theme-toggle { top: 0; }
+.lp-brand { display: flex; min-width: 0; align-items: center; gap: 8px; white-space: nowrap; }
+.lp-mark { display: grid; flex: none; width: 26px; height: 26px; place-items: center; border-radius: 8px; background: var(--accent); color: var(--accent-ink); }
+.lp-brand-n, .lp-title, .lp-input, .lp-h-small, .lp-h-caps, .lp-t-lg, .lp-pill {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+.lp-brand-n { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
+.lp-brand-s { color: var(--ink-subtle); font-size: 14px; }
+
+.lp-stage { display: flex; flex: 1; }
+.lp-grid { width: 100%; max-width: 920px; margin: 0 auto; }
+
+.lp-ticket { margin: 0 16px; overflow: hidden; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); box-shadow: var(--si-shadow); }
+.lp-t-top { padding: 14px 20px 6px; }
+.lp-title { margin: 0; font-weight: 700; font-size: 28px; line-height: 1.1; letter-spacing: -0.02em; }
+.lp-intro { margin: 6px 0 0; color: var(--ink-subtle); font-size: 15px; line-height: 1.4; }
+.lp-perf { position: relative; height: 2px; }
+.lp-dash { position: absolute; top: 0; right: 14px; left: 14px; border-top: 2px dashed var(--line); }
+.lp-notch { position: absolute; top: -6px; width: 14px; height: 14px; border-radius: 50%; background: var(--canvas); box-shadow: inset 0 0 0 1px var(--line); }
+.lp-notch--l { left: -8px; }
+.lp-notch--r { right: -8px; }
+.lp-t-bot { padding: 12px 20px 14px; }
+.lp-label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 15px; line-height: 1.4; }
+.lp-input {
+  width: 100%; height: 60px; margin: 0; padding: 0 18px 0 calc(18px + 0.12em);
+  border: 1.5px solid var(--si-field-line); border-radius: 14px; background: var(--si-field); color: var(--ink);
+  text-align: center; font-weight: 700; font-size: 40px; letter-spacing: 0.12em; text-transform: uppercase;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.lp-input::placeholder { color: var(--ink-subtle); opacity: 1; }
+.lp-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--si-ring); }
+.lp-input[aria-invalid="true"] { border-color: var(--danger); }
+.lp-input[aria-invalid="true"]:focus { box-shadow: 0 0 0 3px var(--si-danger-tint); }
+.lp-alert { margin-top: 6px; padding: 10px 12px; line-height: 1.35; }
+.lp-btn { height: 52px; margin-top: 12px; }
+.lp-btn:active:not(:disabled) { transform: none; }
+
+.lp-legend { margin: 6px 16px 0; padding: 8px 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.lp-h-small { margin: 0 0 6px; color: var(--ink-subtle); font-weight: 600; font-size: 14px; line-height: 1.4; }
+.lp-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 0; padding: 0; list-style: none; }
+.lp-key { display: flex; align-items: center; gap: 8px; font-size: 14px; line-height: 1.4; }
+.lp-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; }
+
+.lp-board, .lp-row {
+  display: flex; align-items: center; gap: 12px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink);
+  text-decoration: none; transition: border-color 0.15s;
+}
+.lp-board:hover, .lp-board:focus-visible, .lp-row:hover, .lp-row:focus-visible { border-color: var(--accent); }
+.lp-board { min-height: 56px; margin: 8px 16px 0; padding: 8px 14px; }
+.lp-tile { flex: none; width: 40px; height: 40px; overflow: hidden; border-radius: 12px; background: var(--lp-tile); }
+.lp-tile img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.lp-pill {
+  display: inline-block; margin-left: 8px; padding: 2px 6px; vertical-align: middle;
+  border: 1px solid var(--accent); border-radius: 999px; color: var(--accent);
+  font-weight: 700; font-size: 10px; line-height: 1.2; letter-spacing: 0.16em;
+}
+.lp-chev { flex: none; color: var(--ink-subtle); }
+
+.lp-staff, .lp-team { margin: 6px 16px 0; }
+.lp-h-caps { margin: 0 0 4px; color: var(--ink-subtle); font-weight: 700; font-size: 12px; line-height: 1.4; letter-spacing: 0.2em; text-transform: uppercase; }
+.lp-row { min-height: 48px; margin-bottom: 4px; padding: 4px 14px; }
+.lp-row:last-child { margin-bottom: 0; }
+.lp-row--judge {
+  min-height: 64px; margin-bottom: 0; padding: 10px 14px;
+  border-color: var(--lp-judge-line);
+  background: linear-gradient(var(--lp-judge-tint), var(--lp-judge-tint)), var(--surface);
+}
+.lp-rt { display: flex; flex: 1; min-width: 0; flex-direction: column; }
+.lp-t { font-weight: 500; font-size: 15px; line-height: 1.35; }
+.lp-t-lg { font-weight: 600; font-size: 16px; line-height: 1.3; }
+.lp-s { color: var(--ink-subtle); font-size: 13px; line-height: 1.35; }
+.lp-avs { display: flex; flex: none; }
+.lp-av { display: block; width: 32px; height: 32px; border-radius: 22%; box-shadow: 0 0 0 2px var(--surface); }
+.lp-av + .lp-av { margin-left: -8px; }
+.lp-av img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 22%; }
+.lp-row--judge .lp-av { width: 40px; height: 40px; box-shadow: none; }
+
+@media (min-width: 768px) {
+  .lp-top { height: auto; padding: 20px 28px; }
+  body:has(.landing) > .theme-toggle { top: 11px; right: 28px; }
+  .lp-grid { display: grid; grid-template-columns: 1.15fr 1fr; align-items: start; gap: 32px; margin: auto; padding: 8px 32px 32px; }
+  .lp-ticket, .lp-legend { margin: 0; }
+  .lp-title { font-size: 36px; }
+  .lp-input { height: 84px; font-size: 46px; }
+  .lp-keys { grid-template-columns: 1fr; }
+  .lp-board { margin: 16px 0 0; }
+  .lp-staff { margin: 20px 0 0; }
+  .lp-team { margin: 16px 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing *, .landing *::before, .landing *::after { transition: none !important; }
 }
 
 @keyframes si-bar { from { transform: translateX(-100%); } to { transform: translateX(260%); } }

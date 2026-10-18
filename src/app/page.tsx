@@ -1,14 +1,22 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- 20-30 KB static avatars; next/image buys nothing here. */
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Banner, Button, inputClass, StatusLegend } from "@/components/ui";
+import { STATUS_META, type Status } from "@/lib/status";
 import { filterTeamNumberInput, isValidTeamNumber } from "@/lib/teamNumber";
+
+/** The statuses a team can see on the board, in the order they happen. */
+const LEGEND: Status[] = ["scheduled", "requested", "acknowledged", "interviewing", "completed"];
 
 /**
  * The front door. A team member with a phone, standing in a loud pit,
  * should be able to get from here to "we asked for a judge" in two taps.
+ *
+ * Styles live under `.landing` in globals.css ("Pit ticket",
+ * design/landing-redesign/).
  */
 export default function Home() {
   const router = useRouter();
@@ -25,53 +33,145 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-5 py-12">
-      <div className="mb-10 text-center">
-        <h1 className="text-4xl font-bold tracking-tight">Judge Queue</h1>
-        <p className="mt-3 text-ink-subtle">
-          Enter your team number to book a judging slot or call for a judge now.
-        </p>
-      </div>
+    <div className="landing">
+      <header className="lp-top">
+        <div className="lp-brand">
+          <span className="lp-mark" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+              <path d="M5 7h14M5 12h10M5 17h6" />
+            </svg>
+          </span>
+          <span className="lp-brand-n">Judge Queue</span>
+          <span className="lp-brand-s">VEX IQ · V5RC</span>
+        </div>
+        {/* The app's theme toggle docks into this row via CSS. */}
+      </header>
 
-      <form onSubmit={go} className="space-y-4">
-        <input
-          value={number}
-          onChange={(e) => {
-            setNumber(filterTeamNumberInput(e.target.value));
-            setError(null);
-          }}
-          autoCapitalize="characters"
-          autoCorrect="off"
-          autoComplete="off"
-          autoFocus
-          placeholder="Team number"
-          aria-label="Team number"
-          className={`${inputClass} py-5 text-center text-3xl font-bold tracking-widest`}
-        />
+      <main className="lp-stage">
+        <div className="lp-grid">
+          <section className="lp-ticket" aria-labelledby="lp-title">
+            <div className="lp-t-top">
+              <h1 className="lp-title" id="lp-title">Find your team</h1>
+              <p className="lp-intro">
+                Enter your team number to book a judging slot or call for a judge now.
+              </p>
+            </div>
+            <div className="lp-perf" aria-hidden="true">
+              <span className="lp-dash" />
+              <span className="lp-notch lp-notch--l" />
+              <span className="lp-notch lp-notch--r" />
+            </div>
+            <form onSubmit={go} className="lp-t-bot">
+              <label className="lp-label" htmlFor="lp-team">Team number</label>
+              <input
+                id="lp-team"
+                className="lp-input"
+                value={number}
+                onChange={(e) => {
+                  setNumber(filterTeamNumberInput(e.target.value));
+                  setError(null);
+                }}
+                autoFocus
+                autoCapitalize="characters"
+                autoCorrect="off"
+                autoComplete="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                maxLength={12}
+                placeholder="1234A"
+                aria-invalid={error !== null}
+                aria-describedby={error ? "lp-error" : undefined}
+              />
+              {error ? (
+                <div className="si-alert lp-alert" role="alert" id="lp-error">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7.5v5.5M12 16.5v.01" />
+                  </svg>
+                  <span>{error}</span>
+                </div>
+              ) : null}
+              <button type="submit" className="si-btn lp-btn" disabled={!number}>
+                Continue
+              </button>
+            </form>
+          </section>
 
-        {error ? <Banner kind="error">{error}</Banner> : null}
+          <div>
+            <section className="lp-legend" aria-labelledby="lp-legend">
+              <h2 className="lp-h-small" id="lp-legend">What the colours mean</h2>
+              <ul className="lp-keys">
+                {LEGEND.map((s) => (
+                  <li key={s} className="lp-key">
+                    <span className={`lp-dot ${STATUS_META[s].dot}`} aria-hidden="true" />
+                    {STATUS_META[s].label}
+                  </li>
+                ))}
+              </ul>
+            </section>
 
-        <Button type="submit" size="lg" className="w-full" disabled={!number}>
-          Continue
-        </Button>
-      </form>
+            <Link href="/board" className="lp-board">
+              <span className="lp-tile">
+                <img src="/avatars/live-board.jpg" alt="" width={40} height={40} />
+              </span>
+              <span className="lp-rt">
+                <span className="lp-t-lg">
+                  Live board<span className="lp-pill">LIVE</span>
+                </span>
+                <span className="lp-s">See every team&apos;s judging status</span>
+              </span>
+              <Chevron />
+            </Link>
 
-      <div className="mt-12 rounded-2xl bg-surface p-5 ring-1 ring-inset ring-line">
-        <h2 className="mb-3 text-sm font-semibold text-ink-muted">What the colours mean</h2>
-        <StatusLegend />
-      </div>
+            <section className="lp-staff" aria-labelledby="lp-judges">
+              <h2 className="lp-h-caps" id="lp-judges">Judges</h2>
+              <Link href="/judge/login" className="lp-row lp-row--judge">
+                <span className="lp-avs" aria-hidden="true">
+                  <span className="lp-av"><img src="/avatars/judge.jpg" alt="" width={40} height={40} /></span>
+                </span>
+                <span className="lp-rt">
+                  <span className="lp-t-lg">Judge sign in</span>
+                  <span className="lp-s">Panel code from your Judge Advisor</span>
+                </span>
+                <Chevron />
+              </Link>
+            </section>
 
-      <nav className="mt-10 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-ink-faint">
-        <Link href="/board" className="hover:text-ink-muted">
-          Live board
-        </Link>
-        <Link href="/login" className="hover:text-ink-muted">
-          Judge / staff sign in
-        </Link>
-        <Link href="/referee/login" className="hover:text-ink-muted">
-          Referee sign in
-        </Link>
-      </nav>
-    </main>
+            <section className="lp-team" aria-labelledby="lp-event">
+              <h2 className="lp-h-caps" id="lp-event">Event team</h2>
+              <Link href="/login" className="lp-row">
+                <span className="lp-avs" aria-hidden="true">
+                  <span className="lp-av"><img src="/avatars/judge-advisor.jpg" alt="" width={32} height={32} /></span>
+                  <span className="lp-av"><img src="/avatars/queue-desk.jpg" alt="" width={32} height={32} /></span>
+                </span>
+                <span className="lp-rt">
+                  <span className="lp-t">Event team sign in</span>
+                  <span className="lp-s">Judge Advisors and queue desk</span>
+                </span>
+                <Chevron />
+              </Link>
+              <Link href="/referee/login" className="lp-row">
+                <span className="lp-avs" aria-hidden="true">
+                  <span className="lp-av"><img src="/avatars/referee.jpg" alt="" width={32} height={32} /></span>
+                </span>
+                <span className="lp-rt">
+                  <span className="lp-t">Referee sign in</span>
+                  <span className="lp-s">Record flags during matches</span>
+                </span>
+                <Chevron />
+              </Link>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function Chevron() {
+  return (
+    <svg className="lp-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 6l6 6-6 6" />
+    </svg>
   );
 }
