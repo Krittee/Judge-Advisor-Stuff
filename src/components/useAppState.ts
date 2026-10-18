@@ -14,6 +14,7 @@ const EMPTY: AppState = {
   conflicts: [],
   pitFloor: { columns: "right-to-left", rows: "bottom-to-top" },
   matchTypes: [],
+  refereeSetup: null,
   flagKinds: [],
   flags: [],
   viewer: {

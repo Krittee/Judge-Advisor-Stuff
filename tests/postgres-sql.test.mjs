@@ -297,3 +297,108 @@ test("migrate() cancels duplicate live requests before it creates the one-live-p
     "the extra rows are picked per team, keeping one",
   );
 });
+
+/* ---- the referee setup and the alliance (no database here either) ----------
+
+   Nothing below runs against Postgres. The recording stand-in shows the
+   statements and parameters the store sends -- the placeholders line up with
+   their values, the alliance goes in the column it is named for -- and the
+   source checks show migrate() and supabase/schema.sql agree. What they
+   cannot show is that Postgres accepts the SQL. */
+
+const sent = (match) => calls.filter((c) => match.test(c.sql));
+
+test("migrate() creates the single-row referee_setup table, locks it down, and adds flags.alliance", () => {
+  const body = src.slice(src.indexOf("async function migrate()"));
+  assert.match(
+    body,
+    /create table if not exists referee_setup \(\s*id\s+int primary key default 1 check \(id = 1\),\s*ruleset\s+text not null,\s*field_count int not null check \(field_count between 1 and 20\),\s*set_by\s+text not null,\s*set_on\s+text not null,\s*updated_at\s+timestamptz not null default now\(\)\s*\);/,
+  );
+  assert.ok(body.includes("alter table referee_setup enable row level security;"), "RLS must cover the new table");
+  assert.ok(body.includes("alter table flags add column if not exists alliance text check (alliance in ('red','blue'));"));
+  /* The alter is additive and sits inside the guarded block, after the table it alters exists. */
+  assert.ok(body.indexOf("create table if not exists flags") < body.indexOf("add column if not exists alliance"));
+
+  const schema = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
+  assert.match(schema, /create table referee_setup \(\s*id\s+int primary key default 1 check \(id = 1\),/);
+  assert.match(schema, /field_count int not null check \(field_count between 1 and 20\)/);
+  assert.ok(schema.includes("alter table referee_setup enable row level security;"));
+  assert.ok(schema.includes("drop table if exists referee_setup cascade;"));
+});
+
+test("createFlag and updateFlag send the alliance in the column it is named for", async () => {
+  const flag = {
+    teamId: "t1",
+    kind: "minor",
+    body: "",
+    author: "Dana",
+    matchType: "QF",
+    matchNumber: "2-1",
+    alliance: "blue",
+    field: "2",
+    rule: "GG17",
+    ruleset: "v5rc",
+    manualVersion: "2.1",
+    matchAffecting: true,
+  };
+
+  calls.length = 0;
+  answer = () => [{ id: "f1" }];
+  await postgresStore.createFlag(flag);
+  const [insert] = sent(/^insert into flags/);
+  assert.match(
+    insert.sql,
+    /\(team_id, kind, body, author, match_type, match_number, field, rule, ruleset, manual_version, match_affecting, alliance\) values \(\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10, \$11, \$12\)/,
+  );
+  assert.deepEqual(insert.params, ["t1", "minor", "", "Dana", "QF", "2-1", "2", "GG17", "v5rc", "2.1", true, "blue"]);
+
+  calls.length = 0;
+  await postgresStore.createFlag({ ...flag, matchType: "SKD", matchNumber: "1", alliance: null });
+  assert.equal(sent(/^insert into flags/)[0].params[11], null, "a Skills run stores a null alliance");
+
+  calls.length = 0;
+  await postgresStore.updateFlag("f1", { ...flag, alliance: "red" });
+  const [update] = sent(/^update flags/);
+  assert.match(update.sql, /match_affecting = \$10, alliance = \$11 where id = \$1 returning \*$/);
+  assert.equal(update.params[10], "red");
+  assert.equal(update.params.length, 11);
+});
+
+test("the referee setup is one upserted row, read back by name, never by its key", async () => {
+  const row = { ruleset: "v5rc", field_count: 3, set_by: "Dana", set_on: "2026-09-09", updated_at: new Date("2026-09-09T01:02:03.456Z") };
+
+  calls.length = 0;
+  answer = () => [row];
+  const saved = await postgresStore.saveRefereeSetup({ ruleset: "v5rc", fieldCount: 3, setBy: "Dana", setOn: "2026-09-09" });
+  const [upsert] = sent(/^insert into referee_setup/);
+  assert.match(
+    upsert.sql,
+    /^insert into referee_setup \(id, ruleset, field_count, set_by, set_on\) values \(1, \$1, \$2, \$3, \$4\) on conflict \(id\) do update set ruleset = excluded\.ruleset, field_count = excluded\.field_count, set_by = excluded\.set_by, set_on = excluded\.set_on, updated_at = now\(\) returning ruleset, field_count, set_by, set_on, updated_at$/,
+  );
+  assert.deepEqual(upsert.params, ["v5rc", 3, "Dana", "2026-09-09"]);
+  assert.deepEqual(saved, { ...row, updated_at: "2026-09-09T01:02:03.456Z" }, "the driver's Date becomes the ISO string the app speaks");
+  assert.equal(saved.set_on, "2026-09-09", "set_on stays the text it was sent as");
+
+  calls.length = 0;
+  const read = await postgresStore.getRefereeSetup();
+  assert.equal(sent(/^select .* from referee_setup/)[0].sql, "select ruleset, field_count, set_by, set_on, updated_at from referee_setup");
+  assert.deepEqual(read, saved);
+
+  answer = () => [];
+  assert.equal(await postgresStore.getRefereeSetup(), null, "no row means no setup");
+});
+
+test("a full wipe truncates the referee setup with the event; a day reset leaves it", async () => {
+  answer = () => [];
+  calls.length = 0;
+  await postgresStore.resetAll();
+  const [wipe] = sent(/^truncate/);
+  assert.match(wipe.sql, /\breferee_setup\b/);
+  assert.ok(wipe.sql.endsWith("cascade"));
+
+  calls.length = 0;
+  await postgresStore.resetDay();
+  const [day] = sent(/^truncate/);
+  assert.ok(day && !/referee_setup/.test(day.sql), "the setup is the event's, not the day's");
+  assert.ok(!/\bflags\b/.test(day.sql));
+});

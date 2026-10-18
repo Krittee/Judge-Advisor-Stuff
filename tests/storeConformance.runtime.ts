@@ -323,7 +323,8 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       author: "Referee",
       matchType: "Q",
       matchNumber: "3",
-      field: "Field 1",
+      alliance: "red",
+      field: "1",
       rule: "SG6",
       ruleset: "viqrc",
       manualVersion: null,
@@ -354,7 +355,8 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       author: "Referee",
       matchType: "Q",
       matchNumber: "4",
-      field: "Field 2",
+      alliance: "blue",
+      field: "2",
       rule: null,
       ruleset: "viqrc",
       manualVersion: null,
@@ -600,7 +602,7 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
 
   /* ---- flags and the event boundary ----------------------------------- */
 
-  it("a flag keeps its ruleset, rules, manual version and match-affecting through create and correct", async (store) => {
+  it("a flag keeps its ruleset, rules, manual version, match-affecting and alliance through create and correct", async (store) => {
     await store.upsertTeams([teamInput("1001")]);
     const team = await store.findTeamByNumber("1001");
     assert.ok(team);
@@ -610,9 +612,10 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       kind: "major",
       body: "Held a robot for a count of five.",
       author: "Referee",
-      matchType: "Q",
-      matchNumber: "3",
-      field: "ES1",
+      matchType: "QF",
+      matchNumber: "2-1",
+      alliance: "blue",
+      field: "1",
       rule: "GG17,SG9",
       ruleset: "v5rc",
       manualVersion: "2.1",
@@ -623,12 +626,23 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       ruleset: f.ruleset,
       manual_version: f.manual_version,
       match_affecting: f.match_affecting,
+      match: `${f.match_type} ${f.match_number}`,
+      alliance: f.alliance,
+      field: f.field,
     });
-    const v5 = { rule: "GG17,SG9", ruleset: "v5rc", manual_version: "2.1", match_affecting: true };
+    const v5 = {
+      rule: "GG17,SG9",
+      ruleset: "v5rc",
+      manual_version: "2.1",
+      match_affecting: true,
+      match: "QF 2-1",
+      alliance: "blue",
+      field: "1",
+    };
     assert.deepEqual(view(created), v5, "createFlag returns what it stored");
     assert.deepEqual(view((await store.listFlags())[0]), v5, "listFlags reads it back");
 
-    // A flag recorded the old way: no ruleset, not match affecting.
+    // A flag recorded the old way: no ruleset, no alliance, a prefixed field, not match affecting.
     await store.createFlag({
       teamId: team.id,
       kind: "warning",
@@ -636,6 +650,7 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       author: "Referee",
       matchType: "Q",
       matchNumber: "4",
+      alliance: null,
       field: "ES1",
       rule: null,
       ruleset: null,
@@ -644,25 +659,61 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     });
     const legacy = (await store.listFlags()).find((f) => f.match_number === "4");
     assert.ok(legacy);
-    assert.deepEqual(view(legacy), { rule: null, ruleset: null, manual_version: null, match_affecting: false });
+    assert.deepEqual(view(legacy), {
+      rule: null,
+      ruleset: null,
+      manual_version: null,
+      match_affecting: false,
+      match: "Q 4",
+      alliance: null,
+      field: "ES1",
+    });
 
     const corrected = await store.updateFlag(created.id, {
       kind: "minor",
       body: "Held a robot for a count of five.",
-      matchType: "Q",
+      matchType: "SKD",
       matchNumber: "3",
-      field: "ES1",
+      alliance: null,
+      field: "2",
       rule: "SG6",
       ruleset: "viqrc",
       manualVersion: null,
       matchAffecting: false,
     });
-    const iq = { rule: "SG6", ruleset: "viqrc", manual_version: null, match_affecting: false };
-    assert.deepEqual(view(corrected), iq, "updateFlag returns the corrected values");
+    const iq = {
+      rule: "SG6",
+      ruleset: "viqrc",
+      manual_version: null,
+      match_affecting: false,
+      match: "SKD 3",
+      alliance: null,
+      field: "2",
+    };
+    assert.deepEqual(view(corrected), iq, "updateFlag returns the corrected values, alliance cleared");
     assert.deepEqual(
       view((await store.listFlags()).find((f) => f.id === created.id)!),
       iq,
       "and they persisted",
+    );
+
+    const recoloured = await store.updateFlag(legacy.id, {
+      kind: "warning",
+      body: "",
+      matchType: "Q",
+      matchNumber: "4",
+      alliance: "red",
+      field: "ES1",
+      rule: null,
+      ruleset: null,
+      manualVersion: null,
+      matchAffecting: false,
+    });
+    assert.equal(recoloured.alliance, "red", "a legacy flag can be given an alliance");
+    assert.equal(
+      (await store.listFlags()).find((f) => f.id === legacy.id)?.alliance,
+      "red",
+      "and it persisted",
     );
   });
 
@@ -679,11 +730,18 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       author: "Referee",
       matchType: "Q",
       matchNumber: "3",
-      field: "Field 1",
+      alliance: "red",
+      field: "1",
       rule: "SG6",
       ruleset: "viqrc",
       manualVersion: null,
       matchAffecting: false,
+    });
+    const setup = await store.saveRefereeSetup({
+      ruleset: "v5rc",
+      fieldCount: 4,
+      setBy: "Dana",
+      setOn: "2026-09-09",
     });
 
     await store.resetDay();
@@ -694,11 +752,51 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     );
     assert.equal((await store.listRequests()).length, 0, "the day's queue does not");
     assert.equal((await store.listTeams()).length, 1, "nor does the roster go");
+    assert.deepEqual(await store.getRefereeSetup(), setup, "the event's referee setup survives a day reset too");
 
     await store.resetAll();
     assert.deepEqual(await store.listFlags(), [], "a full wipe is the event boundary");
+    assert.equal(await store.getRefereeSetup(), null, "and takes the referee setup with it");
     assert.deepEqual(await store.listTeams(), []);
     assert.deepEqual(await store.listPanels(), []);
+  });
+
+  it("the referee setup is one record per event: absent, saved, read back, replaced", async (store) => {
+    assert.equal(await store.getRefereeSetup(), null, "nothing is set up on a fresh event");
+
+    const first = await store.saveRefereeSetup({
+      ruleset: "v5rc",
+      fieldCount: 3,
+      setBy: "Dana",
+      setOn: "2026-09-09",
+    });
+    assert.deepEqual(
+      { ...first, updated_at: undefined },
+      { ruleset: "v5rc", field_count: 3, set_by: "Dana", set_on: "2026-09-09", updated_at: undefined },
+    );
+    assert.equal(typeof first.field_count, "number", "a count, not the driver's text");
+    assert.equal(first.set_on, "2026-09-09", "the date is kept as the caller wrote it");
+    assert.ok(!Number.isNaN(Date.parse(first.updated_at)), "updated_at is a timestamp");
+    assert.deepEqual(await store.getRefereeSetup(), first, "and it reads back as saved");
+
+    const second = await store.saveRefereeSetup({
+      ruleset: "viqrc",
+      fieldCount: 20,
+      setBy: "Judge Advisor",
+      setOn: "2026-09-10",
+    });
+    assert.deepEqual(
+      { ...second, updated_at: undefined },
+      { ruleset: "viqrc", field_count: 20, set_by: "Judge Advisor", set_on: "2026-09-10", updated_at: undefined },
+      "a second save replaces the first rather than adding a second record",
+    );
+    assert.deepEqual(await store.getRefereeSetup(), second);
+    assert.ok(!("id" in second), "the single row's key is not part of the record");
+
+    await store.resetDay();
+    assert.deepEqual(await store.getRefereeSetup(), second, "a day reset keeps it");
+    await store.resetAll();
+    assert.equal(await store.getRefereeSetup(), null, "a full wipe clears it");
   });
 
   it("a conflict is declared once, however many times it is asked for", async (store) => {

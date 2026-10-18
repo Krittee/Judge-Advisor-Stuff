@@ -21,6 +21,7 @@
 
 drop table if exists activity  cascade;
 drop table if exists scores    cascade;
+drop table if exists referee_setup cascade;
 drop table if exists flags     cascade;
 drop table if exists conflicts cascade;
 drop table if exists notes     cascade;
@@ -161,14 +162,30 @@ create table flags (
   kind            text not null,
   body            text not null,
   author          text not null,
-  match_type      text,
-  match_number    text,
-  field           text,
+  match_type      text,                       -- Q, QF, SKD...; see config/rules/*.json (legacy 'SK')
+  match_number    text,                       -- '23', or '2-1' (bracket-match) for a V5RC elimination
+  alliance        text check (alliance in ('red','blue')),  -- null = Skills run, or recorded before alliances
+  field           text,                       -- the field number, '2'; an old flag may hold 'HS2'
   rule            text,                       -- rule id(s), comma-joined: 'SG6' or 'GG17,SG9'
   ruleset         text,                       -- 'viqrc' / 'v5rc'; null = recorded before rulesets = VEX IQ
   manual_version  text,                       -- manual edition of that ruleset, set by the server
   match_affecting boolean not null default false,
   created_at      timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------
+-- Referee setup — the program and number of fields for this event, set once
+-- and used by every referee. One row, ever: the check on id stops a second.
+-- set_on is the referee device's calendar date (YYYY-MM-DD), kept as text so
+-- the driver cannot shift it with the server timezone.
+-- ---------------------------------------------------------------------
+create table referee_setup (
+  id          int primary key default 1 check (id = 1),
+  ruleset     text not null,                  -- 'viqrc' / 'v5rc'
+  field_count int not null check (field_count between 1 and 20),
+  set_by      text not null,
+  set_on      text not null,
+  updated_at  timestamptz not null default now()
 );
 
 -- ---------------------------------------------------------------------
@@ -234,5 +251,6 @@ alter table requests  enable row level security;
 alter table notes     enable row level security;
 alter table conflicts enable row level security;
 alter table flags     enable row level security;
+alter table referee_setup enable row level security;
 alter table scores    enable row level security;
 alter table activity  enable row level security;

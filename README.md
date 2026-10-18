@@ -526,15 +526,21 @@ They live in `config/event.json` and are yours to change:
 what fits on a chip. Colours are `emerald`, `amber`, `orange`, `rose`,
 `black`, `sky` and `zinc`.
 
-The match types are separate, in the same file:
+The match types depend on the program, so they live with each ruleset in
+`config/rules/*.json` (not in `event.json`), each with a `group` of `teamwork`
+or `skills`. A V5RC elimination (`R16`, `QF`, `SF`, `F`) carries
+`"bracket": true`, which makes its number a bracket and a match (`2-1`):
 
 ```json
 "matchTypes": [
-  { "id": "P", "label": "Practice" },
-  { "id": "Q", "label": "Qualification" },
-  { "id": "F", "label": "Final" }
+  { "id": "Q", "label": "Qualification", "group": "teamwork" },
+  { "id": "QF", "label": "Quarterfinal", "group": "teamwork", "bracket": true },
+  { "id": "SKD", "label": "Driver", "group": "skills" }
 ]
 ```
+
+Skills runs are stored as `SKD` (Driver) and `SKA` (Auto); the older plain
+`SK` stays valid on a flag that already has it but is no longer offered.
 
 ### Signing in
 

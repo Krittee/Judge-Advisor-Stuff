@@ -1,4 +1,5 @@
 import type { Status } from "./status";
+import type { MatchType } from "./rules";
 
 export type Panel = {
   id: string;
@@ -102,10 +103,17 @@ export type FlagRow = {
   kind: string;
   body: string;
   author: string;
-  /** One of config/event.json's matchTypes ids (P/Q/F). Null on a flag
-   *  recorded before this was required. */
+  /** One of the flag's ruleset's matchTypes ids (config/rules/*.json: Q, QF,
+   *  SKD...), or the legacy "SK". Null on a flag recorded before this was
+   *  required. */
   match_type: string | null;
+  /** "23", or "2-1" (bracket and match) for a V5RC elimination. */
   match_number: string | null;
+  /** Which side of the field the team was on. Null for a Skills run and for
+   *  a flag recorded before alliances existed. */
+  alliance: "red" | "blue" | null;
+  /** The field number as a string ("2"); a flag recorded before fields were
+   *  just a number may hold a prefixed one ("HS2"). */
   field: string | null;
   /** Rule ids from src/lib/rules.ts, comma-joined ("GG17,SG9"; one rule is
    *  just "SG6"). Null for Good Conduct, an optional-rule Warning, or a flag
@@ -120,6 +128,23 @@ export type FlagRow = {
   /** The referee marked this Minor/Major as having affected the match. */
   match_affecting: boolean;
   created_at: string;
+};
+
+/**
+ * The program and number of fields every referee works from at this event.
+ * One record per event: saved by any referee or the Judge Advisor, and read
+ * by anyone (nothing in it is secret).
+ */
+export type RefereeSetup = {
+  /** A ruleset id ("viqrc", "v5rc"). */
+  ruleset: string;
+  /** 1 to 20. */
+  field_count: number;
+  /** The name of whoever saved it. */
+  set_by: string;
+  /** YYYY-MM-DD on the saver's own device clock -- see parseRefereeSetup. */
+  set_on: string;
+  updated_at: string;
 };
 
 export type ScoreRow = {
@@ -163,8 +188,11 @@ export type AppState = {
   conflicts: ConflictRow[];
   /** Which way round the pit floor is drawn, so the plan matches the room. */
   pitFloor: { columns: "left-to-right" | "right-to-left"; rows: "top-to-bottom" | "bottom-to-top" };
-  /** The match types a flag can be pinned to (P/Q/F), so it can be traced back. */
-  matchTypes: { id: string; label: string }[];
+  /** The match types a new flag can be pinned to under the event's program
+   *  (VEX IQ's when no setup is saved yet), so it can be traced back. */
+  matchTypes: MatchType[];
+  /** Null until a referee or the Judge Advisor sets the event up. */
+  refereeSetup: RefereeSetup | null;
   /** The kinds of flag a referee can record, with their colours. */
   flagKinds: {
     id: string;

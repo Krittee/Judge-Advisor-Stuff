@@ -3,7 +3,7 @@ import test from "node:test";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-test("day reset retains event-wide flags while full wipe starts a clean event", async () => {
+test("day reset retains event-wide flags and setup while full wipe starts a clean event", async () => {
   process.env.DATA_FILE = join(
     tmpdir(),
     `judge-queue-event-boundary-${process.pid}-${Date.now()}.json`,
@@ -31,7 +31,8 @@ test("day reset retains event-wide flags while full wipe starts a clean event", 
     author: "Head Referee",
     matchType: "Q",
     matchNumber: "23",
-    field: "Field 2",
+    alliance: "red",
+    field: "2",
     rule: "SG6",
     ruleset: "viqrc",
     manualVersion: null,
@@ -44,7 +45,8 @@ test("day reset retains event-wide flags while full wipe starts a clean event", 
     author: "Head Referee",
     matchType: "Q",
     matchNumber: "23",
-    field: "Field 2",
+    alliance: "red",
+    field: "2",
     rule: "SG6",
     ruleset: "viqrc",
     manualVersion: null,
@@ -55,10 +57,20 @@ test("day reset retains event-wide flags while full wipe starts a clean event", 
   assert.equal(beforeReset.length, 2);
   assert.notEqual(beforeReset[0].id, beforeReset[1].id);
 
+  // The event's referee setup is event-wide too: a day reset keeps it.
+  const setup = await fileStore.saveRefereeSetup({
+    ruleset: "v5rc",
+    fieldCount: 3,
+    setBy: "Dana",
+    setOn: "2026-09-09",
+  });
+
   await fileStore.resetDay();
   assert.equal((await fileStore.listFlags(team.id)).length, 2);
+  assert.deepEqual(await fileStore.getRefereeSetup(), setup, "a day reset keeps the referee setup");
 
   await fileStore.resetAll();
   assert.deepEqual(await fileStore.listFlags(), []);
   assert.deepEqual(await fileStore.listTeams(), []);
+  assert.equal(await fileStore.getRefereeSetup(), null, "a full wipe clears the referee setup");
 });

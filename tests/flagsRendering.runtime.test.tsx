@@ -41,7 +41,8 @@ function report(values: Partial<FlagRow> = {}): FlagRow {
     author: "Head Referee",
     match_type: "Q",
     match_number: "23",
-    field: "Field 2",
+    alliance: "red",
+    field: "2",
     rule: "SG6",
     ruleset: "viqrc",
     manual_version: null,
@@ -58,6 +59,7 @@ test("FlagList renders rule, severity, match, field, description, author and tim
   assert.match(markup, /&lt;SG6&gt; — Possession \/ Plowing is limited to a maximum of one \(1\) Bean Bag/);
   assert.match(markup, /VEX IQ/);
   assert.match(markup, /Q23/);
+  assert.match(markup, /Red/, "the alliance reads as a word, not only a colour");
   assert.match(markup, /Field 2/);
   assert.match(markup, /Possessed two Bean Bags\./);
   assert.match(markup, /Head Referee/);
@@ -75,6 +77,7 @@ test("Good Conduct and legacy reports without rule information render no broken 
           rule: null,
           match_type: null,
           match_number: null,
+          alliance: null,
           field: null,
           body: "Legacy report",
         }),
@@ -87,6 +90,49 @@ test("Good Conduct and legacy reports without rule information render no broken 
   assert.match(markup, /Helped reset the Field\./);
   assert.match(markup, /Legacy report/);
   assert.doesNotMatch(markup, /undefined|null|Rule violated/);
+});
+
+test("the alliance is a small dot and its name beside the match reference; none when there is none", () => {
+  const red = renderToStaticMarkup(<FlagList flags={[report({ alliance: "red" })]} kinds={kinds} />);
+  assert.match(red, /Q23/);
+  assert.match(red, /Red/);
+  assert.match(red, /oklch\(0\.620 0\.190 25\)/, "the red dot");
+  assert.doesNotMatch(red, /Blue/);
+
+  const blue = renderToStaticMarkup(<FlagList flags={[report({ alliance: "blue" })]} kinds={kinds} />);
+  assert.match(blue, /Blue/);
+  assert.match(blue, /oklch\(0\.620 0\.150 255\)/, "the blue dot");
+  assert.doesNotMatch(blue, /Red/);
+
+  // A Skills run, or a flag from before alliances: no dot, no name.
+  const none = renderToStaticMarkup(<FlagList flags={[report({ alliance: null })]} kinds={kinds} />);
+  assert.doesNotMatch(none, /Red|Blue|oklch/);
+  assert.match(none, /Q23/);
+});
+
+test("the new match references and field labels read as they should", () => {
+  const read = (values: Partial<FlagRow>) => renderToStaticMarkup(<FlagList flags={[report(values)]} kinds={kinds} />);
+
+  const qf = read({ match_type: "QF", match_number: "2-1", ruleset: "v5rc", field: "3" });
+  assert.match(qf, /QF 2-1/);
+  assert.match(qf, /Field 3/);
+
+  assert.match(read({ match_type: "R16", match_number: "3-1", ruleset: "v5rc" }), /R16 3-1/);
+  assert.match(read({ match_type: "SKD", match_number: "1", alliance: null }), /Driver 1/);
+  assert.match(read({ match_type: "SKA", match_number: "2", alliance: null }), /Auto 2/);
+  assert.doesNotMatch(read({ match_type: "SKD", match_number: "1", alliance: null }), /SKD/);
+});
+
+test("a legacy flag (no alliance, SK, an HS2 field) still renders, as it was recorded", () => {
+  const markup = renderToStaticMarkup(
+    <FlagList
+      flags={[report({ match_type: "SK", match_number: "3", alliance: null, field: "HS2", ruleset: null })]}
+      kinds={kinds}
+    />,
+  );
+  assert.match(markup, /Skills 3/);
+  assert.match(markup, /HS2/, "a prefixed field is shown, not hidden or rewritten");
+  assert.doesNotMatch(markup, /Field HS2|Red|Blue|undefined|null/);
 });
 
 test("Flagged Today counts only reports from the referee's own calendar day", () => {

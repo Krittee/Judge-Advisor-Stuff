@@ -10,6 +10,7 @@ import {
 import { store, StoreError } from "@/lib/db";
 import { parseFlagFields } from "@/lib/flagValidation";
 import type { FlagEdit } from "@/lib/db/types";
+import { fieldLabel, matchReference } from "@/lib/match";
 import { getRuleset } from "@/lib/rules";
 
 export const dynamic = "force-dynamic";
@@ -65,12 +66,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That team no longer exists." }, { status: 404 });
   }
 
-  const parsed = parseFlagFields(body);
+  // The event's setup decides the program a new flag is under and how many
+  // fields there are to pick from. With none saved, parseFlagFields falls back.
+  const setup = await store().getRefereeSetup();
+  const parsed = parseFlagFields(body, {
+    eventRuleset: setup?.ruleset,
+    fieldCount: setup?.field_count,
+  });
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   }
-  const { kind, text, matchType, matchNumber, field, rule, ruleset, manualVersion, matchAffecting } =
-    parsed;
+  const {
+    kind,
+    text,
+    matchType,
+    matchNumber,
+    alliance,
+    field,
+    rule,
+    ruleset,
+    manualVersion,
+    matchAffecting,
+  } = parsed;
 
   const flag = await store().createFlag({
     teamId,
@@ -79,6 +96,7 @@ export async function POST(request: Request) {
     author: session!.name,
     matchType,
     matchNumber,
+    alliance,
     field,
     rule,
     ruleset,
@@ -90,10 +108,14 @@ export async function POST(request: Request) {
     teamId,
     actor: actorLabel(session),
     action: `flagged ${kind}`,
-    // No "Field" label here: the field value is free text and a referee
-    // typing "Field 2" (the box's own placeholder) would otherwise read as
-    // "Field Field 2". FlagList shows it the same bare way on screen.
-    detail: `Team ${team.number} · ${matchType}${matchNumber} · ${field}`,
+    detail: [
+      `Team ${team.number}`,
+      matchReference(matchType, matchNumber),
+      alliance ? (alliance === "red" ? "Red" : "Blue") : null,
+      fieldLabel(field),
+    ]
+      .filter(Boolean)
+      .join(" · "),
   });
 
   return NextResponse.json({ flag });
@@ -162,7 +184,8 @@ export async function PATCH(request: Request) {
   // `existing` may already be the new values.
   const before = {
     kind: previousKind,
-    match: `${existing.match_type ?? ""}${existing.match_number ?? ""}`,
+    match: matchReference(existing.match_type, existing.match_number) ?? "",
+    alliance: existing.alliance,
     field: existing.field,
     body: existing.body,
     rules: existing.rule,
@@ -175,18 +198,31 @@ export async function PATCH(request: Request) {
   const parsed = parseFlagFields(body, {
     allowLegacyRulelessKind: existing.rule ? null : existing.kind,
     defaultRuleset: existing.ruleset,
+    fieldCount: (await store().getRefereeSetup())?.field_count,
+    existing,
   });
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   }
-  const { kind, text, matchType, matchNumber, field, rule, ruleset, manualVersion, matchAffecting } =
-    parsed;
+  const {
+    kind,
+    text,
+    matchType,
+    matchNumber,
+    alliance,
+    field,
+    rule,
+    ruleset,
+    manualVersion,
+    matchAffecting,
+  } = parsed;
 
   const edit: FlagEdit = {
     kind,
     body: text,
     matchType,
     matchNumber,
+    alliance,
     field,
     rule,
     ruleset,
@@ -212,7 +248,8 @@ export async function PATCH(request: Request) {
   // itself no longer does.
   const after = {
     kind,
-    match: `${matchType}${matchNumber}`,
+    match: matchReference(matchType, matchNumber) ?? "",
+    alliance,
     field,
     body: text,
     rules: rule,

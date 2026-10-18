@@ -14,6 +14,7 @@ import type {
   FlagRow,
   Note,
   Panel,
+  RefereeSetup,
   RequestRow,
   ScoreRow,
   Team,
@@ -40,6 +41,7 @@ import {
   type NewConflict,
   type NewFlag,
   type FlagEdit,
+  type NewRefereeSetup,
   type NewRequest,
   type SaveScore,
   type Store,
@@ -72,6 +74,8 @@ type Data = {
   scores: ScoreRow[];
   conflicts: ConflictRow[];
   flags: FlagRow[];
+  /** The event's program and field count; null until one is saved. */
+  refereeSetup: RefereeSetup | null;
   activity: ActivityRow[];
 };
 
@@ -120,6 +124,7 @@ function empty(): Data {
     scores: [],
     conflicts: [],
     flags: [],
+    refereeSetup: null,
     activity: [],
   };
 }
@@ -180,8 +185,10 @@ function migrate(data: Data): Data {
   data.scores ??= [];
   data.conflicts ??= [];
   data.flags ??= [];
+  data.refereeSetup ??= null;
   // Match and field arrived after the first flags did; rule after that,
-  // then the ruleset it belongs to. A flag with no ruleset is a VEX IQ one.
+  // then the ruleset it belongs to, then the alliance. A flag with no
+  // ruleset is a VEX IQ one; one with no alliance predates alliances.
   for (const f of data.flags) {
     f.match_type ??= null;
     f.match_number ??= null;
@@ -190,6 +197,7 @@ function migrate(data: Data): Data {
     f.ruleset ??= null;
     f.manual_version ??= null;
     f.match_affecting ??= false;
+    f.alliance ??= null;
   }
 
   // Languages and panel language cover arrived after the first rosters.
@@ -810,6 +818,7 @@ function createFlag(input: NewFlag): FlagRow {
     author: input.author,
     match_type: input.matchType,
     match_number: input.matchNumber,
+    alliance: input.alliance,
     field: input.field,
     rule: input.rule,
     ruleset: input.ruleset,
@@ -830,6 +839,7 @@ function updateFlag(id: string, edit: FlagEdit): FlagRow {
   row.body = edit.body;
   row.match_type = edit.matchType;
   row.match_number = edit.matchNumber;
+  row.alliance = edit.alliance;
   row.field = edit.field;
   row.rule = edit.rule;
   row.ruleset = edit.ruleset;
@@ -844,6 +854,25 @@ function removeFlag(id: string): boolean {
   state().flags = state().flags.filter((f) => f.id !== id);
   save();
   return state().flags.length < before;
+}
+
+function getRefereeSetup(): RefereeSetup | null {
+  return state().refereeSetup;
+}
+
+/** Replaces the record rather than editing it, so a caller holding the old
+ *  one (to log what it was) still reads the old values afterwards. */
+function saveRefereeSetup(input: NewRefereeSetup): RefereeSetup {
+  const setup: RefereeSetup = {
+    ruleset: input.ruleset,
+    field_count: input.fieldCount,
+    set_by: input.setBy,
+    set_on: input.setOn,
+    updated_at: new Date().toISOString(),
+  };
+  state().refereeSetup = setup;
+  save();
+  return setup;
 }
 
 function removeConflict(id: string): boolean {
@@ -934,7 +963,7 @@ function logActivity(entry: NewActivity): void {
  * Whole-store operations
  * ------------------------------------------------------------------ */
 
-/** Clears day-of workflow data. Teams, panels and event-wide referee flags survive. */
+/** Clears day-of workflow data. Teams, panels, event-wide referee flags and the referee setup survive. */
 function resetDay(): void {
   state().requests = [];
   state().notes = [];
@@ -943,7 +972,7 @@ function resetDay(): void {
   save();
 }
 
-/** Wipes the active event, including its roster, panels and referee flags. */
+/** Wipes the active event, including its roster, panels, referee flags and referee setup. */
 function resetAll(): void {
   // Going through state() first claims the file, so a second copy cannot wipe it.
   state();
@@ -1084,7 +1113,17 @@ function demoData(): Data {
     ),
   ];
 
-  return { panels, teams, requests, notes: [], scores: [], conflicts: [], flags: [], activity: [] };
+  return {
+    panels,
+    teams,
+    requests,
+    notes: [],
+    scores: [],
+    conflicts: [],
+    flags: [],
+    refereeSetup: null,
+    activity: [],
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -1132,6 +1171,9 @@ export const fileStore: Store = {
   createFlag: async (input) => createFlag(input),
   updateFlag: async (id, edit) => updateFlag(id, edit),
   removeFlag: async (id) => removeFlag(id),
+
+  getRefereeSetup: async () => getRefereeSetup(),
+  saveRefereeSetup: async (input) => saveRefereeSetup(input),
 
   listConflicts: async () => listConflicts(),
   addConflict: async (input) => addConflict(input),

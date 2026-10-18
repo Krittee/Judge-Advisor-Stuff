@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AppState, FlagRow } from "@/lib/types";
 import { tone, toneSolid } from "@/lib/tone";
-import { filterMatchNumberInput, matchReference, normalizeField } from "@/lib/match";
+import { fieldLabel, filterMatchNumberInput, matchReference } from "@/lib/match";
 import {
   commonFieldRules,
   DEFAULT_OPEN_RULE_CATEGORIES,
+  findMatchType,
   getRuleset,
   groupRulesByCategory,
+  isBracketMatch,
   isCategoryOpen,
   manualLabel,
   MAX_FLAG_RULES,
@@ -19,7 +21,13 @@ import {
   toggleRule,
   type Rule,
 } from "@/lib/rules";
-import { FIELD_PREFIXES, MATCH_AFFECTING_KINDS, splitField, type FlagReport } from "@/lib/flagValidation";
+import {
+  FIELD_PREFIXES,
+  isValidFieldPick,
+  MATCH_AFFECTING_KINDS,
+  MAX_FIELD_COUNT,
+  type FlagReport,
+} from "@/lib/flagValidation";
 import { inputClass } from "@/components/ui";
 
 export type FlagKind = AppState["flagKinds"][number];
@@ -45,8 +53,8 @@ export function flagsOnDay(flags: FlagRow[], day: Date): FlagRow[] {
 }
 
 /** Division prefix and field number, as two boxes that make one field
- *  ("ES" + "2" is "ES2"). Used by the raise form and the correction form,
- *  so both offer the same choices. */
+ *  ("ES" + "2" is "ES2"). Only the old raise form still uses it: a field is
+ *  now just a number, and the server refuses a prefixed one on a new flag. */
 export function FieldPicker({
   prefix,
   number,
@@ -409,6 +417,9 @@ function RulePickerBody({
   );
 }
 
+const editSelect =
+  "rounded-lg bg-surface px-2 py-1.5 text-xs ring-1 ring-inset ring-line disabled:opacity-50";
+
 /** The worst thing said about a team, for a one-glance summary. */
 export function worstFlag(flags: FlagRow[], kinds: FlagKind[]): FlagKind | null {
   let worst: FlagKind | null = null;
@@ -417,6 +428,27 @@ export function worstFlag(flags: FlagRow[], kinds: FlagKind[]): FlagKind | null 
     if (kind && (!worst || kind.severity > worst.severity)) worst = kind;
   }
   return worst;
+}
+
+/* Placeholders until the referee page defines the alliance colours. */
+const ALLIANCE_DOT = { red: "oklch(0.620 0.190 25)", blue: "oklch(0.620 0.150 255)" } as const;
+const ALLIANCE_NAME = { red: "Red", blue: "Blue" } as const;
+
+/** Which side of the field: a small coloured dot and its name. The name is
+ *  always there, so colour never carries it alone. Nothing for a Skills run
+ *  or a flag recorded before alliances existed. */
+function AllianceMark({ alliance }: { alliance: FlagRow["alliance"] }) {
+  if (!alliance) return null;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span
+        aria-hidden
+        className="inline-block h-2 w-2 rounded-full"
+        style={{ backgroundColor: ALLIANCE_DOT[alliance] }}
+      />
+      {ALLIANCE_NAME[alliance]}
+    </span>
+  );
 }
 
 function FlagChip({
@@ -480,14 +512,18 @@ export function FlagSummary({
 export function FlagList({
   flags,
   kinds,
-  matchTypes = [],
+  fieldCount = MAX_FIELD_COUNT,
   onRemove,
   onEdit,
 }: {
   flags: FlagRow[];
   kinds: FlagKind[];
-  /** Needed only if onEdit is passed — the picker's options. */
+  /** @deprecated Not read any more: a correction offers the match types of
+   *  the flag's own ruleset. Kept so the callers compile until the referee
+   *  page is rebuilt. */
   matchTypes?: MatchType[];
+  /** How many fields the event has, for the correction form's field choices. */
+  fieldCount?: number;
   /** Only the Judge Advisor passes this. */
   onRemove?: (id: string) => void;
   /**
@@ -508,7 +544,7 @@ export function FlagList({
           key={f.id}
           flag={f}
           kinds={kinds}
-          matchTypes={matchTypes}
+          fieldCount={fieldCount}
           onRemove={onRemove}
           onEdit={onEdit}
         />
@@ -520,37 +556,43 @@ export function FlagList({
 function FlagListItem({
   flag: f,
   kinds,
-  matchTypes,
+  fieldCount,
   onRemove,
   onEdit,
 }: {
   flag: FlagRow;
   kinds: FlagKind[];
-  matchTypes: MatchType[];
+  fieldCount: number;
   onRemove?: (id: string) => void;
   onEdit?: (id: string, edit: FlagReport) => Promise<void>;
 }) {
   const ruleIds = parseRuleList(f.rule);
   const ruleset = getRuleset(f.ruleset);
+  const field = fieldLabel(f.field);
   const [editing, setEditing] = useState(false);
   const [draftBody, setDraftBody] = useState(f.body);
   const [draftMatchType, setDraftMatchType] = useState(f.match_type ?? "");
   const [draftMatchNumber, setDraftMatchNumber] = useState(f.match_number ?? "");
-  const [draftFieldPrefix, setDraftFieldPrefix] = useState(splitField(f.field).prefix);
-  const [draftFieldNumber, setDraftFieldNumber] = useState(splitField(f.field).number);
+  const [draftAlliance, setDraftAlliance] = useState<FlagReport["alliance"]>(f.alliance ?? "");
+  const [draftField, setDraftField] = useState(f.field ?? "");
   const [draftRuleset, setDraftRuleset] = useState(getRuleset(f.ruleset).id);
   const [draftRules, setDraftRules] = useState<string[]>(parseRuleList(f.rule));
   const [draftMatchAffecting, setDraftMatchAffecting] = useState(f.match_affecting);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const draftBracket = isBracketMatch(draftMatchType, draftRuleset);
+  // Held by this flag but no longer offered by its program: the legacy "SK".
+  const legacyType =
+    f.match_type && !getRuleset(draftRuleset).matchTypes.some((t) => t.id === f.match_type)
+      ? findMatchType(f.match_type, draftRuleset)
+      : null;
 
   function startEditing() {
     setDraftBody(f.body);
     setDraftMatchType(f.match_type ?? "");
     setDraftMatchNumber(f.match_number ?? "");
-    const parts = splitField(f.field);
-    setDraftFieldPrefix(parts.prefix);
-    setDraftFieldNumber(parts.number);
+    setDraftAlliance(f.alliance ?? "");
+    setDraftField(f.field ?? "");
     setDraftRuleset(getRuleset(f.ruleset).id);
     setDraftRules(parseRuleList(f.rule));
     setDraftMatchAffecting(f.match_affecting);
@@ -558,12 +600,25 @@ function FlagListItem({
     setEditing(true);
   }
 
+  // A match type, and the shape of its number, belong to a program: Q23 is
+  // not a bracket and QF 2-1 is not a plain number. Changing the type (or the
+  // ruleset under it) therefore drops a number that no longer fits, and a type
+  // the ruleset does not know.
+  function chooseMatch(type: string, rulesetId: string) {
+    const known = findMatchType(type, rulesetId) ? type : "";
+    if (!known || isBracketMatch(known, rulesetId) !== isBracketMatch(draftMatchType, draftRuleset)) {
+      setDraftMatchNumber("");
+    }
+    setDraftMatchType(known);
+  }
+
   // Tapping a severity button submits the whole correction, the same way
   // it does when a flag is first raised — a referee re-selecting "Minor"
   // instead of "Major" is doing exactly the gesture they did the first
   // time, not filling in a separate form. The field, ruleset and rules are
   // picked the same way too, so a correction can only produce a value the
-  // raise form could have produced.
+  // raise form could have produced. What the flag already holds (an "HS2"
+  // field, a missing alliance) is sent back as it is.
   async function save(kind: string) {
     if (!onEdit) return;
     setBusy(true);
@@ -574,7 +629,8 @@ function FlagListItem({
         body: draftBody,
         matchType: draftMatchType,
         matchNumber: draftMatchNumber,
-        field: normalizeField(`${draftFieldPrefix}${draftFieldNumber}`),
+        alliance: draftAlliance,
+        field: draftField,
         ruleset: draftRuleset,
         rules: draftRules,
         matchAffecting: draftMatchAffecting,
@@ -601,11 +657,17 @@ function FlagListItem({
             moment on the field, not just a comment. */}
         {matchReference(f.match_type, f.match_number) ? (
           <span
-            title="Match · Field"
+            title="Match · Alliance · Field"
             className="rounded-md bg-surface px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-ink-subtle"
           >
             {matchReference(f.match_type, f.match_number)}
-            {f.field ? ` · ${f.field}` : ""}
+            {f.alliance ? (
+              <>
+                {" · "}
+                <AllianceMark alliance={f.alliance} />
+              </>
+            ) : null}
+            {field ? ` · ${field}` : ""}
           </span>
         ) : null}
         {f.match_affecting ? (
@@ -662,35 +724,89 @@ function FlagListItem({
           <div className="flex flex-wrap gap-2">
             <select
               value={draftMatchType}
-              onChange={(e) => setDraftMatchType(e.target.value)}
+              onChange={(e) => chooseMatch(e.target.value, draftRuleset)}
               disabled={busy}
-              className="min-w-[9rem] flex-[2] rounded-lg bg-surface px-2 py-1.5 text-xs ring-1 ring-inset ring-line disabled:opacity-50"
+              aria-label="Match type"
+              className={`min-w-[9rem] flex-[2] ${editSelect}`}
             >
               <option value="" className="bg-surface">
                 — match —
               </option>
-              {matchTypes.map((t) => (
-                <option key={t.id} value={t.id} className="bg-surface">
-                  {t.id} — {t.label}
-                </option>
+              {(["teamwork", "skills"] as const).map((group) => (
+                <optgroup key={group} label={group === "teamwork" ? "Teamwork" : "Skills"}>
+                  {getRuleset(draftRuleset)
+                    .matchTypes.filter((t) => t.group === group)
+                    .map((t) => (
+                      <option key={t.id} value={t.id} className="bg-surface">
+                        {t.id} — {t.label}
+                      </option>
+                    ))}
+                </optgroup>
               ))}
+              {/* A type the program no longer offers (the old "SK") stays
+                  selectable on the flag that holds it. */}
+              {legacyType ? (
+                <option value={legacyType.id} className="bg-surface">
+                  {legacyType.id} — {legacyType.label} (old)
+                </option>
+              ) : null}
             </select>
             <input
               value={draftMatchNumber}
-              onChange={(e) => setDraftMatchNumber(filterMatchNumberInput(e.target.value))}
-              placeholder="#"
-              inputMode="numeric"
+              onChange={(e) =>
+                setDraftMatchNumber(filterMatchNumberInput(e.target.value, draftMatchType, draftRuleset))
+              }
+              placeholder={draftBracket ? "2-1" : "#"}
+              inputMode={draftBracket ? "text" : "numeric"}
+              aria-label={draftBracket ? "Bracket and match" : "Match number"}
               disabled={busy}
               className="min-w-[3.5rem] flex-1 rounded-lg bg-surface px-2 py-1.5 text-center text-xs ring-1 ring-inset ring-line disabled:opacity-50"
             />
           </div>
-          <FieldPicker
-            prefix={draftFieldPrefix}
-            number={draftFieldNumber}
-            onPrefix={setDraftFieldPrefix}
-            onNumber={setDraftFieldNumber}
-            disabled={busy}
-          />
+          <div className="flex flex-wrap gap-2">
+            {/* Skills runs have no alliance. */}
+            {findMatchType(draftMatchType, draftRuleset)?.group === "teamwork" ? (
+              <select
+                value={draftAlliance}
+                onChange={(e) => setDraftAlliance(e.target.value as FlagReport["alliance"])}
+                disabled={busy}
+                aria-label="Alliance"
+                className={`min-w-[7rem] flex-1 ${editSelect}`}
+              >
+                <option value="" className="bg-surface">
+                  — alliance —
+                </option>
+                <option value="red" className="bg-surface">
+                  Red
+                </option>
+                <option value="blue" className="bg-surface">
+                  Blue
+                </option>
+              </select>
+            ) : null}
+            <select
+              value={draftField}
+              onChange={(e) => setDraftField(e.target.value)}
+              disabled={busy}
+              aria-label="Field"
+              className={`min-w-[7rem] flex-1 ${editSelect}`}
+            >
+              <option value="" className="bg-surface">
+                — field —
+              </option>
+              {Array.from({ length: fieldCount }, (_, i) => String(i + 1)).map((n) => (
+                <option key={n} value={n} className="bg-surface">
+                  Field {n}
+                </option>
+              ))}
+              {/* An old prefixed field ("HS2") stays selectable on the flag that holds it. */}
+              {f.field && !isValidFieldPick(f.field, fieldCount) ? (
+                <option value={f.field} className="bg-surface">
+                  {f.field} (old)
+                </option>
+              ) : null}
+            </select>
+          </div>
           <textarea
             value={draftBody}
             onChange={(e) => setDraftBody(e.target.value)}
@@ -704,6 +820,7 @@ function FlagListItem({
             onChange={(id) => {
               setDraftRuleset(id);
               setDraftRules([]);
+              chooseMatch(draftMatchType, id);
             }}
             disabled={busy}
           />

@@ -75,24 +75,6 @@
       "requiresRule": true
     }
   ],
-  "matchTypes": [
-    {
-      "id": "P",
-      "label": "Practice"
-    },
-    {
-      "id": "Q",
-      "label": "Qualification"
-    },
-    {
-      "id": "F",
-      "label": "Final"
-    },
-    {
-      "id": "SK",
-      "label": "Skills"
-    }
-  ],
   "teamCategories": [
     {
       "id": "developing",

@@ -27,10 +27,13 @@ test("POST and PATCH both use the shared validator with server-side rule enforce
   const post = routeSrc.slice(routeSrc.indexOf("export async function POST"), routeSrc.indexOf("export async function PATCH"));
   const patch = routeSrc.slice(routeSrc.indexOf("export async function PATCH"), routeSrc.indexOf("export async function DELETE"));
 
-  assert.match(post, /parseFlagFields\(body\)/);
+  // A new flag is checked against the event's setup: its program and field count.
+  assert.match(post, /parseFlagFields\(body, \{\s*eventRuleset: setup\?\.ruleset,\s*fieldCount: setup\?\.field_count,?\s*\}\)/);
   assert.ok(!routeSrc.includes("requireRuleForSeverity"), "rule enforcement must not be optional");
   assert.match(patch, /allowLegacyRulelessKind:\s*existing\.rule \? null : existing\.kind/);
   assert.match(patch, /defaultRuleset:\s*existing\.ruleset/, "a correction must keep the flag's own ruleset by default");
+  assert.ok(!patch.includes("eventRuleset"), "a correction must not be held to the event's program");
+  assert.match(patch, /\bexisting,\s*\}\)/, "a correction must pass the flag on record so legacy values can be kept");
 });
 
 test("the manual version is taken from the validated ruleset, never read from the request", () => {
@@ -56,14 +59,20 @@ test("both stores add the ruleset columns additively, and a flag from before the
     "alter table flags add column if not exists ruleset text;",
     "alter table flags add column if not exists manual_version text;",
     "alter table flags add column if not exists match_affecting boolean not null default false;",
+    "alter table flags add column if not exists alliance text check (alliance in ('red','blue'));",
   ]) {
     assert.ok(postgresSrc.includes(ddl), `migrate() lost: ${ddl}`);
   }
-  assert.ok(!/drop column[^;]*(ruleset|manual_version|match_affecting)/i.test(postgresSrc));
+  assert.ok(!/drop column[^;]*(ruleset|manual_version|match_affecting|alliance)/i.test(postgresSrc));
 
   // The hand-run schema stays in step with migrate().
   const flagsTable = schemaSql.slice(schemaSql.indexOf("create table flags"), schemaSql.indexOf(");", schemaSql.indexOf("create table flags")));
-  for (const column of [/\bruleset\s+text/, /\bmanual_version\s+text/, /\bmatch_affecting\s+boolean not null default false/]) {
+  for (const column of [
+    /\bruleset\s+text/,
+    /\bmanual_version\s+text/,
+    /\bmatch_affecting\s+boolean not null default false/,
+    /\balliance\s+text check \(alliance in \('red','blue'\)\)/,
+  ]) {
     assert.match(flagsTable, column, `supabase/schema.sql flags table lost ${column}`);
   }
 
@@ -72,6 +81,8 @@ test("both stores add the ruleset columns additively, and a flag from before the
   assert.ok(migrate.includes("f.ruleset ??= null"));
   assert.ok(migrate.includes("f.manual_version ??= null"));
   assert.ok(migrate.includes("f.match_affecting ??= false"));
+  assert.ok(migrate.includes("f.alliance ??= null"));
+  assert.ok(migrate.includes("data.refereeSetup ??= null"), "an old state file has no referee setup");
 });
 
 test("the page sends ruleset, rules and match affecting, and only resets them after a successful request", () => {
@@ -134,13 +145,13 @@ test("match affecting appears once a rule is picked, in the raise form and the c
   assert.match(flagsSrc, /draftRules\.length \|\| MATCH_AFFECTING_KINDS\.includes\(f\.kind\)/);
 });
 
-test("field selection combines the event division prefix (plus Skills) and field number", () => {
+test("a field is a number from the event's setup; the division prefix lives on only in the old form", () => {
   const validatorSrc = readFileSync(new URL("../src/lib/flagValidation.ts", import.meta.url), "utf8");
-  assert.ok(validatorSrc.includes('export const FIELD_PREFIXES = ["ES", "MS", "HS", "BL", "SK"]'));
-  assert.ok(flagsSrc.includes("value={prefix}"));
-  assert.ok(flagsSrc.includes("value={number}"));
+  assert.ok(validatorSrc.includes("export const MAX_FIELD_COUNT = 20"), "the setup's field ceiling moved");
+  assert.ok(validatorSrc.includes("Pick the field — 1 to ${maxField}."));
+  // The correction form picks from the event's fields; the old raise form keeps its division box until it is rebuilt.
+  assert.ok(flagsSrc.includes("length: fieldCount"));
   assert.ok(pageSrc.includes("<FieldPicker"));
-  assert.ok(pageSrc.includes("normalizeField(`${fieldPrefix}${fieldNumber}`)"));
 });
 
 test("repeated history comes from the tested helper and cannot submit an automatic Major or DQ", () => {
@@ -174,13 +185,24 @@ test("correction UI sends the ruleset and rules it shows and blocks unsafe rule-
 
 test("the app's existing full wipe remains the active-event boundary", () => {
   assert.ok(fileStoreSrc.includes("loaded = empty()"));
-  assert.match(postgresSrc, /truncate activity, notes, scores, conflicts, requests, teams, panels cascade/);
+  assert.match(
+    postgresSrc,
+    /truncate activity, notes, scores, conflicts, requests, teams, panels, referee_setup cascade/,
+    "a full wipe must clear the referee setup with the rest of the event",
+  );
   assert.ok(!/resetDay\(\)[\s\S]*truncate[^\n]*flags/.test(postgresSrc));
+  const resetDay = postgresSrc.slice(postgresSrc.indexOf("async resetDay()"), postgresSrc.indexOf("async resetAll()"));
+  assert.ok(!/truncate[^\n]*referee_setup/.test(resetDay), "a day reset must keep the referee setup");
 });
 
 test("the PATCH activity log reports rules, ruleset and match-affecting changes", () => {
   const patch = routeSrc.slice(routeSrc.indexOf("export async function PATCH"), routeSrc.indexOf("export async function DELETE"));
-  for (const label of ["rules: existing.rule", "ruleset: getRuleset(existing.ruleset).id", '"match affecting"']) {
+  for (const label of [
+    "rules: existing.rule",
+    "ruleset: getRuleset(existing.ruleset).id",
+    "alliance: existing.alliance",
+    '"match affecting"',
+  ]) {
     assert.ok(patch.includes(label), `the PATCH before-snapshot lost ${label}`);
   }
   // Both halves are captured before updateFlag runs (the file store aliases).

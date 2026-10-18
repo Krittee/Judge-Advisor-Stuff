@@ -1,4 +1,4 @@
-import { normalizeMatchNumber } from "./match";
+import { matchReference, normalizeMatchNumber } from "./match";
 import { getRuleset, parseRuleList } from "./rules";
 import type { FlagRow } from "./types";
 
@@ -48,7 +48,12 @@ export function refereeHistory(
   const sameRuleset = teamViolations.filter(
     (f) => getRuleset(f.ruleset).id === getRuleset(rulesetId).id,
   );
-  const normalizedCurrentMatch = normalizeMatchNumber(matchNumber);
+  // "Same match" is the whole reference, type and number: QF 2-1 and QF 2-2
+  // are different matches, and so are Q3 and P3. The number is normalized the
+  // way it was stored, which for a bracket keeps "1-12" apart from "11-2".
+  const reference = (type: string | null, number: string | null) =>
+    matchReference(type, normalizeMatchNumber(number, type, rulesetId));
+  const currentMatch = reference(matchType, matchNumber);
 
   const byRule = parseRuleList(rules.join(",")).map((rule): RuleHistory => {
     const sameRule = sameRuleset.filter((f) => parseRuleList(f.rule).includes(rule));
@@ -56,9 +61,7 @@ export function refereeHistory(
       rule,
       sameRule,
       sameMatchSameRule: sameRule.filter(
-        (f) =>
-          f.match_type === matchType &&
-          normalizeMatchNumber(f.match_number) === normalizedCurrentMatch,
+        (f) => currentMatch !== null && reference(f.match_type, f.match_number) === currentMatch,
       ),
     };
   });

@@ -4,6 +4,7 @@ import type {
   FlagRow,
   Note,
   Panel,
+  RefereeSetup,
   RequestRow,
   ScoreRow,
   Team,
@@ -70,6 +71,8 @@ export type NewFlag = {
   /** Which match and field this happened at, so it can be traced back. */
   matchType: string;
   matchNumber: string;
+  /** Null for a Skills run, which has no alliance. */
+  alliance: "red" | "blue" | null;
   field: string;
   /** Rule ids from src/lib/rules.ts, comma-joined, or null when none was picked. */
   rule: string | null;
@@ -94,12 +97,22 @@ export type FlagEdit = {
   body: string;
   matchType: string;
   matchNumber: string;
+  alliance: "red" | "blue" | null;
   field: string;
   /** Rule ids from src/lib/rules.ts, comma-joined, or null. */
   rule: string | null;
   ruleset: string | null;
   manualVersion: string | null;
   matchAffecting: boolean;
+};
+
+/** What a referee or the Judge Advisor saves; the store adds `updated_at`. */
+export type NewRefereeSetup = {
+  ruleset: string;
+  fieldCount: number;
+  setBy: string;
+  /** YYYY-MM-DD, already validated. */
+  setOn: string;
 };
 
 export type NewActivity = {
@@ -177,6 +190,11 @@ export type Store = {
   updateFlag(id: string, edit: FlagEdit): Promise<FlagRow>;
   /** Only the Judge Advisor removes one. Returns whether it existed. */
   removeFlag(id: string): Promise<boolean>;
+
+  /** The event's program and field count; null until one is saved. */
+  getRefereeSetup(): Promise<RefereeSetup | null>;
+  /** Replaces the one record. resetDay keeps it, resetAll clears it. */
+  saveRefereeSetup(input: NewRefereeSetup): Promise<RefereeSetup>;
 
   listConflicts(): Promise<ConflictRow[]>;
   /** Idempotent: declaring the same pair twice returns the existing one. */

@@ -1,5 +1,6 @@
 import presetFile from "../../config/event.json";
 import { normalizePanelCode } from "./panelCode";
+import { getRuleset, type MatchType } from "./rules";
 
 /**
  * Preset panels, read from config/event.json.
@@ -44,7 +45,6 @@ type RawPreset = {
   divisions?: unknown;
   blendedDivisions?: unknown;
   pitFloor?: unknown;
-  matchTypes?: unknown;
   languages?: unknown;
   refereeFlags?: unknown;
   teamCategories?: unknown;
@@ -183,36 +183,20 @@ export function resolveFlagKind(input: unknown): string {
  * the way there is for a flag kind, so nothing about this resolves to a
  * safe guess -- the API rejects an unrecognised type outright rather than
  * silently filing a Qualification incident as Practice.
+ *
+ * The types depend on the program, so they live with each ruleset in
+ * config/rules/*.json and are read through rules.ts.
  * ------------------------------------------------------------------ */
 
-export type MatchType = { id: string; label: string };
-
-const MATCH_TYPE_FALLBACK: MatchType[] = [
-  { id: "P", label: "Practice" },
-  { id: "Q", label: "Qualification" },
-  { id: "F", label: "Final" },
-  { id: "SK", label: "Skills" },
-];
-
-export function matchTypes(): MatchType[] {
-  const list = Array.isArray(raw.matchTypes) ? raw.matchTypes : [];
-
-  const parsed = list
-    .map((t: unknown) => {
-      const o = (t ?? {}) as Record<string, unknown>;
-      const id = String(o.id ?? "").trim();
-      if (!id) return null;
-      return { id, label: String(o.label ?? id) };
-    })
-    .filter((t): t is MatchType => t !== null);
-
-  return parsed.length ? parsed : MATCH_TYPE_FALLBACK;
+/** The match types a new flag can be pinned to under this ruleset. */
+export function matchTypes(rulesetId?: string | null): MatchType[] {
+  return getRuleset(rulesetId).matchTypes;
 }
 
-/** True only for an id that is actually configured — never a guess. */
-export function isValidMatchType(input: unknown): boolean {
+/** True only for a type this ruleset actually offers -- never a guess. */
+export function isValidMatchType(input: unknown, rulesetId: string | null | undefined): boolean {
   const wanted = String(input ?? "").trim();
-  return matchTypes().some((t) => t.id === wanted);
+  return matchTypes(rulesetId).some((t) => t.id === wanted);
 }
 
 /* ------------------------------------------------------------------ *

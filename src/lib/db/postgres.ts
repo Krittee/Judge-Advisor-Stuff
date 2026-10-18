@@ -5,6 +5,7 @@ import type {
   FlagRow,
   Note,
   Panel,
+  RefereeSetup,
   RequestRow,
   ScoreRow,
   Team,
@@ -21,6 +22,7 @@ import {
   type NewNote,
   type NewConflict,
   type NewFlag,
+  type NewRefereeSetup,
   type NewRequest,
   type SaveScore,
   type Store,
@@ -211,6 +213,20 @@ async function migrate(): Promise<void> {
       created_at   timestamptz not null default now()
     );
 
+    -- The program and number of fields for this event. One row, ever: the
+    -- check on id is what stops a second one. set_on is text on purpose: it
+    -- is a calendar date from the referee device, and a date column would
+    -- come back through the driver as a Date and shift with the server
+    -- timezone.
+    create table if not exists referee_setup (
+      id          int primary key default 1 check (id = 1),
+      ruleset     text not null,
+      field_count int not null check (field_count between 1 and 20),
+      set_by      text not null,
+      set_on      text not null,
+      updated_at  timestamptz not null default now()
+    );
+
     create table if not exists scores (
       id         uuid primary key default gen_random_uuid(),
       team_id    uuid not null references teams(id) on delete cascade,
@@ -304,6 +320,7 @@ async function migrate(): Promise<void> {
     alter table flags     enable row level security;
     alter table scores    enable row level security;
     alter table activity  enable row level security;
+    alter table referee_setup enable row level security;
   `);
 
   // Schema changes that an already-deployed event may not have yet.
@@ -346,6 +363,10 @@ async function migrate(): Promise<void> {
       alter table flags add column if not exists ruleset text;
       alter table flags add column if not exists manual_version text;
       alter table flags add column if not exists match_affecting boolean not null default false;
+
+      -- Which side of the field the team was on. Null for a Skills run and
+      -- for a flag recorded before alliances existed.
+      alter table flags add column if not exists alliance text check (alliance in ('red','blue'));
     end $$;
   `);
 }
@@ -892,8 +913,8 @@ export const postgresStore: Store = {
     return one(
       await query<FlagRow>(
         `insert into flags (team_id, kind, body, author, match_type, match_number, field, rule,
-                            ruleset, manual_version, match_affecting)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                            ruleset, manual_version, match_affecting, alliance)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          returning *`,
         [
           input.teamId,
@@ -907,6 +928,7 @@ export const postgresStore: Store = {
           input.ruleset,
           input.manualVersion,
           input.matchAffecting,
+          input.alliance,
         ],
       ),
     )!;
@@ -916,7 +938,7 @@ export const postgresStore: Store = {
     const updated = one(
       await query<FlagRow>(
         `update flags set kind = $2, body = $3, match_type = $4, match_number = $5, field = $6, rule = $7,
-                          ruleset = $8, manual_version = $9, match_affecting = $10
+                          ruleset = $8, manual_version = $9, match_affecting = $10, alliance = $11
          where id = $1
          returning *`,
         [
@@ -930,6 +952,7 @@ export const postgresStore: Store = {
           edit.ruleset,
           edit.manualVersion,
           edit.matchAffecting,
+          edit.alliance,
         ],
       ),
     );
@@ -940,6 +963,32 @@ export const postgresStore: Store = {
   async removeFlag(id) {
     const gone = await query<{ id: string }>("delete from flags where id = $1 returning id", [id]);
     return gone.length > 0;
+  },
+
+  async getRefereeSetup() {
+    // Named columns, not *: the row's id is an implementation detail.
+    return one(
+      await query<RefereeSetup>(
+        "select ruleset, field_count, set_by, set_on, updated_at from referee_setup",
+      ),
+    );
+  },
+
+  async saveRefereeSetup(input: NewRefereeSetup) {
+    return one(
+      await query<RefereeSetup>(
+        `insert into referee_setup (id, ruleset, field_count, set_by, set_on)
+         values (1, $1, $2, $3, $4)
+         on conflict (id) do update set
+           ruleset = excluded.ruleset,
+           field_count = excluded.field_count,
+           set_by = excluded.set_by,
+           set_on = excluded.set_on,
+           updated_at = now()
+         returning ruleset, field_count, set_by, set_on, updated_at`,
+        [input.ruleset, input.fieldCount, input.setBy, input.setOn],
+      ),
+    )!;
   },
 
   async addConflict(input: NewConflict) {
@@ -1058,13 +1107,16 @@ export const postgresStore: Store = {
 
   async resetDay() {
     // Referee flags intentionally survive a day reset: repeat history is
-    // event-wide, including at multi-day events.
+    // event-wide, including at multi-day events. So does the referee setup.
     await query("truncate activity, notes, scores, requests");
   },
 
   async resetAll() {
     // Teams cascade to referee flags. This is the application's event
     // boundary and must be used before importing the next event's roster.
-    await query("truncate activity, notes, scores, conflicts, requests, teams, panels cascade");
+    // The referee setup is the event's too, so it goes with them.
+    await query(
+      "truncate activity, notes, scores, conflicts, requests, teams, panels, referee_setup cascade",
+    );
   },
 };

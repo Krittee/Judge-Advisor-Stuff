@@ -6,7 +6,9 @@ import test from "node:test";
 
 /**
  * A state file written before rulesets existed must still load, and its
- * flags must come back as VEX IQ ones with nothing match affecting.
+ * flags must come back as VEX IQ ones with nothing match affecting. The same
+ * goes for one written before alliances and the referee setup: a flag has no
+ * alliance, and there is no setup.
  *
  * The data file is named before the store is imported because file.ts
  * resolves DATA_FILE once, at load; node's test runner gives each test file
@@ -57,4 +59,13 @@ test("a flag from before rulesets loads as a VEX IQ flag that is not match affec
   assert.equal(flag.ruleset, null, "null is how a legacy flag says it is IQ");
   assert.equal(flag.manual_version, null);
   assert.equal(flag.match_affecting, false);
+});
+
+test("a flag from before alliances loads with none, its legacy match and field untouched, and there is no setup", async () => {
+  const { fileStore } = await import("../src/lib/db/file");
+  const [flag] = await fileStore.listFlags();
+  assert.equal(flag.alliance, null, "null is how a flag from before alliances says so");
+  assert.equal(flag.match_type, "Q");
+  assert.equal(flag.field, "ES2", "a prefixed field is kept, not rewritten");
+  assert.equal(await fileStore.getRefereeSetup(), null, "an old file has no referee setup");
 });

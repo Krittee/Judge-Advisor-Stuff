@@ -44,12 +44,13 @@ import type { AppState, ViewerCapabilities } from "./types";
  */
 export async function loadState(session: Session | null): Promise<AppState> {
   const db = store();
-  const [panels, teams, rows, allConflicts, allFlags] = await Promise.all([
+  const [panels, teams, rows, allConflicts, allFlags, refereeSetup] = await Promise.all([
     db.listPanels(),
     db.listTeams(),
     db.listRequests(),
     db.listConflicts(),
     db.listFlags(),
+    db.getRefereeSetup(),
   ]);
 
   const isJudge = session?.role === "judge";
@@ -165,7 +166,11 @@ export async function loadState(session: Session | null): Promise<AppState> {
         ? allConflicts.filter((c) => c.panel_id === session.panelId)
         : allConflicts,
     pitFloor: pitFloor(),
-    matchTypes: matchTypes(),
+    /* The program and field count are the same for every viewer, so they
+       go to everyone. Who set them is a staff name, nulled like the rest. */
+    matchTypes: matchTypes(refereeSetup?.ruleset),
+    refereeSetup:
+      refereeSetup && !includeStaffFields ? { ...refereeSetup, set_by: "" } : refereeSetup,
     flagKinds: refereeFlags(),
     /* A referee's flag is about a team's conduct, not the queue, so it
        goes only to those who act on it: referees writing them, judges
