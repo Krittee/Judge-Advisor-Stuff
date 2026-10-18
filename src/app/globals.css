@@ -587,7 +587,7 @@ textarea {
   --si-field-line: oklch(0.640 0.012 265);
   --si-disabled: oklch(0.915 0.008 265);
   --si-ref-band: oklch(0.225 0.016 265);
-  --si-desk: oklch(0.560 0.110 185);
+  --si-desk: oklch(0.520 0.105 185); /* darker than the reference so white band text clears AA */
   --si-ja: oklch(0.520 0.180 300);
   --si-ref: oklch(0.700 0.170 55);
   --si-judge-tint: oklch(0.510 0.160 258 / 0.10);
@@ -638,6 +638,9 @@ body:has(.signin) > .theme-toggle:hover {
   gap: 10px; overflow: hidden; padding: 30px 20px 14px;
   background: var(--accent); color: var(--accent-ink);
 }
+/* One-role doors wear that role's colour; the referee keeps its striped ink band. */
+.si-band--solo { gap: 8px; padding-bottom: 18px; background: var(--rc); }
+.si-band--solo .si-mark { color: var(--rc); }
 .si-band--ref { gap: 8px; padding-bottom: 18px; background: var(--si-ref-band); color: var(--si-on-band); }
 .si-slot {
   position: absolute; top: 12px; left: 50%; width: 56px; height: 10px; margin-left: -28px;
@@ -673,11 +676,11 @@ body:has(.signin) > .theme-toggle:hover {
 .si-band--ref .si-b5 { left: 40px; top: 100px; width: 5px; height: 5px; background: var(--si-sun); }
 .si-band--ref .si-b6, .si-band--ref .si-b7 { display: none; }
 
-.si-band-top { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; }
-.si-brand { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+.si-band-top { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.si-brand { position: relative; z-index: 1; display: flex; flex: none; white-space: nowrap; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
 .si-mark { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 8px; background: var(--accent-ink); color: var(--accent); }
 .si-band--ref .si-mark { background: var(--si-on-band); color: var(--si-ref-band); }
-.si-role { position: relative; z-index: 1; font-weight: 700; font-size: 13px; line-height: 1.2; letter-spacing: 0.24em; text-transform: uppercase; }
+.si-role { position: relative; z-index: 1; text-align: right; font-weight: 700; font-size: 13px; line-height: 1.2; letter-spacing: 0.24em; text-transform: uppercase; }
 
 .si-crew { position: relative; z-index: 1; order: 1; display: flex; gap: 8px; }
 .si-mate { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: center; gap: 4px; }
@@ -760,7 +763,7 @@ body:has(.signin) > .theme-toggle:hover {
   .si-pass { flex-direction: row; }
   .si-band { width: 240px; min-height: 0; justify-content: space-between; gap: 0; padding: 36px 28px 28px; }
   .si-band-top { display: contents; }
-  .si-role { order: 2; font-size: 26px; letter-spacing: 0.2em; }
+  .si-role { order: 2; text-align: left; font-size: 26px; letter-spacing: 0.2em; }
   .si-crew { flex-direction: column; gap: 12px; }
   .si-mate { flex: none; flex-direction: row; justify-content: flex-start; gap: 14px; }
   .si-solo { align-items: flex-start; gap: 10px; }

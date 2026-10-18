@@ -42,10 +42,13 @@ const WELCOME_MS = 900;
 export function SignInForm({
   title,
   intro,
+  door,
   placeholder = "ABC123",
 }: {
   title: string;
   intro: string;
+  /** A one-role door shows that role alone on the pass; without it, the whole staff crew. */
+  door?: Role;
   placeholder?: string;
 }) {
   const router = useRouter();
@@ -54,9 +57,8 @@ export function SignInForm({
      refuses a referee without one. This form cannot know the role before
      the code is checked, so it goes by which door they came through: a
      referee who types their code at /login instead still gets the server's
-     message in the banner. The same door picks the pass they see. */
+     message in the banner. */
   const nameRequired = usePathname()?.startsWith("/referee") ?? false;
-  const referee = nameRequired;
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +105,7 @@ export function SignInForm({
       <main className="si-stage">
         <div className="si-pwrap">
           <section className="si-pass" aria-labelledby="si-title">
-            <Band referee={referee} checking={busy && !signedIn} />
+            <Band door={door} checking={busy && !signedIn} />
 
             <div className="si-body">
               {signedIn ? (
@@ -163,7 +165,9 @@ export function SignInForm({
                       <p className="si-help" id="si-name-help">
                         {nameRequired
                           ? "Every flag you file is recorded under this name. Use your full name."
-                          : "Shown to the Judge Advisor on the activity log."}
+                          : door === "admin"
+                            ? "Shown on the activity log."
+                            : "Shown to the Judge Advisor on the activity log."}
                       </p>
                     </div>
 
@@ -194,9 +198,10 @@ export function SignInForm({
 }
 
 /** The top of the pass: who it is for, and the crew it covers. */
-function Band({ referee, checking }: { referee: boolean; checking: boolean }) {
+function Band({ door, checking }: { door?: Role; checking: boolean }) {
+  const look = !door ? "" : door === "referee" ? " si-band--ref" : ` si-band--solo ${ROLES[door].tone}`;
   return (
-    <div className={`si-band${referee ? " si-band--ref" : ""}${checking ? " is-checking" : ""}`}>
+    <div className={`si-band${look}${checking ? " is-checking" : ""}`}>
       <span className="si-slot" aria-hidden="true" />
       {[1, 2, 3, 4, 5, 6, 7].map((n) => (
         <span key={n} className={`si-bx si-b${n}`} aria-hidden="true" />
@@ -210,19 +215,19 @@ function Band({ referee, checking }: { referee: boolean; checking: boolean }) {
           </span>
           <span>Judge Queue</span>
         </div>
-        <div className="si-role">{referee ? "Referee" : "Staff"}</div>
+        <div className="si-role">{door ? ROLES[door].label : "Staff"}</div>
       </div>
 
-      {referee ? (
+      {door ? (
         <>
           <div className="si-solo">
-            <span className={`si-tile si-tile--solo ${ROLES.referee.tone}`}>
+            <span className={`si-tile si-tile--solo ${ROLES[door].tone}`}>
               {/* eslint-disable-next-line @next/next/no-img-element -- 20 KB static JPEGs; next/image buys nothing here. */}
-              <img className="si-av" src={ROLES.referee.avatar} alt="" width={60} height={60} />
+              <img className="si-av" src={ROLES[door].avatar} alt="" width={60} height={60} />
             </span>
-            <span className="si-solo-l">{ROLES.referee.label}</span>
+            <span className="si-solo-l">{ROLES[door].label}</span>
           </div>
-          <span className="si-stripes" aria-hidden="true" />
+          {door === "referee" ? <span className="si-stripes" aria-hidden="true" /> : null}
         </>
       ) : (
         <div className="si-crew">

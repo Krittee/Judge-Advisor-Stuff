@@ -14,6 +14,7 @@ export default function RefereeLoginPage() {
     <SignInForm
       title="Referee sign in"
       intro="Referees sign in here to record flags during matches."
+      door="referee"
     />
   );
 }

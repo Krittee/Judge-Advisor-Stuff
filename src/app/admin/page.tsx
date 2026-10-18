@@ -51,12 +51,12 @@ export default function AdminPage() {
     call<{ session: Session | null }>("/api/session", { method: "GET" })
       .then(({ session }) => {
         if (session?.role !== "admin") {
-          router.replace("/login");
+          router.replace("/admin/login");
           return;
         }
         setSession(session);
       })
-      .catch(() => router.replace("/login"));
+      .catch(() => router.replace("/admin/login"));
   }, [router]);
 
   if (session === undefined) {
@@ -89,7 +89,7 @@ export default function AdminPage() {
         online={online}
         role={state.viewer.role}
         current="/admin"
-        right={<SignOutButton />}
+        right={<SignOutButton to="/admin/login" />}
       />
 
       <nav className="app-header sticky top-[53px] z-10 border-b border-line backdrop-blur">

@@ -51,12 +51,12 @@ export default function QueuePage() {
     call<{ session: Session | null }>("/api/session", { method: "GET" })
       .then(({ session }) => {
         if (!session) {
-          router.replace("/login");
+          router.replace("/queue/login");
           return;
         }
         setSession(session);
       })
-      .catch(() => router.replace("/login"));
+      .catch(() => router.replace("/queue/login"));
   }, [router]);
 
   // Default the booking language once the config has arrived.
@@ -226,7 +226,7 @@ export default function QueuePage() {
         online={online}
         role={state.viewer.role}
         current="/queue"
-        right={<SignOutButton />}
+        right={<SignOutButton to="/queue/login" />}
       />
 
       <main className="mx-auto max-w-2xl space-y-6 px-4 py-6">

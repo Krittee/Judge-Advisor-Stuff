@@ -47,12 +47,12 @@ export default function JudgePage() {
     call<{ session: Session | null }>("/api/session", { method: "GET" })
       .then(({ session }) => {
         if (!session || (session.role !== "judge" && session.role !== "admin")) {
-          router.replace("/login");
+          router.replace("/judge/login");
           return;
         }
         setSession(session);
       })
-      .catch(() => router.replace("/login"));
+      .catch(() => router.replace("/judge/login"));
   }, [router]);
 
   const panelId = session?.role === "judge" ? session.panelId : null;
@@ -185,7 +185,7 @@ export default function JudgePage() {
         online={online}
         role={state.viewer.role}
         current="/judge"
-        right={<SignOutButton />}
+        right={<SignOutButton to="/judge/login" />}
       />
 
       <main className="mx-auto max-w-3xl space-y-5 px-4 py-5">
