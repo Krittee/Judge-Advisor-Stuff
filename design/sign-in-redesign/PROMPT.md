@@ -9,6 +9,32 @@ Implement the approved "Courtside credential" sign-in redesign for `/login`
 (staff) and `/referee/login` (referee). The design is final; match it, don't
 redesign it.
 
+## Scope: all four roles, each with its own door
+
+| Role (session `role`) | Own door | Avatar | Role colour |
+|---|---|---|---|
+| Judge (`judge`) | `/judge/login` | `/avatars/judge.jpg` | blue `--accent` |
+| Queue desk (`queuer`) | `/queue/login` | `/avatars/queue-desk.jpg` | teal `--desk` |
+| Judge Advisor (`admin`) | `/admin/login` | `/avatars/judge-advisor.jpg` | violet `--ja` |
+| Referee (`referee`) | `/referee/login` | `/avatars/referee.jpg` | striped ink `--ref-band` |
+
+- Each own door shows that role alone on the band (60px avatar, role word),
+  like the referee pass. Staff doors wear the role colour as the band; the
+  referee keeps its ink band with the stripe strip. `SignInForm` takes a
+  `door` prop for this.
+- `/login` stays as the all-staff door. Its band shows all three staff
+  avatars as the "crew", because the role is only known once the code is
+  checked. The team view (`/`) links to `/login` and `/referee/login` only.
+- The Judge, Queue desk and JA consoles send signed-out visitors (and their
+  Sign out button) to their own door, as the referee console already does.
+- Any code works at any door and lands on its own console. After a
+  successful sign-in every role gets its own welcome panel (avatar, colour,
+  "Signed in as {Role}") whichever door the code was typed at: a Judge
+  Advisor code typed on `/referee/login` shows the Judge Advisor panel.
+- Band text must clear WCAG AA. The light-mode teal is `oklch(0.520 0.105
+  185)`, a step darker than the reference, so white text reaches 5:1.
+- Test all four roles, not just one.
+
 ## Sources
 
 - **Visual spec:** `design/sign-in-redesign/reference-signin.dc.html`. It is a
@@ -26,11 +52,13 @@ redesign it.
 ## Files to change
 
 - `src/components/SignInForm.tsx` — the whole visual rewrite lives here.
-- `src/app/login/page.tsx`, `src/app/referee/login/page.tsx` — pass a
-  `variant: "staff" | "referee"` prop (referee intro becomes
-  "Referees sign in here to record flags during matches.").
+- `src/app/{referee,judge,queue,admin}/login/page.tsx` — pass `door` (one
+  role); `src/app/login/page.tsx` passes none (the crew). Referee intro:
+  "Referees sign in here to record flags during matches."
+- `src/app/{judge,queue,admin}/page.tsx` — point the signed-out redirect and
+  `SignOutButton` at the console's own door.
 - `src/app/globals.css` — only the new scoped tokens/classes below.
-- Do not touch auth, `/api/session`, rate limiting or routing.
+- Do not touch auth, `/api/session` or rate limiting.
 
 ## Behaviour to keep exactly
 
