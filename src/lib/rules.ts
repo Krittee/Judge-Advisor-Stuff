@@ -41,7 +41,7 @@ export type MatchType = {
   /** Stored on a flag: "Q", "QF", "SKD". */
   id: string;
   label: string;
-  /** Skills runs have no alliance; every other type is a Teamwork match. */
+  /** Skills runs are one team alone; every other type is a Teamwork match. */
   group: "teamwork" | "skills";
   /** Its number is a bracket and a match ("2-1"), not a single number. */
   bracket: boolean;

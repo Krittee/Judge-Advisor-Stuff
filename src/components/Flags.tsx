@@ -4,14 +4,13 @@ import { useState } from "react";
 import type { AppState, FlagRow } from "@/lib/types";
 import { tone, toneSolid } from "@/lib/tone";
 import { fieldLabel, matchReference } from "@/lib/match";
-import { findMatchType, getRuleset, parseRuleList, ruleDisplayLabel } from "@/lib/rules";
+import { getRuleset, parseRuleList, ruleDisplayLabel } from "@/lib/rules";
 import {
   MATCH_AFFECTING_KINDS,
   MAX_FIELD_COUNT,
-  type Alliance,
   type FlagReport,
 } from "@/lib/flagValidation";
-import { AllianceToggle, MatchFields, type MatchDraft } from "@/components/MatchFields";
+import { MatchFields, type MatchDraft } from "@/components/MatchFields";
 import { AllRulesPicker } from "@/components/AllRulesPicker";
 
 export type FlagKind = AppState["flagKinds"][number];
@@ -72,24 +71,6 @@ export function worstFlag(flags: FlagRow[], kinds: FlagKind[]): FlagKind | null 
     if (kind && (!worst || kind.severity > worst.severity)) worst = kind;
   }
   return worst;
-}
-
-const ALLIANCE_MARK = {
-  red: { name: "Red", dot: "bg-[var(--alliance-red)]" },
-  blue: { name: "Blue", dot: "bg-[var(--alliance-blue)]" },
-} as const;
-
-/** Which side of the field: a small coloured dot and its name. The name is
- *  always there, so colour never carries it alone. Nothing for a Skills run
- *  or a flag recorded before alliances existed. */
-function AllianceMark({ alliance }: { alliance: FlagRow["alliance"] }) {
-  if (!alliance) return null;
-  return (
-    <span className="inline-flex items-center gap-1">
-      <span aria-hidden className={`inline-block h-2 w-2 rounded-full ${ALLIANCE_MARK[alliance].dot}`} />
-      {ALLIANCE_MARK[alliance].name}
-    </span>
-  );
 }
 
 function FlagChip({
@@ -195,21 +176,6 @@ function matchOf(f: FlagRow): MatchDraft {
   return { matchType: f.match_type ?? "", matchNumber: f.match_number ?? "", field: f.field ?? "" };
 }
 
-/**
- * Whether a correction still has to pick an alliance. Every Teamwork match
- * needs one, except that a flag recorded before alliances existed has none to
- * give back, and the server accepts leaving it so while the match type stays.
- * A Skills run has no alliance at all.
- */
-export function correctionNeedsAlliance(
-  flag: Pick<FlagRow, "match_type" | "alliance" | "ruleset">,
-  matchType: string,
-  alliance: Alliance | null,
-): boolean {
-  if (findMatchType(matchType, flag.ruleset)?.group === "skills" || alliance) return false;
-  return !(flag.alliance === null && flag.match_type === matchType);
-}
-
 function FlagListItem({
   flag: f,
   kinds,
@@ -230,20 +196,15 @@ function FlagListItem({
   const [editing, setEditing] = useState(false);
   const [draftBody, setDraftBody] = useState(f.body);
   const [draftMatch, setDraftMatch] = useState(matchOf(f));
-  const [draftAlliance, setDraftAlliance] = useState<Alliance | null>(f.alliance);
   const [draftRules, setDraftRules] = useState<string[]>(parseRuleList(f.rule));
   const [draftMatchAffecting, setDraftMatchAffecting] = useState(f.match_affecting);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Skills runs have no alliance: the toggle is for every other match.
-  const skills = findMatchType(draftMatch.matchType, ruleset.id)?.group === "skills";
-  const needsAlliance = correctionNeedsAlliance(f, draftMatch.matchType, draftAlliance);
 
   function startEditing() {
     setDraftBody(f.body);
     setDraftMatch(matchOf(f));
-    setDraftAlliance(f.alliance);
     setDraftRules(parseRuleList(f.rule));
     setDraftMatchAffecting(f.match_affecting);
     setError(null);
@@ -256,7 +217,7 @@ function FlagListItem({
   // time, not filling in a separate form. The match, field and rules are
   // picked the same way too, so a correction can only produce a value the
   // raise form could have produced. What the flag already holds (an "HS2"
-  // field, a missing alliance) is sent back as it is.
+  // field) is sent back as it is.
   async function save(kind: string) {
     if (!onEdit) return;
     setBusy(true);
@@ -268,7 +229,6 @@ function FlagListItem({
         matchType: draftMatch.matchType,
         matchNumber: draftMatch.matchNumber,
         field: draftMatch.field,
-        alliance: skills ? "" : (draftAlliance ?? ""),
         ruleset: ruleset.id,
         rules: draftRules,
         matchAffecting: draftMatchAffecting,
@@ -295,16 +255,10 @@ function FlagListItem({
             moment on the field, not just a comment. */}
         {matchReference(f.match_type, f.match_number) ? (
           <span
-            title="Match · Alliance · Field"
+            title="Match · Field"
             className="rounded-md bg-surface px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-ink-subtle"
           >
             {matchReference(f.match_type, f.match_number)}
-            {f.alliance ? (
-              <>
-                {" · "}
-                <AllianceMark alliance={f.alliance} />
-              </>
-            ) : null}
             {field ? ` · ${field}` : ""}
           </span>
         ) : null}
@@ -371,9 +325,6 @@ function FlagListItem({
               idPrefix={`edit-${f.id}`}
               legacy={{ matchType: f.match_type, field: f.field }}
             />
-            {skills ? null : (
-              <AllianceToggle value={draftAlliance} onChange={setDraftAlliance} idPrefix={`edit-${f.id}-alliance`} />
-            )}
           </fieldset>
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-ink">Note</span>
@@ -435,7 +386,6 @@ function FlagListItem({
               disabled={busy}
             />
           ) : null}
-          {needsAlliance ? <p className="text-sm text-ink-subtle">Pick the alliance to save.</p> : null}
           <div className="flex flex-wrap gap-2">
             {kinds.map((k) => {
               // Minor and Major need a rule, except a legacy flag that has
@@ -446,7 +396,7 @@ function FlagListItem({
                 <button
                   key={k.id}
                   type="button"
-                  disabled={busy || needsAlliance || (k.requiresRule && !draftRules.length && !legacyKeep)}
+                  disabled={busy || (k.requiresRule && !draftRules.length && !legacyKeep)}
                   onClick={() => save(k.id)}
                   className={`min-h-11 rounded-lg px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
                     k.id === f.kind ? "ring-2 ring-ink/60" : ""

@@ -298,26 +298,23 @@ test("migrate() cancels duplicate live requests before it creates the one-live-p
   );
 });
 
-/* ---- the referee setup and the alliance (no database here either) ----------
+/* ---- the referee setup and the flag columns (no database here either) -------
 
    Nothing below runs against Postgres. The recording stand-in shows the
    statements and parameters the store sends -- the placeholders line up with
-   their values, the alliance goes in the column it is named for -- and the
+   their values, the flag fields go in the columns they are named for -- and the
    source checks show migrate() and supabase/schema.sql agree. What they
    cannot show is that Postgres accepts the SQL. */
 
 const sent = (match) => calls.filter((c) => match.test(c.sql));
 
-test("migrate() creates the single-row referee_setup table, locks it down, and adds flags.alliance", () => {
+test("migrate() creates the single-row referee_setup table, and locks it down", () => {
   const body = src.slice(src.indexOf("async function migrate()"));
   assert.match(
     body,
     /create table if not exists referee_setup \(\s*id\s+int primary key default 1 check \(id = 1\),\s*ruleset\s+text not null,\s*field_count int not null check \(field_count between 1 and 20\),\s*set_by\s+text not null,\s*set_on\s+text not null,\s*updated_at\s+timestamptz not null default now\(\)\s*\);/,
   );
   assert.ok(body.includes("alter table referee_setup enable row level security;"), "RLS must cover the new table");
-  assert.ok(body.includes("alter table flags add column if not exists alliance text check (alliance in ('red','blue'));"));
-  /* The alter is additive and sits inside the guarded block, after the table it alters exists. */
-  assert.ok(body.indexOf("create table if not exists flags") < body.indexOf("add column if not exists alliance"));
 
   const schema = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
   assert.match(schema, /create table referee_setup \(\s*id\s+int primary key default 1 check \(id = 1\),/);
@@ -326,7 +323,15 @@ test("migrate() creates the single-row referee_setup table, locks it down, and a
   assert.ok(schema.includes("drop table if exists referee_setup cascade;"));
 });
 
-test("createFlag and updateFlag send the alliance in the column it is named for", async () => {
+test("no alliance anywhere in the Postgres store or its schema", () => {
+  /* An alliance (red/blue) was briefly a flag column. The match API it needed
+     is not there, so it was removed outright; nothing may bring it back. */
+  const schema = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /alliance/i, "src/lib/db/postgres.ts mentions an alliance");
+  assert.doesNotMatch(schema, /alliance/i, "supabase/schema.sql mentions an alliance");
+});
+
+test("createFlag and updateFlag send every flag field in the column it is named for", async () => {
   const flag = {
     teamId: "t1",
     kind: "minor",
@@ -334,7 +339,6 @@ test("createFlag and updateFlag send the alliance in the column it is named for"
     author: "Dana",
     matchType: "QF",
     matchNumber: "2-1",
-    alliance: "blue",
     field: "2",
     rule: "GG17",
     ruleset: "v5rc",
@@ -348,20 +352,16 @@ test("createFlag and updateFlag send the alliance in the column it is named for"
   const [insert] = sent(/^insert into flags/);
   assert.match(
     insert.sql,
-    /\(team_id, kind, body, author, match_type, match_number, field, rule, ruleset, manual_version, match_affecting, alliance\) values \(\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10, \$11, \$12\)/,
+    /\(team_id, kind, body, author, match_type, match_number, field, rule, ruleset, manual_version, match_affecting\) values \(\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10, \$11\)/,
   );
-  assert.deepEqual(insert.params, ["t1", "minor", "", "Dana", "QF", "2-1", "2", "GG17", "v5rc", "2.1", true, "blue"]);
+  assert.deepEqual(insert.params, ["t1", "minor", "", "Dana", "QF", "2-1", "2", "GG17", "v5rc", "2.1", true]);
 
   calls.length = 0;
-  await postgresStore.createFlag({ ...flag, matchType: "SKD", matchNumber: "1", alliance: null });
-  assert.equal(sent(/^insert into flags/)[0].params[11], null, "a Skills run stores a null alliance");
-
-  calls.length = 0;
-  await postgresStore.updateFlag("f1", { ...flag, alliance: "red" });
+  await postgresStore.updateFlag("f1", flag);
   const [update] = sent(/^update flags/);
-  assert.match(update.sql, /match_affecting = \$10, alliance = \$11 where id = \$1 returning \*$/);
-  assert.equal(update.params[10], "red");
-  assert.equal(update.params.length, 11);
+  assert.match(update.sql, /match_affecting = \$10 where id = \$1 returning \*$/);
+  assert.equal(update.params[9], true);
+  assert.equal(update.params.length, 10);
 });
 
 test("the referee setup is one upserted row, read back by name, never by its key", async () => {

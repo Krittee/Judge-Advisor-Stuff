@@ -61,7 +61,6 @@ test("deleting a team clears its flags and request-linked activity, and nulls th
     author: "Head Referee",
     matchType: "Q",
     matchNumber: "23",
-    alliance: "red",
     field: "2",
     rule: "SG6",
     ruleset: "viqrc",

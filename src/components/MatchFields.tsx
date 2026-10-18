@@ -1,6 +1,6 @@
 "use client";
 
-import { isValidFieldPick, type Alliance } from "@/lib/flagValidation";
+import { isValidFieldPick } from "@/lib/flagValidation";
 import { filterMatchNumberInput, normalizeMatchNumber } from "@/lib/match";
 import { matchTypes } from "@/lib/presets";
 import { findMatchType, isBracketMatch, type MatchType } from "@/lib/rules";
@@ -18,6 +18,8 @@ const hintClass = "text-sm text-ink-subtle";
 const outline = "border-[1.5px] border-ink-faint bg-sunken text-ink";
 const chipOff = `${outline} hover:bg-surface-2`;
 const chipOn = "border-[1.5px] border-accent bg-accent text-accent-ink";
+/* The 56px number boxes: Bracket, Match, and a Skills Run #. */
+const numBox = `h-14 w-full min-w-0 rounded-xl px-0 text-center font-display text-[28px] font-bold focus:border-accent ${outline}`;
 
 /** A row of mutually exclusive buttons in one rounded track. */
 function Segmented({
@@ -138,7 +140,6 @@ function BracketInputs({
   // Each box holds digits only; normalizeMatchNumber does the trimming.
   const part = (raw: string) => normalizeMatchNumber(raw, matchType, rulesetId).split("-")[0];
   const compose = (b: string, m: string) => (m ? `${b}-${m}` : b);
-  const box = `h-14 w-full min-w-0 rounded-xl px-0 text-center font-display text-[28px] font-bold focus:border-accent ${outline}`;
   return (
     <div className="flex gap-2.5">
       <div className="min-w-0 flex-1">
@@ -151,7 +152,7 @@ function BracketInputs({
           onChange={(e) => onChange(compose(part(e.target.value), match))}
           inputMode="numeric"
           autoComplete="off"
-          className={box}
+          className={numBox}
         />
       </div>
       <div className="min-w-0 flex-1">
@@ -164,7 +165,7 @@ function BracketInputs({
           onChange={(e) => onChange(compose(bracket, part(e.target.value)))}
           inputMode="numeric"
           autoComplete="off"
-          className={box}
+          className={numBox}
         />
       </div>
     </div>
@@ -276,8 +277,8 @@ export function MatchFields({
           )}
         </>
       ) : (
-        <>
-          <div>
+        <div className="flex gap-2.5">
+          <div className="min-w-0 flex-[2]">
             <div id={`${idPrefix}-run-l`} className={labelClass}>
               Skills run
             </div>
@@ -288,16 +289,22 @@ export function MatchFields({
               options={typesOf("skills").map((t) => ({ id: t.id, text: textOf(t) }))}
             />
           </div>
-          <Stepper
-            id={`${idPrefix}-number`}
-            label="Run #"
-            value={value.matchNumber}
-            onChange={(matchNumber) => set({ matchNumber })}
-            matchType={value.matchType}
-            rulesetId={rulesetId}
-          />
-          <p className={`${hintClass} text-center`}>Skills runs have no alliance.</p>
-        </>
+          <div className="min-w-0 flex-1">
+            <label htmlFor={`${idPrefix}-number`} className={labelClass}>
+              Run #
+            </label>
+            <input
+              id={`${idPrefix}-number`}
+              value={value.matchNumber}
+              onChange={(e) =>
+                set({ matchNumber: filterMatchNumberInput(e.target.value, value.matchType, rulesetId) })
+              }
+              inputMode="numeric"
+              autoComplete="off"
+              className={numBox}
+            />
+          </div>
+        </div>
       )}
 
       <div role="group" aria-labelledby={`${idPrefix}-field-l`}>
@@ -334,64 +341,5 @@ export function MatchFields({
         </div>
       </div>
     </div>
-  );
-}
-
-const ALLIANCE = {
-  red: {
-    name: "Red",
-    dot: "bg-[var(--alliance-red)]",
-    on: "border-[color:var(--alliance-red)] bg-[color-mix(in_oklab,var(--alliance-red)_24%,transparent)]",
-  },
-  blue: {
-    name: "Blue",
-    dot: "bg-[var(--alliance-blue)]",
-    on: "border-[color:var(--alliance-blue)] bg-[color-mix(in_oklab,var(--alliance-blue)_24%,transparent)]",
-  },
-} as const;
-
-/**
- * Red or Blue, required. The selected side gets a tint and a border in its
- * colour and the text stays ink: the colour is only the marker, so it is never
- * a filled button (a filled red would be read as a Major violation).
- */
-export function AllianceToggle({
-  value,
-  onChange,
-  idPrefix,
-  disabled,
-}: {
-  value: Alliance | null;
-  onChange: (next: Alliance) => void;
-  idPrefix: string;
-  disabled?: boolean;
-}) {
-  return (
-    <fieldset className="min-w-0">
-      <legend className={labelClass}>
-        Alliance <span className="ml-1 font-normal text-ink-subtle">Required</span>
-      </legend>
-      <div className="flex gap-2">
-        {(["red", "blue"] as const).map((a) => {
-          const on = value === a;
-          return (
-            <button
-              key={a}
-              id={`${idPrefix}-${a}`}
-              type="button"
-              onClick={() => onChange(a)}
-              aria-pressed={on}
-              disabled={disabled}
-              className={`flex h-[46px] flex-1 items-center justify-center gap-2 rounded-xl border-2 font-display text-base font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-50 ${
-                on ? ALLIANCE[a].on : "border-line bg-surface hover:bg-surface-2"
-              }`}
-            >
-              <span aria-hidden className={`h-4 w-4 shrink-0 rounded-full ${ALLIANCE[a].dot}`} />
-              {ALLIANCE[a].name}
-            </button>
-          );
-        })}
-      </div>
-    </fieldset>
   );
 }

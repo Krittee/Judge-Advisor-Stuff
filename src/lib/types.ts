@@ -109,9 +109,6 @@ export type FlagRow = {
   match_type: string | null;
   /** "23", or "2-1" (bracket and match) for a V5RC elimination. */
   match_number: string | null;
-  /** Which side of the field the team was on. Null for a Skills run and for
-   *  a flag recorded before alliances existed. */
-  alliance: "red" | "blue" | null;
   /** The field number as a string ("2"); a flag recorded before fields were
    *  just a number may hold a prefixed one ("HS2"). */
   field: string | null;

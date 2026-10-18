@@ -5,16 +5,17 @@ import { isValidElement, type ComponentProps, type ReactElement, type ReactNode 
 import { renderToStaticMarkup } from "react-dom/server";
 
 import * as flagsModule from "../src/components/Flags";
-import { correctionNeedsAlliance, FlagList, type FlagKind } from "../src/components/Flags";
+import { FlagList, type FlagKind } from "../src/components/Flags";
 import { AllRulesPicker } from "../src/components/AllRulesPicker";
-import { AllianceToggle, MatchFields, type MatchDraft } from "../src/components/MatchFields";
+import * as matchFieldsModule from "../src/components/MatchFields";
+import { MatchFields, type MatchDraft } from "../src/components/MatchFields";
 import { commonFieldRules, getRuleset, MAX_FLAG_RULES } from "../src/lib/rules";
 import type { FlagRow } from "../src/lib/types";
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 
-/* MatchFields and AllianceToggle are controlled and hold no hooks, so a test can
-   call them as plain functions, read the element tree they return and fire the
+/* MatchFields is controlled and holds no hooks, so a test can call it as a
+   plain function, read the element tree they return and fire the
    handlers on it -- there is no DOM harness in this repo to click a real page. */
 type El = ReactElement<Record<string, unknown>>;
 type Fn = (props: unknown) => ReactNode;
@@ -94,7 +95,6 @@ test("VEX IQ offers Practice, Qualification and Final for Teamwork, and Driver a
   assert.match(skills.markup, />Driver</);
   assert.match(skills.markup, />Auto</);
   assert.match(skills.markup, />Run #</);
-  assert.match(skills.markup, /Skills runs have no alliance\./);
   assert.deepEqual(skills.typeNames, [], "Skills shows no Teamwork type chips");
   assert.doesNotMatch(skills.markup, /Match type|Bracket/);
 });
@@ -111,6 +111,30 @@ test("V5RC offers Practice, Qualification, Round of 16, Quarterfinal, Semifinal 
   ]);
   // The visible text is the short code, the full name is the accessible name.
   for (const code of ["P", "Q", "R16", "QF", "SF", "F"]) assert.match(v5.markup, new RegExp(`>${code}<`));
+});
+
+test("the Skills panel is a Driver | Auto control beside a plain Run # box, with no alliance anywhere", () => {
+  for (const rulesetId of ["viqrc", "v5rc"]) {
+    const skills = fields({ rulesetId, value: draft("SKA", "2") });
+    assert.deepEqual(
+      skills.buttons.filter((b) => ["Driver", "Auto"].includes(textOf(b))).map((b) => [textOf(b), b.props["aria-pressed"]]),
+      [
+        ["Driver", false],
+        ["Auto", true],
+      ],
+    );
+    assert.match(skills.markup, /<label[^>]*for="t-number"[^>]*>Run #<\/label>/);
+    assert.equal(skills.input("t-number")?.props.value, "2");
+    // One row, as in the match-sheet mocks: the run box has no -/+ stepper.
+    assert.doesNotMatch(skills.markup, /Decrease|Increase/);
+    assert.doesNotMatch(skills.markup, /alliance|\b(?:Red|Blue)\b/i);
+  }
+  const f = fields({ value: draft("SKD", "1") });
+  typeInto(f.input("t-number"), "4a5");
+  assert.deepEqual(f.changes, [{ matchType: "SKD", matchNumber: "45", field: "2" }], "digits only, other fields untouched");
+  press(f.labelled("Auto"));
+  assert.equal(f.changes[1].matchType, "SKA");
+  assert.equal(f.changes[1].matchNumber, "1", "Driver to Auto keeps the run number");
 });
 
 test("the selected type and group carry aria-pressed", () => {
@@ -311,62 +335,6 @@ test("a legacy 'SK' shows beside Driver and Auto only when the flag holds it", (
   assert.match(f.markup, />Skills \(old\)</);
 });
 
-/* ---- AllianceToggle ---------------------------------------------------------- */
-
-function alliance(value: "red" | "blue" | null, extra: { disabled?: boolean } = {}) {
-  const changes: string[] = [];
-  const props = { value, onChange: (a: string) => changes.push(a), idPrefix: "a", ...extra } as ComponentProps<typeof AllianceToggle>;
-  const tree = [...walk(AllianceToggle(props))];
-  return {
-    changes,
-    markup: renderToStaticMarkup(<AllianceToggle {...props} />),
-    buttons: tree.filter((e) => e.type === "button"),
-  };
-}
-
-test("AllianceToggle is a labelled Red/Blue pair of 46px aria-pressed buttons", () => {
-  const red = alliance("red");
-  assert.match(red.markup, /<fieldset[^>]*>\s*<legend[^>]*>Alliance/);
-  assert.match(red.markup, /Required/);
-  assert.deepEqual(
-    red.buttons.map((b) => [textOf(b), b.props["aria-pressed"]]),
-    [
-      ["Red", true],
-      ["Blue", false],
-    ],
-  );
-  assert.ok(red.buttons.every((b) => /\bh-\[46px\]/.test(String(b.props.className))), "46px tall");
-  assert.deepEqual(alliance("blue").buttons.map((b) => b.props["aria-pressed"]), [false, true]);
-  assert.deepEqual(alliance(null).buttons.map((b) => b.props["aria-pressed"]), [false, false], "a flag with no alliance shows none selected");
-});
-
-test("AllianceToggle selects with a tint and a border, never a filled colour, and the text stays ink", () => {
-  for (const value of ["red", "blue"] as const) {
-    for (const b of alliance(value).buttons) {
-      const cls = String(b.props.className);
-      assert.doesNotMatch(cls, /\bbg-\[var\(--alliance/, "no filled alliance background on a button");
-      assert.doesNotMatch(cls, /\b(bg|text)-(danger|red|blue|rose)/, "no status colour on an alliance button");
-      assert.match(cls, /\btext-ink\b/);
-    }
-  }
-  const [redOn, blueOff] = alliance("red").buttons.map((b) => String(b.props.className));
-  assert.match(redOn, /border-\[color:var\(--alliance-red\)\]/);
-  assert.match(redOn, /color-mix\(in_oklab,var\(--alliance-red\)_24%,transparent\)/);
-  assert.doesNotMatch(blueOff, /alliance/, "the unselected side carries no alliance colour on the button");
-  // The colour is the small dot only.
-  assert.match(alliance("red").markup, /bg-\[var\(--alliance-red\)\]/);
-  assert.match(alliance("red").markup, /bg-\[var\(--alliance-blue\)\]/);
-});
-
-test("AllianceToggle reports the tapped side and can be disabled", () => {
-  const a = alliance(null);
-  press(a.buttons[1]);
-  press(a.buttons[0]);
-  assert.deepEqual(a.changes, ["blue", "red"]);
-  assert.ok(alliance("red", { disabled: true }).buttons.every((b) => b.props.disabled === true));
-  assert.ok(alliance("red").buttons.every((b) => !b.props.disabled));
-});
-
 /* ---- AllRulesPicker ---------------------------------------------------------- */
 
 const picker = (over: Partial<ComponentProps<typeof AllRulesPicker>> = {}) =>
@@ -500,8 +468,14 @@ test("the three new controls take their colours from the app's tokens, not liter
     const src = source(`../src/components/${file}`);
     assert.ok(!/oklch\(|#[0-9a-fA-F]{3,8}\b|\brgb\(/.test(src), `${file} hard-codes a colour`);
   }
-  assert.match(source("../src/components/MatchFields.tsx"), /var\(--alliance-red\)/);
-  assert.match(source("../src/components/MatchFields.tsx"), /var\(--alliance-blue\)/);
+});
+
+test("there is no alliance: no toggle, no helper, no caption, no token, no PATCH key", () => {
+  assert.ok(!("AllianceToggle" in matchFieldsModule), "AllianceToggle is exported again");
+  assert.ok(!("correctionNeedsAlliance" in flagsModule), "correctionNeedsAlliance is exported again");
+  for (const file of ["MatchFields.tsx", "Flags.tsx", "AllRulesPicker.tsx"]) {
+    assert.ok(!/alliance/i.test(source(`../src/components/${file}`)), `${file} still mentions an alliance`);
+  }
 });
 
 /* ---- the correction form ------------------------------------------------------ */
@@ -520,7 +494,6 @@ function flag(values: Partial<FlagRow> = {}): FlagRow {
     author: "Head Referee",
     match_type: "Q",
     match_number: "23",
-    alliance: "red",
     field: "2",
     rule: "SG6",
     ruleset: "viqrc",
@@ -530,21 +503,6 @@ function flag(values: Partial<FlagRow> = {}): FlagRow {
     ...values,
   };
 }
-
-test("a correction needs an alliance for Teamwork, except a pre-alliance flag that keeps its type", () => {
-  const recorded = flag();
-  const legacy = flag({ alliance: null });
-  assert.equal(correctionNeedsAlliance(recorded, "Q", "red"), false);
-  assert.equal(correctionNeedsAlliance(recorded, "Q", null), true, "a flag that has one cannot go without");
-  // No alliance on record and the type unchanged: the server accepts "".
-  assert.equal(correctionNeedsAlliance(legacy, "Q", null), false);
-  // Changing the type makes it a new claim, so a pick is required.
-  assert.equal(correctionNeedsAlliance(legacy, "P", null), true);
-  assert.equal(correctionNeedsAlliance(legacy, "P", "blue"), false);
-  // Skills runs have no alliance.
-  assert.equal(correctionNeedsAlliance(recorded, "SKD", null), false);
-  assert.equal(correctionNeedsAlliance(flag({ match_type: "SK", alliance: null }), "SK", null), false);
-});
 
 test("the list's edit and remove buttons and the correction's actions are 44px targets", () => {
   const markup = renderToStaticMarkup(

@@ -74,7 +74,6 @@ const base = {
   body: "",
   matchType: "Q",
   matchNumber: "23",
-  alliance: "red",
   field: "2",
 };
 /** SG6 exists in both rulesets, so a Minor with it records under either. */
@@ -219,7 +218,6 @@ test("correcting a legacy flag (no ruleset) does not log a phantom ruleset chang
     author: "Dana",
     matchType: "Q",
     matchNumber: "23",
-    alliance: null,
     field: "ES2",
     rule: "SG6",
     ruleset: null,
@@ -234,7 +232,7 @@ test("correcting a legacy flag (no ruleset) does not log a phantom ruleset chang
   assert.match(log.detail ?? "", /body:/);
 });
 
-/* ---- the event's setup: program, alliance, match types and fields ---------- */
+/* ---- the event's setup: program, match types and fields ---------------------- */
 
 test("a new flag takes the event's program when the request names none", async () => {
   const t = await team();
@@ -266,25 +264,34 @@ test("naming a different program than the event's is a 400 that says which, and 
   assert.equal(same.status, 200, same.body.error);
 });
 
-test("Skills runs store no alliance, whatever the client sent; a Teamwork match without one is a 400", async () => {
+test("an alliance in the request is accepted and nothing alliance-like is stored, returned or logged", async () => {
   const t = await team();
   await setUp("viqrc");
+  const db = await store();
 
-  for (const matchType of ["SKD", "SKA"]) {
-    const { status, body } = await send("POST", REFEREE, { ...base, ...sg6, teamId: t.id, matchType, matchNumber: "1", alliance: "red" });
-    assert.equal(status, 200, body.error);
-    assert.equal(body.flag?.alliance, null, `${matchType} has no alliance`);
+  // An older client may still send one; neither a pick nor garbage is a 400.
+  for (const [matchType, alliance] of [["Q", "red"], ["SKD", "blue"], ["F", "green"]]) {
+    const { status, body } = await send("POST", REFEREE, { ...base, ...sg6, teamId: t.id, matchType, matchNumber: "1", alliance });
+    assert.equal(status, 200, `${matchType} with alliance ${alliance}: ${body.error}`);
     assert.equal(body.flag?.match_type, matchType);
+    assert.doesNotMatch(JSON.stringify(body), /alliance|"red"|"blue"/i, "the response carries no alliance");
   }
 
-  const missing = await send("POST", REFEREE, { ...base, ...sg6, teamId: t.id, alliance: undefined });
-  assert.equal(missing.status, 400);
-  assert.equal(missing.body.error, "Pick the alliance — Red or Blue.");
-  const stored = await (await store()).listFlags(t.id);
-  assert.equal(stored.length, 2, "only the two Skills runs were recorded");
+  const stored = await db.listFlags(t.id);
+  assert.equal(stored.length, 3);
+  for (const f of stored) assert.equal("alliance" in f, false, "the stored flag has no alliance");
+  for (const a of await db.listActivity()) {
+    assert.doesNotMatch(`${a.action} ${a.detail ?? ""}`, /alliance|\bred\b|\bblue\b/i, "the log says nothing of one");
+  }
+  const q = (await db.listActivity()).find((a) => a.detail?.includes("Q1"));
+  assert.equal(q?.detail, "Team 1852B · Q1 · Field 2");
 
-  const blue = await send("POST", REFEREE, { ...base, ...sg6, teamId: t.id, alliance: "blue" });
-  assert.equal(blue.body.flag?.alliance, "blue");
+  // A correction that sends one changes nothing, and the log says so.
+  const fix = await send("PATCH", REFEREE, { id: stored[0].id, ...base, ...sg6, matchType: stored[0].match_type, matchNumber: "1", alliance: "blue" });
+  assert.equal(fix.status, 200, fix.body.error);
+  assert.equal("alliance" in fix.body.flag!, false);
+  const [entry] = (await db.listActivity()).filter((a) => a.action === "corrected a flag");
+  assert.equal(entry.detail, "Team 1852B · nothing changed");
 });
 
 test("\"QF 2-1\" round-trips: stored as 2-1, read back, and logged as QF 2-1", async () => {
@@ -295,7 +302,6 @@ test("\"QF 2-1\" round-trips: stored as 2-1, read back, and logged as QF 2-1", a
     teamId: t.id,
     matchType: "QF",
     matchNumber: "2 1",
-    alliance: "blue",
     field: "2",
     rules: ["GG17"],
   });
@@ -306,7 +312,7 @@ test("\"QF 2-1\" round-trips: stored as 2-1, read back, and logged as QF 2-1", a
   const [stored] = await (await store()).listFlags(t.id);
   assert.equal(matchReference(stored.match_type, stored.match_number), "QF 2-1");
   const log = (await (await store()).listActivity()).find((a) => a.action === "flagged minor");
-  assert.equal(log?.detail, "Team 1852B · QF 2-1 · Blue · Field 2");
+  assert.equal(log?.detail, "Team 1852B · QF 2-1 · Field 2");
 
   // A correction can move it to another match in the bracket, and says so.
   const moved = await send("PATCH", REFEREE, { id: stored.id, ...base, matchType: "QF", matchNumber: "2-2", rules: ["GG17"] });
@@ -365,7 +371,6 @@ function unchanged(f: FlagRow): Record<string, unknown> {
     body: f.body,
     matchType: f.match_type,
     matchNumber: f.match_number,
-    alliance: f.alliance ?? "",
     field: f.field ?? "",
     ruleset: f.ruleset ?? "viqrc",
     rules: f.rule ? f.rule.split(",") : [],
@@ -373,7 +378,7 @@ function unchanged(f: FlagRow): Record<string, unknown> {
   };
 }
 
-test("legacy flags (no alliance, SK, an HS2 field) survive a correction that changes none of them", async () => {
+test("legacy flags (SK, an HS2 field) survive a correction that changes none of them", async () => {
   const t = await team();
   await setUp("v5rc", 3);
   const db = await store();
@@ -382,7 +387,6 @@ test("legacy flags (no alliance, SK, an HS2 field) survive a correction that cha
     kind: "warning",
     body: "old",
     author: "Dana",
-    alliance: null,
     rule: null,
     ruleset: null,
     manualVersion: null,
@@ -398,16 +402,15 @@ test("legacy flags (no alliance, SK, an HS2 field) survive a correction that cha
     assert.equal(body.flag?.match_type, flag.match_type, "the legacy type is kept");
     assert.equal(body.flag?.match_number, flag.match_number);
     assert.equal(body.flag?.field, flag.field, "the prefixed field is kept");
-    assert.equal(body.flag?.alliance, null, "no alliance is invented");
     assert.equal(body.flag?.ruleset, "viqrc", "a flag keeps its own program, not the event's");
   }
   const log = (await db.listActivity()).filter((a) => a.action === "corrected a flag");
   for (const entry of log) {
-    assert.doesNotMatch(entry.detail ?? "", /alliance|field|match:/, "only the body changed");
+    assert.doesNotMatch(entry.detail ?? "", /field|match:/, "only the body changed");
   }
 });
 
-test("a legacy flag can be given an alliance and a real field, and the log says what changed", async () => {
+test("a legacy flag can be given a real field, and the log says what changed", async () => {
   const t = await team();
   await setUp("viqrc", 3);
   const db = await store();
@@ -419,7 +422,6 @@ test("a legacy flag can be given an alliance and a real field, and the log says 
       author: "Dana",
       matchType: "Q",
       matchNumber: "23",
-      alliance: null,
       field: "HS2",
       rule: null,
       ruleset: null,
@@ -428,23 +430,13 @@ test("a legacy flag can be given an alliance and a real field, and the log says 
     });
   const quals = await legacyQuals();
 
-  const { status, body } = await send("PATCH", REFEREE, { ...unchanged(quals), alliance: "blue", field: "2" });
+  const { status, body } = await send("PATCH", REFEREE, { ...unchanged(quals), field: "2" });
   assert.equal(status, 200, body.error);
-  assert.equal(body.flag?.alliance, "blue");
   assert.equal(body.flag?.field, "2");
   const [entry] = (await db.listActivity()).filter((a) => a.action === "corrected a flag");
-  assert.match(entry.detail ?? "", /alliance: none → "blue"/);
   assert.match(entry.detail ?? "", /field: "HS2" → "2"/);
 
-  const again = await send("PATCH", REFEREE, { ...unchanged(body.flag!), alliance: "red" });
-  assert.equal(again.status, 200, again.body.error);
-  assert.ok(
-    (await db.listActivity()).some((a) => /alliance: "blue" → "red"/.test(a.detail ?? "")),
-    "recolouring it is logged",
-  );
-
-  // Changing the match makes the legacy exemptions moot: HS2 is not a pick, and neither is no alliance.
+  // Only the value it already holds is exempt: another prefixed field is not a pick.
   const other = await legacyQuals();
   assert.equal((await send("PATCH", REFEREE, { ...unchanged(other), field: "ES3" })).status, 400);
-  assert.equal((await send("PATCH", REFEREE, { ...unchanged(other), matchType: "P" })).status, 400);
 });

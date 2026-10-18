@@ -71,8 +71,6 @@ export type NewFlag = {
   /** Which match and field this happened at, so it can be traced back. */
   matchType: string;
   matchNumber: string;
-  /** Null for a Skills run, which has no alliance. */
-  alliance: "red" | "blue" | null;
   field: string;
   /** Rule ids from src/lib/rules.ts, comma-joined, or null when none was picked. */
   rule: string | null;
@@ -97,7 +95,6 @@ export type FlagEdit = {
   body: string;
   matchType: string;
   matchNumber: string;
-  alliance: "red" | "blue" | null;
   field: string;
   /** Rule ids from src/lib/rules.ts, comma-joined, or null. */
   rule: string | null;

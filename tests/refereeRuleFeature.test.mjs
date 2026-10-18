@@ -61,11 +61,10 @@ test("both stores add the ruleset columns additively, and a flag from before the
     "alter table flags add column if not exists ruleset text;",
     "alter table flags add column if not exists manual_version text;",
     "alter table flags add column if not exists match_affecting boolean not null default false;",
-    "alter table flags add column if not exists alliance text check (alliance in ('red','blue'));",
   ]) {
     assert.ok(postgresSrc.includes(ddl), `migrate() lost: ${ddl}`);
   }
-  assert.ok(!/drop column[^;]*(ruleset|manual_version|match_affecting|alliance)/i.test(postgresSrc));
+  assert.ok(!/drop column[^;]*(ruleset|manual_version|match_affecting)/i.test(postgresSrc));
 
   // The hand-run schema stays in step with migrate().
   const flagsTable = schemaSql.slice(schemaSql.indexOf("create table flags"), schemaSql.indexOf(");", schemaSql.indexOf("create table flags")));
@@ -73,7 +72,6 @@ test("both stores add the ruleset columns additively, and a flag from before the
     /\bruleset\s+text/,
     /\bmanual_version\s+text/,
     /\bmatch_affecting\s+boolean not null default false/,
-    /\balliance\s+text check \(alliance in \('red','blue'\)\)/,
   ]) {
     assert.match(flagsTable, column, `supabase/schema.sql flags table lost ${column}`);
   }
@@ -83,23 +81,22 @@ test("both stores add the ruleset columns additively, and a flag from before the
   assert.ok(migrate.includes("f.ruleset ??= null"));
   assert.ok(migrate.includes("f.manual_version ??= null"));
   assert.ok(migrate.includes("f.match_affecting ??= false"));
-  assert.ok(migrate.includes("f.alliance ??= null"));
   assert.ok(migrate.includes("data.refereeSetup ??= null"), "an old state file has no referee setup");
 });
 
-test("the page sends the event's ruleset, rules, alliance and match affecting, and only resets them after a successful request", () => {
+test("the page sends the event's ruleset, rules and match affecting, and only resets them after a successful request", () => {
   const start = pageSrc.indexOf("async function record");
   const record = pageSrc.slice(start, pageSrc.indexOf("\n  }", start));
   assert.match(
     record,
-    /recordPayload\(\{ teamId: team\.id, kind: kind\.id, body, match, alliance, rulesetId, rules, matchAffecting \}\)/,
+    /recordPayload\(\{ teamId: team\.id, kind: kind\.id, body, match, rulesetId, rules, matchAffecting \}\)/,
   );
   assert.ok(record.indexOf("await call") < record.indexOf("setRules([])"));
   assert.ok(record.indexOf("await call") < record.indexOf("setMatchAffecting(false)"));
   assert.ok(record.indexOf("await call") < record.indexOf("setKindId(null)"));
   assert.ok(record.includes('setBody("")'));
   // The team, match and field stay, so the next team in the same match is quick.
-  for (const kept of ["setNumber(", "setMatch(", "setPickedAlliance(", "setRulesetId", "setSheetOpen("]) {
+  for (const kept of ["setNumber(", "setMatch(", "setRulesetId", "setSheetOpen("]) {
     assert.ok(!record.includes(kept), `a recorded flag must not touch ${kept}`);
   }
 });
@@ -215,7 +212,6 @@ test("the PATCH activity log reports rules, ruleset and match-affecting changes"
   for (const label of [
     "rules: existing.rule",
     "ruleset: getRuleset(existing.ruleset).id",
-    "alliance: existing.alliance",
     '"match affecting"',
   ]) {
     assert.ok(patch.includes(label), `the PATCH before-snapshot lost ${label}`);

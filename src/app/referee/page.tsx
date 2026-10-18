@@ -5,17 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { call, useAppState } from "@/components/useAppState";
 import { Banner } from "@/components/ui";
 import { FlagList, FlagSummary, flagsOnDay, kindOf } from "@/components/Flags";
-import { AllianceToggle } from "@/components/MatchFields";
 import { AllRulesPicker } from "@/components/AllRulesPicker";
 import { EventSetup } from "@/components/referee/EventSetup";
 import { MatchSheet } from "@/components/referee/MatchSheet";
 import { RefereeFrame } from "@/components/referee/RefereeFrame";
 import { SeverityButtons } from "@/components/referee/SeverityButtons";
 import {
-  isSkills,
   localDate,
   matchIsSet,
-  matchTeams,
   needsEventSetup,
   recordBlocker,
   recordLabel,
@@ -27,7 +24,7 @@ import {
 import { toneSolid } from "@/lib/tone";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
 import { fieldLabel, matchReference } from "@/lib/match";
-import { DISQUALIFIED_KIND, MAX_FIELD_COUNT, type Alliance, type FlagReport } from "@/lib/flagValidation";
+import { DISQUALIFIED_KIND, MAX_FIELD_COUNT, type FlagReport } from "@/lib/flagValidation";
 import { refereeHistory } from "@/lib/refereeHistory";
 import {
   commonFieldRules,
@@ -163,21 +160,6 @@ function Referee() {
       .sort((a, b) => b.flags[0].created_at.localeCompare(a.flags[0].created_at));
   }, [todayFlags, state.teams]);
 
-  // Teams already reported in this match, to tap instead of typing, and the
-  // side a team was on when it was.
-  const inMatch = useMemo(
-    () => matchTeams(todayFlags, state.teams, match, rulesetId),
-    [todayFlags, state.teams, match, rulesetId],
-  );
-  const knownAlliance = inMatch.find((m) => m.team.id === team?.id)?.alliance ?? null;
-  // A side the referee picked holds for this team in this match only; anything
-  // else starts from what an earlier report in the match already said.
-  const [pickedAlliance, setPickedAlliance] = useState<{ key: string; value: Alliance } | null>(null);
-  const allianceKey = `${team?.id}|${matchReference(matchType, matchNumber)}|${field}`;
-  const alliance: Alliance | null =
-    (pickedAlliance?.key === allianceKey ? pickedAlliance.value : null) ?? knownAlliance;
-  const skills = isSkills(matchType, rulesetId);
-
   // The most serious kind short of Disqualified gets the escalation
   // highlight -- derived from severity rather than a hardcoded "major" id,
   // the same way the button order above is. Disqualified is left out on
@@ -209,7 +191,6 @@ function Referee() {
     rulesetId,
     fieldCount,
     hasTeam: Boolean(team),
-    alliance,
     kind,
     rules,
   });
@@ -228,7 +209,7 @@ function Referee() {
     setSaved(null);
     try {
       await call("/api/flags", {
-        body: recordPayload({ teamId: team.id, kind: kind.id, body, match, alliance, rulesetId, rules, matchAffecting }),
+        body: recordPayload({ teamId: team.id, kind: kind.id, body, match, rulesetId, rules, matchAffecting }),
       });
       setSaved(
         `${kind.label} recorded against ${team.number} for ${matchReference(matchType, matchNumber)} · ${fieldLabel(field)}. ` +
@@ -328,7 +309,7 @@ function Referee() {
 
         <section>
           <label className="rf-lab" htmlFor="rf-team">
-            <span>Team number</span>
+            <span>Team to flag</span>
           </label>
           <input
             id="rf-team"
@@ -346,11 +327,7 @@ function Referee() {
 
           {team ? (
             <div className="rf-tline">
-              <b>{team.name}</b>
-              <span>
-                {team.division}
-                {team.pit ? ` · pit ${team.pit}` : ""}
-              </span>
+              <span>{[team.name, team.division, team.pit ? `Pit ${team.pit}` : null].filter(Boolean).join(" · ")}</span>
               {flagsFor(team.id).length ? (
                 <span className="rf-tflags">
                   <FlagSummary flags={flagsFor(team.id)} kinds={state.flagKinds} />
@@ -358,35 +335,7 @@ function Referee() {
               ) : null}
             </div>
           ) : null}
-
-          {inMatch.length ? (
-            <div className="rf-used">
-              <span>In match</span>
-              {inMatch.map(({ team: t, alliance: side }) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={`rf-chip rf-chip--dot ${side ? `rf-${side}` : ""}`}
-                  aria-pressed={team?.id === t.id}
-                  aria-label={side ? `${t.number}, ${side} alliance` : t.number}
-                  onClick={() => setNumber(t.number)}
-                >
-                  {side ? <i aria-hidden="true" /> : null}
-                  {t.number}
-                </button>
-              ))}
-            </div>
-          ) : null}
         </section>
-
-        {/* Skills runs have no alliance, so there is nothing to pick. */}
-        {skills ? null : (
-          <AllianceToggle
-            idPrefix="rf-alliance"
-            value={alliance}
-            onChange={(value) => setPickedAlliance({ key: allianceKey, value })}
-          />
-        )}
 
         <section>
           <div className="rf-lab" id="rf-rules-l">
@@ -579,7 +528,7 @@ function Referee() {
           aria-describedby={blocker ? "rf-need" : undefined}
           onClick={record}
         >
-          {busy ? "Recording…" : recordLabel(kind, team, skills ? null : alliance)}
+          {busy ? "Recording…" : recordLabel(kind, team)}
         </button>
       </div>
 

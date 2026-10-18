@@ -323,7 +323,6 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       author: "Referee",
       matchType: "Q",
       matchNumber: "3",
-      alliance: "red",
       field: "1",
       rule: "SG6",
       ruleset: "viqrc",
@@ -355,7 +354,6 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       author: "Referee",
       matchType: "Q",
       matchNumber: "4",
-      alliance: "blue",
       field: "2",
       rule: null,
       ruleset: "viqrc",
@@ -602,7 +600,7 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
 
   /* ---- flags and the event boundary ----------------------------------- */
 
-  it("a flag keeps its ruleset, rules, manual version, match-affecting and alliance through create and correct", async (store) => {
+  it("a flag keeps its ruleset, rules, manual version and match-affecting through create and correct", async (store) => {
     await store.upsertTeams([teamInput("1001")]);
     const team = await store.findTeamByNumber("1001");
     assert.ok(team);
@@ -614,7 +612,6 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       author: "Referee",
       matchType: "QF",
       matchNumber: "2-1",
-      alliance: "blue",
       field: "1",
       rule: "GG17,SG9",
       ruleset: "v5rc",
@@ -627,7 +624,6 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       manual_version: f.manual_version,
       match_affecting: f.match_affecting,
       match: `${f.match_type} ${f.match_number}`,
-      alliance: f.alliance,
       field: f.field,
     });
     const v5 = {
@@ -636,13 +632,12 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       manual_version: "2.1",
       match_affecting: true,
       match: "QF 2-1",
-      alliance: "blue",
       field: "1",
     };
     assert.deepEqual(view(created), v5, "createFlag returns what it stored");
     assert.deepEqual(view((await store.listFlags())[0]), v5, "listFlags reads it back");
 
-    // A flag recorded the old way: no ruleset, no alliance, a prefixed field, not match affecting.
+    // A flag recorded the old way: no ruleset, a prefixed field, not match affecting.
     await store.createFlag({
       teamId: team.id,
       kind: "warning",
@@ -650,7 +645,6 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       author: "Referee",
       matchType: "Q",
       matchNumber: "4",
-      alliance: null,
       field: "ES1",
       rule: null,
       ruleset: null,
@@ -665,7 +659,6 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       manual_version: null,
       match_affecting: false,
       match: "Q 4",
-      alliance: null,
       field: "ES1",
     });
 
@@ -674,7 +667,6 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       body: "Held a robot for a count of five.",
       matchType: "SKD",
       matchNumber: "3",
-      alliance: null,
       field: "2",
       rule: "SG6",
       ruleset: "viqrc",
@@ -687,33 +679,13 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       manual_version: null,
       match_affecting: false,
       match: "SKD 3",
-      alliance: null,
       field: "2",
     };
-    assert.deepEqual(view(corrected), iq, "updateFlag returns the corrected values, alliance cleared");
+    assert.deepEqual(view(corrected), iq, "updateFlag returns the corrected values");
     assert.deepEqual(
       view((await store.listFlags()).find((f) => f.id === created.id)!),
       iq,
       "and they persisted",
-    );
-
-    const recoloured = await store.updateFlag(legacy.id, {
-      kind: "warning",
-      body: "",
-      matchType: "Q",
-      matchNumber: "4",
-      alliance: "red",
-      field: "ES1",
-      rule: null,
-      ruleset: null,
-      manualVersion: null,
-      matchAffecting: false,
-    });
-    assert.equal(recoloured.alliance, "red", "a legacy flag can be given an alliance");
-    assert.equal(
-      (await store.listFlags()).find((f) => f.id === legacy.id)?.alliance,
-      "red",
-      "and it persisted",
     );
   });
 
@@ -730,7 +702,6 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       author: "Referee",
       matchType: "Q",
       matchNumber: "3",
-      alliance: "red",
       field: "1",
       rule: "SG6",
       ruleset: "viqrc",

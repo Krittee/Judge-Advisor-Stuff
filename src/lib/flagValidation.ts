@@ -32,8 +32,6 @@ export const DISQUALIFIED_KIND = "dq";
 /** Only these kinds can be marked as having affected the match. */
 export const MATCH_AFFECTING_KINDS: readonly string[] = ["minor", "major"];
 
-export type Alliance = "red" | "blue";
-
 /**
  * What the browser sends to POST and PATCH /api/flags. `rules` is the list
  * the picker holds; the server also still accepts the old single `rule`
@@ -44,8 +42,6 @@ export type FlagReport = {
   body: string;
   matchType: string;
   matchNumber: string;
-  /** "red" or "blue"; "" for a Skills run, or a flag that never had one. */
-  alliance: Alliance | "";
   field: string;
   ruleset: string;
   rules: string[];
@@ -57,8 +53,6 @@ export type ParsedFlagFields = {
   text: string;
   matchType: string;
   matchNumber: string;
-  /** Always null for a Skills run, and for a legacy flag corrected without one. */
-  alliance: Alliance | null;
   field: string;
   /** The rule ids comma-joined for storage, or null. */
   rule: string | null;
@@ -92,7 +86,7 @@ type ParseOptions = {
   /** How many fields the event has. With no setup saved yet, MAX_FIELD_COUNT. */
   fieldCount?: number | null;
   /** A correction: the flag as it is on record. What it already holds -- a
-   *  legacy match type, field or missing alliance -- may be sent back
+   *  legacy match type or field -- may be sent back
    *  unchanged, because refusing it would make the flag uncorrectable. */
   existing?: FlagRow | null;
 };
@@ -152,19 +146,6 @@ export function parseFlagFields(
     };
   }
 
-  // Skills runs have no alliance, so whatever was sent with one is dropped.
-  // A Teamwork match needs it -- except that a flag recorded before alliances
-  // existed has none to give back, and a correction that leaves it so is fine.
-  const sentAlliance = String(body.alliance ?? "").trim().toLowerCase();
-  let alliance: Alliance | null = null;
-  if (type.group === "teamwork") {
-    if (sentAlliance === "red" || sentAlliance === "blue") {
-      alliance = sentAlliance;
-    } else if (!(sentAlliance === "" && existing?.match_type === matchType && existing.alliance === null)) {
-      return { ok: false, status: 400, error: "Pick the alliance — Red or Blue." };
-    }
-  }
-
   // A field is a number, 1 to the event's count -- unless it is the one the
   // flag already holds, which may be a legacy "HS2" or a number the event has
   // since outgrown.
@@ -215,7 +196,6 @@ export function parseFlagFields(
     text,
     matchType,
     matchNumber,
-    alliance,
     field,
     rule,
     rules,

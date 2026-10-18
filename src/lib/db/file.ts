@@ -187,8 +187,7 @@ function migrate(data: Data): Data {
   data.flags ??= [];
   data.refereeSetup ??= null;
   // Match and field arrived after the first flags did; rule after that,
-  // then the ruleset it belongs to, then the alliance. A flag with no
-  // ruleset is a VEX IQ one; one with no alliance predates alliances.
+  // then the ruleset it belongs to. A flag with no ruleset is a VEX IQ one.
   for (const f of data.flags) {
     f.match_type ??= null;
     f.match_number ??= null;
@@ -197,7 +196,8 @@ function migrate(data: Data): Data {
     f.ruleset ??= null;
     f.manual_version ??= null;
     f.match_affecting ??= false;
-    f.alliance ??= null;
+    // A dev data file from the build that briefly recorded an alliance.
+    delete (f as { alliance?: unknown }).alliance;
   }
 
   // Languages and panel language cover arrived after the first rosters.
@@ -818,7 +818,6 @@ function createFlag(input: NewFlag): FlagRow {
     author: input.author,
     match_type: input.matchType,
     match_number: input.matchNumber,
-    alliance: input.alliance,
     field: input.field,
     rule: input.rule,
     ruleset: input.ruleset,
@@ -839,7 +838,6 @@ function updateFlag(id: string, edit: FlagEdit): FlagRow {
   row.body = edit.body;
   row.match_type = edit.matchType;
   row.match_number = edit.matchNumber;
-  row.alliance = edit.alliance;
   row.field = edit.field;
   row.rule = edit.rule;
   row.ruleset = edit.ruleset;

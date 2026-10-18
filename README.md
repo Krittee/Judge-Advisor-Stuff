@@ -366,25 +366,27 @@ often the thing a judge most needs to know. `/referee` is their page:
 1. **Set the match** — the pinned *Current match* bar (`QF 2-1 · Field 2`,
    with the program as a read-only tag) opens the *Set the match* sheet:
    **Teamwork** or **Skills**, the match type and number, and the field.
-2. Find the team — **type the number** if you can read it off the robot,
-   tap one of the **In match** chips for a team already flagged in this
-   match, or use **All teams** to scroll and pick one.
-3. Pick the **alliance**, Red or Blue (not for a Skills run).
-4. Pick the **rule(s)** broken — the program's common rules are chips, and
+2. Find the **team to flag** — **type the number** if you can read it off
+   the robot, or use **All teams** to scroll and pick one. A referee cannot
+   know who is in a match, so there is no roster step: you flag the one team
+   you saw. Under the box, one line gives its name, division and pit, with
+   any flags it already has.
+3. Pick the **rule(s)** broken — the program's common rules are chips, and
    **All rules** opens the whole manual with search — and add a note if it
    needs saying.
-5. Tap **how serious** it was, then **Record**. A severity button only
-   selects; the pinned Record bar (`Record Minor · 9882K (Red)`) saves, and
+4. Tap **how serious** it was, then **Record**. A severity button only
+   selects; the pinned Record bar (`Record Minor · 9882K`) saves, and
    says in one line what it is still waiting for.
 
 The tab bar along the bottom has **Report**, **All teams** and **Today**
 (the *Flagged today* section, further down the Report page).
 
-The **All teams** page searches by number, name *or* pit (`9882`, `nova`
-and `A1` all find a team), filters by division, and narrows to teams that
-have already been flagged. Picking one hands it to the flagging page
-rather than repeating the form there, so a flag is still only ever
-written in one place.
+The **All teams** page has a pinned search by number, name *or* pit (`9882`,
+`nova` and `A1` all find a team), a division filter, a *Flagged only* chip
+and a `shown of total teams` count. Each row shows the team's number, name,
+division and pit, and any flags it has; tapping one opens Report with that
+team filled in, rather than repeating the form there, so a flag is still
+only ever written in one place.
 
 Five kinds, each its own colour, ordered least to most serious so the
 sharpest button is not the one under your thumb:
@@ -412,16 +414,13 @@ moment, so every one carries a match reference:
   both programs, **F**inal in VIQRC, and in V5RC the eliminations **R16**,
   **QF**, **SF** and **F**, whose number is a bracket and a match (`QF 2-1`).
   Skills is **Driver** or **Auto** with a run number.
-- **Alliance** — Red or Blue, required for Teamwork. A Skills run has none.
-  Once a team has been reported in a match, its side is filled in for the
-  next report.
 - **Field** — a plain number, 1 to the event's field count (`Field 2`).
 
-The match, alliance and field are required; the note is optional. A flag
-nobody can trace back is not much use days later. They show up everywhere a
-flag does as a compact reference, `Q23 · Red · Field 2`, right beside who
-wrote it and when. A flag recorded before alliances existed, or with an old
-`HS2`-style field, still shows and can be corrected without losing either.
+The match and field are required; the note is optional. A flag nobody can
+trace back is not much use days later. They show up everywhere a flag does
+as a compact reference, `Q23 · Field 2`, right beside who wrote it and
+when. A flag recorded with an old `HS2`-style field still shows and can be
+corrected without losing it.
 
 **Match and field are remembered between flags, on purpose.** A referee
 works one match at a time and often flags more than one team against it,

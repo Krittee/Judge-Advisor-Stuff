@@ -363,10 +363,6 @@ async function migrate(): Promise<void> {
       alter table flags add column if not exists ruleset text;
       alter table flags add column if not exists manual_version text;
       alter table flags add column if not exists match_affecting boolean not null default false;
-
-      -- Which side of the field the team was on. Null for a Skills run and
-      -- for a flag recorded before alliances existed.
-      alter table flags add column if not exists alliance text check (alliance in ('red','blue'));
     end $$;
   `);
 }
@@ -913,8 +909,8 @@ export const postgresStore: Store = {
     return one(
       await query<FlagRow>(
         `insert into flags (team_id, kind, body, author, match_type, match_number, field, rule,
-                            ruleset, manual_version, match_affecting, alliance)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                            ruleset, manual_version, match_affecting)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          returning *`,
         [
           input.teamId,
@@ -928,7 +924,6 @@ export const postgresStore: Store = {
           input.ruleset,
           input.manualVersion,
           input.matchAffecting,
-          input.alliance,
         ],
       ),
     )!;
@@ -938,7 +933,7 @@ export const postgresStore: Store = {
     const updated = one(
       await query<FlagRow>(
         `update flags set kind = $2, body = $3, match_type = $4, match_number = $5, field = $6, rule = $7,
-                          ruleset = $8, manual_version = $9, match_affecting = $10, alliance = $11
+                          ruleset = $8, manual_version = $9, match_affecting = $10
          where id = $1
          returning *`,
         [
@@ -952,7 +947,6 @@ export const postgresStore: Store = {
           edit.ruleset,
           edit.manualVersion,
           edit.matchAffecting,
-          edit.alliance,
         ],
       ),
     );

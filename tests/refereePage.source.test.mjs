@@ -120,19 +120,34 @@ test("Set the match is a real modal dialog that closes on Escape and the backdro
 
 /* ---- the form ------------------------------------------------------------- */
 
-test("the alliance toggle is hidden for Skills and its side is remembered per team and match", () => {
-  assert.match(pageSrc, /\{skills \? null : \(\s*<AllianceToggle/);
-  assert.ok(pageSrc.includes("const skills = isSkills(matchType, rulesetId)"));
-  assert.ok(pageSrc.includes("?? knownAlliance"), "an earlier report in this match pre-fills the side");
-  assert.ok(pageSrc.includes("const allianceKey = `${team?.id}|${matchReference(matchType, matchNumber)}|${field}`"));
+test("the team box is labelled Team to flag, with one muted summary line and its flag pills", () => {
+  assert.ok(pageSrc.includes("<span>Team to flag</span>"));
+  assert.ok(!pageSrc.includes("<span>Team number</span>"), "the old label is gone");
+  assert.ok(pageSrc.includes('htmlFor="rf-team"') && pageSrc.includes('id="rf-team"'), "the label is tied to the input");
+  // "{name} · {division} · Pit {pit}": one line, the pit left out when there is none.
+  assert.ok(pageSrc.includes("[team.name, team.division, team.pit ? `Pit ${team.pit}` : null].filter(Boolean).join(\" · \")"));
+  assert.ok(pageSrc.includes("<FlagSummary flags={flagsFor(team.id)} kinds={state.flagKinds} />"), "the existing flags sit on the right");
+  assert.ok(pageSrc.includes("No team with that number."));
+  assert.ok(!/<b>\{team\.name\}<\/b>/.test(pageSrc), "the name is not set apart from the line");
+  assert.doesNotMatch(rule(".rf-tline {"), /margin-left: auto/);
+  assert.ok(!css.includes(".rf-tline b"), "no bold name in the summary line");
 });
 
-test("teams already reported in this match are chips with their alliance dot that fill the team box", () => {
-  assert.ok(pageSrc.includes("matchTeams(todayFlags, state.teams, match, rulesetId)"));
-  assert.ok(pageSrc.includes("onClick={() => setNumber(t.number)}"));
-  assert.ok(pageSrc.includes("alliance`") || pageSrc.includes("${side} alliance"), "the chip names its alliance for a screen reader");
-  assert.ok(pageSrc.includes("No team with that number."));
-  assert.ok(pageSrc.includes("flagsOnDay(state.flags, new Date())"), "in-match chips and Flagged today use today's flags only");
+test("there is no In match shortcut and no recent-team chips: the referee types or picks every team", () => {
+  assert.ok(!pageSrc.includes("In match") && !pageSrc.includes("inMatch"));
+  assert.ok(!pageSrc.includes("matchTeams") && !logicSrc.includes("matchTeams"));
+  assert.ok(!pageSrc.includes("rf-used") && !css.includes(".rf-used"));
+  assert.ok(!pageSrc.includes("rf-chip--dot") && !css.includes("rf-chip--dot"));
+  assert.ok(!css.includes(".rf-red") && !css.includes(".rf-blue"));
+  // The only chips left on the page are the rules.
+  assert.equal(pageSrc.match(/className="rf-chip"/g)?.length, 1);
+  assert.ok(pageSrc.includes("flagsOnDay(state.flags, new Date())"), "Flagged today uses today's flags only");
+});
+
+test("arriving with ?team= fills the team box, from the All teams list", () => {
+  assert.ok(pageSrc.includes('params.get("team")'));
+  assert.match(pageSrc, /if \(pickedTeam\) setNumber\(normalizeTeamNumber\(pickedTeam\)\)/);
+  assert.ok(pageSrc.includes("useSearchParams"));
 });
 
 test("severity buttons are a 2-column grid of 56px toneSolid buttons that only select", () => {
@@ -155,7 +170,7 @@ test("the Record bar is pinned above the tabs, 52px, and is the only thing that 
   const bar = pageSrc.slice(pageSrc.indexOf('<div className="rf-abar">'), pageSrc.indexOf("<MatchSheet"));
   assert.ok(bar.includes("disabled={busy || Boolean(blocker)}"));
   assert.ok(bar.includes("onClick={record}"));
-  assert.ok(bar.includes("recordLabel(kind, team, skills ? null : alliance)"));
+  assert.ok(bar.includes("recordLabel(kind, team)"));
   assert.ok(bar.includes("toneSolid(kind.color)"), "tinted in the selected severity");
   assert.ok(bar.includes("{blocker}") && bar.includes("{error}"), "one line says what is missing, or what went wrong");
   assert.ok(pageSrc.includes("recordBlocker({"));
@@ -169,21 +184,72 @@ test("the success banner stays, and the form returns to the top for the next tea
   assert.ok(pageSrc.includes("bodyRef.current?.scrollTo({ top: 0 })"));
 });
 
-/* ---- the alliance colours ------------------------------------------------- */
+/* ---- All teams ------------------------------------------------------------ */
 
-test("the alliance colours are tokens on :root in both themes, used only as markers", () => {
-  const dark = css.slice(css.indexOf(":root,\n:root[data-theme=\"dark\"] {"), css.indexOf(':root[data-theme="light"] {'));
-  const light = css.slice(css.indexOf(':root[data-theme="light"] {'), css.indexOf("@theme inline"));
-  for (const [name, block] of [["dark", dark], ["light", light]]) {
-    assert.ok(block.includes("--alliance-red: oklch(0.620 0.190 25);"), `${name} theme has no alliance red`);
-    assert.ok(block.includes("--alliance-blue: oklch(0.620 0.150 255);"), `${name} theme has no alliance blue`);
+test("All teams: a sticky search, a division pill, a Flagged only chip and a shown-of-total count", () => {
+  assert.ok(teamsSrc.includes("<span>Search number, name or pit</span>"), "the search is labelled as the mock has it");
+  assert.ok(teamsSrc.includes('placeholder="9882K, Nova, A1"'));
+  assert.ok(teamsSrc.includes("{shown.length} of {state.teams.length} teams"));
+  assert.ok(teamsSrc.includes("Tap a team to flag it on Report."));
+  // The toggle is a chip, not the old checkbox.
+  assert.match(teamsSrc, /className="rf-fchip" aria-pressed=\{flaggedOnly\} onClick=\{\(\) => setFlaggedOnly\(!flaggedOnly\)\}/);
+  assert.ok(!teamsSrc.includes('type="checkbox"'));
+  assert.ok(teamsSrc.includes('<select value={division}') && teamsSrc.includes('aria-label="Division"'), "the division is still a real select");
+  assert.match(rule(".rf-find {"), /position: sticky; top: 0/);
+  assert.match(rule(".rf-body--list"), /padding-top: 0/);
+  assert.match(rule('.rf-fchip[aria-pressed="true"]'), /background: var\(--accent\)/);
+  assert.match(rule(".rf-dsel select, .rf-fchip {"), /min-height: 44px; padding: 0 12px;[^}]*border-radius: 999px/);
+});
+
+test("All teams rows are full-width, 64px or more: number, name, division and pit, flags and a chevron", () => {
+  assert.match(rule(".rf-trow {"), /width: 100%; min-height: 64px/);
+  assert.ok(teamsSrc.includes('className="rf-trow"'));
+  assert.ok(teamsSrc.includes("<b>{t.number}</b>") && teamsSrc.includes("<span>{t.name}</span>"));
+  assert.ok(teamsSrc.includes('{t.pit ? ` · Pit ${t.pit}` : ""}'), "the second line reads division · Pit n");
+  assert.ok(teamsSrc.includes("<FlagSummary flags={flags} kinds={state.flagKinds} />"));
+  assert.ok(teamsSrc.includes('<path d="M9 6l6 6-6 6" />'), "a chevron says the row goes somewhere");
+});
+
+test("All teams still searches number, name or pit, and a tap opens Report with that team", () => {
+  assert.ok(teamsSrc.includes("t.number.toLowerCase().includes(q)"));
+  assert.ok(teamsSrc.includes("t.name.toLowerCase().includes(q)"));
+  assert.ok(teamsSrc.includes('(t.pit ?? "").toLowerCase().includes(q)'));
+  assert.ok(teamsSrc.includes("router.push(`/referee?team=${encodeURIComponent(t.number)}`)"));
+  assert.ok(teamsSrc.includes("flaggedOnly && !flagsByTeam.has(t.id)"));
+  assert.ok(teamsSrc.includes("No teams have been imported yet.") && teamsSrc.includes("Nothing matches that."));
+});
+
+test("All teams has no match bar: it is not where a flag is written", () => {
+  assert.ok(!teamsSrc.includes("rf-mbar") && !teamsSrc.includes("Current match") && !teamsSrc.includes("MatchSheet"));
+  assert.ok(teamsSrc.includes('current="/referee/teams"'));
+});
+
+test("the report's rhythm follows the mock: 8px between sections, 10px above, the pinned bar at 12px sides", () => {
+  assert.match(rule(".rf-body {"), /gap: 8px;\s*padding: 10px var\(--rf-gutter\) 14px/);
+  assert.match(rule(".rf-abar {"), /padding: 10px calc\(var\(--rf-gutter\) - 4px\)/);
+  // The setup screen keeps its own, roomier rhythm.
+  assert.match(rule(".rf-setup .rf-body"), /gap: 20px; padding-top: 20px/);
+});
+
+/* ---- no alliance --------------------------------------------------------- */
+
+test("the alliance is gone from the referee pages, their components and their styles", () => {
+  for (const [name, src] of [
+    ["page", pageSrc],
+    ["teams page", teamsSrc],
+    ["frame", frameSrc],
+    ["event setup", setupSrc],
+    ["match sheet", sheetSrc],
+    ["severity buttons", severitySrc],
+    ["logic", logicSrc],
+  ]) {
+    assert.doesNotMatch(src, /alliance/i, `${name} still mentions an alliance`);
   }
-  assert.match(dark, /Colour is signal[^]*alliance|signal in this app/, "the token says what it is for");
-  // Not in the severity buttons or any filled control: markers only.
+  assert.ok(!pageSrc.includes("AllianceToggle"));
+  // The referee block of the stylesheet, and the two tokens on :root in both themes.
   const referee = css.slice(css.indexOf("Referee console"), css.indexOf("@keyframes si-bar"));
-  const uses = referee.match(/var\(--alliance-[a-z]+\)/g) ?? [];
-  assert.deepEqual(uses, ["var(--alliance-red)", "var(--alliance-blue)"], "only the in-match dot reads them");
-  assert.match(referee, /\.rf-chip--dot i \{[^}]*background: var\(--dc\)/);
+  assert.doesNotMatch(referee, /alliance/i);
+  assert.doesNotMatch(css, /--alliance/);
 });
 
 test("the referee styles sit after the landing block, scoped under .referee, with a light theme", () => {
@@ -191,12 +257,4 @@ test("the referee styles sit after the landing block, scoped under .referee, wit
   assert.ok(css.indexOf('.referee {') > css.indexOf(".lp-chev"));
   assert.ok(css.includes(':root[data-theme="light"] .referee {'));
   assert.ok(css.includes("--rf-field-line: oklch(0.640 0.012 265)"), "the light field outline keeps 3:1 against the surface");
-});
-
-test("a pressed In match chip is outlined in ink, never filled with the accent blue", () => {
-  const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
-  const rule = css.match(/\.rf-chip--dot\[aria-pressed="true"\]\s*\{([^}]*)\}/);
-  assert.ok(rule, "the dot chip has its own pressed rule");
-  assert.doesNotMatch(rule[1], /var\(--accent\)/);
-  assert.match(rule[1], /border-color:\s*var\(--ink\)/);
 });

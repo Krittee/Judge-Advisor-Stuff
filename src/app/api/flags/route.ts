@@ -81,7 +81,6 @@ export async function POST(request: Request) {
     text,
     matchType,
     matchNumber,
-    alliance,
     field,
     rule,
     ruleset,
@@ -96,7 +95,6 @@ export async function POST(request: Request) {
     author: session!.name,
     matchType,
     matchNumber,
-    alliance,
     field,
     rule,
     ruleset,
@@ -111,7 +109,6 @@ export async function POST(request: Request) {
     detail: [
       `Team ${team.number}`,
       matchReference(matchType, matchNumber),
-      alliance ? (alliance === "red" ? "Red" : "Blue") : null,
       fieldLabel(field),
     ]
       .filter(Boolean)
@@ -185,7 +182,6 @@ export async function PATCH(request: Request) {
   const before = {
     kind: previousKind,
     match: matchReference(existing.match_type, existing.match_number) ?? "",
-    alliance: existing.alliance,
     field: existing.field,
     body: existing.body,
     rules: existing.rule,
@@ -209,7 +205,6 @@ export async function PATCH(request: Request) {
     text,
     matchType,
     matchNumber,
-    alliance,
     field,
     rule,
     ruleset,
@@ -222,7 +217,6 @@ export async function PATCH(request: Request) {
     body: text,
     matchType,
     matchNumber,
-    alliance,
     field,
     rule,
     ruleset,
@@ -249,7 +243,6 @@ export async function PATCH(request: Request) {
   const after = {
     kind,
     match: matchReference(matchType, matchNumber) ?? "",
-    alliance,
     field,
     body: text,
     rules: rule,

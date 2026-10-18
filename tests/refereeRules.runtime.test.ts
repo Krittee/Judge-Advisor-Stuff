@@ -19,7 +19,6 @@ const validReport = {
   body: "Robot contacted a second Bean Bag.",
   matchType: "Q",
   matchNumber: "23",
-  alliance: "red",
   field: "2",
   rule: null,
 };
@@ -57,7 +56,6 @@ test("the real validator preserves the required match fields", () => {
   for (const [field, value] of [
     ["matchType", "X"],
     ["matchNumber", ""],
-    ["alliance", ""],
     ["field", ""],
     ["field", "ES2"], // the division prefix is no longer a field
   ] as const) {
@@ -205,7 +203,7 @@ test("Disqualified is a configured kind: the most severe, rule-requiring, and ne
   assert.equal(unknown.ok && unknown.kind, "good");
 });
 
-/* ---- match types, alliance and field ------------------------------------- */
+/* ---- match types and field ------------------------------------- */
 
 const ids = (rulesetId: string) => matchTypes(rulesetId).map((t) => t.id);
 
@@ -261,63 +259,34 @@ test("a V5RC elimination is stored as bracket-match, \"QF 2-1\"", () => {
 
 test("the legacy SK is refused on a new flag but a flag already holding it can be corrected", () => {
   assert.equal(isValidMatchType("SK", "viqrc"), false, "never offered");
-  const fresh = parseFlagFields({ ...validReport, matchType: "SK", matchNumber: "3", alliance: "" });
+  const fresh = parseFlagFields({ ...validReport, matchType: "SK", matchNumber: "3" });
   assert.equal(fresh.ok, false);
 
-  const legacy = flag("1", { match_type: "SK", match_number: "3", alliance: null, field: "HS2" });
+  const legacy = flag("1", { match_type: "SK", match_number: "3", field: "HS2" });
   const kept = parseFlagFields(
-    { ...validReport, matchType: "SK", matchNumber: "3", alliance: "", field: "HS2" },
+    { ...validReport, matchType: "SK", matchNumber: "3", field: "HS2" },
     { existing: legacy },
   );
-  assert.equal(kept.ok, true, "an unchanged correction keeps the legacy type, field and no alliance");
+  assert.equal(kept.ok, true, "an unchanged correction keeps the legacy type and field");
   assert.equal(kept.ok && kept.matchType, "SK");
   assert.equal(kept.ok && kept.field, "HS2");
-  assert.equal(kept.ok && kept.alliance, null, "Skills has none");
 
   // Moving it to a type the program offers is a normal pick.
   const moved = parseFlagFields(
-    { ...validReport, matchType: "SKD", matchNumber: "3", alliance: "", field: "HS2" },
+    { ...validReport, matchType: "SKD", matchNumber: "3", field: "HS2" },
     { existing: legacy },
   );
   assert.equal(moved.ok && moved.matchType, "SKD");
 });
 
-test("Teamwork needs an alliance; Skills runs store none, whatever was sent", () => {
-  for (const alliance of ["", undefined, "green", null]) {
-    const r = parseFlagFields({ ...validReport, alliance });
-    assert.equal(r.ok, false, `Teamwork with alliance ${JSON.stringify(alliance)}`);
-    assert.equal(!r.ok && r.error, "Pick the alliance — Red or Blue.");
-  }
-  const blue = parseFlagFields({ ...validReport, alliance: " Blue " });
-  assert.equal(blue.ok && blue.alliance, "blue");
-
-  for (const matchType of ["SKD", "SKA"]) {
-    for (const alliance of ["red", "blue", "green", ""]) {
+test("an alliance in the request is ignored: nothing of it is validated, kept or returned", () => {
+  for (const matchType of ["Q", "SKD"]) {
+    for (const alliance of ["red", "blue", "green", "", null]) {
       const r = parseFlagFields({ ...validReport, matchType, matchNumber: "1", alliance });
       assert.equal(r.ok, true, `${matchType} with alliance ${JSON.stringify(alliance)}`);
-      assert.equal(r.ok && r.alliance, null, `${matchType} stores no alliance`);
+      assert.equal(r.ok && "alliance" in r, false, "the parsed fields carry no alliance");
     }
   }
-});
-
-test("a flag from before alliances keeps none through a correction that leaves its match alone", () => {
-  const legacy = flag("1", { alliance: null });
-  const sameMatch = { ...validReport, alliance: "", matchType: "Q", matchNumber: "23" };
-
-  const kept = parseFlagFields(sameMatch, { existing: legacy });
-  assert.equal(kept.ok && kept.alliance, null);
-
-  // It can still be given one...
-  const given = parseFlagFields({ ...sameMatch, alliance: "blue" }, { existing: legacy });
-  assert.equal(given.ok && given.alliance, "blue");
-  // ...but a garbage value is not "leaving it alone"...
-  assert.equal(parseFlagFields({ ...sameMatch, alliance: "green" }, { existing: legacy }).ok, false);
-  // ...a different match is a new report that needs one...
-  assert.equal(parseFlagFields({ ...sameMatch, matchType: "P" }, { existing: legacy }).ok, false);
-  // ...and so is a flag that has one: it cannot be blanked.
-  assert.equal(parseFlagFields(sameMatch, { existing: flag("2", { alliance: "red" }) }).ok, false);
-  // A new flag has no existing record to lean on.
-  assert.equal(parseFlagFields(sameMatch).ok, false);
 });
 
 test("a field is a number from 1 to the event's field count", () => {
@@ -418,7 +387,6 @@ function flag(id: string, values: Partial<FlagRow> = {}): FlagRow {
     author: "Head Referee",
     match_type: "Q",
     match_number: "23",
-    alliance: "red",
     field: "2",
     rule: "SG6",
     ruleset: "viqrc",

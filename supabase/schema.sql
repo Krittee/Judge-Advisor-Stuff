@@ -164,7 +164,6 @@ create table flags (
   author          text not null,
   match_type      text,                       -- Q, QF, SKD...; see config/rules/*.json (legacy 'SK')
   match_number    text,                       -- '23', or '2-1' (bracket-match) for a V5RC elimination
-  alliance        text check (alliance in ('red','blue')),  -- null = Skills run, or recorded before alliances
   field           text,                       -- the field number, '2'; an old flag may hold 'HS2'
   rule            text,                       -- rule id(s), comma-joined: 'SG6' or 'GG17,SG9'
   ruleset         text,                       -- 'viqrc' / 'v5rc'; null = recorded before rulesets = VEX IQ

@@ -1,7 +1,7 @@
-import { isValidMatchNumber, matchReference, normalizeMatchNumber } from "@/lib/match";
-import { isValidFieldPick, type Alliance, type FlagReport } from "@/lib/flagValidation";
-import { findMatchType, getRuleset } from "@/lib/rules";
-import type { FlagRow, RefereeSetup, Team } from "@/lib/types";
+import { isValidMatchNumber } from "@/lib/match";
+import { isValidFieldPick, type FlagReport } from "@/lib/flagValidation";
+import { findMatchType } from "@/lib/rules";
+import type { RefereeSetup } from "@/lib/types";
 
 /**
  * The referee console's decisions, as plain functions so each can be checked
@@ -54,11 +54,6 @@ export function setupChangeQuestion(
   return null;
 }
 
-/** A Skills run has no alliance. A match not chosen yet is not one. */
-export function isSkills(matchType: string, rulesetId: string): boolean {
-  return findMatchType(matchType, rulesetId)?.group === "skills";
-}
-
 /** Whether the match and field are complete enough to pin a flag to. The same
  *  checks the server makes, so a ready match is never refused for its shape. */
 export function matchIsSet(match: CurrentMatch, rulesetId: string, fieldCount: number): boolean {
@@ -72,48 +67,37 @@ export function matchIsSet(match: CurrentMatch, rulesetId: string, fieldCount: n
 /**
  * What is still missing before a flag can be recorded, as the one line shown
  * above the Record button; null when nothing is. Match first, then the team,
- * then the alliance (never for a Skills run), the severity, and last the rule
- * that Minor, Major and Disqualified need.
+ * then the severity, and last the rule that Minor, Major and Disqualified need.
  */
 export function recordBlocker(p: {
   match: CurrentMatch;
   rulesetId: string;
   fieldCount: number;
   hasTeam: boolean;
-  alliance: Alliance | null;
   kind: { label: string; requiresRule: boolean } | null;
   rules: string[];
 }): string | null {
   if (!matchIsSet(p.match, p.rulesetId, p.fieldCount)) return "Set the match and field first.";
   if (!p.hasTeam) return "Enter a team number.";
-  if (!isSkills(p.match.matchType, p.rulesetId) && !p.alliance) return "Pick the alliance — Red or Blue.";
   if (!p.kind) return "Pick how serious it was.";
   if (p.kind.requiresRule && !p.rules.length) return `${p.kind.label} needs at least one rule — pick it under What happened.`;
   return null;
 }
 
-const ALLIANCE_NAME: Record<Alliance, string> = { red: "Red", blue: "Blue" };
-
-/** The Record button: "Record Minor · 9882K (Red)". The alliance only when
- *  there is one to name -- a Skills run has none. */
-export function recordLabel(
-  kind: { short: string } | null,
-  team: { number: string } | null,
-  alliance: Alliance | null,
-): string {
+/** The Record button: "Record Minor · 9882K". */
+export function recordLabel(kind: { short: string } | null, team: { number: string } | null): string {
   if (!kind) return "Record";
   if (!team) return `Record ${kind.short}`;
-  return `Record ${kind.short} · ${team.number}${alliance ? ` (${ALLIANCE_NAME[alliance]})` : ""}`;
+  return `Record ${kind.short} · ${team.number}`;
 }
 
 /** The body of POST /api/flags. The ruleset is always the event's, which the
- *  server insists on, and a Skills run sends no alliance. */
+ *  server insists on. */
 export function recordPayload(p: {
   teamId: string;
   kind: string;
   body: string;
   match: CurrentMatch;
-  alliance: Alliance | null;
   rulesetId: string;
   rules: string[];
   matchAffecting: boolean;
@@ -124,41 +108,9 @@ export function recordPayload(p: {
     body: p.body,
     matchType: p.match.matchType,
     matchNumber: p.match.matchNumber,
-    alliance: isSkills(p.match.matchType, p.rulesetId) ? "" : (p.alliance ?? ""),
     field: p.match.field,
     ruleset: p.rulesetId,
     rules: p.rules,
     matchAffecting: p.matchAffecting,
   };
-}
-
-/**
- * Teams already flagged in this match -- the same match reference on the same
- * field, in the event's program -- newest first, each with the alliance it was
- * reported on (the latest report that named one). Pass today's flags: a match
- * number comes round again tomorrow.
- */
-export function matchTeams(
-  flags: FlagRow[],
-  teams: Team[],
-  match: CurrentMatch,
-  rulesetId: string,
-): { team: Team; alliance: Alliance | null }[] {
-  const here = matchReference(match.matchType, normalizeMatchNumber(match.matchNumber, match.matchType, rulesetId));
-  if (!here) return [];
-
-  const program = getRuleset(rulesetId).id;
-  const alliances = new Map<string, Alliance | null>();
-  for (const f of [...flags].sort((a, b) => b.created_at.localeCompare(a.created_at))) {
-    if (getRuleset(f.ruleset).id !== program || f.field !== match.field) continue;
-    if (matchReference(f.match_type, f.match_number) !== here) continue;
-    if (!alliances.has(f.team_id) || (alliances.get(f.team_id) === null && f.alliance)) {
-      alliances.set(f.team_id, f.alliance);
-    }
-  }
-
-  const byId = new Map(teams.map((t) => [t.id, t]));
-  return [...alliances]
-    .map(([id, alliance]) => ({ team: byId.get(id), alliance }))
-    .filter((row): row is { team: Team; alliance: Alliance | null } => Boolean(row.team));
 }

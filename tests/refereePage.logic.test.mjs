@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import {
   localDate,
   matchIsSet,
-  matchTeams,
   needsEventSetup,
   recordBlocker,
   recordLabel,
@@ -101,29 +101,26 @@ const ready = {
   rulesetId: "v5rc",
   fieldCount: 3,
   hasTeam: true,
-  alliance: "red",
   kind: { label: "Minor violation", requiresRule: true },
   rules: ["GG17"],
 };
 
-test("nothing blocks Record once the match, team, alliance, severity and rule are all there", () => {
+test("nothing blocks Record once the match, team, severity and rule are all there", () => {
   assert.equal(recordBlocker(ready), null);
 });
 
 test("each missing piece is named, in the order a referee fills them in", () => {
   assert.match(recordBlocker({ ...ready, match: { ...qf, field: "" } }), /Set the match and field/);
   assert.match(recordBlocker({ ...ready, hasTeam: false }), /Enter a team number/);
-  assert.equal(recordBlocker({ ...ready, alliance: null }), "Pick the alliance — Red or Blue.");
   assert.equal(recordBlocker({ ...ready, kind: null }), "Pick how serious it was.");
   assert.match(recordBlocker({ ...ready, rules: [] }), /Minor violation needs at least one rule/);
 
   // The first missing thing wins.
   assert.match(
-    recordBlocker({ ...ready, match: { ...qf, matchNumber: "" }, hasTeam: false, alliance: null, kind: null }),
+    recordBlocker({ ...ready, match: { ...qf, matchNumber: "" }, hasTeam: false, kind: null }),
     /Set the match/,
   );
-  assert.match(recordBlocker({ ...ready, hasTeam: false, alliance: null, kind: null }), /team number/);
-  assert.match(recordBlocker({ ...ready, alliance: null, kind: null }), /alliance/);
+  assert.match(recordBlocker({ ...ready, hasTeam: false, kind: null }), /team number/);
   assert.match(recordBlocker({ ...ready, kind: null, rules: [] }), /how serious/);
 });
 
@@ -132,22 +129,31 @@ test("a rule is only needed for the severities that require one", () => {
   assert.equal(recordBlocker({ ...ready, kind: { label: "Good conduct", requiresRule: false }, rules: [] }), null);
 });
 
-test("a Skills run never needs an alliance", () => {
-  const skills = { ...ready, match: { matchType: "SKD", matchNumber: "1", field: "2" }, alliance: null };
+test("Record never asks for an alliance, Teamwork or Skills", () => {
+  const skills = { ...ready, match: { matchType: "SKD", matchNumber: "1", field: "2" } };
+  assert.equal(recordBlocker(ready), null, "Teamwork with everything else set is ready");
   assert.equal(recordBlocker(skills), null);
   assert.equal(recordBlocker({ ...skills, rulesetId: "viqrc" }), null);
-  // The same missing alliance on a Teamwork match does block.
-  assert.equal(recordBlocker({ ...ready, alliance: null }), "Pick the alliance — Red or Blue.");
+
+  // Whatever is missing, the line never mentions a side of the field.
+  const missing = [
+    { ...ready, match: { ...qf, field: "" } },
+    { ...ready, hasTeam: false },
+    { ...ready, kind: null },
+    { ...ready, rules: [] },
+    { ...skills, kind: null },
+    { ...skills, rules: [] },
+  ];
+  for (const p of missing) assert.doesNotMatch(recordBlocker(p), /alliance|\bred\b|\bblue\b/i);
 });
 
-test("the Record button names the severity, the team and the alliance", () => {
+test("the Record button names the severity and the team", () => {
   const minor = { short: "Minor" };
   const team = { number: "9882K" };
-  assert.equal(recordLabel(minor, team, "red"), "Record Minor · 9882K (Red)");
-  assert.equal(recordLabel(minor, team, "blue"), "Record Minor · 9882K (Blue)");
-  assert.equal(recordLabel(minor, team, null), "Record Minor · 9882K", "a Skills run has no alliance to name");
-  assert.equal(recordLabel(minor, null, null), "Record Minor");
-  assert.equal(recordLabel(null, team, "red"), "Record");
+  assert.equal(recordLabel(minor, team), "Record Minor · 9882K");
+  assert.equal(recordLabel(minor, null), "Record Minor");
+  assert.equal(recordLabel(null, team), "Record");
+  assert.equal(recordLabel(null, null), "Record");
 });
 
 /* ---- what a record sends -------------------------------------------------- */
@@ -157,20 +163,18 @@ const base = {
   kind: "minor",
   body: "Held a Cup past the count.",
   match: qf,
-  alliance: "red",
   rulesetId: "v5rc",
   rules: ["GG17", "SG6"],
   matchAffecting: true,
 };
 
-test("a record carries the alliance and the event's ruleset", () => {
+test("a record carries the match, field, rules and the event's ruleset, and no alliance", () => {
   assert.deepEqual(recordPayload(base), {
     teamId: "t1",
     kind: "minor",
     body: "Held a Cup past the count.",
     matchType: "QF",
     matchNumber: "2-1",
-    alliance: "red",
     field: "2",
     ruleset: "v5rc",
     rules: ["GG17", "SG6"],
@@ -178,94 +182,17 @@ test("a record carries the alliance and the event's ruleset", () => {
   });
 });
 
-test("a Skills run sends no alliance, even if one was picked on an earlier Teamwork match", () => {
-  const skills = recordPayload({
-    ...base,
-    match: { matchType: "SKA", matchNumber: "2", field: "1" },
-    rulesetId: "viqrc",
-    alliance: "blue",
-  });
-  assert.equal(skills.alliance, "");
+test("a Skills run is recorded the same way", () => {
+  const skills = recordPayload({ ...base, match: { matchType: "SKA", matchNumber: "2", field: "1" }, rulesetId: "viqrc" });
   assert.equal(skills.ruleset, "viqrc");
   assert.equal(skills.matchType, "SKA");
-  assert.equal(recordPayload({ ...base, alliance: null }).alliance, "", "nothing picked sends nothing");
+  assert.equal(skills.matchNumber, "2");
+  // Even a stray side handed in by an old caller never reaches the request.
+  assert.equal("alliance" in recordPayload({ ...base, alliance: "red" }), false);
 });
 
-/* ---- the teams already in this match -------------------------------------- */
-
-const team = (id, number) => ({ id, number, name: `Team ${number}`, division: "Division 1", category: "graded", panel_id: null, pit: null, created_at: "" });
-const teams = [team("a", "9882K"), team("b", "1234A"), team("c", "77777Z")];
-const flag = (over) => ({
-  id: String(Math.random()),
-  team_id: "a",
-  kind: "minor",
-  body: "",
-  author: "Jordan Lee",
-  match_type: "QF",
-  match_number: "2-1",
-  alliance: "red",
-  field: "2",
-  rule: "GG17",
-  ruleset: "v5rc",
-  manual_version: "2.1",
-  match_affecting: false,
-  created_at: "2026-10-18T03:00:00.000Z",
-  ...over,
-});
-
-test("teams already flagged in this match are listed with the side they were on", () => {
-  const found = matchTeams(
-    [
-      flag({ team_id: "a", alliance: "red", created_at: "2026-10-18T03:00:00.000Z" }),
-      flag({ team_id: "b", alliance: "blue", created_at: "2026-10-18T03:05:00.000Z" }),
-    ],
-    teams,
-    qf,
-    "v5rc",
-  );
-  assert.deepEqual(
-    found.map((m) => [m.team.number, m.alliance]),
-    [
-      ["1234A", "blue"],
-      ["9882K", "red"],
-    ],
-    "newest first",
-  );
-});
-
-test("a different match, field or program is not this match", () => {
-  const flags = [
-    flag({ team_id: "a", match_number: "2-2" }),
-    flag({ team_id: "b", field: "1" }),
-    flag({ team_id: "c", ruleset: "viqrc", match_type: "Q", match_number: "23" }),
-    flag({ team_id: "a", match_type: "Q", match_number: "21" }),
-  ];
-  assert.deepEqual(matchTeams(flags, teams, qf, "v5rc"), []);
-  // team c's flag is a VEX IQ Q23 on field 2: found there, and not as V5RC's Q23.
-  const q23 = { matchType: "Q", matchNumber: "23", field: "2" };
-  assert.deepEqual(matchTeams(flags, teams, q23, "viqrc").map((m) => m.team.number), ["77777Z"]);
-  assert.deepEqual(matchTeams(flags, teams, q23, "v5rc"), []);
-  assert.deepEqual(matchTeams([flag({})], teams, { matchType: "", matchNumber: "", field: "" }, "v5rc"), [], "no match set");
-});
-
-test("a team keeps the side the latest report named, and a Skills run lists teams with no side", () => {
-  const found = matchTeams(
-    [
-      flag({ team_id: "a", alliance: "red", created_at: "2026-10-18T03:00:00.000Z" }),
-      flag({ team_id: "a", alliance: "blue", created_at: "2026-10-18T03:10:00.000Z" }),
-      flag({ team_id: "a", alliance: null, created_at: "2026-10-18T03:20:00.000Z" }),
-    ],
-    teams,
-    qf,
-    "v5rc",
-  );
-  assert.deepEqual(found.map((m) => [m.team.number, m.alliance]), [["9882K", "blue"]], "a later report with no side does not erase it");
-
-  const skills = matchTeams(
-    [flag({ team_id: "c", match_type: "SKD", match_number: "1", alliance: null, ruleset: "viqrc", field: "3" })],
-    teams,
-    { matchType: "SKD", matchNumber: "1", field: "3" },
-    "viqrc",
-  );
-  assert.deepEqual(skills.map((m) => [m.team.number, m.alliance]), [["77777Z", null]]);
+test("the referee console's logic has no alliance left in it", () => {
+  const src = readFileSync(new URL("../src/components/referee/logic.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /alliance/i);
+  assert.doesNotMatch(src, /matchTeams/, "the In match shortcut is gone");
 });

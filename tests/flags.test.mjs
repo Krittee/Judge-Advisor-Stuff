@@ -360,7 +360,6 @@ test("the file store's updateFlag only assigns the correctable fields", () => {
       "body",
       "match_type",
       "match_number",
-      "alliance",
       "field",
       "rule",
       "ruleset",
@@ -391,7 +390,6 @@ test("the Postgres store's updateFlag only sets the correctable columns", () => 
       "body",
       "match_type",
       "match_number",
-      "alliance",
       "field",
       "rule",
       "ruleset",
@@ -464,7 +462,7 @@ test("a field is a plain number from 1 to the field count; the division prefix i
 });
 
 test("a correction with a prefixed, free-text or empty field is refused, and a picked number is stored plain", () => {
-  const report = { kind: "warning", body: "", matchType: "Q", matchNumber: "23", alliance: "red", rule: null };
+  const report = { kind: "warning", body: "", matchType: "Q", matchNumber: "23", rule: null };
   assert.equal(parseFlagFields({ ...report, field: "Field 2" }).ok, false);
   assert.equal(parseFlagFields({ ...report, field: "ES2" }).ok, false);
   assert.equal(parseFlagFields({ ...report, field: "" }).ok, false);
@@ -479,29 +477,40 @@ test("a correction can change the rule, not only keep the one already on record"
     body: "",
     matchType: "Q",
     matchNumber: "23",
-    alliance: "blue",
     field: "2",
     rule: "sg7",
   });
   assert.equal(edit.ok && edit.rule, "SG7");
 });
 
-test("the correction form offers the match fields, alliance and rule picker and sends everything it shows", () => {
+test("the correction form offers the match fields and rule picker and sends everything it shows", () => {
   const flags = readFileSync(new URL("../src/components/Flags.tsx", import.meta.url), "utf8");
   const form = flags.slice(flags.indexOf("function FlagListItem"));
-  // The match, alliance, field and rules are the shared controls, not selects of its own.
+  // The match, field and rules are the shared controls, not selects of its own.
   assert.ok(form.includes("<MatchFields"), "the correction form lost the match fields");
   assert.ok(form.includes("rulesetId={ruleset.id}") && form.includes("fieldCount={fieldCount}"), "MatchFields is not given the flag's ruleset and the event's field count");
   assert.ok(form.includes("legacy={{ matchType: f.match_type, field: f.field }}"), "an old match type or field can no longer be kept through a correction");
-  assert.ok(form.includes("<AllianceToggle"), "the correction form cannot change the alliance");
   assert.ok(form.includes("<AllRulesPicker"), "the correction form lost the all-rules picker");
   assert.ok(!/<select|<RulePicker|<RulesetPicker|<FieldPicker/.test(form), "the correction form is back to its own selects or a removed picker");
   assert.ok(form.includes("matchType: draftMatch.matchType"), "the correction form no longer sends its match type");
   assert.ok(form.includes("matchNumber: draftMatch.matchNumber"), "the correction form no longer sends its match number");
   assert.ok(form.includes("field: draftMatch.field"), "the correction form no longer sends its field");
-  assert.ok(form.includes('alliance: skills ? "" : (draftAlliance ?? "")'), "the correction form no longer sends its alliance (none for Skills)");
   assert.ok(form.includes("rules: draftRules"), "the correction form no longer sends the rules it shows");
   assert.ok(form.includes("ruleset: ruleset.id"), "the correction form no longer sends the flag's ruleset");
   assert.ok(form.includes("matchAffecting: draftMatchAffecting"), "the correction form lost match affecting");
-  assert.ok(form.includes("skills ? null : ("), "Skills runs must hide the alliance toggle");
+});
+
+test("the alliance concept is gone from the shared match and flag components", () => {
+  for (const file of ["Flags.tsx", "MatchFields.tsx"]) {
+    const src = readFileSync(new URL(`../src/components/${file}`, import.meta.url), "utf8");
+    assert.ok(!/alliance/i.test(src), `${file} still mentions an alliance`);
+  }
+  const match = readFileSync(new URL("../src/components/MatchFields.tsx", import.meta.url), "utf8");
+  assert.ok(!/export\s+function\s+AllianceToggle/.test(match), "AllianceToggle is exported again");
+  const flags = readFileSync(new URL("../src/components/Flags.tsx", import.meta.url), "utf8");
+  const form = flags.slice(flags.indexOf("function FlagListItem"));
+  // The correction's PATCH body is what onEdit receives: no alliance key in it.
+  const body = form.slice(form.indexOf("await onEdit("), form.indexOf("setEditing(false)"));
+  assert.ok(!/alliance/i.test(body), "the correction body sends an alliance");
+  for (const key of ["matchType:", "matchNumber:", "field:"]) assert.ok(body.includes(key), `the correction body lost ${key}`);
 });
