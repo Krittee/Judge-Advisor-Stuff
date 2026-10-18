@@ -48,9 +48,10 @@ test("saving the setup is a PUT with the device's date, behind the in-page confi
   assert.ok(save.indexOf("await ask(question") < save.indexOf("await call("), "the question comes before the save");
 });
 
-test("the setup is reachable later from the Event setup row, not from the match sheet", () => {
+test("the setup is reachable later from the program tag at the top, not from the match sheet or a row at the foot", () => {
   assert.ok(!pageSrc.includes("onChangeProgram") && !sheetSrc.includes("onChangeProgram"));
-  assert.match(pageSrc, /className="rf-setup-link" onClick=\{\(\) => setEditingSetup\(true\)\}/);
+  assert.ok(!pageSrc.includes("rf-setup-link") && !read("src/app/globals.css").includes("rf-setup-link"), "the foot-of-Report Event setup row is gone");
+  assert.equal(pageSrc.match(/setEditingSetup\(true\)/g).length, 1, "the tag is the only way into setup");
 });
 
 test("the setup screen has the specified words, pre-fills from the last setup and defaults to 3 fields", () => {
@@ -68,6 +69,7 @@ test("the setup screen has the specified words, pre-fills from the last setup an
   assert.ok(logicSrc.includes("export const DEFAULT_FIELD_COUNT = 3"));
   assert.ok(setupSrc.includes("MAX_FIELD_COUNT"), "the stepper stops at the event ceiling");
   assert.ok(setupSrc.includes("RULESETS.map"), "the program cards come from the rulesets");
+  assert.ok(!setupSrc.includes("r.label") && !setupSrc.includes("r.rules.length") && !read("src/app/globals.css").includes(".rf-pt span"), "the program cards show just the name, no rule-count line");
 });
 
 test("today's date comes from the local clock, never toISOString (which is UTC)", () => {
@@ -99,11 +101,13 @@ test("the current-match bar shows the match, the field and the read-only program
   assert.ok(bar.includes("matchReference(matchType, matchNumber)") && bar.includes("fieldLabel(field)"));
   assert.ok(bar.includes("{ruleset.program}"));
   // The program tag is a button that opens Event setup (reachable from the top, not only the Report footer).
+  const css0 = read("src/app/globals.css");
   const tag = bar.slice(bar.lastIndexOf("<button", bar.indexOf('className="rf-ptag"')), bar.indexOf("</button>", bar.indexOf('className="rf-ptag"')));
   assert.ok(tag.includes('<button') && tag.includes('type="button"'), "the program tag is a button");
   assert.ok(tag.includes("aria-label={`Event setup: ${ruleset.program}, ${fieldCount}"));
   assert.ok(tag.includes("onClick={() => setEditingSetup(true)}"));
-  assert.ok(tag.includes("{ruleset.program}") && tag.includes('aria-hidden="true"'));
+  assert.ok(tag.includes('{ruleset.program} · {fieldCount} {fieldCount === 1 ? "field" : "fields"}') && tag.includes('aria-hidden="true"'), "the tag shows the program and the field count");
+  assert.match(css0, /\.rf-ptag \{[^}]*white-space:\s*nowrap/, "the tag never wraps its own text");
   const css = read("src/app/globals.css");
   const ptag = css.match(/\.rf-ptag::before \{([^}]*)\}/)?.[1] ?? "";
   const [vy, vx] = (ptag.match(/inset:\s*(-?\d+)px\s+(-?\d+)px/) ?? []).slice(1).map(Number);

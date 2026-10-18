@@ -303,7 +303,7 @@ function Referee() {
           title="Event setup"
           onClick={() => setEditingSetup(true)}
         >
-          {ruleset.program}
+          {ruleset.program} · {fieldCount} {fieldCount === 1 ? "field" : "fields"}
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M6 9l6 6 6-6" />
           </svg>
@@ -510,15 +510,6 @@ function Referee() {
             </ul>
           )}
         </section>
-
-        {/* The program and fields are the event's, so this is a deliberate
-            move: it asks before it changes them for everyone. */}
-        <button type="button" className="rf-setup-link" onClick={() => setEditingSetup(true)}>
-          <span>Event setup</span>
-          <span>
-            {ruleset.program} · {fieldCount} {fieldCount === 1 ? "field" : "fields"}
-          </span>
-        </button>
       </main>
 
       {/* Pinned above the tabs: the one button that saves, and one line saying

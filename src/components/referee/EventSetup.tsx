@@ -69,9 +69,6 @@ export function EventSetup({
               >
                 <span className="rf-pt">
                   <b>{r.program}</b>
-                  <span>
-                    {r.label} · {r.rules.length} rules
-                  </span>
                 </span>
                 <span className="rf-ck" aria-hidden="true">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">

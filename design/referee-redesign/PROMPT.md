@@ -160,7 +160,7 @@ as today apart from the new fields.
      - title "Set up refereeing";
      - intro "Choose once for this event. Every referee will use it. You can
        change it for another event or day.";
-     - two large program cards (V5RC / VIQRC);
+     - two large program cards (V5RC / VIQRC), name only, no rule-count line;
      - a **Number of fields** stepper (−/+, 48px buttons, default 3) with a
        preview row of field chips;
      - "Set by {name} · applies to all referees";
@@ -175,10 +175,10 @@ as today apart from the new fields.
    (`/referee/teams`) and Today. Today can be an anchor to the "Flagged
    today" section, or a third view if simpler.
 2. **Pinned "Current match" bar:** shows e.g. "QF 2-1 · Field 2", a small
-   read-only program tag ("V5RC"), and a Change button that opens the **Set
+   program tag ("V5RC · 3 fields", opens Event setup), and a Change button that opens the **Set
    the match** bottom sheet:
    - **No program line:** the program is shown only as the bar's read-only
-     tag and is changed from Event setup (the row at the foot of Report).
+     tag and is changed from Event setup, opened from the "{PROGRAM} · {N} fields" tag.
    - **Group:** a "Teamwork | Skills" segmented control.
    - **Teamwork:** the program's type chips. A number stepper for single
      numbers, or "Bracket" + "Match" inputs for V5RC eliminations.
