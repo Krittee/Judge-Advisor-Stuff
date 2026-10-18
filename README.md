@@ -353,14 +353,32 @@ months later when someone asks why a panel never saw a particular team.
 Referees work the field, not the judging room, and what they see there is
 often the thing a judge most needs to know. `/referee` is their page:
 
-0. Once per device: pick the **ruleset** (VEX IQ or V5RC Override) at the
-   top of the form. It is remembered on that device.
-1. Find the team — **type the number** if you can read it off the robot,
-   or **All teams** to scroll and pick one.
-2. Say which match — **P / Q / F** and the match number — and which
-   **field**.
-3. Pick the **rule(s)** broken, and say what happened if it needs saying.
-4. Tap how serious it was.
+0. **Once per event, not per device:** the first referee to open `/referee`
+   each day gets **Event setup** — the **program** (V5RC or VIQRC) and the
+   **number of fields** (1–20, default 3). It is saved for everyone, and
+   every referee then works from it, so there is no ruleset to pick on a
+   phone. The screen comes back once a day pre-filled with yesterday's
+   choice (a multi-day event is one tap), and a change to a setup other
+   referees are already using asks first. Any referee can change it later
+   from the match sheet's *Change* link or the *Event setup* row at the foot
+   of the page (there is no head-referee role); every save is logged in the
+   Activity log.
+1. **Set the match** — the pinned *Current match* bar (`QF 2-1 · Field 2`,
+   with the program as a read-only tag) opens the *Set the match* sheet:
+   **Teamwork** or **Skills**, the match type and number, and the field.
+2. Find the team — **type the number** if you can read it off the robot,
+   tap one of the **In match** chips for a team already flagged in this
+   match, or use **All teams** to scroll and pick one.
+3. Pick the **alliance**, Red or Blue (not for a Skills run).
+4. Pick the **rule(s)** broken — the program's common rules are chips, and
+   **All rules** opens the whole manual with search — and add a note if it
+   needs saying.
+5. Tap **how serious** it was, then **Record**. A severity button only
+   selects; the pinned Record bar (`Record Minor · 9882K (Red)`) saves, and
+   says in one line what it is still waiting for.
+
+The tab bar along the bottom has **Report**, **All teams** and **Today**
+(the *Flagged today* section, further down the Report page).
 
 The **All teams** page searches by number, name *or* pit (`9882`, `nova`
 and `A1` all find a team), filters by division, and narrows to teams that
@@ -390,43 +408,53 @@ anyone who cannot separate amber from orange still knows which is which.
 A flag is only useful to a head referee later if it can be traced back to a
 moment, so every one carries a match reference:
 
-- **Match** — a dropdown, **P**ractice / **Q**ualification / **F**inal.
-- **Match #** — the match number.
-- **Field** — an ES/MS/HS/BL selector plus its short field number.
+- **Teamwork or Skills.** Teamwork is **P**ractice and **Q**ualification in
+  both programs, **F**inal in VIQRC, and in V5RC the eliminations **R16**,
+  **QF**, **SF** and **F**, whose number is a bracket and a match (`QF 2-1`).
+  Skills is **Driver** or **Auto** with a run number.
+- **Alliance** — Red or Blue, required for Teamwork. A Skills run has none.
+  Once a team has been reported in a match, its side is filled in for the
+  next report.
+- **Field** — a plain number, 1 to the event's field count (`Field 2`).
 
-All three are required; the description is optional. A flag nobody can trace
-back is not much use days later. They show up everywhere a flag does as a
-compact reference, `Q23 · ES2`, right beside who wrote it and when.
+The match, alliance and field are required; the note is optional. A flag
+nobody can trace back is not much use days later. They show up everywhere a
+flag does as a compact reference, `Q23 · Red · Field 2`, right beside who
+wrote it and when. A flag recorded before alliances existed, or with an old
+`HS2`-style field, still shows and can be corrected without losing either.
 
 **Match and field are remembered between flags, on purpose.** A referee
 works one match at a time and often flags more than one team against it,
-so only the description clears after each save — re-typing the match for
-every team would work against the whole point of tracking it. Change the
-dropdown or the number the moment you move to a different match; there is
-nothing that resets them for you.
+so after each save only the note, rules, match-affecting tick and severity
+clear — the team, the match and the field stay, and re-typing them for
+every team would work against the whole point of tracking it. Open *Set the
+match* the moment you move to a different one; nothing resets it for you.
 
 ### Rulesets and rules
 
-The event runs VEX IQ and V5RC side by side, so a flag names a **ruleset**
-first (the dropdown at the top of the referee form, with the manual edition
-underneath — "Override Manual v2.1"), then **one or more rules** from it
-(up to 5). Switching ruleset clears the rules you had picked, because a rule
-id means nothing outside its own manual.
+VEX IQ and V5RC have different manuals, so a flag names a **ruleset** — and
+it is always the event's: the program set in Event setup. The server fills it
+in when a request leaves it out and refuses another ("This event is set to
+V5RC Override."). A flag then cites **one or more rules** from that manual
+(up to 5). Changing the program clears the rules you had picked, because a
+rule id means nothing outside its own manual.
 
-The **Rules violated** picker is one searchable, multi-select list:
+The rules are picked on the form like this:
 
-- Search by id (`SG6`), title words (`holding`, `autonomous`) or number.
-- Rules are grouped by the manual's categories in collapsible sections —
-  Scoring, Specific Game and General Game open, the rest collapsed; every
-  section opens while you are searching. Each row reads
-  `<SG6> — <the manual's own title>`.
-- Common field rules sit at the top as shortcuts; picked rules show above as
-  removable chips (`SG9 ×`).
+- The program's **common rules** are chips under *What happened*; tap to
+  select, tap again to undo. Anything picked from the full list is shown
+  there too, so what is selected can always be seen.
+- **All rules · n in V5RC Override** opens the whole manual in a full-screen
+  dialog: search by id (`SG6`), title words (`holding`, `autonomous`) or
+  number; *Common* first, then each of the manual's categories as a
+  collapsible group with its count (every group opens while you search). Each
+  row reads `<SG6> — <the manual's own title>`.
 - TS1–TS3 (this event's Tournament Special rules) are in **every** ruleset.
 
 A rule is required for Minor, Major and Disqualified, optional for Warning,
 and never attached to Good Conduct. **Match affecting** can be ticked for a
-Minor or Major (the server stores it only for those two). The referee page
+Minor or Major (the server stores it only for those two; the switch appears
+once a rule is picked). The referee page
 shows same-rule, same-match and overall active-event history — per rule
 picked, and only against flags from the **same ruleset** (V5RC `SG6` and IQ
 `SG6` are different rules; a flag recorded before rulesets existed counts as

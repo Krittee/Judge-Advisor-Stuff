@@ -486,19 +486,22 @@ test("a correction can change the rule, not only keep the one already on record"
   assert.equal(edit.ok && edit.rule, "SG7");
 });
 
-test("the correction form offers the rule picker and sends everything it shows", () => {
+test("the correction form offers the match fields, alliance and rule picker and sends everything it shows", () => {
   const flags = readFileSync(new URL("../src/components/Flags.tsx", import.meta.url), "utf8");
-  const page = readFileSync(new URL("../src/app/referee/page.tsx", import.meta.url), "utf8");
-  assert.ok(flags.includes("<RulePicker"), "the correction form lost the rule picker");
-  assert.ok(page.includes("<RulePicker"), "the raise form lost the rule picker");
-  // The field is a choice from the event's fields, not a typed box or a division prefix.
-  assert.ok(flags.includes('aria-label="Field"') && flags.includes("length: fieldCount"), "the correction form lost its field choices");
-  assert.ok(flags.includes('aria-label="Alliance"'), "the correction form cannot change the alliance");
-  assert.ok(!/<FieldPicker/.test(flags.slice(flags.indexOf("function FlagListItem"))), "the correction form is back to a division prefix");
-  assert.ok(flags.includes("alliance: draftAlliance"), "the correction form no longer sends its alliance");
-  assert.ok(flags.includes("field: draftField"), "the correction form no longer sends its field");
-  assert.ok(flags.includes("rules: draftRules"), "the correction form no longer sends the rules it shows");
-  assert.ok(flags.includes("ruleset: draftRuleset"), "the correction form no longer sends its ruleset");
-  assert.ok(flags.includes("matchAffecting: draftMatchAffecting"), "the correction form lost match affecting");
-  assert.ok(flags.includes("<RulesetPicker"), "the correction form lost the ruleset dropdown");
+  const form = flags.slice(flags.indexOf("function FlagListItem"));
+  // The match, alliance, field and rules are the shared controls, not selects of its own.
+  assert.ok(form.includes("<MatchFields"), "the correction form lost the match fields");
+  assert.ok(form.includes("rulesetId={ruleset.id}") && form.includes("fieldCount={fieldCount}"), "MatchFields is not given the flag's ruleset and the event's field count");
+  assert.ok(form.includes("legacy={{ matchType: f.match_type, field: f.field }}"), "an old match type or field can no longer be kept through a correction");
+  assert.ok(form.includes("<AllianceToggle"), "the correction form cannot change the alliance");
+  assert.ok(form.includes("<AllRulesPicker"), "the correction form lost the all-rules picker");
+  assert.ok(!/<select|<RulePicker|<RulesetPicker|<FieldPicker/.test(form), "the correction form is back to its own selects or a removed picker");
+  assert.ok(form.includes("matchType: draftMatch.matchType"), "the correction form no longer sends its match type");
+  assert.ok(form.includes("matchNumber: draftMatch.matchNumber"), "the correction form no longer sends its match number");
+  assert.ok(form.includes("field: draftMatch.field"), "the correction form no longer sends its field");
+  assert.ok(form.includes('alliance: skills ? "" : (draftAlliance ?? "")'), "the correction form no longer sends its alliance (none for Skills)");
+  assert.ok(form.includes("rules: draftRules"), "the correction form no longer sends the rules it shows");
+  assert.ok(form.includes("ruleset: ruleset.id"), "the correction form no longer sends the flag's ruleset");
+  assert.ok(form.includes("matchAffecting: draftMatchAffecting"), "the correction form lost match affecting");
+  assert.ok(form.includes("skills ? null : ("), "Skills runs must hide the alliance toggle");
 });

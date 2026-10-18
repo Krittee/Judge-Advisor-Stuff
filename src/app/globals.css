@@ -87,6 +87,15 @@
   --cat-3: oklch(0.720 0.120 150);
   --cat-4: oklch(0.690 0.140 265);
 
+  /* Alliance markers. Colour is signal in this app, so these two are for
+     showing which side of the field a team was on -- a dot, a tint, a
+     border -- and nothing else: never a status, a chip or a filled button
+     (a filled red would read as a Major violation). Defined here, not under
+     the referee page, so the flag lists on the Judge Advisor's console can
+     use them too. */
+  --alliance-red: oklch(0.620 0.190 25);
+  --alliance-blue: oklch(0.620 0.150 255);
+
   --shadow: oklch(0 0 0 / 45%);
   --shadow-key: 0 1px 2px oklch(0 0 0 / 30%), 0 8px 24px oklch(0 0 0 / 35%);
 }
@@ -147,6 +156,11 @@
   --cat-2: oklch(0.520 0.155 315);
   --cat-3: oklch(0.520 0.120 150);
   --cat-4: oklch(0.510 0.150 265);
+
+  /* Same values: 3.3:1 or better against the light canvas and surface, which
+     is what a marker needs (the side is always named beside it). */
+  --alliance-red: oklch(0.620 0.190 25);
+  --alliance-blue: oklch(0.620 0.150 255);
 
   --shadow: oklch(0.225 0.016 265 / 14%);
   --shadow-key: 0 1px 2px oklch(0.225 0.016 265 / 8%), 0 8px 24px
@@ -898,6 +912,274 @@ body:has(.landing) > .theme-toggle { top: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .landing *, .landing *::before, .landing *::after { transition: none !important; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Referee console ("Match first", design/referee-redesign/)
+ *
+ * A phone app shell: the page never scrolls, so the current-match bar, the
+ * Record bar and the tabs stay put around .rf-body. Everything is scoped
+ * under .referee. The orange on the active tab and the match chip is the
+ * referee's colour from the sign-in pass; the alliance colours are the
+ * :root tokens above and mark a side of the field, nothing more. Severity
+ * buttons take their fill from toneSolid, as everywhere else.
+ * ------------------------------------------------------------------ */
+
+.referee {
+  --rf-gutter: max(16px, calc((100vw - 32rem) / 2));
+  --rf-field: oklch(0.180 0.013 265);
+  --rf-field-line: oklch(0.520 0.014 265);
+  --rf-ring: oklch(0.680 0.140 258 / 0.35);
+  --rf-ref: oklch(0.860 0.110 55);
+  --rf-ref-tint: oklch(0.760 0.150 55 / 0.15);
+  --rf-disabled: oklch(0.280 0.014 265);
+
+  display: flex; height: 100dvh; flex-direction: column; overflow: hidden;
+  background: var(--canvas); color: var(--ink);
+}
+:root[data-theme="light"] .referee {
+  --rf-field: oklch(0.995 0.002 265);
+  --rf-field-line: oklch(0.640 0.012 265);
+  --rf-ring: oklch(0.510 0.160 258 / 0.25);
+  --rf-ref: oklch(0.470 0.130 52);
+  --rf-ref-tint: oklch(0.700 0.170 55 / 0.15);
+  --rf-disabled: oklch(0.915 0.008 265);
+}
+
+.rf-mm b, .rf-big, .rf-chip, .rf-sv, .rf-prim, .rf-h1, .rf-pt b, .rf-fnum, .rf-tline b, .rf-prog b, .rf-sh-h h2 {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+
+.referee > .app-header { flex: none; }
+.rf-strip {
+  flex: none; height: 6px;
+  background: repeating-linear-gradient(135deg, oklch(0.985 0.003 265) 0 6px, oklch(0.180 0.012 265) 6px 12px);
+}
+
+/* The app's one floating theme toggle, docked into the top bar's corner:
+   floating bottom-right it would sit on top of the Record button. */
+.rf-top-r { margin-right: 44px; }
+body:has(.referee) > .theme-toggle {
+  top: 4px; right: 6px; bottom: auto; width: 44px; height: 44px;
+  border: 0; border-radius: 12px; background: transparent; box-shadow: none; color: var(--ink-subtle);
+}
+body:has(.referee) > .theme-toggle:hover {
+  transform: none; color: var(--ink); background: color-mix(in oklch, var(--accent) 12%, transparent);
+}
+@media (pointer: coarse) { body:has(.referee) > .theme-toggle { top: 10px; } }
+
+.rf-body {
+  display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 14px;
+  padding: 14px var(--rf-gutter) 20px; overflow-y: auto; overscroll-behavior: contain;
+}
+.rf-body > * { flex: none; }
+
+.rf-tabs {
+  display: flex; flex: none; padding: 0 calc(var(--rf-gutter) - 16px) env(safe-area-inset-bottom);
+  background: var(--surface); border-top: 1px solid var(--line);
+}
+.rf-tab {
+  position: relative; display: flex; flex: 1; min-height: 64px; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px;
+  color: var(--ink-subtle); font-size: 12px; font-weight: 500; text-decoration: none;
+}
+.rf-tab:hover { color: var(--ink); }
+.rf-tab[aria-current] { color: var(--rf-ref); }
+.rf-tab[aria-current]::before {
+  content: ""; position: absolute; top: -1px; right: 30%; left: 30%; height: 3px;
+  border-radius: 0 0 3px 3px; background: var(--rf-ref);
+}
+
+/* Shared by the form, the setup screen and the sheet. */
+.rf-lab { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 6px; font-weight: 500; font-size: 15px; line-height: 1.3; }
+.rf-tag { color: var(--ink-subtle); font-weight: 400; font-size: 13px; }
+.rf-h2 { margin: 0 0 8px; color: var(--ink-muted); font-weight: 600; font-size: 15px; }
+.rf-empty { margin: 0; padding: 24px 16px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-faint); text-align: center; font-size: 14px; }
+.rf-cap { margin: 0; color: var(--ink-subtle); text-align: center; font-size: 14px; line-height: 1.4; }
+
+.rf-input {
+  width: 100%; height: 48px; margin: 0; padding: 0 14px;
+  border: 1.5px solid var(--rf-field-line); border-radius: 12px; background: var(--rf-field); color: var(--ink);
+  font-size: 16px; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.rf-input::placeholder { color: var(--ink-subtle); opacity: 1; }
+.rf-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--rf-ring); }
+.rf-big { height: 52px; padding: 0 16px; font-weight: 700; font-size: 32px; letter-spacing: 0.08em; text-transform: uppercase; }
+.rf-text { height: auto; padding: 10px 14px; resize: vertical; }
+
+.rf-prim {
+  width: 100%; height: 52px; border: 1px solid transparent; border-radius: 12px;
+  font-weight: 700; font-size: 17px; transition: background 0.15s;
+}
+.rf-prim:disabled { opacity: 0.4; cursor: not-allowed; }
+.rf-prim--idle { background: var(--rf-disabled); color: var(--ink-subtle); }
+.rf-prim--idle:disabled { opacity: 1; }
+.rf-prim--accent { height: 56px; background: var(--accent); color: var(--accent-ink); }
+.rf-prim--accent:hover:not(:disabled) { background: color-mix(in oklch, var(--accent) 88%, var(--ink)); }
+.rf-link { min-height: 44px; border: 0; background: transparent; color: var(--ink-subtle); font-size: 15px; text-decoration: underline; }
+.rf-link:hover { color: var(--ink); }
+
+/* The pinned bar above the tabs: what is missing, and the button that saves. */
+.rf-abar {
+  display: flex; flex: none; flex-direction: column; gap: 8px; padding: 10px var(--rf-gutter) 12px;
+  background: var(--surface); border-top: 1px solid var(--line);
+}
+.rf-setup .rf-abar { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+.rf-need { margin: 0; color: var(--ink-subtle); text-align: center; font-size: 13px; line-height: 1.3; }
+.rf-need--error { color: var(--danger-quiet); font-weight: 500; }
+.rf-by { margin: 0; color: var(--ink-subtle); text-align: center; font-size: 13px; line-height: 1.3; }
+
+/* Event setup */
+.rf-setup { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.rf-setup .rf-body { gap: 20px; padding-top: 20px; }
+.rf-eyebrow { margin: 0 0 4px; color: var(--ink-subtle); font-weight: 500; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+.rf-h1 { margin: 0 0 8px; font-weight: 700; font-size: 26px; line-height: 1.15; letter-spacing: -0.01em; }
+.rf-intro { margin: 0; color: var(--ink-subtle); font-size: 15px; line-height: 1.45; }
+.rf-cards { display: flex; flex-direction: column; gap: 8px; }
+.rf-pc {
+  display: flex; width: 100%; min-height: 76px; align-items: center; gap: 12px; padding: 12px 14px;
+  border: 2px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); text-align: left;
+}
+.rf-pc[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in oklch, var(--accent) 14%, var(--surface)); }
+.rf-pt { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
+.rf-pt b { font-weight: 700; font-size: 20px; line-height: 1.2; }
+.rf-pt span { color: var(--ink-subtle); font-size: 13px; line-height: 1.35; }
+.rf-ck { display: grid; flex: none; width: 26px; height: 26px; place-items: center; border: 2px solid var(--rf-field-line); border-radius: 50%; color: transparent; }
+.rf-pc[aria-pressed="true"] .rf-ck { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.rf-stepper { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--surface); }
+.rf-sb {
+  display: grid; flex: none; width: 48px; height: 48px; place-items: center;
+  border: 1.5px solid var(--rf-field-line); border-radius: 12px; background: var(--rf-field); color: var(--ink);
+}
+.rf-sb:disabled { opacity: 0.4; cursor: not-allowed; }
+.rf-fnum { flex: 1; text-align: center; font-weight: 700; font-size: 32px; line-height: 1; }
+.rf-prev { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.rf-prev span { display: inline-flex; height: 28px; align-items: center; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-weight: 500; font-size: 13px; }
+.rf-hint { margin: 8px 0 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.4; }
+
+/* The current-match bar */
+.rf-mbar {
+  display: flex; flex: none; flex-wrap: wrap; min-height: 56px; align-items: center; gap: 4px 8px;
+  padding: 6px var(--rf-gutter); background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.rf-mm { display: flex; min-width: 0; flex-direction: column; margin-right: 4px; line-height: 1; }
+.rf-mm span { margin-bottom: 3px; color: var(--ink-subtle); font-weight: 500; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+.rf-mm b { font-weight: 700; font-size: 28px; line-height: 1; letter-spacing: -0.01em; }
+.rf-mchip { display: inline-flex; height: 28px; align-items: center; padding: 0 10px; border-radius: 8px; background: var(--rf-ref-tint); color: var(--rf-ref); font-weight: 500; font-size: 13px; white-space: nowrap; }
+.rf-ptag { display: inline-flex; height: 24px; align-items: center; padding: 0 7px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink-subtle); font-weight: 500; font-size: 12px; letter-spacing: 0.04em; white-space: nowrap; }
+.rf-chg {
+  display: flex; min-height: 44px; align-items: center; gap: 6px; margin-left: auto; padding: 0 12px;
+  border: 1.5px solid var(--rf-field-line); border-radius: 12px; background: transparent; font-weight: 500; font-size: 14px;
+}
+.rf-chg:hover { background: var(--surface-2); }
+
+/* Team, chips, rules */
+.rf-miss { margin: 6px 0 0; color: var(--caution-quiet); font-size: 14px; }
+.rf-tline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 8px; color: var(--ink-subtle); font-size: 14px; }
+.rf-tline b { color: var(--ink); font-weight: 600; font-size: 15px; }
+.rf-tflags { margin-left: auto; }
+.rf-used { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.rf-used > span { width: 46px; margin-right: 2px; color: var(--ink-subtle); font-size: 12px; line-height: 1.2; }
+.rf-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rf-chip {
+  min-width: 56px; height: 44px; padding: 0 12px;
+  border: 1.5px solid var(--rf-field-line); border-radius: 12px; background: var(--rf-field); color: var(--ink);
+  font-weight: 600; font-size: 15px;
+}
+.rf-chip:hover:not(:disabled) { background: var(--surface-2); }
+.rf-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+/* An "In match" chip carries an alliance dot, so its pressed state is an ink
+   outline, not the accent fill -- blue around a Red team would muddy the signal. */
+.rf-chip--dot[aria-pressed="true"] { border-color: var(--ink); background: var(--rf-field, transparent); color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.rf-chip:disabled { opacity: 0.4; cursor: not-allowed; }
+.rf-chip--dot { display: inline-flex; min-width: 0; align-items: center; justify-content: center; gap: 6px; padding: 0 9px; }
+.rf-chip--dot i { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--dc); box-shadow: 0 0 0 1.5px var(--canvas); }
+.rf-red { --dc: var(--alliance-red); }
+.rf-blue { --dc: var(--alliance-blue); }
+.rf-dd {
+  display: flex; width: 100%; height: 48px; align-items: center; gap: 8px; margin-top: 8px; padding: 0 12px 0 14px;
+  border: 1.5px solid var(--rf-field-line); border-radius: 12px; background: var(--rf-field); color: var(--ink);
+  text-align: left; font-weight: 500; font-size: 15px;
+}
+.rf-dd:hover { background: var(--surface-2); }
+.rf-dl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rf-dl em { color: var(--ink-subtle); font-style: normal; font-weight: 400; font-size: 13px; }
+.rf-cnt { flex: none; padding: 2px 9px; border-radius: 999px; background: var(--rf-ring); color: var(--ink); font-weight: 500; font-size: 12px; }
+.rf-dd svg { flex: none; color: var(--ink-subtle); }
+
+.rf-note { border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface); }
+.rf-note summary { display: flex; min-height: 44px; align-items: center; gap: 8px; padding: 0 14px; font-weight: 500; font-size: 15px; list-style: none; }
+.rf-note summary::-webkit-details-marker { display: none; }
+.rf-note summary .rf-tag { margin-right: auto; }
+.rf-note summary svg { flex: none; color: var(--ink-subtle); }
+.rf-note[open] summary svg { transform: rotate(180deg); }
+.rf-note .rf-text { width: calc(100% - 28px); margin: 0 14px 14px; }
+
+.rf-row {
+  display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 14px;
+  border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface); font-weight: 500; font-size: 15px;
+}
+.rf-row small { margin-left: 6px; color: var(--ink-subtle); font-weight: 400; font-size: 12px; }
+.rf-sw {
+  appearance: none; -webkit-appearance: none; position: relative; flex: none; width: 48px; height: 28px; margin: 0;
+  border: 1.5px solid var(--rf-field-line); border-radius: 14px; background: var(--rf-field);
+}
+.rf-sw::before { content: ""; position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; border-radius: 50%; background: var(--ink-subtle); }
+.rf-sw:checked { border-color: var(--accent); background: var(--accent); }
+.rf-sw:checked::before { left: 22px; background: var(--accent-ink); }
+
+.rf-caution {
+  display: flex; align-items: flex-start; gap: 10px; padding: 7px 12px;
+  border: 1px solid color-mix(in oklch, var(--caution) 35%, transparent); border-radius: 12px;
+  background: color-mix(in oklch, var(--caution) 12%, transparent); color: var(--caution-quiet); font-size: 14px; line-height: 1.4;
+}
+.rf-caution svg { flex: none; margin-top: 1px; }
+.rf-caution p { margin: 0; }
+.rf-caution p + p { margin-top: 4px; }
+.rf-caution b { font-weight: 600; }
+.rf-hist { margin: 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.4; }
+
+/* How serious: the fill comes from toneSolid, so this only sizes and selects. */
+.rf-sev { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rf-sv {
+  display: flex; min-height: 56px; align-items: center; justify-content: center; gap: 8px; padding: 0 8px;
+  border: 1px solid transparent; border-radius: 12px; font-weight: 600; font-size: 16px;
+}
+.rf-sv svg { flex: none; }
+.rf-sv--wide { grid-column: 1 / -1; }
+.rf-sv[aria-pressed="true"] { outline: 3px solid var(--ink); outline-offset: 2px; }
+.rf-sv:focus-visible { outline-color: var(--accent); }
+
+.rf-setup-link {
+  display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 14px;
+  border: 1.5px solid var(--line); border-radius: 12px; background: transparent; color: var(--ink-subtle);
+  text-align: left; font-size: 14px;
+}
+.rf-setup-link span:first-child { color: var(--ink); font-weight: 500; }
+.rf-setup-link:hover { background: var(--surface); }
+
+/* The "Set the match" sheet: a native <dialog>, so it brings its own focus trap and Escape. */
+.rf-sheet {
+  width: 100%; max-width: 32rem; max-height: 92dvh; margin: auto auto 0; padding: 0; overflow-y: auto;
+  border: 0; border-top: 1px solid var(--rf-field-line); border-radius: 24px 24px 0 0;
+  background: var(--surface); color: var(--ink);
+}
+.rf-sheet::backdrop { background: oklch(0.100 0.010 265 / 0.68); }
+:root[data-theme="light"] .rf-sheet::backdrop { background: oklch(0.225 0.016 265 / 0.45); }
+.rf-sheet-in { display: flex; flex-direction: column; gap: 12px; padding: 8px 16px max(18px, env(safe-area-inset-bottom)); }
+.rf-grab { width: 40px; height: 4px; margin: 0 auto; border-radius: 2px; background: var(--rf-field-line); }
+.rf-sh-h { display: flex; align-items: center; justify-content: space-between; margin-top: -4px; }
+.rf-sh-h h2 { margin: 0; font-weight: 700; font-size: 22px; letter-spacing: -0.01em; }
+.rf-x { display: grid; width: 44px; height: 44px; place-items: center; margin-right: -8px; border: 0; border-radius: 12px; background: transparent; color: var(--ink-subtle); }
+.rf-x:hover { color: var(--ink); background: var(--surface-2); }
+.rf-prog { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink-subtle); font-size: 14px; }
+.rf-prog p { margin: 0; }
+.rf-prog b { color: var(--ink); font-weight: 700; }
+.rf-lnk { min-width: 44px; min-height: 44px; flex: none; padding: 0 6px; border: 0; background: transparent; color: var(--accent); font-weight: 500; font-size: 14px; text-decoration: underline; }
+.rf-sheet-foot { display: flex; flex-direction: column; gap: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .referee *, .referee *::before, .referee *::after { transition: none !important; }
 }
 
 @keyframes si-bar { from { transform: translateX(-100%); } to { transform: translateX(260%); } }

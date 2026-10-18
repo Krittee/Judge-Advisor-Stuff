@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Referee all rules · V5RC · dark</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Fira+Sans:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit}
+.jq{--canvas:oklch(0.165 0.012 265);--surface:oklch(0.205 0.014 265);--ink:oklch(0.955 0.005 265);--muted:oklch(0.670 0.013 265);--line:oklch(0.320 0.016 265);--accent:oklch(0.680 0.140 258);--on-accent:oklch(0.165 0.012 265);--ring:oklch(0.680 0.140 258 / 0.35);--field:oklch(0.180 0.013 265);--field-line:oklch(0.520 0.014 265);--ref:oklch(0.760 0.150 55);--ref-tint:oklch(0.760 0.150 55 / 0.15);--good:oklch(0.745 0.140 158);--warn:oklch(0.790 0.150 82);--minor:oklch(0.735 0.185 58);--major:oklch(0.640 0.200 18);--dq:oklch(0.300 0.010 265);--dq-line:oklch(0.440 0.020 265);--sev-ink:oklch(0.165 0.012 265);--caution-bg:oklch(0.790 0.150 82 / 0.12);--caution-line:oklch(0.790 0.150 82 / 0.35);--caution-ink:oklch(0.840 0.100 82);position:relative;box-sizing:border-box;width:375px;height:812px;overflow:hidden;display:flex;flex-direction:column;background:var(--canvas);color:var(--ink);font-family:'Fira Sans',system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.jq *,.jq *::before,.jq *::after{box-sizing:border-box}
+.jq :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.hd{flex:none;height:56px;display:flex;align-items:center;gap:4px;padding:0 10px 0 4px}
+.hd h1{flex:1;min-width:0;margin:0;font-family:Archivo,sans-serif;font-weight:700;font-size:18px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ib{flex:none;width:44px;height:44px;border:0;border-radius:12px;background:transparent;color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.done{flex:none;height:44px;padding:0 16px;border:0;border-radius:12px;background:var(--accent);color:var(--on-accent);font-family:Archivo,sans-serif;font-weight:700;font-size:15px;cursor:pointer}
+.strip{display:block;flex:none;height:6px;background:repeating-linear-gradient(135deg,oklch(0.985 0.003 265) 0 6px,oklch(0.180 0.012 265) 6px 12px)}
+.list{flex:1;min-height:0;overflow:auto}
+.sticky{position:sticky;top:0;z-index:2;padding:8px 16px;background:var(--canvas);border-bottom:1px solid var(--line)}
+.srch{position:relative;display:block}
+.srch svg{position:absolute;left:14px;top:14px;color:var(--muted)}
+.input{height:48px;width:100%;margin:0;border:1.5px solid var(--field-line);border-radius:12px;background:var(--field);color:var(--ink);padding:0 12px 0 42px;font-family:inherit;font-size:16px}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.input::placeholder{color:var(--muted);opacity:1;font-size:13.5px}
+.gh{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:0 16px;border:0;border-bottom:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Archivo,sans-serif;font-weight:600;font-size:15px;text-align:left;cursor:pointer}
+.gh .n{flex:none;padding:1px 9px;border-radius:999px;background:var(--field);border:1px solid var(--line);font-family:'Fira Sans',sans-serif;font-weight:500;font-size:12px;color:var(--muted)}
+.gh .t{flex:1;min-width:0}
+.gh svg{flex:none;color:var(--muted)}
+.cm{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px 12px}
+.chip{min-width:56px;height:44px;padding:0 12px;border:1.5px solid var(--field-line);border-radius:12px;background:var(--field);color:var(--ink);font-family:Archivo,sans-serif;font-weight:600;font-size:15px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.rr{display:flex;align-items:center;gap:12px;min-height:52px;padding:0 16px;border-bottom:1px solid var(--line);cursor:pointer}
+.rr.on{background:var(--ring)}
+.rr b{flex:none;width:48px;font-family:Archivo,sans-serif;font-weight:600;font-size:15px}
+.rr span{flex:1;min-width:0;font-size:14px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cb{appearance:none;-webkit-appearance:none;flex:none;position:relative;width:26px;height:26px;margin:0;border:2px solid var(--field-line);border-radius:7px;background:var(--field);cursor:pointer}
+.cb:checked{background:var(--accent);border-color:var(--accent)}
+.cb:checked::after{content:"";position:absolute;left:7px;top:2px;width:6px;height:12px;border:solid var(--on-accent);border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+.bar{flex:none;display:flex;flex-direction:column;gap:6px;padding:10px 12px 14px;background:var(--surface);border-top:1px solid var(--line)}
+.bar p{margin:0;font-size:14px;line-height:1.3;color:var(--muted)}
+.bar p b{font-family:Archivo,sans-serif;font-weight:600;color:var(--ink)}
+.prim{width:100%;height:52px;border:1px solid var(--accent);border-radius:12px;background:var(--accent);color:var(--on-accent);font-family:Archivo,sans-serif;font-weight:700;font-size:17px;cursor:pointer}
+</style>
+</helmet>
+<div class="jq" data-theme="dark">
+<header class="hd">
+<button type="button" class="ib" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg></button>
+<h1>Rules · V5RC Override</h1>
+<button type="button" class="done">Done (2)</button>
+</header>
+<div class="strip" aria-hidden="true"></div>
+<main class="list">
+<div class="sticky"><label class="srch"><span class="sr">Search rules</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg><input class="input" type="search" placeholder="Search by number or words (e.g. SG6, holding)" autocomplete="off"></label></div>
+<button type="button" class="gh" aria-expanded="true"><span class="t">Common</span><span class="n">9</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg></button>
+<div class="cm" role="group" aria-label="Common rules">
+<button type="button" class="chip" aria-pressed="true">SG6</button>
+<button type="button" class="chip" aria-pressed="false">SG7</button>
+<button type="button" class="chip" aria-pressed="false">SG9</button>
+<button type="button" class="chip" aria-pressed="false">GG4</button>
+<button type="button" class="chip" aria-pressed="false">GG14</button>
+<button type="button" class="chip" aria-pressed="true">GG17</button>
+<button type="button" class="chip" aria-pressed="false">SG2</button>
+<button type="button" class="chip" aria-pressed="false">SG3</button>
+<button type="button" class="chip" aria-pressed="false">S1</button>
+</div>
+<button type="button" class="gh" aria-expanded="true"><span class="t">Specific Game Rules</span><span class="n">13</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg></button>
+<label class="rr"><b>SG1</b><span>Starting a Match</span><input type="checkbox" class="cb" aria-label="SG1"></label>
+<label class="rr"><b>SG2</b><span>Horizontal expansion is limited</span><input type="checkbox" class="cb" aria-label="SG2"></label>
+<label class="rr"><b>SG3</b><span>Vertical expansion is limited</span><input type="checkbox" class="cb" aria-label="SG3"></label>
+<label class="rr"><b>SG4</b><span>Keep Scoring Objects in the Field</span><input type="checkbox" class="cb" aria-label="SG4"></label>
+<label class="rr"><b>SG5</b><span>Each Robot gets one Pin as a Preload</span><input type="checkbox" class="cb" aria-label="SG5"></label>
+<label class="rr on"><b>SG6</b><span>Possession is limited to a maximum of one Pin and one Cup</span><input type="checkbox" class="cb" checked="checked" aria-label="SG6"></label>
+<label class="rr"><b>SG7</b><span>Don&#x27;t cross the Autonomous Line, and don&#x27;t interfere with your opponents&#x27; actions</span><input type="checkbox" class="cb" aria-label="SG7"></label>
+<label class="rr"><b>SG8</b><span>Engage with the Midfield and Autonomous Line during the Autonomous Period at your own risk</span><input type="checkbox" class="cb" aria-label="SG8"></label>
+<label class="rr"><b>SG9</b><span>Alliance Goals are protected</span><input type="checkbox" class="cb" aria-label="SG9"></label>
+<label class="rr"><b>SG10</b><span>Scoring Objects may not be removed from neutral Goals</span><input type="checkbox" class="cb" aria-label="SG10"></label>
+<label class="rr"><b>SG11</b><span>Match Loads may be introduced during the Match under certain conditions</span><input type="checkbox" class="cb" aria-label="SG11"></label>
+<label class="rr"><b>SG12</b><span>Some rules change during the Endgame period</span><input type="checkbox" class="cb" aria-label="SG12"></label>
+<label class="rr"><b>SG13</b><span>Load Zones are protected during the Driver Controlled Period of the Match</span><input type="checkbox" class="cb" aria-label="SG13"></label>
+<button type="button" class="gh" aria-expanded="true"><span class="t">General Game Rules</span><span class="n">18</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg></button>
+<label class="rr"><b>GG1</b><span>Only Drive Team Members, and only in the Alliance Station</span><input type="checkbox" class="cb" aria-label="GG1"></label>
+<label class="rr"><b>GG2</b><span>A Team&#x27;s Robot should attend every Match</span><input type="checkbox" class="cb" aria-label="GG2"></label>
+<label class="rr"><b>GG3</b><span>Robots on the Field must be ready to play</span><input type="checkbox" class="cb" aria-label="GG3"></label>
+<label class="rr"><b>GG4</b><span>Hands out of the Field</span><input type="checkbox" class="cb" aria-label="GG4"></label>
+<label class="rr"><b>GG5</b><span>Match replays are allowed, but rare</span><input type="checkbox" class="cb" aria-label="GG5"></label>
+<label class="rr"><b>GG6</b><span>Disqualifications</span><input type="checkbox" class="cb" aria-label="GG6"></label>
+<label class="rr"><b>GG7</b><span>Time-outs</span><input type="checkbox" class="cb" aria-label="GG7"></label>
+<label class="rr"><b>GG8</b><span>Keep your Robots together</span><input type="checkbox" class="cb" aria-label="GG8"></label>
+<label class="rr"><b>GG9</b><span>Don&#x27;t hook your Robot to the Field, and don&#x27;t get Entangled</span><input type="checkbox" class="cb" aria-label="GG9"></label>
+<label class="rr"><b>GG10</b><span>The red Alliance may choose to place last</span><input type="checkbox" class="cb" aria-label="GG10"></label>
+<label class="rr"><b>GG11</b><span>Controllers must stay connected to the Field</span><input type="checkbox" class="cb" aria-label="GG11"></label>
+<label class="rr"><b>GG12</b><span>Autonomous means &quot;no humans&quot;</span><input type="checkbox" class="cb" aria-label="GG12"></label>
+<label class="rr"><b>GG13</b><span>All rules still apply in the Autonomous Period</span><input type="checkbox" class="cb" aria-label="GG13"></label>
+<label class="rr"><b>GG14</b><span>Don&#x27;t destroy other Robots. But, be prepared to encounter defense</span><input type="checkbox" class="cb" aria-label="GG14"></label>
+<label class="rr"><b>GG15</b><span>Offensive Robots get the &quot;benefit of the doubt&quot; when judgment calls are required</span><input type="checkbox" class="cb" aria-label="GG15"></label>
+<label class="rr"><b>GG16</b><span>You can&#x27;t force an opponent into a penalty</span><input type="checkbox" class="cb" aria-label="GG16"></label>
+<label class="rr on"><b>GG17</b><span>No Holding for more than a 3-count</span><input type="checkbox" class="cb" checked="checked" aria-label="GG17"></label>
+<label class="rr"><b>GG18</b><span>Use Scoring Objects to play the game</span><input type="checkbox" class="cb" aria-label="GG18"></label>
+<button type="button" class="gh" aria-expanded="false"><span class="t">Safety Rules</span><span class="n">5</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+<button type="button" class="gh" aria-expanded="false"><span class="t">Scoring Rules</span><span class="n">8</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+<button type="button" class="gh" aria-expanded="false"><span class="t">General Rules</span><span class="n">5</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+<button type="button" class="gh" aria-expanded="false"><span class="t">Robot Rules</span><span class="n">28</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+<button type="button" class="gh" aria-expanded="false"><span class="t">Tournament Rules</span><span class="n">24</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+<button type="button" class="gh" aria-expanded="false"><span class="t">Robot Skills Challenge Rules</span><span class="n">5</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+</main>
+<div class="bar">
+<p><b>2 rules selected</b> · GG17, SG6</p>
+<button type="button" class="prim">Done</button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":375,"height":812}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

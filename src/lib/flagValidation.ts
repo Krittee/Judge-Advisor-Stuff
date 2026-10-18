@@ -13,20 +13,14 @@ import {
 } from "./rules";
 import type { FlagRow } from "./types";
 
-/**
- * A field used to be a division and a number, "ES2". Only the old FieldPicker
- * still reads this; the server accepts no prefix on a new flag, and a flag
- * already recorded with one keeps it (see parseFlagFields).
- */
-export const FIELD_PREFIXES = ["ES", "MS", "HS", "BL", "SK"] as const;
-
 /** The most fields an event can have. Also what a field is checked against
  *  before any setup has been saved. */
 export const MAX_FIELD_COUNT = 20;
 
-/** A field is now just its number, 1 to the event's field count. Creation and
+/** A field is its number, 1 to the event's field count. Creation and
  *  correction both check it here, so a corrected field can only be one a
- *  referee could have picked in the first place. */
+ *  referee could have picked in the first place. (A flag recorded with an
+ *  older value keeps it through a correction; see parseFlagFields.) */
 export function isValidFieldPick(field: string, fieldCount: number = MAX_FIELD_COUNT): boolean {
   return /^\d{1,2}$/.test(field) && Number(field) >= 1 && Number(field) <= fieldCount;
 }

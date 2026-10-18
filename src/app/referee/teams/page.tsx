@@ -3,9 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { call, useAppState } from "@/components/useAppState";
-import { inputClass, TopBar } from "@/components/ui";
-import { TabBar } from "@/components/nav";
-import { SignOutButton } from "@/components/judging";
+import { inputClass } from "@/components/ui";
+import { RefereeFrame } from "@/components/referee/RefereeFrame";
 import { FlagSummary } from "@/components/Flags";
 import { compareTeamNumbers } from "@/lib/teamNumber";
 import type { Session } from "@/lib/auth";
@@ -69,30 +68,8 @@ export default function RefereeTeamsPage() {
   }
 
   return (
-    <>
-      <TopBar
-        title="Referee"
-        subtitle={session ? session.name : undefined}
-        online={online}
-        role={state.viewer.role}
-        current="/referee/teams"
-        right={<SignOutButton to="/referee/login" />}
-      />
-
-      <main className="mx-auto max-w-lg space-y-4 px-5 py-6">
-        {/* The head referee's main move is "show me all the teams", so the
-            way there is the first thing on the page rather than a link in
-            the bar. */}
-        <TabBar
-          label="Referee views"
-          variant="segmented"
-          active={"teams"}
-          items={[
-            { id: "lookup", label: "Type a number", href: "/referee" },
-            { id: "teams", label: "All teams", href: "/referee/teams" },
-          ]}
-        />
-
+    <RefereeFrame name={session?.name} online={online} role={state.viewer.role} current="/referee/teams">
+      <main className="rf-body">
         <div className="space-y-3 rounded-2xl bg-surface p-4 ring-1 ring-inset ring-line">
           <label className="block">
             <span className="mb-1 block text-xs text-ink-subtle">
@@ -190,6 +167,6 @@ export default function RefereeTeamsPage() {
           </ul>
         )}
       </main>
-    </>
+    </RefereeFrame>
   );
 }

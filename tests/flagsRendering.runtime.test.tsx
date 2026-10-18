@@ -8,8 +8,6 @@ import {
   flagsOnDay,
   FlagSummary,
   MatchAffectingCheck,
-  RulePicker,
-  RulesetPicker,
   type FlagKind,
 } from "../src/components/Flags";
 import {
@@ -96,17 +94,17 @@ test("the alliance is a small dot and its name beside the match reference; none 
   const red = renderToStaticMarkup(<FlagList flags={[report({ alliance: "red" })]} kinds={kinds} />);
   assert.match(red, /Q23/);
   assert.match(red, /Red/);
-  assert.match(red, /oklch\(0\.620 0\.190 25\)/, "the red dot");
-  assert.doesNotMatch(red, /Blue/);
+  assert.match(red, /var\(--alliance-red\)/, "the red dot uses the alliance token");
+  assert.doesNotMatch(red, /Blue|alliance-blue/);
 
   const blue = renderToStaticMarkup(<FlagList flags={[report({ alliance: "blue" })]} kinds={kinds} />);
   assert.match(blue, /Blue/);
-  assert.match(blue, /oklch\(0\.620 0\.150 255\)/, "the blue dot");
+  assert.match(blue, /var\(--alliance-blue\)/, "the blue dot uses the alliance token");
   assert.doesNotMatch(blue, /Red/);
 
   // A Skills run, or a flag from before alliances: no dot, no name.
   const none = renderToStaticMarkup(<FlagList flags={[report({ alliance: null })]} kinds={kinds} />);
-  assert.doesNotMatch(none, /Red|Blue|oklch/);
+  assert.doesNotMatch(none, /Red|Blue|alliance|oklch/);
   assert.match(none, /Q23/);
 });
 
@@ -205,68 +203,7 @@ test("Disqualified renders as its own DQ chip, in a tone no other kind shares", 
   assert.notEqual(toneSolid("black"), toneSolid(undefined));
 });
 
-/* ---- the rule picker ------------------------------------------------------ */
-
-test("selected rules show as removable chips, each tap target at least 44px tall", () => {
-  const markup = renderToStaticMarkup(
-    <RulePicker rulesetId="v5rc" value={["SG9", "GG17"]} onChange={() => {}} />,
-  );
-  assert.match(markup, /SG9 ×/);
-  assert.match(markup, /GG17 ×/);
-  assert.match(markup, /aria-label="Remove SG9"/);
-  assert.match(markup, /min-h-11/, "44px (min-h-11) touch targets");
-  assert.match(markup, /aria-expanded="false"/, "closed until tapped");
-  assert.doesNotMatch(markup, /COMMON FIELD RULES/);
-});
-
-test("the open picker starts with Scoring, Specific Game and General Game rules expanded, the rest collapsed", () => {
-  const markup = renderToStaticMarkup(
-    <RulePicker rulesetId="v5rc" value={[]} onChange={() => {}} startOpen />,
-  );
-  // Expanded: their rule rows are present, code + em dash + official title.
-  assert.match(markup, /&lt;SC1&gt;<\/span> — All scoring statuses are evaluated after the Match ends/);
-  assert.match(markup, /&lt;SG6&gt;<\/span> — Possession is limited to a maximum of one Pin and one Cup/);
-  assert.match(markup, /&lt;GG17&gt;<\/span> — No Holding for more than a 3-count/);
-  // Collapsed: the header says so and none of their rows render.
-  for (const [category, sample] of [
-    ["SAFETY RULES", "&lt;S4&gt;"],
-    ["ROBOT RULES", "&lt;R1&gt;"],
-    ["TOURNAMENT RULES", "&lt;T1&gt;"],
-    ["TOURNAMENT SPECIAL", "&lt;TS1&gt;"],
-  ]) {
-    assert.match(markup, new RegExp(category), `${category} header missing`);
-    assert.ok(!markup.includes(`${sample}</span>`), `${sample} should be hidden in a collapsed ${category}`);
-  }
-  assert.match(markup, /aria-expanded="true"/);
-  assert.match(markup, /aria-expanded="false"/);
-  // The shortcut section is V5RC's own list.
-  assert.match(markup, /COMMON FIELD RULES/);
-  assert.match(markup, /0 of 5 selected/);
-});
-
-test("the open picker marks selected rows, and a ruleset switch shows that ruleset's rules", () => {
-  const markup = renderToStaticMarkup(
-    <RulePicker rulesetId="viqrc" value={["SG6"]} onChange={() => {}} startOpen />,
-  );
-  assert.match(markup, /aria-pressed="true"/);
-  assert.match(markup, /Possession \/ Plowing is limited/, "IQ's SG6 wording");
-  assert.doesNotMatch(markup, /one Pin and one Cup/, "V5RC wording must not leak into IQ");
-  assert.match(markup, /1 of 5 selected/);
-});
-
-test("at the cap every unselected row is disabled and selected rows stay tappable", () => {
-  const picked = ["SC1", "SC2", "SC3", "SC4", "SC5"];
-  const markup = renderToStaticMarkup(
-    <RulePicker rulesetId="v5rc" value={picked} onChange={() => {}} startOpen />,
-  );
-  assert.match(markup, /5 of 5 selected/);
-  const rows = markup.match(/<button[^>]*aria-pressed="(?:true|false)"[^>]*>/g) ?? [];
-  assert.ok(rows.length > 5);
-  for (const row of rows) {
-    const selected = row.includes('aria-pressed="true"');
-    assert.equal(/\sdisabled=""/.test(row), !selected, `row ${selected ? "selected" : "unselected"}: ${row.slice(0, 80)}`);
-  }
-});
+/* ---- the rule helpers (the picker UI is AllRulesPicker: tests/refereeComponents.runtime.test.tsx) ---- */
 
 test("a search opens every category, an empty one leaves the referee's own toggles in charge", () => {
   const open = new Set(DEFAULT_OPEN_RULE_CATEGORIES);
@@ -306,17 +243,6 @@ test("groupRulesByCategory follows the manual's order and keeps an unknown categ
   // Search narrows the groups to the categories that still have a hit.
   const holding = groupRulesByCategory(searchRules("holding", "v5rc"));
   assert.deepEqual(holding.map((g) => g.category), ["General Game Rules"]);
-});
-
-test("the ruleset dropdown lists both rulesets and shows the manual edition from the data", () => {
-  const v5 = renderToStaticMarkup(<RulesetPicker value="v5rc" onChange={() => {}} />);
-  assert.match(v5, /VEX IQ/);
-  assert.match(v5, /V5RC Override/);
-  assert.match(v5, /Override Manual v2\.1/);
-
-  const iq = renderToStaticMarkup(<RulesetPicker value="viqrc" onChange={() => {}} />);
-  assert.doesNotMatch(iq, /Manual v/, "IQ records no edition, so none is invented");
-  assert.match(renderToStaticMarkup(<RulesetPicker value="nope" onChange={() => {}} />), /<option value="viqrc"[^>]*selected/);
 });
 
 test("the match-affecting checkbox is a real, labelled checkbox with a 44px row", () => {

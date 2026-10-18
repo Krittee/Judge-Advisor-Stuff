@@ -903,7 +903,7 @@ function FlagsTab({
                 <FlagList
                   flags={flags}
                   kinds={state.flagKinds}
-                  matchTypes={state.matchTypes}
+                  fieldCount={state.refereeSetup?.field_count}
                   onRemove={remove}
                   onEdit={edit}
                 />

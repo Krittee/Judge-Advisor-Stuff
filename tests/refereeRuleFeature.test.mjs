@@ -10,6 +10,8 @@ const event = JSON.parse(readFileSync(new URL("../config/event.json", import.met
 const routeSrc = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
 const pageSrc = readFileSync(new URL("../src/app/referee/page.tsx", import.meta.url), "utf8");
 const flagsSrc = readFileSync(new URL("../src/components/Flags.tsx", import.meta.url), "utf8");
+const allRulesSrc = readFileSync(new URL("../src/components/AllRulesPicker.tsx", import.meta.url), "utf8");
+const matchFieldsSrc = readFileSync(new URL("../src/components/MatchFields.tsx", import.meta.url), "utf8");
 const fileStoreSrc = readFileSync(new URL("../src/lib/db/file.ts", import.meta.url), "utf8");
 const postgresSrc = readFileSync(new URL("../src/lib/db/postgres.ts", import.meta.url), "utf8");
 const schemaSql = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
@@ -85,83 +87,96 @@ test("both stores add the ruleset columns additively, and a flag from before the
   assert.ok(migrate.includes("data.refereeSetup ??= null"), "an old state file has no referee setup");
 });
 
-test("the page sends ruleset, rules and match affecting, and only resets them after a successful request", () => {
+test("the page sends the event's ruleset, rules, alliance and match affecting, and only resets them after a successful request", () => {
   const start = pageSrc.indexOf("async function record");
   const record = pageSrc.slice(start, pageSrc.indexOf("\n  }", start));
   assert.match(
     record,
-    /body:\s*\{ teamId: team\.id, kind, body, matchType, matchNumber, field, ruleset: rulesetId, rules, matchAffecting \}/,
+    /recordPayload\(\{ teamId: team\.id, kind: kind\.id, body, match, alliance, rulesetId, rules, matchAffecting \}\)/,
   );
   assert.ok(record.indexOf("await call") < record.indexOf("setRules([])"));
   assert.ok(record.indexOf("await call") < record.indexOf("setMatchAffecting(false)"));
+  assert.ok(record.indexOf("await call") < record.indexOf("setKindId(null)"));
   assert.ok(record.includes('setBody("")'));
-  assert.ok(!record.includes("setRulesetId"), "the ruleset is remembered, not cleared after a flag");
-  assert.ok(!record.includes('setMatchType("")'));
-  assert.ok(!record.includes('setMatchNumber("")'));
-  assert.ok(!record.includes('setField("")'));
+  // The team, match and field stay, so the next team in the same match is quick.
+  for (const kept of ["setNumber(", "setMatch(", "setPickedAlliance(", "setRulesetId", "setSheetOpen("]) {
+    assert.ok(!record.includes(kept), `a recorded flag must not touch ${kept}`);
+  }
 });
 
-test("the ruleset is remembered per device in localStorage, guarded, and switching it clears the rules", () => {
-  assert.match(pageSrc, /try \{\s*const saved = localStorage\.getItem\(RULESET_STORAGE_KEY\);/);
-  assert.match(pageSrc, /try \{\s*localStorage\.setItem\(RULESET_STORAGE_KEY, id\);/);
-  assert.ok(pageSrc.includes("isValidRulesetId(saved)"), "a stale or tampered stored value must fall back to the default");
-  const choose = pageSrc.slice(pageSrc.indexOf("function chooseRuleset"), pageSrc.indexOf("function chooseRuleset") + 400);
-  assert.ok(choose.includes("setRules([])"), "switching ruleset must clear the selected rules");
-  assert.ok(pageSrc.includes("<RulesetPicker"));
-  assert.ok(
-    pageSrc.indexOf("<RulesetPicker") < pageSrc.indexOf("Team number"),
-    "the ruleset dropdown belongs at the top of the flag form",
-  );
+test("the program comes from the event setup, not from this device", () => {
+  assert.ok(!pageSrc.includes("RulesetPicker"), "the per-device ruleset dropdown is gone");
+  assert.ok(!pageSrc.includes("localStorage"), "nothing about the program is remembered on the device");
+  assert.ok(!pageSrc.includes("RULESET_STORAGE_KEY"));
+  assert.ok(pageSrc.includes("const rulesetId = setup?.ruleset ?? DEFAULT_RULESET_ID"));
 });
 
-test("What did you see is optional in the UI and server path", () => {
-  assert.ok(pageSrc.includes("(optional)"));
+test("the note is optional: a collapsed row, capped at 500, never required", () => {
+  assert.ok(pageSrc.includes("Add a note"));
+  assert.match(pageSrc, /<details className="rf-note">/);
+  assert.ok(pageSrc.includes("maxLength={500}"));
   assert.ok(!pageSrc.includes("!body.trim()"));
   assert.ok(!flagsSrc.includes("!draftBody.trim()"));
 });
 
-test("the selector remains one searchable control between observation and action buttons", () => {
-  const observation = pageSrc.indexOf("What did you see?");
-  const selector = pageSrc.indexOf("Rules violated");
-  const actions = pageSrc.indexOf("{kinds.map((k) => {");
-  assert.ok(observation < selector && selector < actions);
-  assert.equal(flagsSrc.match(/placeholder="Search: SG6/g)?.length, 1);
-  assert.ok(pageSrc.includes("<RulePicker"), "the raise form no longer uses the shared rule picker");
-  assert.ok(!pageSrc.includes("choose category"));
-  assert.ok(flagsSrc.includes("break-words"));
-  assert.ok(flagsSrc.includes("overflow-y-auto"));
+test("rules are common-rule chips plus one All rules dialog, between the note and the severity buttons", () => {
+  const note = pageSrc.indexOf("Add a note");
+  const trigger = pageSrc.indexOf("All rules <em>");
+  const severity = pageSrc.indexOf("<SeverityButtons");
+  assert.ok(trigger < note && note < severity, "What happened, then the note, then How serious");
+  assert.ok(pageSrc.includes("<AllRulesPicker"), "the page lost the All rules dialog");
+  assert.ok(!pageSrc.includes("<RulePicker"), "the old dropdown picker is back");
+  assert.ok(pageSrc.includes("commonFieldRules(rulesetId)"), "the chips are the event program's common rules");
+  assert.match(pageSrc, /aria-pressed=\{rules\.includes\(id\)\}/, "a rule chip is a multi-select toggle");
+  assert.ok(pageSrc.includes("MAX_FLAG_RULES") && pageSrc.includes("toggleRule(rules, id)"), "the cap on rules is kept");
+  assert.equal(allRulesSrc.match(/placeholder="Search/g)?.length, 1, "the dialog has the one search box");
+  assert.ok(allRulesSrc.includes("overflow-y-auto overscroll-contain"), "the long list must scroll inside the dialog");
 });
 
-test("the rule list wraps on a phone: no fixed widths or nowrap on the picker rows", () => {
-  const picker = flagsSrc.slice(flagsSrc.indexOf("function RuleRow"), flagsSrc.indexOf("/** The worst thing said about a team"));
-  assert.ok(!/whitespace-nowrap/.test(picker), "rule rows must wrap, not scroll sideways");
-  assert.ok(!/\bw-\[\d/.test(picker) && !/\bmin-w-\[/.test(picker), "no fixed widths in the picker");
-  assert.ok(picker.includes("min-w-0 break-words"), "long official titles must break inside the row");
-  assert.ok(picker.includes("min-h-11"), "44px touch targets");
+test("the rule list wraps on a phone: no nowrap on the rows, long official titles break inside them", () => {
+  const rows = allRulesSrc.slice(allRulesSrc.indexOf("rules.map((r) => {"));
+  assert.ok(!/whitespace-nowrap/.test(rows), "rule rows must wrap, not scroll sideways");
+  assert.ok(rows.includes("min-w-0 flex-1 break-words"), "long official titles must break inside the row");
+  assert.ok(rows.includes("min-h-12"), "rows are at least 48px tall");
 });
 
-test("match affecting appears once a rule is picked, in the raise form and the correction form", () => {
-  assert.match(pageSrc, /rules\.length \? \(\s*<MatchAffectingCheck/);
+test("match affecting is a switch that appears once a rule is picked, in the raise form and the correction form", () => {
+  assert.match(pageSrc, /rules\.length \? \(\s*<label className="rf-row">/);
+  assert.match(pageSrc, /type="checkbox"\s+role="switch"/);
   assert.match(flagsSrc, /draftRules\.length \|\| MATCH_AFFECTING_KINDS\.includes\(f\.kind\)/);
 });
 
-test("a field is a number from the event's setup; the division prefix lives on only in the old form", () => {
+test("a field is a number from the event's setup; the division prefix is gone", () => {
   const validatorSrc = readFileSync(new URL("../src/lib/flagValidation.ts", import.meta.url), "utf8");
   assert.ok(validatorSrc.includes("export const MAX_FIELD_COUNT = 20"), "the setup's field ceiling moved");
   assert.ok(validatorSrc.includes("Pick the field — 1 to ${maxField}."));
-  // The correction form picks from the event's fields; the old raise form keeps its division box until it is rebuilt.
-  assert.ok(flagsSrc.includes("length: fieldCount"));
-  assert.ok(pageSrc.includes("<FieldPicker"));
+  assert.ok(!validatorSrc.includes("FIELD_PREFIXES"));
+  // The field chips are the shared match control's, one per field the event has.
+  assert.ok(matchFieldsSrc.includes("length: fieldCount"));
+  assert.ok(!pageSrc.includes("FieldPicker") && !pageSrc.includes("FIELD_PREFIXES"));
+  assert.ok(pageSrc.includes("const fieldCount = setup?.field_count ?? MAX_FIELD_COUNT"));
+  assert.match(pageSrc, /<MatchSheet[^>]*fieldCount=\{fieldCount\}/);
+  assert.equal(
+    pageSrc.match(/<FlagList[^>]*fieldCount=\{fieldCount\}/g)?.length,
+    pageSrc.match(/<FlagList/g)?.length,
+    "every FlagList is given the event's field count",
+  );
+  assert.ok(!pageSrc.includes("matchTypes={"), "FlagList's deprecated matchTypes prop is no longer passed");
 });
 
-test("repeated history comes from the tested helper and cannot submit an automatic Major or DQ", () => {
+test("repeated history comes from the tested helper and cannot select an automatic Major or DQ", () => {
   assert.ok(pageSrc.includes("refereeHistory(state.flags"));
-  assert.ok(pageSrc.includes("rules, matchType, matchNumber, rulesetId"), "history must be scoped to the chosen ruleset");
+  assert.ok(pageSrc.includes("rules, matchType, matchNumber, rulesetId"), "history must be scoped to the event's ruleset");
   assert.ok(!/kind\s*=\s*["']major["']/.test(pageSrc));
   assert.ok(!/severity\s*=\s*["']major["']/.test(pageSrc));
   assert.ok(!pageSrc.includes('record("major")'));
   assert.ok(!pageSrc.includes('record("dq")'));
-  assert.ok(pageSrc.includes("onClick={() => record(k.id)}"));
+  // A severity is only ever selected by a tap on its button, never set from here.
+  assert.ok(!/setKindId\(\s*["'`]/.test(pageSrc), "nothing may select a severity by id");
+  assert.ok(pageSrc.includes("onChange={setKindId}"));
+  // The Record button is the only thing that saves.
+  assert.equal(pageSrc.match(/onClick=\{record\}/g)?.length, 1);
+  assert.ok(!pageSrc.includes("record(k.id)"), "tapping a severity must not save");
   assert.ok(pageSrc.includes("Head Referee"));
 });
 
@@ -179,7 +194,7 @@ test("Flagged Today renders each complete report and legacy null rules remain gu
 
 test("correction UI sends the ruleset and rules it shows and blocks unsafe rule-less severity changes", () => {
   assert.ok(flagsSrc.includes("rules: draftRules"));
-  assert.ok(flagsSrc.includes("ruleset: draftRuleset"));
+  assert.ok(flagsSrc.includes("ruleset: ruleset.id"), "a correction keeps the flag's own ruleset");
   assert.match(flagsSrc, /k\.requiresRule && !draftRules\.length && !legacyKeep/);
 });
 
