@@ -13,7 +13,7 @@ export default function RefereeLoginPage() {
   return (
     <SignInForm
       title="Referee sign in"
-      intro="For referees on the field. Your code was given to you by the Judge Advisor."
+      intro="Referees sign in here to record flags during matches."
     />
   );
 }

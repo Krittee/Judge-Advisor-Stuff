@@ -537,3 +537,253 @@ textarea {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ------------------------------------------------------------------ *
+ * Sign-in pass ("Courtside credential", design/sign-in-redesign/)
+ *
+ * The role colours below are the one place the palette rules above are
+ * bent: on a lanyard pass, colour says who the pass is for. They are
+ * scoped to .signin on purpose -- inside the app orange means "a team
+ * is waiting" and violet means "active", so never reuse them as chips
+ * or tiles elsewhere.
+ * ------------------------------------------------------------------ */
+
+.signin {
+  --si-accent-hover: oklch(0.730 0.125 258);
+  --si-danger-text: oklch(0.800 0.110 18);
+  --si-danger-tint: oklch(0.555 0.200 18 / 0.16);
+  --si-danger-line: oklch(0.555 0.200 18 / 0.55);
+  --si-ring: oklch(0.680 0.140 258 / 0.35);
+  --si-field: oklch(0.180 0.013 265);
+  --si-field-line: oklch(0.520 0.014 265);
+  --si-disabled: oklch(0.280 0.014 265);
+  --si-ref-band: oklch(0.300 0.016 265);
+  --si-desk: oklch(0.740 0.110 185);
+  --si-ja: oklch(0.720 0.140 300);
+  --si-ref: oklch(0.760 0.150 55);
+  --si-sun: oklch(0.880 0.150 95);
+  --si-bright-ink: oklch(0.225 0.016 265);
+  --si-on-band: oklch(0.985 0.003 265);
+  --si-judge-tint: oklch(0.680 0.140 258 / 0.16);
+  --si-desk-tint: oklch(0.740 0.110 185 / 0.14);
+  --si-ja-tint: oklch(0.720 0.140 300 / 0.16);
+  --si-ref-tint: oklch(0.760 0.150 55 / 0.15);
+  --si-shadow: none;
+
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+:root[data-theme="light"] .signin {
+  --si-accent-hover: oklch(0.455 0.160 258);
+  --si-danger-text: oklch(0.470 0.180 18);
+  --si-danger-tint: oklch(0.560 0.200 18 / 0.08);
+  --si-danger-line: oklch(0.560 0.200 18 / 0.35);
+  --si-ring: oklch(0.510 0.160 258 / 0.25);
+  --si-field: oklch(0.995 0.002 265);
+  --si-field-line: oklch(0.640 0.012 265);
+  --si-disabled: oklch(0.915 0.008 265);
+  --si-ref-band: oklch(0.225 0.016 265);
+  --si-desk: oklch(0.560 0.110 185);
+  --si-ja: oklch(0.520 0.180 300);
+  --si-ref: oklch(0.700 0.170 55);
+  --si-judge-tint: oklch(0.510 0.160 258 / 0.10);
+  --si-desk-tint: oklch(0.560 0.110 185 / 0.10);
+  --si-ja-tint: oklch(0.520 0.180 300 / 0.10);
+  --si-ref-tint: oklch(0.700 0.170 55 / 0.12);
+  --si-shadow: 0 1px 2px oklch(0.225 0.016 265 / 0.05),
+    0 18px 40px -24px oklch(0.225 0.016 265 / 0.25);
+}
+
+.signin .r-judge { --rc: var(--accent); --rt: var(--si-judge-tint); --rp: oklch(0.925 0.045 258); }
+.signin .r-desk { --rc: var(--si-desk); --rt: var(--si-desk-tint); --rp: oklch(0.935 0.045 185); }
+.signin .r-ja { --rc: var(--si-ja); --rt: var(--si-ja-tint); --rp: oklch(0.930 0.045 300); }
+.signin .r-ref { --rc: var(--si-ref); --rt: var(--si-ref-tint); --rp: oklch(0.945 0.055 55); }
+
+.si-brand, .si-role, .si-mate-l, .si-solo-l, .si-title, .si-code, .si-btn, .si-w-title, .si-stamp {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; }
+
+.si-top { display: flex; flex: none; height: 56px; align-items: center; padding: 6px 8px; }
+.si-back {
+  display: inline-flex; min-height: 44px; align-items: center; gap: 6px; padding: 0 10px;
+  border-radius: 10px; color: var(--ink-subtle); font-size: 15px; text-decoration: none;
+}
+.si-back:hover { color: var(--ink); text-decoration: underline; }
+
+/* The app's one floating theme toggle, docked into the pass's top row
+   here: floating bottom-right it would sit on top of the Sign in button. */
+body:has(.signin) > .theme-toggle {
+  position: absolute; top: 6px; right: 8px; bottom: auto;
+  width: 44px; height: 44px; border: 0; border-radius: 12px;
+  background: transparent; box-shadow: none; color: var(--ink-subtle);
+}
+body:has(.signin) > .theme-toggle:hover {
+  transform: none; color: var(--ink);
+  background: color-mix(in oklch, var(--accent) 12%, transparent);
+}
+
+.si-stage { display: flex; flex: 1; flex-direction: column; }
+.si-pwrap { display: flex; flex: 1; margin: 0 16px 16px; }
+.si-pass {
+  display: flex; flex: 1; min-width: 0; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 24px;
+  background: var(--surface); box-shadow: var(--si-shadow);
+}
+
+.si-band {
+  position: relative; display: flex; flex: none; min-height: 104px; flex-direction: column;
+  gap: 10px; overflow: hidden; padding: 30px 20px 14px;
+  background: var(--accent); color: var(--accent-ink);
+}
+.si-band--ref { gap: 8px; padding-bottom: 18px; background: var(--si-ref-band); color: var(--si-on-band); }
+.si-slot {
+  position: absolute; top: 12px; left: 50%; width: 56px; height: 10px; margin-left: -28px;
+  border-radius: 5px; background: var(--canvas); box-shadow: inset 0 0 0 1px var(--line);
+}
+.si-stripes { position: absolute; z-index: 1; right: 0; bottom: 0; left: 0; height: 10px; overflow: hidden; }
+.si-stripes::before {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: -17px;
+  background: repeating-linear-gradient(135deg, oklch(0.985 0.003 265) 0 6px, oklch(0.180 0.012 265) 6px 12px);
+}
+.si-band.is-checking .si-stripes::before { animation: si-pole 0.7s linear infinite; }
+.si-band.is-checking::after {
+  content: ""; position: absolute; z-index: 2; top: 0; bottom: 0; left: 0; width: 36%;
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.38), transparent);
+  transform: skewX(-20deg); animation: si-shimmer 1.2s linear infinite; pointer-events: none;
+}
+.si-band--ref.is-checking::after { background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.30), transparent); }
+
+/* Confetti bits: static decoration on the band. */
+.si-bx { position: absolute; width: 6px; height: 6px; opacity: 0.55; }
+.si-b1 { left: 16px; top: 38px; background: var(--si-sun); }
+.si-b2 { right: 22px; top: 24px; width: 5px; height: 5px; background: var(--si-sun); }
+.si-b3 { left: 104px; top: 20px; background: var(--si-desk); }
+.si-b4 { right: 92px; top: 44px; width: 7px; height: 7px; background: var(--si-ja); }
+.si-b5 { left: 34px; top: 104px; background: var(--si-ja); }
+.si-b6 { right: 14px; top: 98px; background: var(--si-sun); }
+.si-b7 { right: 150px; top: 112px; width: 5px; height: 5px; background: var(--si-desk); }
+.si-band--ref .si-bx { opacity: 0.6; }
+.si-band--ref .si-b1 { left: 16px; top: 40px; background: var(--si-ref); }
+.si-band--ref .si-b2 { right: 22px; top: 26px; background: var(--si-sun); }
+.si-band--ref .si-b3 { left: 110px; top: 20px; background: var(--si-sun); }
+.si-band--ref .si-b4 { right: 60px; top: 92px; background: var(--si-ref); }
+.si-band--ref .si-b5 { left: 40px; top: 100px; width: 5px; height: 5px; background: var(--si-sun); }
+.si-band--ref .si-b6, .si-band--ref .si-b7 { display: none; }
+
+.si-band-top { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; }
+.si-brand { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+.si-mark { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 8px; background: var(--accent-ink); color: var(--accent); }
+.si-band--ref .si-mark { background: var(--si-on-band); color: var(--si-ref-band); }
+.si-role { position: relative; z-index: 1; font-weight: 700; font-size: 13px; line-height: 1.2; letter-spacing: 0.24em; text-transform: uppercase; }
+
+.si-crew { position: relative; z-index: 1; order: 1; display: flex; gap: 8px; }
+.si-mate { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: center; gap: 4px; }
+.si-solo { position: relative; z-index: 1; order: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.si-tile { display: block; width: 44px; height: 44px; border-radius: 12px; background: var(--rp); }
+.si-tile--solo { width: 60px; height: 60px; border-radius: 14px; }
+.si-mate-l { font-weight: 600; font-size: 11px; line-height: 1.2; text-align: center; }
+.si-solo-l { font-weight: 600; font-size: 12px; line-height: 1.2; }
+.si-av { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 22%; box-shadow: 0 0 0 2px var(--si-on-band); }
+
+.si-body { display: flex; flex: 1; min-width: 0; flex-direction: column; padding: 22px 20px 20px; }
+.si-title { margin: 0; font-weight: 700; font-size: 28px; line-height: 1.15; letter-spacing: -0.02em; }
+.si-intro { margin: 6px 0 0; color: var(--ink-subtle); font-size: 15px; line-height: 1.5; }
+.si-form { display: flex; flex: 1; flex-direction: column; gap: 20px; margin: 22px 0 0; }
+.si-field { display: flex; flex-direction: column; gap: 8px; }
+.si-label { display: flex; align-items: baseline; justify-content: space-between; font-weight: 500; font-size: 15px; line-height: 1.4; }
+.si-tag { color: var(--ink-subtle); font-weight: 400; font-size: 13px; }
+
+.si-code, .si-input {
+  width: 100%; margin: 0; border: 1.5px solid var(--si-field-line); border-radius: 12px;
+  background: var(--si-field); color: var(--ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.si-code {
+  height: 64px; padding: 0 18px; font-weight: 600; font-size: 26px;
+  letter-spacing: 0.14em; text-transform: uppercase;
+}
+.si-code::placeholder { color: var(--ink-subtle); opacity: 1; }
+.si-code[aria-invalid="true"] { border-color: var(--danger); }
+.si-input { height: 52px; padding: 0 14px; font-size: 17px; }
+.si-code:focus, .si-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--si-ring); }
+.si-code:read-only, .si-input:read-only { opacity: 0.7; }
+.si-help { margin: 0; color: var(--ink-subtle); font-size: 14px; line-height: 1.45; }
+
+.si-alert {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px;
+  border: 1px solid var(--si-danger-line); border-radius: 12px;
+  background: var(--si-danger-tint); color: var(--si-danger-text);
+  font-weight: 500; font-size: 15px; line-height: 1.4;
+}
+.si-alert svg { flex: none; margin-top: 1px; }
+
+.si-actions { margin-top: auto; }
+.si-btn {
+  position: relative; display: flex; width: 100%; height: 56px; align-items: center; justify-content: center;
+  overflow: hidden; border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink);
+  font-weight: 600; font-size: 17px; cursor: pointer; transition: background 0.15s, transform 0.1s;
+}
+.si-btn:hover:not(:disabled) { background: var(--si-accent-hover); }
+.si-btn:active:not(:disabled) { transform: scale(0.98); }
+.si-btn:disabled { background: var(--si-disabled); color: var(--ink-subtle); cursor: not-allowed; }
+.si-btn[aria-busy="true"]:disabled { background: var(--accent); color: var(--accent-ink); cursor: progress; }
+.si-btn[aria-busy="true"]::after {
+  content: ""; position: absolute; bottom: 0; left: 0; width: 40%; height: 3px;
+  background: var(--accent-ink); opacity: 0.7; animation: si-bar 1.1s ease-in-out infinite;
+}
+
+.si-welcome {
+  display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center;
+  padding: 12px 16px; border: 1.5px solid var(--rc); border-radius: 18px;
+  background: var(--rt); text-align: center;
+}
+.si-hero { position: relative; width: 128px; height: 128px; }
+.si-w-tile { display: block; width: 128px; height: 128px; border-radius: 28px; background: var(--rp); box-shadow: 0 0 0 4px var(--rc); }
+.si-w-tile .si-av { box-shadow: none; }
+.si-w-title { margin: 40px 0 0; font-weight: 700; font-size: 24px; line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance; }
+.si-w-sub { margin: 6px 0 0; color: var(--ink-subtle); font-size: 15px; }
+.si-stamp {
+  position: absolute; right: -46px; bottom: -4px; padding: 3px 10px;
+  border: 3px solid var(--si-bright-ink); border-radius: 6px;
+  background: var(--si-sun); color: var(--si-bright-ink);
+  font-weight: 700; font-size: 15px; line-height: 1.2; letter-spacing: 0.14em; transform: rotate(-8deg);
+}
+
+@media (min-width: 768px) {
+  .si-top { height: auto; padding: 20px 28px; }
+  body:has(.signin) > .theme-toggle { top: 20px; right: 28px; }
+  .si-stage { flex-direction: row; align-items: center; justify-content: center; padding: 0 32px 56px; }
+  .si-pwrap { flex: none; width: 100%; max-width: 780px; min-height: 572px; margin: 0; }
+  .si-pass { flex-direction: row; }
+  .si-band { width: 240px; min-height: 0; justify-content: space-between; gap: 0; padding: 36px 28px 28px; }
+  .si-band-top { display: contents; }
+  .si-role { order: 2; font-size: 26px; letter-spacing: 0.2em; }
+  .si-crew { flex-direction: column; gap: 12px; }
+  .si-mate { flex: none; flex-direction: row; justify-content: flex-start; gap: 14px; }
+  .si-solo { align-items: flex-start; gap: 10px; }
+  .si-tile { width: 64px; height: 64px; border-radius: 16px; }
+  .si-tile--solo { width: 92px; height: 92px; border-radius: 20px; }
+  .si-mate-l { font-size: 15px; text-align: left; }
+  .si-solo-l { font-size: 15px; }
+  .si-stripes { top: 0; left: auto; width: 10px; height: auto; }
+  .si-b4 { top: auto; right: 30px; left: auto; bottom: 150px; }
+  .si-b5 { top: auto; left: 30px; bottom: 110px; }
+  .si-b6 { top: auto; right: 40px; bottom: 70px; }
+  .si-b7 { top: auto; right: 100px; bottom: 100px; }
+  .si-body { padding: 32px 44px 28px; }
+  .si-title { font-size: 30px; }
+  .si-form { gap: 18px; margin-top: 18px; }
+}
+
+@keyframes si-bar { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+@keyframes si-shimmer { from { transform: translateX(-130%) skewX(-20deg); } to { transform: translateX(380%) skewX(-20deg); } }
+@keyframes si-pole { to { transform: translateX(17px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .signin *, .signin *::before, .signin *::after { animation: none !important; transition: none !important; }
+  .si-btn[aria-busy="true"]::after { width: 100%; opacity: 0.35; }
+  .si-band.is-checking::after { display: none; }
+}
