@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Judge Advisor conflicts · one form and table · phone · dark</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Fira+Sans:wght@400;500&amp;display=swap">
+<style>
+.jq{--canvas:oklch(0.165 0.012 265);--surface:oklch(0.205 0.014 265);--ink:oklch(0.955 0.005 265);--muted:oklch(0.670 0.013 265);--line:oklch(0.320 0.016 265);--accent:oklch(0.680 0.140 258);--on-accent:oklch(0.165 0.012 265);--ring:oklch(0.680 0.140 258 / 0.35);--field:oklch(0.180 0.013 265);--field-line:oklch(0.520 0.014 265);--waiting:oklch(0.735 0.185 58);--waiting-ink:oklch(0.240 0.060 58);--enroute:oklch(0.720 0.140 232);--enroute-ink:oklch(0.220 0.050 232);--active:oklch(0.680 0.170 300);--active-ink:oklch(0.220 0.060 300);--done:oklch(0.745 0.140 158);--done-ink:oklch(0.225 0.055 158);--booked:oklch(0.330 0.020 265);--booked-ink:oklch(0.860 0.012 265);--booked-line:oklch(0.440 0.020 265);--waiting-t:oklch(0.735 0.185 58 / 0.12);--waiting-r:oklch(0.735 0.185 58 / 0.45);--active-t:oklch(0.680 0.170 300 / 0.12);--active-r:oklch(0.680 0.170 300 / 0.45);--caution-bg:oklch(0.790 0.150 82 / 0.12);--caution-line:oklch(0.790 0.150 82 / 0.35);--caution-ink:oklch(0.840 0.100 82);--warn:oklch(0.790 0.150 82);--top-t:oklch(0.760 0.130 175 / 0.14);--top-l:oklch(0.760 0.130 175 / 0.40);--top-i:oklch(0.850 0.110 175);--strong-t:oklch(0.780 0.100 210 / 0.14);--strong-l:oklch(0.780 0.100 210 / 0.40);--strong-i:oklch(0.850 0.080 210);--middle-t:oklch(0.800 0.130 88 / 0.14);--middle-l:oklch(0.800 0.130 88 / 0.40);--middle-i:oklch(0.860 0.100 88);--emerging-t:oklch(0.700 0.010 265 / 0.16);--emerging-l:oklch(0.700 0.010 265 / 0.40);--emerging-i:oklch(0.820 0.008 265);--accent-t:oklch(0.680 0.140 258 / 0.14);--danger-quiet:oklch(0.760 0.130 18);--danger-ring:oklch(0.760 0.130 18 / 0.25);--danger-tint:oklch(0.555 0.200 18 / 0.14);--danger-line:oklch(0.555 0.200 18 / 0.45);position:relative;box-sizing:border-box;width:375px;height:900px;overflow:hidden;display:flex;flex-direction:column;background:var(--canvas);color:var(--ink);font-family:'Fira Sans',system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+.jq *,.jq *::before,.jq *::after{box-sizing:border-box}
+:where(.jq) :is(h1,h2,h3,p,ul,li,table,blockquote){margin:0;padding:0}
+:where(.jq) ul{list-style:none}
+.jq :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rule{flex:none;height:1px;background:var(--line)}
+.av{flex:none;width:28px;height:28px;display:block}
+.av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:22%;box-shadow:0 0 0 2px var(--accent)}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.who-t{display:flex;flex-direction:column;line-height:1.15}
+.who-t b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.who-t span{font-size:12px;color:var(--muted)}
+.top-r{display:flex;align-items:center;gap:2px}
+.live{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--done)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--done)}
+.signout{padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:14px;text-decoration:underline;cursor:pointer}
+.ptag{display:inline-flex;align-items:center;flex:none;height:24px;padding:0 7px;border:1px solid var(--line);border-radius:6px;color:var(--muted);font-size:12px;font-weight:500;letter-spacing:.04em;white-space:nowrap}
+.ptag.np{border-style:dashed}
+.pill{display:inline-flex;align-items:center;gap:4px;flex:none;padding:2px 9px 2px 7px;border-radius:999px;font-size:12px;font-weight:500;line-height:1.5;white-space:nowrap}
+.pill svg{flex:none}
+.p-warn{background:var(--caution-bg);border:1px solid var(--caution-line);color:var(--caution-ink)}
+.ghost{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;border:1.5px solid var(--field-line);background:transparent;color:var(--ink);font-weight:500;white-space:nowrap;cursor:pointer}
+.sec{display:flex;align-items:center;gap:8px;min-height:24px;font-size:12px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rb{flex:none;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--waiting);color:var(--waiting-ink);font-size:12px;font-weight:500;line-height:22px;text-align:center;font-variant-numeric:tabular-nums}
+.fc{display:flex;flex-direction:column;gap:14px;padding:20px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.fh{display:flex;flex-direction:column;gap:4px}
+.fh h2{font-family:Archivo,sans-serif;font-weight:700;font-size:20px;line-height:1.2}
+.fl{display:flex;flex-direction:column;gap:6px;min-width:0}
+.lab{font-size:14px;font-weight:500;line-height:1.3}
+.op{font-weight:400;color:var(--muted)}
+.input,.area{display:block;width:100%;margin:0;border:1.5px solid var(--field-line);border-radius:10px;background:var(--field);color:var(--ink);font-family:inherit;font-size:15px;padding:0 12px}
+.input{height:40px;text-overflow:ellipsis}
+.area{padding:9px 12px;line-height:1.4;resize:none;text-transform:uppercase}
+.input::placeholder,.area::placeholder{color:var(--muted);opacity:1;font-size:14px}
+.input:focus,.area:focus,.area.f{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.hint{font-size:12.5px;line-height:1.35;color:var(--muted)}
+.selw{position:relative}
+.sel{appearance:none;-webkit-appearance:none;padding-right:38px;color-scheme:dark;cursor:pointer}
+.selw svg{position:absolute;right:12px;top:50%;margin-top:-8px;pointer-events:none;color:var(--muted)}
+.blk{display:inline-flex;align-items:center;gap:5px;font-size:13px;line-height:1.4;color:var(--muted)}
+.blk svg{flex:none}
+.prim{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 24px;border:0;border-radius:10px;background:var(--accent);color:var(--on-accent);font-family:Archivo,sans-serif;font-weight:700;font-size:16px;white-space:nowrap;cursor:pointer}
+.res{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--field)}
+.res ul{display:flex;flex-direction:column;gap:8px}
+.res li{display:flex;align-items:flex-start;gap:8px;font-size:14px;line-height:1.4}
+.res li svg{flex:none;margin-top:2px}
+.res b{font-weight:500}
+.r-ok{color:var(--done)}
+.r-warn{color:var(--caution-ink)}
+.r-mute{color:var(--muted)}
+.r-bad{color:var(--danger-quiet)}
+.stranded{display:grid;grid-template-columns:20px minmax(0,1fr);gap:6px 12px;align-items:start;padding:14px 16px;border:1px solid var(--danger-line);border-radius:14px;background:var(--danger-tint)}
+.stranded svg{margin-top:1px;color:var(--danger-quiet)}
+.stranded h2{font-family:Archivo,sans-serif;font-weight:600;font-size:16px;line-height:1.3;color:var(--danger-quiet);text-wrap:balance}
+.stranded p{font-size:13.5px;line-height:1.45}
+.stx{display:flex;flex-direction:column;gap:3px}
+.stt{grid-column:2}
+.stt b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.stranded.row{grid-template-columns:20px minmax(0,1fr) auto;align-items:center}
+.stranded.row svg{margin-top:0}
+.stranded.row .stt{grid-column:3;grid-row:1}
+.gl{display:flex;flex-direction:column;gap:16px}
+.grp{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.gh{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;min-height:46px;padding:8px 16px;border-bottom:1px solid var(--line)}
+.gh h2,.gh h3{font-family:Archivo,sans-serif;font-weight:700;font-size:18px;line-height:1.2}
+.gn{margin-left:auto;font-size:13px;color:var(--muted)}
+.gh.old{row-gap:2px}
+.sub2{flex-basis:100%;font-size:13px;line-height:1.4;color:var(--muted)}
+.cr{display:flex;align-items:center;gap:10px;padding:10px 16px}
+.cr+.cr{border-top:1px solid var(--line)}
+.cm{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.c1{display:flex;align-items:baseline;gap:8px;min-width:0}
+.n{flex:none;font-family:Archivo,sans-serif;font-weight:700;font-size:20px;line-height:1.2;font-variant-numeric:tabular-nums}
+.tn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
+.c2{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13.5px;line-height:1.4;color:var(--muted)}
+.wd{height:32px;padding:0 12px;border-radius:8px;font-size:13px}
+.empty{font-size:14px;color:var(--muted)}
+.lh{display:flex;align-items:center;gap:8px}
+.lh h2{font-family:Archivo,sans-serif;font-weight:700;font-size:18px;line-height:1.2}
+.gn2{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.addj{height:36px;margin-left:auto;padding:0 14px;border-radius:10px;font-size:14px}
+.jl{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.jh{display:flex;align-items:center;gap:8px;min-height:56px;padding:8px 12px 8px 16px;border-bottom:1px solid var(--line)}
+.jh h2{font-family:Archivo,sans-serif;font-weight:700;font-size:18px;line-height:1.2}
+.jl li+li{border-top:1px solid var(--line)}
+.jr{position:relative;display:flex;align-items:center;gap:8px;min-height:52px;padding:6px 16px;color:var(--ink);text-decoration:none}
+.jr .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:500}
+.jr .ct{flex:none;min-width:20px;text-align:right;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.jr[aria-current="true"]{background:var(--accent-t)}
+.jr[aria-current="true"]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.jr[aria-current="true"] .ct{color:var(--ink);font-weight:500}
+.top{flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 6px 0 4px}
+.menu{flex:none;width:44px;height:44px;margin-right:2px;border:0;border-radius:12px;background:transparent;color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.signout{min-height:44px}
+.sbar{position:relative;flex:none;height:44px;display:flex;align-items:center;gap:10px;padding:0 16px 0 17px;background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.sbar::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.sbar svg{color:var(--accent)}
+.sbar b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.sbar .rc{margin-left:auto;font-size:13px;color:var(--muted)}
+.body{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:12px 16px 16px}
+.body>*{flex:none}
+.fc{gap:12px;padding:14px}
+.input{height:48px;font-size:16px}
+.area{font-size:16px}
+.prim{height:52px;width:100%;font-size:17px}
+.wd{height:44px;padding:0 14px;border-radius:10px;font-size:14px}
+.gh{min-height:48px;padding:8px 14px}
+.cr{padding:10px 12px 10px 14px}
+.n{font-size:22px}
+.res{padding:12px}
+.stranded{padding:12px 14px}
+.addj{height:44px}
+.jh{min-height:52px;padding:6px 14px}
+.pinbar{flex:none;padding:10px 16px 14px;background:var(--surface);border-top:1px solid var(--line)}
+.under{flex:1;min-height:0;display:flex;flex-direction:column}
+.gh.jg .blk{flex-basis:100%}
+.dim{position:absolute;inset:0;z-index:5;background:oklch(0.100 0.010 265 / 0.68)}
+.sheet{position:absolute;z-index:6;left:0;right:0;top:160px;bottom:0;display:flex;flex-direction:column;background:var(--surface);border-radius:24px 24px 0 0;border-top:1px solid var(--field-line);overflow:hidden}
+.grab{flex:none;width:40px;height:4px;margin:8px auto 0;border-radius:2px;background:var(--field-line)}
+.sh-top{flex:none;display:flex;align-items:center;gap:8px;padding:6px 16px 4px}
+.sh-top h2{flex:1;min-width:0;font-family:Archivo,sans-serif;font-weight:700;font-size:24px;line-height:1.1;letter-spacing:-.01em}
+.x{flex:none;width:44px;height:44px;margin-right:-8px;border:0;border-radius:12px;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.sh-scroll{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:2px 16px 14px}
+.sh-scroll>*{flex:none}
+.sh-foot{flex:none;padding:10px 16px 18px;background:var(--surface);border-top:1px solid var(--line)}
+.pk{margin-top:0}
+</style>
+</helmet>
+<div class="jq" data-theme="dark">
+<header class="top">
+<div class="who"><button type="button" class="menu" aria-label="Sections"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></button><span class="av"><img src="/avatars/judge-advisor.jpg" alt="" width="28" height="28"></span><span class="who-t"><b>Judge Advisor</b><span>Alex Morgan</span></span></div>
+<div class="top-r"><span class="live"><i aria-hidden="true"></i>Live</span><button type="button" class="signout">Sign out</button></div>
+</header>
+<div class="rule" aria-hidden="true"></div>
+<div class="sbar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M5.6 5.6l12.8 12.8"></path></svg><b>Conflicts</b><span class="rc">5 conflicts</span></div>
+<div class="under">
+<main class="body">
+<h1 class="sr">Conflicts</h1>
+<section class="stranded " role="alert" aria-labelledby="st-h"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.2v.01"></path></svg><div class="stx"><h2 id="st-h">One team has no panel left to judge them</h2><p>Every panel in its division is conflicted, so auto-assign skips it. Move a panel into the division, or withdraw a conflict.</p></div><p class="stt"><b>5150Z</b> (MS)</p></section>
+<section aria-labelledby="ls-h"><h2 class="sr" id="ls-h">Conflicts by judge</h2><div class="gl"><section class="grp" aria-labelledby="g-priya"><header class="gh jg"><h3 id="g-priya">Priya Nair</h3><span class="ptag">Panel 2 · MS</span><span class="blk"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M5.6 5.6l12.8 12.8"></path></svg>Blocks Panel 2</span><span class="gn">2 conflicts</span></header><ul><li class="cr"><div class="cm"><p class="c1"><b class="n">9882K</b><span class="tn">Torque Titans</span></p><p class="c2"><span class="nt">“coaches this team”</span></p></div><button type="button" class="ghost wd" aria-haspopup="dialog" aria-label="Withdraw conflict: 9882K, Priya Nair">Withdraw</button></li><li class="cr"><div class="cm"><p class="c1"><b class="n">7700B</b><span class="tn">Byte Me</span></p><p class="c2"><span class="pill p-warn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01"></path></svg>needs a panel</span></p></div><button type="button" class="ghost wd" aria-haspopup="dialog" aria-label="Withdraw conflict: 7700B, Priya Nair">Withdraw</button></li></ul></section><section class="grp" aria-labelledby="g-lee"><header class="gh jg"><h3 id="g-lee">Lee Chen</h3><span class="ptag">Panel 2 · MS</span><span class="blk"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M5.6 5.6l12.8 12.8"></path></svg>Blocks Panel 2</span><span class="gn">1 conflict</span></header><ul><li class="cr"><div class="cm"><p class="c1"><b class="n">5150Z</b><span class="tn">Sparky</span></p><p class="c2"><span class="pill p-warn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01"></path></svg>needs a panel</span></p></div><button type="button" class="ghost wd" aria-haspopup="dialog" aria-label="Withdraw conflict: 5150Z, Lee Chen">Withdraw</button></li></ul></section><section class="grp" aria-labelledby="g-tom"><header class="gh jg"><h3 id="g-tom">Tom Baker</h3><span class="ptag">Panel 3 · MS</span><span class="blk"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M5.6 5.6l12.8 12.8"></path></svg>Blocks Panel 3</span><span class="gn">1 conflict</span></header><ul><li class="cr"><div class="cm"><p class="c1"><b class="n">5150Z</b><span class="tn">Sparky</span></p><p class="c2"><span class="nt">“parent of a member”</span><span class="pill p-warn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01"></path></svg>needs a panel</span></p></div><button type="button" class="ghost wd" aria-haspopup="dialog" aria-label="Withdraw conflict: 5150Z, Tom Baker">Withdraw</button></li></ul></section><section class="grp" aria-labelledby="g-jordan"><header class="gh jg"><h3 id="g-jordan">Jordan Kim</h3><span class="blk">Not on a panel yet</span><span class="gn">1 conflict</span></header><ul><li class="cr"><div class="cm"><p class="c1"><b class="n">1234X</b><span class="tn">Circuit Breakers</span></p><p class="c2"><span class="nt">“mentor”</span></p></div><button type="button" class="ghost wd" aria-haspopup="dialog" aria-label="Withdraw conflict: 1234X, Jordan Kim">Withdraw</button></li></ul></section><section class="grp" aria-labelledby="g-old"><header class="gh old"><h3 id="g-old">Whole panel (older entries)</h3><span class="gn">1 entry</span><p class="sub2">Apply to every judge on the panel, not one judge.</p></header><ul><li class="cr"><div class="cm"><p class="c1"><b class="n">2468E</b><span class="tn">Rivet Riders</span></p><p class="c2"><span class="ptag">Panel 4 · ES</span></p></div><button type="button" class="ghost wd" aria-haspopup="dialog" aria-label="Withdraw conflict: 2468E, whole Panel 4">Withdraw</button></li></ul></section></div></section>
+</main>
+<div class="pinbar"><button type="button" class="prim">Record conflicts</button></div>
+</div>
+<div class="dim" aria-hidden="true"></div>
+<section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-t">
+<div class="grab" aria-hidden="true"></div>
+<div class="sh-top"><h2 id="sh-t">Record conflicts</h2><button type="button" class="x" aria-label="Close"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>
+<div class="sh-scroll">
+<div class="fl"><label class="lab" for="c-judge">Judge</label><div class="selw"><select id="c-judge" class="input sel"><optgroup label="Panel 1 · HS"><option value="dana">Dana Ruiz</option><option value="sam">Sam Okafor</option></optgroup><optgroup label="Panel 2 · MS"><option value="priya" selected="selected">Priya Nair</option><option value="lee">Lee Chen</option></optgroup><optgroup label="Panel 3 · MS"><option value="tom">Tom Baker</option><option value="ana">Ana Silva</option></optgroup><optgroup label="Panel 4 · ES"><option value="mei">Mei Tan</option><option value="raj">Raj Patel</option></optgroup><optgroup label="Not on a panel"><option value="jordan">Jordan Kim</option></optgroup><option value="new">+ New judge…</option></select><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></div><span class="blk pk"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M5.6 5.6l12.8 12.8"></path></svg>Blocks Panel 2</span></div>
+<div class="fl"><label class="lab" for="c-nums">Team numbers</label><textarea id="c-nums" class="area f" rows="2" placeholder="1234, 5678, 9882K" autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false" aria-describedby="c-nums-h"></textarea><p class="hint" id="c-nums-h">commas, spaces or one per line</p></div>
+<div class="fl"><label class="lab" for="c-note">Note <span class="op">(optional)</span></label><input id="c-note" class="input" type="text" maxlength="280" autocomplete="off" placeholder="e.g. coaches this team, parent of a member" aria-describedby="c-note-h"><p class="hint" id="c-note-h">Only when you enter one team</p></div>
+<section class="res" role="status" aria-labelledby="res-h">
+<h3 class="sr" id="res-h">Last recording</h3>
+<ul>
+<li class="r-ok"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg><span>Recorded for Priya Nair: <b>9882K</b>, <b>7700B</b></span></li>
+<li class="r-warn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01"></path></svg><span>Priya Nair is on Panel 2, so <b>7700B</b> comes off it and needs a panel</span></li>
+<li class="r-mute"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12h8"></path></svg><span>Already recorded: <b>5150Z</b></span></li>
+<li class="r-bad"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.2v.01"></path></svg><span>No team with that number — check these: <b>0420Z</b></span></li>
+</ul>
+</section>
+</div>
+<div class="sh-foot"><button type="button" class="prim">Record conflicts</button></div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":375,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
