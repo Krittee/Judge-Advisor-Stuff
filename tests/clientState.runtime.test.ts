@@ -66,7 +66,8 @@ test("a lone failure also asks the server instead of trusting the stale prop", (
 });
 
 test("ScoreSheet routes every save through settleSave and no longer rolls back to the prop", () => {
-  const src = code(read("src/components/ScoreSheet.tsx"));
+  // The save logic lives in the hook the sheet calls; the markup stays in the sheet.
+  const src = code(read("src/components/ScoreSheet.tsx") + read("src/components/useRubricScoring.ts"));
   assert.match(src, /settleSave\(\{/);
   assert.ok(!/setValues\(score\?\.values/.test(src.replace(/useEffect\([\s\S]*?\[score\]\);/, "")));
   assert.ok(!/setSaving\b/.test(src), "a single saving key is back");

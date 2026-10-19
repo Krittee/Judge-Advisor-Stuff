@@ -64,7 +64,11 @@ export function Elapsed({ since, prefix = "" }: { since: string | null; prefix?:
 }
 
 function formatElapsed(since: string): string {
-  const mins = Math.max(0, Math.round((Date.now() - new Date(since).getTime()) / 60000));
+  return formatMinutes(Math.max(0, Math.round((Date.now() - new Date(since).getTime()) / 60000)));
+}
+
+/** "just now", "6 min", "1h 5m": a wait already worked out in whole minutes. */
+export function formatMinutes(mins: number): string {
   if (mins < 1) return "just now";
   if (mins === 1) return "1 min";
   if (mins < 60) return `${mins} min`;

@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { call } from "./useAppState";
 import { Banner, Button, formatClock, inputClass } from "./ui";
 import { ScoreSheet } from "./ScoreSheet";
 import { BandChip } from "./BandChip";
-import { rubricsFor, totalFor } from "@/lib/rubrics";
-import type { Rubric } from "@/lib/rubrics";
-import type { Note, ScoreRow, Team } from "@/lib/types";
+import { useTeamRecord } from "./useTeamRecord";
+import type { Team } from "@/lib/types";
 
 /**
  * @param to where signing out lands. Defaults to the staff sign-in; the
@@ -54,33 +53,23 @@ export function NotesDrawer({
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<string>("notes");
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [rubrics, setRubrics] = useState<Rubric[]>([]);
-  const [scores, setScores] = useState<ScoreRow[]>([]);
-
-  const loadNotes = useMemo(
-    () => () =>
-      call<{ notes: Note[] }>(`/api/notes?teamId=${team.id}`, { method: "GET" })
-        .then(({ notes }) => setNotes(notes))
-        .catch((e) => setError((e as Error).message)),
-    [team.id],
-  );
-
-  useEffect(() => {
-    loadNotes();
-    call<{ scores: ScoreRow[]; rubrics: Rubric[] }>(`/api/scores?teamId=${team.id}`, {
-      method: "GET",
-    })
-      .then((d) => {
-        setRubrics(d.rubrics);
-        setScores(d.scores);
-      })
-      .catch((e) => setError((e as Error).message));
-  }, [loadNotes, team.id]);
+  // The notes, scores and totals are loaded and saved by the shared hook.
+  const {
+    notes,
+    draft,
+    setDraft,
+    busy,
+    error,
+    rubrics,
+    scores,
+    setScores,
+    saveNote: save,
+    total: grandTotal,
+    max: grandMax,
+    scored: anyScored,
+    excludedLabel,
+    categoryLabel,
+  } = useTeamRecord(team, requestId, categories);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -90,38 +79,10 @@ export function NotesDrawer({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  async function save() {
-    if (!draft.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await call("/api/notes", { body: { teamId: team.id, requestId, body: draft } });
-      setDraft("");
-      await loadNotes();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /* Total across the rubrics this team is judged on, which is what the
-     colour band reads. A category can put one out of scope: an Ungraded
-     notebook is unmarked, not zero, so it counts in neither the total nor
-     the denominator. */
-  const applicable = rubricsFor(rubrics, team.category, categories);
-  const {
-    total: grandTotal,
-    max: grandMax,
-    scored: anyScored,
-  } = totalFor(scores, applicable);
-
   const tabs: [string, string][] = [
     ["notes", "Notes"],
     ...rubrics.map((r) => [r.id, r.name] as [string, string]),
   ];
-
-  const excludedLabel = rubrics.find((r) => !applicable.some((a) => a.id === r.id))?.name;
 
   return (
     <div
@@ -143,7 +104,7 @@ export function NotesDrawer({
             {excludedLabel ? (
               <p className="mt-1 text-xs text-caution-quiet">
                 {excludedLabel} is not counted for this team —{" "}
-                {categories.find((c) => c.id === team.category)?.label ?? "excluded"}.
+                {categoryLabel ?? "excluded"}.
               </p>
             ) : null}
           </div>
