@@ -1,3 +1,4 @@
+import { formatClock, formatMinutes } from "@/components/ui";
 import { matchReference } from "@/lib/match";
 import { parseRuleList } from "@/lib/rules";
 import { NEXT_STATUS, type Status } from "@/lib/status";
@@ -76,6 +77,34 @@ export function leadFlag(
 }
 
 /**
+ * What the cancel confirm says, by what is being cancelled: a request in the
+ * queue, an interview under way, or a booked slot.
+ */
+export function cancelCopy(
+  team: Pick<Team, "number">,
+  request: Pick<RequestRow, "status" | "slot_start">,
+): { question: string; confirmLabel: string } {
+  const n = team.number;
+  if (request.status === "interviewing") {
+    return {
+      question: `Cancel ${n}'s interview? It ends without being completed.`,
+      confirmLabel: "Yes, cancel interview",
+    };
+  }
+  if (request.status === "scheduled") {
+    const when = request.slot_start ? ` ${formatClock(request.slot_start)}` : "";
+    return {
+      question: `Cancel ${n}'s${when} booking? The slot opens up.`,
+      confirmLabel: "Yes, cancel booking",
+    };
+  }
+  return {
+    question: `Cancel ${n}'s request? They leave the queue.`,
+    confirmLabel: "Yes, cancel request",
+  };
+}
+
+/**
  * Cancelling is not undoable from this screen, so it asks first and only
  * sends once the answer is yes. `ask` is the shared in-page confirm
  * (useConfirm), never window.confirm.
@@ -83,14 +112,36 @@ export function leadFlag(
 export async function cancelAfterAsking(
   ask: Ask,
   team: Pick<Team, "number">,
+  request: Pick<RequestRow, "status" | "slot_start">,
   cancel: () => Promise<void>,
 ): Promise<boolean> {
-  const yes = await ask(`Cancel ${team.number}'s request? They leave the queue.`, {
-    confirmLabel: "Yes, cancel request",
-    danger: true,
-  });
+  const { question, confirmLabel } = cancelCopy(team, request);
+  const yes = await ask(question, { confirmLabel, danger: true });
   if (yes) await cancel();
   return yes;
+}
+
+/** "Clear 1 Interview score for 9882K?" / "Clear all 3 Interview scores for 9882K?" */
+export function clearScoresQuestion(
+  rubric: Pick<Rubric, "name">,
+  team: Pick<Team, "number">,
+  count: number,
+): string {
+  const what = count === 1 ? "1" : `all ${count}`;
+  const scores = count === 1 ? "score" : "scores";
+  return `Clear ${what} ${rubricShort(rubric)} ${scores} for ${team.number}? The other rubric is untouched.`;
+}
+
+/**
+ * The interview timer's two runs of text: the big one and the small one
+ * beside it. "12 min" / "in · started 1:09 PM", and in the first minute
+ * "Just started" / "· 1:09 PM".
+ */
+export function interviewTimer(minutes: number, startedAt: string): { big: string; small: string } {
+  const at = formatClock(startedAt);
+  return minutes < 1
+    ? { big: "Just started", small: `· ${at}` }
+    : { big: formatMinutes(minutes), small: `in · started ${at}` };
 }
 
 /** A rubric's one-word name for a tight button: "Engineering Notebook" is "Notebook". */
@@ -110,6 +161,27 @@ export function sectionMax(rubric: Rubric, criteriaCount: number): number {
 export function nowIndex(slots: Pick<Slot, "start">[], now: number): number {
   const i = slots.findIndex((s) => Date.parse(s.start) > now);
   return i === -1 ? slots.length : i;
+}
+
+/** "Fri 16 Oct": a date in the device's own wording. */
+export function dayLabel(iso: string): string {
+  return new Date(iso).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+}
+
+/**
+ * The slots on today's calendar date, and when there are none, the date the
+ * panel's slots are on. A panel set up for an earlier day would otherwise
+ * show that whole day with the "now" rule stranded after it.
+ * ponytail: the device clock decides the day, as in parseRefereeSetup
+ * (src/lib/flagValidation.ts). Add an event timezone setting if that ever matters.
+ */
+export function slotsToday(
+  slots: Slot[],
+  now: number,
+): { today: Slot[]; otherDay: string | null } {
+  const day = new Date(now).toDateString();
+  const today = slots.filter((s) => new Date(s.start).toDateString() === day);
+  return { today, otherDay: !today.length && slots.length ? dayLabel(slots[0].start) : null };
 }
 
 /**

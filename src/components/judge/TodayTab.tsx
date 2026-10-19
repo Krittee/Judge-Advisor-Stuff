@@ -4,16 +4,16 @@ import { Fragment } from "react";
 import { formatClock } from "@/components/ui";
 import type { AppState, PublicPanel, RequestRow, Slot, Team } from "@/lib/types";
 import { Dot, StatusPill } from "./parts";
-import { clockParts, completedBeforeSlots, dueText, nowIndex, teamMeta } from "./logic";
+import { clockParts, completedBeforeSlots, dueText, nowIndex, slotsToday, teamMeta } from "./logic";
 
 /**
- * The Today tab: the panel's booking grid as a timeline, with a static rule
- * at the current time. The rule is where `now` falls when the page last drew;
- * it does not move between polls and nothing animates.
+ * The Today tab: the panel's booking grid for today as a timeline, with a
+ * static rule at the current time. The rule is where `now` falls when the
+ * page last drew; it does not move between polls and nothing animates.
  */
 export function TodayTab({
   panel,
-  slots,
+  slots: allSlots,
   teams,
   panelTeams,
   requests,
@@ -22,6 +22,7 @@ export function TodayTab({
   onOpen,
 }: {
   panel: Pick<PublicPanel, "name" | "slot_minutes">;
+  /** All the panel's slots; only today's are drawn. */
   slots: Slot[];
   /** Every team: a slot's holder can be looked up by id. */
   teams: Team[];
@@ -32,12 +33,17 @@ export function TodayTab({
   now: number;
   onOpen: (team: Team) => void;
 }) {
-  if (!slots.length) {
+  if (!allSlots.length) {
     return (
       <p className="jg-empty">
         This panel has no booking slots. The Judge Advisor sets them up from the admin console.
       </p>
     );
+  }
+
+  const { today: slots, otherDay } = slotsToday(allSlots, now);
+  if (otherDay) {
+    return <p className="jg-empty">{`No slots today. ${panel.name}'s slots are on ${otherDay}.`}</p>;
   }
 
   const booked = slots.filter((s) => s.takenBy).length;

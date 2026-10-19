@@ -2,25 +2,31 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  cancelCopy,
+  clearScoresQuestion,
   clockParts,
   completedBeforeSlots,
+  dayLabel,
   dueText,
   flagDetail,
+  interviewTimer,
   leadFlag,
   nowIndex,
   primaryAction,
   rubricShort,
   sectionMax,
+  slotsToday,
   teamMeta,
 } from "../src/components/judge/logic";
-import { formatMinutes } from "../src/components/ui";
+import { formatClock, formatMinutes } from "../src/components/ui";
 import { minutesSince, waitingAlert } from "../src/lib/judgeQueue";
 
 /* The judge console's decisions, run for real against
    src/components/judge/logic.ts. How they are drawn is in
    judgePage.runtime.test.tsx. */
 
-const NOW = Date.parse("2026-10-17T10:36:00Z");
+// Local time, so "today" is the same calendar day wherever the tests run.
+const NOW = new Date(2026, 9, 17, 12, 36).getTime();
 const at = (min) => new Date(NOW + min * 60_000).toISOString();
 
 /* ---- the primary action --------------------------------------------------- */
@@ -98,6 +104,61 @@ test("the time column splits the period off so the column stays narrow", () => {
   const { time, period } = clockParts("2026-10-17T10:40:00");
   assert.match(time, /^\d{1,2}:\d{2}$/);
   assert.ok(period === "" || /^[AP]M$/i.test(period), `a 12-hour locale gives AM/PM, a 24-hour one nothing (got "${period}")`);
+});
+
+test("Today keeps the slots on today's date, and names the other date when none are", () => {
+  const slot = (d, h, m = 0) => ({ start: new Date(2026, 9, d, h, m).toISOString() });
+  // Slots either side of midnight: the 16th is another day, however close.
+  const mixed = [slot(16, 23, 40), slot(17, 0, 0), slot(17, 23, 40), slot(18, 0, 0)];
+  const { today, otherDay } = slotsToday(mixed, NOW);
+  assert.deepEqual(today, [mixed[1], mixed[2]]);
+  assert.equal(otherDay, null);
+
+  const earlier = [slot(16, 9), slot(16, 9, 20)];
+  const none = slotsToday(earlier, NOW);
+  assert.deepEqual(none.today, []);
+  assert.equal(none.otherDay, dayLabel(earlier[0].start), "named by the first slot's date");
+  assert.match(none.otherDay, /16/);
+
+  assert.deepEqual(slotsToday([], NOW), { today: [], otherDay: null }, "no slots at all is not another day");
+});
+
+test("the interview timer reads naturally from the first second", () => {
+  const started = new Date(2026, 9, 17, 13, 9).toISOString();
+  const at = formatClock(started);
+  const text = (m) => Object.values(interviewTimer(m, started)).join(" ");
+  assert.equal(text(0), `Just started · ${at}`);
+  assert.equal(text(1), `1 min in · started ${at}`);
+  assert.equal(text(12), `12 min in · started ${at}`);
+  assert.equal(text(65), `1h 5m in · started ${at}`);
+  assert.equal(text(60), `1h in · started ${at}`);
+});
+
+/* ---- confirm copy --------------------------------------------------------- */
+
+test("the cancel confirm says what is being cancelled and what happens", () => {
+  const team = { number: "1136" };
+  const slot_start = new Date(2026, 9, 17, 14, 40).toISOString();
+  assert.equal(cancelCopy(team, { status: "requested", slot_start: null }).question, "Cancel 1136's request? They leave the queue.");
+  assert.equal(cancelCopy(team, { status: "acknowledged", slot_start: null }).question, "Cancel 1136's request? They leave the queue.");
+  assert.equal(cancelCopy(team, { status: "interviewing", slot_start: null }).question, "Cancel 1136's interview? It ends without being completed.");
+  const booked = cancelCopy(team, { status: "scheduled", slot_start });
+  assert.equal(booked.question, `Cancel 1136's ${formatClock(slot_start)} booking? The slot opens up.`);
+  assert.match(booked.question, /^Cancel 1136's \d{1,2}:40.* booking\?/);
+  assert.equal(cancelCopy(team, { status: "scheduled", slot_start: null }).question, "Cancel 1136's booking? The slot opens up.");
+  // The confirming button names the same thing.
+  assert.deepEqual(
+    ["requested", "interviewing", "scheduled"].map((status) => cancelCopy(team, { status, slot_start }).confirmLabel),
+    ["Yes, cancel request", "Yes, cancel interview", "Yes, cancel booking"],
+  );
+});
+
+test("the clear-scores confirm counts the scores, singular for one", () => {
+  const interview = { name: "Team Interview" };
+  const team = { number: "1136" };
+  assert.equal(clearScoresQuestion(interview, team, 1), "Clear 1 Interview score for 1136? The other rubric is untouched.");
+  assert.equal(clearScoresQuestion(interview, team, 3), "Clear all 3 Interview scores for 1136? The other rubric is untouched.");
+  assert.match(clearScoresQuestion({ name: "Engineering Notebook" }, team, 12), /^Clear all 12 Notebook scores for 1136\?/);
 });
 
 /* ---- flags ---------------------------------------------------------------- */

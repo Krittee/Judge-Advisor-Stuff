@@ -6,10 +6,11 @@ import { formatClock, formatMinutes } from "@/components/ui";
 import { groupQueue, minutesSince, pickHero, waitingAlert, type QueueCard } from "@/lib/judgeQueue";
 import { STATUS_META } from "@/lib/status";
 import type { AppState, FlagRow, RequestRow, Team } from "@/lib/types";
-import { ChevronDown, ChevronRight, Dot, MessageIcon, PlusIcon, StatusPill, BandPill } from "./parts";
+import { BandPill, ChevronDown, ChevronRight, CloseIcon, Dot, MessageIcon, PlusIcon, StatusPill } from "./parts";
 import {
   dueText,
   flagDetail,
+  interviewTimer,
   leadFlag,
   primaryAction,
   teamMeta,
@@ -219,11 +220,18 @@ function Hero({
         </div>
         {score.max > 0 ? (
           <div className="jg-hscore">
-            <b>
-              {score.total}
-              <small>/{score.max}</small>
-            </b>
-            <BandPill {...score} />
+            {/* A team with no marks is not on 0: say so, rather than print a number that reads as a real score. */}
+            {score.scored ? (
+              <>
+                <b>
+                  {score.total}
+                  <small>/{score.max}</small>
+                </b>
+                <BandPill {...score} />
+              </>
+            ) : (
+              <span className="jg-ns">not scored</span>
+            )}
           </div>
         ) : null}
       </div>
@@ -243,12 +251,7 @@ function Hero({
         </span>
       </div>
 
-      {interviewing ? (
-        <div className="jg-tmr">
-          <b>{formatMinutes(minutesSince(request.started_at ?? request.updated_at, now))}</b>
-          <span>in · started {formatClock(request.started_at ?? request.updated_at)}</span>
-        </div>
-      ) : null}
+      {interviewing ? <Timer since={request.started_at ?? request.updated_at} now={now} /> : null}
 
       {lead ? (
         <div className="jg-flagrow">
@@ -307,6 +310,16 @@ function Hero({
   );
 }
 
+function Timer({ since, now }: { since: string; now: number }) {
+  const { big, small } = interviewTimer(minutesSince(since, now), since);
+  return (
+    <div className="jg-tmr">
+      <b>{big}</b>
+      <span>{small}</span>
+    </div>
+  );
+}
+
 function Row({
   card,
   done = false,
@@ -314,6 +327,7 @@ function Row({
   now,
   busy,
   onAdvance,
+  onCancel,
   onSummon,
   onOpen,
 }: Context & { card: QueueCard; done?: boolean }) {
@@ -383,6 +397,19 @@ function Row({
           onClick={() => onAdvance(request)}
         >
           {working ? "Saving…" : action.label}
+        </button>
+      ) : null}
+
+      {/* A sibling of the row's tap target, so it never opens the sheet. Quiet, and the page asks first. */}
+      {request ? (
+        <button
+          type="button"
+          className="jg-cx"
+          aria-label={`Cancel ${team.number}'s request`}
+          disabled={working}
+          onClick={() => onCancel(team, request)}
+        >
+          <CloseIcon />
         </button>
       ) : null}
 

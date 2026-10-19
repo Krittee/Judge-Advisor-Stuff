@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
@@ -9,7 +10,7 @@ import { QueueTab, type QueueActions } from "../src/components/judge/QueueTab";
 import { ScoresTab } from "../src/components/judge/ScoresTab";
 import { RubricSegment, TeamSheet } from "../src/components/judge/TeamSheet";
 import { TodayTab } from "../src/components/judge/TodayTab";
-import { cancelAfterAsking } from "../src/components/judge/logic";
+import { cancelAfterAsking, dayLabel } from "../src/components/judge/logic";
 import { createConfirmer, type Pending } from "../src/components/ConfirmDialog";
 import { rankTeams } from "../src/lib/ranking";
 import { rubricById, rubrics } from "../src/lib/rubrics";
@@ -23,7 +24,8 @@ import type { FlagRow, RequestRow, ScoreRow, Slot, Team } from "../src/lib/types
    (judgePage.logic.test.mjs and the cancel test below) and the page's wiring
    is read from source at the foot. */
 
-const NOW = Date.parse("2026-10-17T10:36:00Z");
+// Local time, so "today" is the same calendar day wherever the tests run.
+const NOW = new Date(2026, 9, 17, 12, 36).getTime();
 const ago = (min: number) => new Date(NOW - min * 60_000).toISOString();
 const inMin = (min: number) => new Date(NOW + min * 60_000).toISOString();
 const noop = () => {};
@@ -194,6 +196,26 @@ test("score total and band, and the referee flag with one line of it, ride on th
   assert.doesNotMatch(bare, /jg-hscore|jg-flagrow/);
 });
 
+test("an unscored hero says not scored rather than printing 0/76", () => {
+  const unscored = hero(queue([card(titans, request(titans, "requested"), { total: 0, max: 76, scored: false })]));
+  assert.match(unscored, /<div class="jg-hscore"><span class="jg-ns">not scored<\/span><\/div>/);
+  assert.doesNotMatch(unscored, /0<small>|\/76|jg-band/);
+  // Scored, even on a real zero, it is a number again.
+  const zero = hero(queue([card(titans, request(titans, "requested"), { total: 0, max: 76, scored: true })]));
+  assert.match(zero, /<b>0<small>\/76<\/small><\/b>/);
+  assert.doesNotMatch(zero, /not scored/);
+});
+
+test("the interview timer reads Just started, then N min in, then 1h 5m in", () => {
+  const timer = (startedMin: number) =>
+    hero(queue([card(gremlins, request(gremlins, "interviewing", { started_at: ago(startedMin) }))])).match(/<div class="jg-tmr">.*?<\/div>/)?.[0] ?? "";
+  assert.match(timer(0), /<b>Just started<\/b><span>· [^<]+<\/span>/);
+  assert.match(timer(1), /<b>1 min<\/b><span>in · started [^<]+<\/span>/);
+  assert.match(timer(12), /<b>12 min<\/b><span>in · started /);
+  assert.match(timer(65), /<b>1h 5m<\/b><span>in · started /);
+  assert.doesNotMatch(timer(0), /just now|in ·/);
+});
+
 /* ---- the waiting alert row ------------------------------------------------ */
 
 test("with a team being interviewed and others waiting, an alert row says who and for how long", () => {
@@ -260,6 +282,89 @@ test("a booked row has its time chip, and says in N min only inside ten minutes"
   assert.match(rows[1], /4410C/);
   assert.doesNotMatch(rows[1], /in 24 min|<b>in/);
   assert.match(rows[1], /Ungraded · Pit 9/);
+});
+
+test("every row with a live or booked request has a Cancel outside its tap target; the others have none", () => {
+  const markup = queue(
+    [
+      card(gremlins, request(gremlins, "interviewing", { started_at: ago(7) })), // hero
+      card(byteMe, request(byteMe, "requested")),
+      card(titans, request(titans, "acknowledged")),
+      card(rangers, request(rangers, "scheduled", { kind: "slot", slot_start: inMin(30) })),
+      card(quantum, null),
+      card(sparky, null),
+    ],
+    { completed: [sparky.id] },
+  );
+  const rows = markup.match(/<div class="jg-qrow[^"]*">[\s\S]*?<\/div>(?=<\/li>)/g) ?? [];
+  assert.equal(rows.length, 5);
+  const cancelled = rows.filter((r) => r.includes('class="jg-cx"')).map((r) => r.match(/<b>(\w+)<\/b>/)?.[1]);
+  assert.deepEqual(cancelled, ["7700B", "9882K", "4410C"], "Waiting, With us and Booked; not Not in queue or Done");
+  const row = rows.find((r) => r.includes("7700B"))!;
+  assert.match(row, /<button type="button" class="jg-cx" aria-label="Cancel 7700B&#x27;s request">/);
+  // Beside the tap target that opens the sheet, never inside it, and after the primary action.
+  assert.ok(row.indexOf("</button>") < row.indexOf("jg-cx"), "after the row's own button closes");
+  assert.ok(row.indexOf("jg-go") < row.indexOf("jg-cx"));
+  assert.match(queue([card(byteMe, request(byteMe, "requested")), card(titans, request(titans, "requested", { requested_at: ago(9) }))], { busy: "r-7700B" }), /class="jg-cx" aria-label="[^"]*" disabled=""/);
+  // 44px, and the primary action keeps its size: it is the name that gives way.
+  const css = read("src/app/globals.css");
+  assert.match(css, /\.jg-cx \{[^}]*width: 44px; height: 44px;/);
+  assert.match(css, /\.jg-go\.jg-sm \{ width: auto; flex: none; height: 44px;/);
+});
+
+/** Walks a function-component tree (QueueTab and its rows hold no hooks) to the button with this label. */
+function findByLabel(node: ReactNode, label: string): ReactElement<{ onClick?: () => void }> | null {
+  if (Array.isArray(node)) {
+    for (const n of node) {
+      const found = findByLabel(n, label);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!isValidElement(node)) return null;
+  const el = node as ReactElement<{ "aria-label"?: string; children?: ReactNode; onClick?: () => void }>;
+  if (typeof el.type === "function") return findByLabel((el.type as (p: unknown) => ReactNode)(el.props), label);
+  return el.props["aria-label"] === label ? el : findByLabel(el.props.children, label);
+}
+
+test("a list row's Cancel asks first, sends nothing until confirmed, and never opens the sheet", async () => {
+  const sent: string[] = [];
+  const opened: string[] = [];
+  const shown: (Pending | null)[] = [];
+  const { ask, settle } = createConfirmer((p) => shown.push(p));
+  const waiting = request(byteMe, "requested");
+  const tree = (
+    <QueueTab
+      cards={[card(titans, request(titans, "requested", { requested_at: ago(9) })), card(byteMe, waiting)]}
+      completed={new Set()}
+      categories={categories}
+      languages={languages}
+      flags={[]}
+      flagKinds={flagKinds}
+      now={NOW}
+      busy={null}
+      {...handlers}
+      onCancel={(t, r) => void cancelAfterAsking(ask, t, r, async () => void sent.push(r.id))}
+      onOpen={(t) => opened.push(t.number)}
+    />
+  );
+  const cancel = findByLabel(tree, "Cancel 7700B's request");
+  assert.ok(cancel, "the row has a Cancel");
+
+  cancel.props.onClick!();
+  assert.equal(shown.length, 1, "a confirm dialog opened");
+  assert.match(shown[0]!.question, /Cancel 7700B's request\?/);
+  assert.equal(shown[0]!.danger, true);
+  assert.deepEqual(sent, [], "nothing sent while the question is open");
+  settle(false);
+  await Promise.resolve();
+  assert.deepEqual(sent, [], "declined: still nothing");
+
+  cancel.props.onClick!();
+  settle(true);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(sent, ["r-7700B"], "confirmed: sent once");
+  assert.deepEqual(opened, [], "Cancel is not the row's open button");
 });
 
 test("a panel with no teams gets the notice, restyled", () => {
@@ -448,6 +553,43 @@ test("with every slot already started the now rule closes the timeline; with non
   );
 });
 
+test("Today shows only today's slots; the count and the Before line follow", () => {
+  const slot = (iso: string, by?: Team): Slot => ({
+    panelId: "p2",
+    start: iso,
+    end: iso,
+    takenBy: by ? { teamId: by.id, teamNumber: by.number, status: "scheduled" } : null,
+    blocked: false,
+  });
+  const yesterday = (h: number) => new Date(2026, 9, 16, h).toISOString();
+  const today = (h: number) => new Date(2026, 9, 17, h).toISOString();
+  const props = { panel: { name: "Panel 2", slot_minutes: 20 }, teams: [gremlins, rangers, titans], panelTeams: [gremlins, rangers, titans], categories, now: NOW, onOpen: noop };
+  const markup = renderToStaticMarkup(
+    <TodayTab
+      {...props}
+      slots={[slot(yesterday(9), gremlins), slot(yesterday(10)), slot(today(13), rangers), slot(today(14)), slot(today(15))]}
+      // Titans finished at 8:00 today, before today's first slot; Gremlins' slot was yesterday.
+      requests={[request(titans, "completed", { finished_at: today(8) })]}
+    />,
+  );
+  assert.match(markup, /<span>1 of 3 booked<\/span>/, "yesterday's slots are not counted");
+  assert.equal(markup.match(/class="jg-sl/g)?.length, 3);
+  assert.doesNotMatch(markup, /2011A|Gear Gremlins/, "yesterday's booking is not drawn");
+  assert.match(markup, /Before [^<]* · 9882K complete/);
+  assert.equal(markup.slice(0, markup.indexOf('class="jg-now"')).match(/class="jg-sl/g)?.length ?? 0, 0, "the rule leads: all of today's slots are still to come");
+});
+
+test("with no slots today, Today names the date the panel's slots are on", () => {
+  const start = new Date(2026, 9, 16, 9).toISOString();
+  const later = new Date(2026, 9, 16, 9, 20).toISOString();
+  const slots: Slot[] = [start, later].map((iso) => ({ panelId: "p2", start: iso, end: iso, takenBy: null, blocked: false }));
+  const markup = renderToStaticMarkup(
+    <TodayTab panel={{ name: "Panel A", slot_minutes: 20 }} slots={slots} teams={[]} panelTeams={[]} requests={[]} categories={categories} now={NOW} onOpen={noop} />,
+  );
+  assert.ok(markup.includes(`No slots today. Panel A&#x27;s slots are on ${dayLabel(start)}.`), markup);
+  assert.doesNotMatch(markup, /jg-now|jg-sl|booked/, "no timeline for another day");
+});
+
 /* ---- the team sheet ------------------------------------------------------- */
 
 const sheetProps = { request: null, categories, languages, flags: [], flagKinds, ask: async () => true, onClose: noop };
@@ -528,7 +670,7 @@ test("Cancel request opens a confirm, and nothing is sent until it is confirmed"
   const shown: (Pending | null)[] = [];
   const { ask, settle } = createConfirmer((p) => shown.push(p));
 
-  const answered = cancelAfterAsking(ask, titans, async () => {
+  const answered = cancelAfterAsking(ask, titans, request(titans, "requested"), async () => {
     sent.push("cancel");
   });
   assert.equal(shown.length, 1, "a confirm dialog opened");
@@ -544,7 +686,7 @@ test("Cancel request opens a confirm, and nothing is sent until it is confirmed"
 test("declining the confirm sends nothing", async () => {
   const sent: string[] = [];
   const { ask, settle } = createConfirmer(noop);
-  const answered = cancelAfterAsking(ask, titans, async () => {
+  const answered = cancelAfterAsking(ask, titans, request(titans, "requested"), async () => {
     sent.push("cancel");
   });
   settle(false); // Cancel, Escape and the backdrop all answer no
@@ -562,12 +704,18 @@ function read(path: string) {
 test("the page cancels only through the confirm, and advances through the guarded advance()", () => {
   assert.ok(page.includes('import { useConfirm } from "@/components/ConfirmDialog"'));
   assert.ok(page.includes("const { ask, dialog } = useConfirm();"));
-  assert.ok(page.includes('cancelAfterAsking(ask, team, () => advance(request, "cancel"))'));
+  assert.ok(page.includes('cancelAfterAsking(ask, team, request, () => advance(request, "cancel"))'));
   assert.equal(page.match(/advance\(request, "cancel"\)/g)?.length, 1, "no cancel that skips the question");
   assert.ok(page.includes("{dialog}"), "the confirm is rendered");
   const queue = read("src/components/judge/QueueTab.tsx");
   assert.match(queue, /onClick=\{\(\) => onCancel\(team, request\)\}/);
   assert.ok(!queue.includes('"cancel"'), "the tab never sends a cancel itself");
+});
+
+test("the clear-scores confirm is worded by its helper", () => {
+  const src = read("src/components/judge/TeamSheet.tsx");
+  assert.ok(src.includes("ask(clearScoresQuestion(rubric, team, answered)"));
+  assert.ok(!src.includes("Clear all ${answered}"));
 });
 
 test("the writes keep their guards: a synchronous writing ref, from: request.status, Saving… and Adding…", () => {

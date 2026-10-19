@@ -7,7 +7,7 @@ import { useTeamRecord } from "@/components/useTeamRecord";
 import type { Rubric } from "@/lib/rubrics";
 import type { AppState, FlagRow, RequestRow, ScoreRow, Team } from "@/lib/types";
 import { BandPill, CheckIcon, CloseIcon, WarnIcon } from "./parts";
-import { flagDetail, rubricShort, sectionMax, type Ask } from "./logic";
+import { clearScoresQuestion, flagDetail, rubricShort, sectionMax, type Ask } from "./logic";
 
 /**
  * The team sheet: everything a judge records about one team, in a bottom
@@ -274,10 +274,10 @@ export function RubricSegment({
   const saving = pending.size > 0;
 
   async function clear() {
-    const ok = await ask(
-      `Clear all ${answered} ${rubricShort(rubric)} scores for ${team.number}? The other rubric is untouched.`,
-      { confirmLabel: "Clear scores", danger: true },
-    );
+    const ok = await ask(clearScoresQuestion(rubric, team, answered), {
+      confirmLabel: "Clear scores",
+      danger: true,
+    });
     if (ok) await clearAll();
   }
 

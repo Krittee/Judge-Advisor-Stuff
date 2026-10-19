@@ -195,7 +195,9 @@ export default function JudgePage() {
           now={now}
           busy={busy}
           onAdvance={(request) => advance(request)}
-          onCancel={(team, request) => cancelAfterAsking(ask, team, () => advance(request, "cancel"))}
+          onCancel={(team, request) =>
+            cancelAfterAsking(ask, team, request, () => advance(request, "cancel"))
+          }
           onSummon={summon}
           onOpen={open}
         />
