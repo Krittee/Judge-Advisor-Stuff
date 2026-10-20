@@ -20,6 +20,7 @@ import {
   columnKey,
   coverTags,
   defaultColumnKey,
+  divisionTag,
   gapNote,
   loadLine,
   sinceFor,
@@ -444,7 +445,11 @@ function Card({
                       onClick={() => onMove(request, p.id)}
                     >
                       <b>{p.name}</b>
-                      <span className="jg-ptag">{p.division}</span>
+                      {/* The short tag keeps "Panel B" on one line; the full name is still read out. */}
+                      <span className="jg-ptag">
+                        <span aria-hidden="true">{divisionTag(p.division)}</span>
+                        <span className="sr-only">{p.division}</span>
+                      </span>
                       <span className="ja-tags">
                         {coverTags(p, languages).map((t) => (
                           <span key={t.id} className="jg-ptag" lang={t.id}>

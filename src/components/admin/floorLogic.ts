@@ -142,6 +142,18 @@ export function chipLabel(name: string): string {
   return m ? `P${m[1]}` : name;
 }
 
+/**
+ * A division as a tag: "Middle School" is "MS", "Elementary School" "ES",
+ * "Division 1" "D1". A one-word division ("Blended") has no shorter form and
+ * stays whole. Where room is tight, as in the "Move to panel…" rows, so the
+ * panel's name keeps its line.
+ */
+export function divisionTag(division: string): string {
+  const words = division.trim().split(/\s+/).filter(Boolean);
+  if (words.length < 2) return division.trim();
+  return words.map((w) => (/^\d+$/.test(w) ? w : [...w][0].toUpperCase())).join("");
+}
+
 export const teamCount = (n: number): string => `${n} ${n === 1 ? "team" : "teams"}`;
 
 /** What a panel can interview in, as tags: "EN only" for one language, else one tag each. */

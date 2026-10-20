@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
-import { AdminFrame, SECTION_GROUPS } from "../src/components/admin/AdminFrame";
+import { AdminFrame, OTHER_CONSOLES, SECTION_GROUPS, railCounts } from "../src/components/admin/AdminFrame";
 import { FloorBoard, FloorTab, type FloorActions, type FloorMenu } from "../src/components/admin/FloorTab";
 import { buildColumns, defaultColumnKey } from "../src/components/admin/floorLogic";
 import { cancelAfterAsking } from "../src/components/judge/logic";
@@ -179,13 +179,15 @@ const sheet = (markup: string) => markup.match(/<dialog class="ja-sheet"[\s\S]*?
 test("the rail is a labelled nav with LIVE, SETUP and RESULTS in order, and the eight sections under them", () => {
   const r = rail(frame());
   assert.match(r, /^<nav class="ja-rail" aria-label="Judge Advisor sections">/);
-  assert.deepEqual([...r.matchAll(/<h2 class="ja-rl">(.*?)<\/h2>/g)].map((m) => m[1]), ["Live", "Setup", "Results"]);
-  const groups = r.split('<h2 class="ja-rl">').slice(1).map((g) => [...g.matchAll(/<span>(\w+)<\/span>/g)].map((m) => m[1]));
+  assert.deepEqual([...r.matchAll(/<h2 class="ja-rl">(.*?)<\/h2>/g)].map((m) => m[1]), ["Live", "Setup", "Results", "Other consoles"]);
+  const groups = r.split('<h2 class="ja-rl">').slice(1, 4).map((g) => [...g.matchAll(/<span>(\w+)<\/span>/g)].map((m) => m[1]));
   assert.deepEqual(groups, [["Floor", "Conflicts", "Referee"], ["Teams", "Panels", "Import"], ["Scores", "Activity"]]);
   assert.deepEqual(SECTION_GROUPS.flatMap((g) => g.items.map((i) => i.id)), ["floor", "conflicts", "flags", "teams", "panels", "import", "scores", "log"]);
   // Real buttons, not links: the section is page state.
   assert.equal(r.match(/<button type="button" class="ja-ri"/g)?.length, 8);
-  assert.doesNotMatch(r, /<a /);
+  // The only links are the other consoles, in a group of their own after the sections.
+  const sections = r.split('<h2 class="ja-rl">Other consoles</h2>')[0];
+  assert.doesNotMatch(sections, /<a /);
 });
 
 test("the current section is marked aria-current in the rail, and only that one", () => {
@@ -237,12 +239,87 @@ test("the Sections sheet is a native dialog with a grab handle, title, Close, th
   assert.match(s, /<div class="jg-grab" aria-hidden="true"><\/div>/);
   assert.match(s, /<h2 id="[^"]+">Sections<\/h2><button type="button" class="ja-x" aria-label="Close">/);
   assert.match(s, /<nav class="ja-sh-list" aria-label="Judge Advisor sections">/);
-  assert.deepEqual([...s.matchAll(/<h3 class="ja-rl">(.*?)<\/h3>/g)].map((m) => m[1]), ["Live", "Setup", "Results"]);
+  assert.deepEqual([...s.matchAll(/<h3 class="ja-rl">(.*?)<\/h3>/g)].map((m) => m[1]), ["Live", "Setup", "Results", "Other consoles"]);
   assert.equal(s.match(/<button type="button" class="ja-ri"/g)?.length, 8);
   assert.match(s, /<button type="button" class="ja-ri" aria-current="page">[\s\S]*<span>Floor<\/span><b class="ja-rb">3<\/b>/, "current is marked as in the rail");
   assert.match(s, /<div class="ja-sh-foot"><p>Alex Morgan · Judge Advisor<\/p><button[^>]*>Sign out<\/button><\/div>/);
   // Closed until the menu button opens it: showModal() is what makes it open.
   assert.doesNotMatch(s, /^<dialog[^>]* open/);
+});
+
+/* ---- Other consoles ------------------------------------------------------- */
+
+const SECTION_IDS = SECTION_GROUPS.flatMap((g) => g.items.map((i) => i.id));
+const otherConsoles = (markup: string) => markup.match(/<div class="ja-oc">[\s\S]*?<\/ul><\/div>/)?.[0] ?? "";
+
+test("Other consoles: four quiet links at the foot of the rail, each opening in a new tab and saying so in its name", () => {
+  const group = otherConsoles(rail(frame()));
+  assert.match(group, /^<div class="ja-oc"><h2 class="ja-rl">Other consoles<\/h2>/);
+  const links = [...group.matchAll(/<a class="ja-ol" href="([^"]+)" target="_blank" rel="noopener">([\s\S]*?)<\/a>/g)];
+  assert.deepEqual(
+    links.map((m) => [m[1], text(m[2])]),
+    [
+      ["/queue", "Queue desk↗ (opens in a new tab)"],
+      ["/judge", "Judge↗ (opens in a new tab)"],
+      ["/referee", "Referee↗ (opens in a new tab)"],
+      ["/board", "Big-screen board↗ (opens in a new tab)"],
+    ],
+  );
+  // The arrow is decoration; the words are what a screen reader gets.
+  assert.equal(group.match(/<span aria-hidden="true">↗<\/span><span class="sr-only"> \(opens in a new tab\)<\/span>/g)?.length, 4);
+  assert.deepEqual(OTHER_CONSOLES.map((c) => c.href), ["/queue", "/judge", "/referee", "/board"]);
+  // After the sections, not among them.
+  assert.ok(rail(frame()).indexOf("Other consoles") > rail(frame()).indexOf("<span>Activity</span>"));
+});
+
+test("Other consoles are not counted and are never current, whichever section is open", () => {
+  for (const tab of SECTION_IDS) {
+    const markup = frame({ tab, counts: { floor: 3, conflicts: 2, flags: 14, teams: 48, panels: 4 } });
+    for (const where of [otherConsoles(rail(markup)), otherConsoles(sheet(markup))]) {
+      assert.ok(where, "the group is there");
+      assert.doesNotMatch(where, /aria-current|ja-rc|ja-rb/, `${tab}: a quiet link, no count, never current`);
+    }
+    // The sections' own marks are unchanged: one current, in the rail and in the sheet.
+    assert.equal(rail(markup).match(/aria-current="page"/g)?.length, 1);
+    assert.equal(sheet(markup).match(/aria-current="page"/g)?.length, 1);
+  }
+});
+
+test("the phone Sections sheet shows the same group under its list, above the sign-out line", () => {
+  const s = sheet(frame());
+  const group = otherConsoles(s);
+  assert.match(group, /^<div class="ja-oc"><h3 class="ja-rl">Other consoles<\/h3>/);
+  assert.equal(group.match(/<a class="ja-ol" href="\/(?:queue|judge|referee|board)" target="_blank" rel="noopener">/g)?.length, 4);
+  assert.equal(group.match(/ \(opens in a new tab\)/g)?.length, 4);
+  assert.ok(s.indexOf("<span>Activity</span>") < s.indexOf("Other consoles") && s.indexOf("Other consoles") < s.indexOf('class="ja-sh-foot"'));
+  assert.ok(s.indexOf('class="ja-sh-foot"') > s.indexOf("</nav>"), "the group sits inside the list's nav, before it closes");
+  assert.ok(s.indexOf("Other consoles") < s.indexOf("</nav>"));
+});
+
+/* ---- the rail's counts ---------------------------------------------------- */
+
+test("the rail counts: Floor is the teams requesting, Conflicts is the judges' conflicts only", () => {
+  const conflict = (id: string, over: Partial<ConflictRow>): ConflictRow => ({
+    id, panel_id: null, judge_id: null, team_id: titans.id, judge_name: null, note: null, declared_by: "admin:Alex", created_at: ago(60), ...over,
+  });
+  const state = {
+    requests,
+    teams,
+    panels,
+    flags: [warning],
+    conflicts: [conflict("c1", { judge_id: "j1" }), conflict("c2", { judge_id: "j1", team_id: byteMe.id }), conflict("c3", { panel_id: "p4" })],
+  };
+  assert.deepEqual(railCounts(state), { floor: 3, conflicts: 2, flags: 1, teams: 8, panels: 4 });
+  assert.equal(railCounts({ ...state, conflicts: [conflict("c3", { panel_id: "p4" })] }).conflicts, 0, "older whole-panel entries are not counted");
+  // Zero draws nothing.
+  assert.doesNotMatch(rail(frame({ counts: railCounts({ ...state, conflicts: [conflict("c3", { panel_id: "p4" })] }) })), /<span>Conflicts<\/span><span class="ja-rc"/);
+});
+
+test("on a phone the Conflicts bar reads '5 conflicts', and '1 conflict'", () => {
+  const bar = (n: number) => frame({ tab: "conflicts", counts: { conflicts: n } }).match(/<div class="ja-sbar">[\s\S]*?<\/div>/)?.[0] ?? "";
+  assert.match(bar(5), /<b>Conflicts<\/b><span class="ja-rc">5 conflicts<\/span>/);
+  assert.match(bar(1), /<span class="ja-rc">1 conflict<\/span>/);
+  assert.doesNotMatch(bar(0), /ja-rc/);
 });
 
 /* ---- the Floor: top strip and columns ------------------------------------ */
@@ -393,7 +470,11 @@ test("Move to panel… lists only panels in the team's division without a confli
   const pop = move({});
   assert.match(pop, /aria-label="Move 5150Z to another panel"/);
   assert.match(pop, /<p class="ja-pop-h">Move to panel…<\/p>/);
-  assert.deepEqual([...pop.matchAll(/<button type="button" class="ja-opt"[^>]*><b>(.*?)<\/b><span class="jg-ptag">(.*?)<\/span>/g)].map((m) => [m[1], m[2]]), [["Panel 2", "Middle School"]]);
+  // The short tag keeps "Panel 2" on one line; the full division is still in the markup for a screen reader.
+  assert.deepEqual(
+    [...pop.matchAll(/<button type="button" class="ja-opt"[^>]*><b>(.*?)<\/b>(?:<!-- -->)?<span class="jg-ptag"><span aria-hidden="true">(.*?)<\/span><span class="sr-only">(.*?)<\/span><\/span>/g)].map((m) => [m[1], m[2], m[3]]),
+    [["Panel 2", "MS", "Middle School"]],
+  );
   assert.match(pop, /<span class="ja-tags"><span class="jg-ptag" lang="en">EN<\/span><span class="jg-ptag" lang="th">TH<\/span><\/span>/);
   assert.match(pop, /<p class="ja-pop-c">Only Middle School panels without a conflict<\/p>/);
   assert.doesNotMatch(pop, /Panel 1|Panel 3|Panel 4/, "High School and Elementary panels are out, and so is where it already is");
@@ -588,6 +669,9 @@ test("the admin styles are page-scoped after the judge block, with light-theme t
   assert.match(block, /--ja-accent-t: color-mix\(in oklch, var\(--accent\) 14%/);
   assert.match(block, /\.ja-rail \{\s*display: none;/);
   assert.match(block, /@media \(min-width: 1024px\) \{[\s\S]*\.ja-rail \{ display: flex; \}/, "the rail appears from 1024px");
+  assert.match(block, /\.ja-opt b \{[^}]*white-space: nowrap/, "a panel's name in the Move list stays on one line");
+  assert.match(block, /\.ja-rail \.ja-oc \{ margin-top: auto/, "Other consoles sit at the foot of the rail");
+  assert.match(block, /\.ja-sheet \.ja-ol \{ height: 48px/, "and are 48px rows in the phone sheet");
   assert.doesNotMatch(block, /@keyframes|animation|transition/, "no playful motion");
 });
 

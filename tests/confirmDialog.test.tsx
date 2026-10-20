@@ -136,15 +136,14 @@ test("the referee page awaits the shared ask() for the setup change before savin
   assert.equal(src.match(/\{dialog\}/g)?.length, 2, "rendered on the setup screen and the report");
 });
 
-test("each of the admin console's six confirmations goes through ask()", () => {
+test("each of the admin console's confirmations goes through ask()", () => {
   const src = read("src/app/admin/page.tsx");
-  assert.equal(src.match(/await ask\(/g)?.length, 6);
-  assert.equal(src.match(/useConfirm\(\)/g)?.length, 5, "one hook per component that asks");
-  assert.equal(src.match(/\{dialog\}/g)?.length, 5, "each renders its dialog");
+  assert.equal(src.match(/await ask\(/g)?.length, 5);
+  assert.equal(src.match(/useConfirm\(\)/g)?.length, 4, "one hook per component that asks");
+  assert.equal(src.match(/\{dialog\}/g)?.length, 4, "each renders its dialog");
   const sites: [string, RegExp][] = [
     ["remove team", /await ask\(`Remove team \$\{team\.number\} and all its requests\?`,\s*\{\s*confirmLabel: "Remove team",\s*danger: true/],
     ["remove flag", /await ask\("Remove this flag\? The judges will stop seeing it\.",\s*\{\s*confirmLabel: "Remove flag",\s*danger: true/],
-    ["withdraw conflict", /await ask\("Withdraw this conflict\? The panel will be able to judge the team again\.",\s*\{\s*confirmLabel: "Withdraw",\s*danger: true/],
     ["reset", /await ask\(confirmText, \{ confirmLabel, danger: true \}\)/],
     ["move division", /await ask\(\s*`Move \$\{panel\.name\} to \$\{division\}\?[\s\S]*?confirmLabel: "Move division", danger: true/],
     ["delete panel", /await ask\(`Delete \$\{panel\.name\}\? Its teams become unassigned\.`,\s*\{\s*confirmLabel: "Delete panel",\s*danger: true/],
@@ -153,6 +152,12 @@ test("each of the admin console's six confirmations goes through ask()", () => {
   // The select snaps back while the question is open, so the choice is read first.
   assert.ok(src.indexOf("const division = e.target.value;") < src.indexOf("await ask(\n"));
   assert.ok(!src.includes("onPatch(panel.id, { division: e.target.value })"));
+
+  // Two more ask from elsewhere: the Panels judges field (inside the page) and Withdraw (in the Conflicts tab).
+  assert.match(src, /saveJudgesAfterAsking\(\s*ask,/, "the judges field asks before it takes teams off a panel");
+  const conflicts = read("src/components/admin/ConflictsTab.tsx");
+  assert.ok(conflicts.includes("withdrawAfterAsking(ask, question,"), "withdraw a conflict asks first");
+  assert.match(read("src/components/admin/conflictsLogic.ts"), /await ask\(question, \{ confirmLabel: "Withdraw", danger: true \}\)/);
 });
 
 test("the match sheet no longer carries the program line or its Change link", () => {

@@ -1751,7 +1751,7 @@ body:has(.admin) > .theme-toggle:hover {
   border: 1.5px solid var(--jg-field-line); border-radius: 10px; background: var(--jg-field); color: var(--ink); text-align: left;
 }
 .ja-opt:hover:not(:disabled), .ja-opt:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--jg-ring); }
-.ja-opt b { font-weight: 600; font-size: 15px; }
+.ja-opt b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 15px; }
 .ja-opt:disabled { opacity: 0.6; }
 
 /* From 1024px: the rail, and every panel as a column */
@@ -1794,3 +1794,134 @@ body:has(.admin) > .theme-toggle:hover {
 
 /* The Floor's list tags sit where the column header puts them; inside the popover's option they sit at its right. */
 .ja-opt .ja-tags { order: 0; margin: 0 0 0 auto; }
+
+/* Other consoles: quiet links at the foot of the rail and of the Sections sheet. Not sections: no count, never current. */
+.ja-rail .ja-oc { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); }
+.ja-ol {
+  display: flex; width: calc(100% - 12px); height: 36px; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 0 12px 0 20px; border-radius: 0 10px 10px 0; color: var(--ink-subtle); font-size: 14px; text-decoration: none;
+}
+.ja-ol:hover { background: var(--surface-2); color: var(--ink); }
+.ja-sheet .ja-ol { height: 48px; padding: 0 14px 0 20px; border-radius: 0 12px 12px 0; font-size: 15px; }
+
+/* Conflicts (design/admin-redesign/reference-conflicts-*.dc.html): the list by judge, and the form to record more */
+.ja-cf-main h2, .ja-fc h2, .ja-gh h3, .ja-c1 b, .ja-str-t b, .ja-prim { font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; }
+.ja-pad:has(> .ja-cf) { display: flex; min-height: 100%; flex-direction: column; padding-bottom: 0; }
+.ja-cf { display: flex; flex: 1; flex-direction: column; gap: 12px; }
+.ja-cf-main { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 12px; }
+.ja-aside { display: none; }
+.ja-pin { position: sticky; bottom: 0; z-index: 2; margin: 0 -16px; padding: 10px 16px max(14px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
+
+.ja-str {
+  display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 6px 12px; align-items: start; padding: 12px 14px;
+  border: 1px solid color-mix(in oklch, var(--danger) 45%, transparent); border-radius: 14px; background: color-mix(in oklch, var(--danger) 14%, transparent);
+}
+.ja-str > svg { margin-top: 1px; color: var(--danger-quiet); }
+.ja-str > div { display: flex; flex-direction: column; gap: 3px; }
+.ja-str h2 { color: var(--danger-quiet); font-weight: 600; font-size: 16px; line-height: 1.3; text-wrap: balance; }
+.ja-str p { margin: 0; font-size: 13.5px; line-height: 1.45; }
+.ja-str-t { grid-column: 2; }
+.ja-str-t b { font-weight: 700; font-size: 16px; }
+
+.ja-gl { display: flex; flex-direction: column; gap: 16px; }
+.ja-grp { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.ja-gh { display: flex; min-height: 48px; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+.ja-gh h3 { font-weight: 700; font-size: 18px; line-height: 1.2; }
+.ja-gn { margin-left: auto; color: var(--ink-subtle); font-size: 13px; }
+.ja-blk { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-subtle); font-size: 13px; line-height: 1.4; }
+.ja-blk svg { flex: none; }
+.ja-gh .ja-blk { flex-basis: 100%; }
+.ja-old { row-gap: 2px; }
+.ja-sub { flex-basis: 100%; margin: 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.4; }
+
+.ja-cr { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 14px; }
+.ja-cr + .ja-cr { border-top: 1px solid var(--line); }
+.ja-cm { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.ja-c1 { display: flex; min-width: 0; align-items: baseline; gap: 8px; margin: 0; }
+.ja-c1 b { flex: none; font-weight: 700; font-size: 22px; line-height: 1.2; }
+.ja-tn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+.ja-c2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; color: var(--ink-subtle); font-size: 13.5px; line-height: 1.4; }
+.ja-pill {
+  display: inline-flex; flex: none; align-items: center; gap: 4px; padding: 2px 9px 2px 7px; border-radius: 999px;
+  border: 1px solid color-mix(in oklch, var(--caution) 35%, transparent); background: color-mix(in oklch, var(--caution) 12%, transparent);
+  color: var(--caution-quiet); font-weight: 500; font-size: 12px; line-height: 1.5; white-space: nowrap;
+}
+.ja-pill svg { flex: none; width: 12px; height: 12px; }
+.ja-wd {
+  flex: none; height: 44px; padding: 0 14px; border: 1.5px solid var(--jg-field-line); border-radius: 10px; background: transparent;
+  color: var(--ink); font-weight: 500; font-size: 14px; white-space: nowrap;
+}
+.ja-wd:hover:not(:disabled) { background: var(--surface-2); }
+.ja-wd:disabled { opacity: 0.5; }
+.ja-empty { margin: 0; padding: 32px 16px; border: 1px dashed var(--line-strong); border-radius: 14px; color: var(--ink-subtle); text-align: center; font-size: 14px; }
+
+.ja-fc { display: flex; flex-direction: column; gap: 14px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.ja-fc h2 { font-weight: 700; font-size: 20px; line-height: 1.2; }
+.ja-fl { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
+.ja-lab { font-weight: 500; font-size: 14px; line-height: 1.3; }
+.ja-op { color: var(--ink-subtle); font-weight: 400; }
+.ja-in {
+  display: block; width: 100%; height: 48px; margin: 0; padding: 0 12px; border: 1.5px solid var(--jg-field-line); border-radius: 10px;
+  background: var(--jg-field); color: var(--ink); font: inherit; font-size: 16px; text-overflow: ellipsis;
+}
+.ja-in::placeholder { color: var(--ink-subtle); opacity: 1; font-size: 14px; }
+.ja-in:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--jg-ring); }
+.ja-ta { height: auto; padding: 9px 12px; line-height: 1.4; resize: none; text-transform: uppercase; }
+.ja-selw { position: relative; }
+.ja-sel { padding-right: 38px; appearance: none; cursor: pointer; }
+.ja-selw svg { position: absolute; top: 50%; right: 12px; margin-top: -9px; color: var(--ink-subtle); pointer-events: none; }
+.ja-hint { margin: 0; color: var(--ink-subtle); font-size: 12.5px; line-height: 1.35; }
+.ja-prim {
+  display: inline-flex; width: 100%; height: 52px; align-items: center; justify-content: center; border-radius: 12px;
+  background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 17px;
+}
+.ja-prim:hover:not(:disabled) { background: color-mix(in oklch, var(--accent) 88%, var(--ink)); }
+.ja-prim:disabled { opacity: 0.4; cursor: not-allowed; }
+.ja-err {
+  margin: 0; padding: 8px 12px; border: 1px solid color-mix(in oklch, var(--danger) 45%, transparent); border-radius: 12px;
+  background: color-mix(in oklch, var(--danger) 14%, transparent); color: var(--danger-quiet); font-size: 14px; line-height: 1.4;
+}
+.ja-res { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--jg-field); }
+.ja-sec { display: flex; min-height: 24px; align-items: center; margin: 0; color: var(--ink-subtle); font-weight: 500; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ja-res ul { display: flex; flex-direction: column; gap: 8px; }
+.ja-res li { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.4; }
+.ja-res li svg { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+.ja-res b { font-weight: 500; }
+.ja-fc > [role="status"]:empty { margin-top: -14px; }
+.ja-cf-scroll > [role="status"]:empty { margin-top: -12px; }
+.ja-r-ok { color: var(--done-quiet); }
+.ja-r-warn { color: var(--caution-quiet); }
+.ja-r-mute { color: var(--ink-subtle); }
+.ja-r-bad { color: var(--danger-quiet); }
+
+/* The record sheet (phone): a native <dialog> like the Sections sheet; the button that submits is pinned under the scrolling fields. */
+.ja-sh-form { display: flex; min-height: 0; flex: 1; flex-direction: column; }
+.ja-cf-scroll { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 12px; padding: 2px 16px 14px; overflow-y: auto; overscroll-behavior: contain; }
+.ja-cf-scroll > * { flex: none; }
+.ja-cf-foot { flex: none; padding: 10px 16px max(18px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
+.ja-cfs .ja-sec { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (min-width: 1024px) {
+  .ja-pad:has(> .ja-cf) { padding-bottom: 16px; }
+  .ja-cf { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+  .ja-aside { position: sticky; top: 12px; display: block; max-height: calc(100dvh - 80px); overflow-y: auto; }
+  .ja-pin { display: none; }
+  .ja-gh .ja-blk { flex-basis: auto; margin-left: 6px; }
+  .ja-cr { padding: 10px 16px; }
+  .ja-c1 b { font-size: 20px; }
+  .ja-wd { height: 32px; padding: 0 12px; border-radius: 8px; font-size: 13px; }
+  .ja-in { height: 40px; font-size: 15px; }
+  .ja-ta { height: auto; }
+  .ja-prim { height: 44px; font-size: 16px; }
+}
+
+/* Wide enough for a table row: number, name, note, pill and Withdraw on one line. */
+@media (min-width: 1280px) {
+  .ja-cr { display: grid; grid-template-columns: 84px minmax(0, 1fr) minmax(0, 1.2fr) 118px 92px; min-height: 56px; }
+  .ja-cm, .ja-c1, .ja-c2 { display: contents; }
+  .ja-c1 b { grid-column: 1; }
+  .ja-tn { grid-column: 2; }
+  .ja-nt { grid-column: 3; min-width: 0; }
+  .ja-fg { grid-column: 4; justify-self: end; }
+  .ja-wd { grid-column: 5; justify-self: end; }
+}

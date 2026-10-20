@@ -5,6 +5,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { SignOutButton } from "@/components/judging";
 import { CloseIcon } from "@/components/judge/parts";
+import { judgeConflictCount } from "./conflictsLogic";
+import type { AppState } from "@/lib/types";
 
 export type AdminTab =
   | "floor"
@@ -82,6 +84,30 @@ export const SECTION_GROUPS: { label: string; items: Section[] }[] = [
 
 const ALL_SECTIONS = SECTION_GROUPS.flatMap((g) => g.items);
 
+/**
+ * The rail's counts: Floor's is the teams requesting, Conflicts' is the
+ * judges' conflicts (the older whole-panel entries are not counted).
+ */
+export function railCounts(
+  state: Pick<AppState, "requests" | "conflicts" | "flags" | "teams" | "panels">,
+): Partial<Record<AdminTab, number>> {
+  return {
+    floor: state.requests.filter((r) => r.status === "requested").length,
+    conflicts: judgeConflictCount(state.conflicts),
+    flags: state.flags.length,
+    teams: state.teams.length,
+    panels: state.panels.length,
+  };
+}
+
+/** The other consoles, for a Judge Advisor who needs to see what a judge or a referee sees. Each opens in a tab of its own. */
+export const OTHER_CONSOLES = [
+  { href: "/queue", label: "Queue desk" },
+  { href: "/judge", label: "Judge" },
+  { href: "/referee", label: "Referee" },
+  { href: "/board", label: "Big-screen board" },
+] as const;
+
 /** Floor's count is the teams requesting: the same orange as the waiting colour. Zero shows nothing. */
 function Count({ id, count }: { id: AdminTab; count?: number }) {
   if (!count) return null;
@@ -131,6 +157,26 @@ function SectionList({
         </div>
       ))}
     </>
+  );
+}
+
+/** Quiet links under the sections. Not sections: never counted, never current. */
+function OtherConsoles({ Heading }: { Heading: "h2" | "h3" }) {
+  return (
+    <div className="ja-oc">
+      <Heading className="ja-rl">Other consoles</Heading>
+      <ul>
+        {OTHER_CONSOLES.map((c) => (
+          <li key={c.href}>
+            <a className="ja-ol" href={c.href} target="_blank" rel="noopener">
+              <span>{c.label}</span>
+              <span aria-hidden="true">↗</span>
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -232,6 +278,10 @@ export function AdminFrame({
         {counts[tab] ? (
           tab === "floor" ? (
             <span className="ja-rb">{counts[tab]} requesting</span>
+          ) : tab === "conflicts" ? (
+            <span className="ja-rc">
+              {counts[tab]} {counts[tab] === 1 ? "conflict" : "conflicts"}
+            </span>
           ) : (
             <span className="ja-rc">{counts[tab]}</span>
           )
@@ -241,6 +291,7 @@ export function AdminFrame({
       <div className="ja-shell">
         <nav className="ja-rail" aria-label="Judge Advisor sections">
           <SectionList tab={tab} counts={counts} onPick={onTab} Heading="h2" />
+          <OtherConsoles Heading="h2" />
         </nav>
         <main className="ja-main" ref={body}>
           <h1 className="sr-only">{current.label}</h1>
@@ -272,6 +323,7 @@ export function AdminFrame({
         </div>
         <nav className="ja-sh-list" aria-label="Judge Advisor sections">
           <SectionList tab={tab} counts={counts} onPick={pick} Heading="h3" />
+          <OtherConsoles Heading="h3" />
         </nav>
         <div className="ja-sh-foot">
           <p>{name ? `${name} · Judge Advisor` : "Judge Advisor"}</p>

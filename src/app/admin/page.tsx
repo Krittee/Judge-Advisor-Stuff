@@ -4,8 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { liveRequestFor } from "@/lib/data";
 import { divisionsCompatible } from "@/lib/presets";
-import { isPanelBlocked, panelBlocks } from "@/lib/roster";
-import { AdminFrame, type AdminTab as Tab } from "@/components/admin/AdminFrame";
+import { panelBlocks } from "@/lib/roster";
+import { AdminFrame, railCounts, type AdminTab as Tab } from "@/components/admin/AdminFrame";
+import { ConflictsTab } from "@/components/admin/ConflictsTab";
+import { saveJudgesAfterAsking } from "@/components/admin/conflictsLogic";
 import { FloorTab } from "@/components/admin/FloorTab";
 import { canTransition, STATUS_META, type Status } from "@/lib/status";
 import { call, useAppState, useScores } from "@/components/useAppState";
@@ -19,7 +21,6 @@ import {
 } from "@/components/ui";
 import { NotesDrawer } from "@/components/judging";
 import { Rankings } from "@/components/Rankings";
-import { ConflictDialog } from "@/components/ConflictDialog";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { CategoryChip, CategorySelect } from "@/components/CategoryChip";
 import { FlagList, FlagSummary } from "@/components/Flags";
@@ -65,14 +66,9 @@ export default function AdminPage() {
      behind it, then the record of both. The counts are what turn eight
      words into something you can triage -- "Conflicts" says nothing,
      "Conflicts 2" sends you there. Floor's is only the teams actually
-     waiting; a total that is merely large is not a reason to look. */
-  const counts = {
-    floor: state.requests.filter((r) => r.status === "requested").length,
-    conflicts: state.conflicts.length,
-    flags: state.flags.length,
-    teams: state.teams.length,
-    panels: state.panels.length,
-  };
+     waiting, Conflicts' only the judges' (older whole-panel entries are not
+     counted); a total that is merely large is not a reason to look. */
+  const counts = railCounts(state);
 
   return (
     <>
@@ -87,8 +83,8 @@ export default function AdminPage() {
           setTab(id);
         }}
       >
-        {/* The Floor fills the width the rail leaves; the older tabs keep the width and padding they had. */}
-        <div className={tab === "floor" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
+        {/* The Floor and Conflicts fill the width the rail leaves; the older tabs keep the width and padding they had. */}
+        <div className={tab === "floor" || tab === "conflicts" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
           {error ? (
             <div className="mb-4">
               <Banner kind="error" onDismiss={() => setError(null)}>
@@ -579,22 +575,6 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
 }
 
 /**
- * Declared conflicts of interest.
- *
- * The Judge Advisor is the only one who can withdraw one, so this is the
- * only place a conflict can be lifted. A team named here has been taken
- * off that panel and needs assigning to another.
- */
-/** What the bulk conflict endpoint reports back, number by number. */
-type BulkConflictResult = {
-  panel: string;
-  recorded: string[];
-  unchanged: string[];
-  notFound: string[];
-  unassigned: string[];
-};
-
-/**
  * What the referees have recorded.
  *
  * Read-only for the Judge Advisor except for removal: flags are the
@@ -733,322 +713,6 @@ function FlagsTab({
           })}
         </div>
       )}
-    </div>
-  );
-}
-
-function ConflictsTab({ state, refresh, onError }: TabProps) {
-  const [adding, setAdding] = useState<Team | null>(null);
-  const [pick, setPick] = useState("");
-  const [panelId, setPanelId] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [bulkPanel, setBulkPanel] = useState("");
-  const [bulkNumbers, setBulkNumbers] = useState("");
-  const [bulkJudge, setBulkJudge] = useState("");
-  const [bulkResult, setBulkResult] = useState<BulkConflictResult | null>(null);
-  const { ask, dialog } = useConfirm();
-
-  const teamById = useMemo(() => new Map(state.teams.map((t) => [t.id, t])), [state.teams]);
-  const judgeById = useMemo(() => new Map(state.judges.map((j) => [j.id, j])), [state.judges]);
-  /* Which panel each conflict blocks right now: a judge's conflict follows
-     the judge, a whole-panel one is its own panel. */
-  const blocks = useMemo(
-    () => panelBlocks(state.conflicts, state.judges),
-    [state.conflicts, state.judges],
-  );
-
-  async function withdraw(id: string) {
-    if (
-      !(await ask("Withdraw this conflict? The panel will be able to judge the team again.", {
-        confirmLabel: "Withdraw",
-        danger: true,
-      }))
-    ) {
-      return;
-    }
-    setBusy(true);
-    onError(null);
-    try {
-      await call(`/api/conflicts?id=${id}`, { method: "DELETE" });
-      await refresh();
-    } catch (e) {
-      onError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function declareBulk() {
-    setBusy(true);
-    onError(null);
-    setBulkResult(null);
-    try {
-      const res = (await call("/api/conflicts", {
-        body: { panelId: bulkPanel, teamNumbers: bulkNumbers, judgeName: bulkJudge },
-      })) as BulkConflictResult;
-      setBulkResult(res);
-      setBulkNumbers("");
-      setBulkJudge("");
-      await refresh();
-    } catch (e) {
-      onError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /* Panels in their configured order, each with the conflicts declared
-     against it; a panel with none is left out rather than listed empty. */
-  const byPanel = useMemo(() => {
-    const panelOf = new Map(blocks.map((b) => [b.conflict_id, b.panel_id]));
-    const groups = state.panels
-      .map((panel) => ({
-        panel,
-        rows: state.conflicts.filter((c) => panelOf.get(c.id) === panel.id),
-      }))
-      .filter((g) => g.rows.length);
-
-    // A conflict with no panel to show it under -- a judge not on a panel
-    // yet -- still has to be visible, or it becomes an invisible rule
-    // nobody can withdraw.
-    const shown = new Set(groups.flatMap((g) => g.rows.map((r) => r.id)));
-    const orphans = state.conflicts.filter((c) => !shown.has(c.id));
-    return orphans.length ? [...groups, { panel: null, rows: orphans }] : groups;
-  }, [state.panels, state.conflicts, blocks]);
-
-  const chosen = state.teams.find((t) => t.number === pick.trim().toUpperCase());
-
-  /* A team every panel in its division is conflicted with can never be
-     assigned. Auto-assign simply skips it, so without this it sits
-     unassigned and nobody finds out until the team turns up to be judged. */
-  const stranded = state.teams.filter((team) => {
-    if (team.panel_id) return false;
-    const inDivision = state.panels.filter((p) =>
-      divisionsCompatible(team.division, p.division),
-    );
-    if (!inDivision.length) return false;
-    return inDivision.every((p) => isPanelBlocked(blocks, p.id, team.id));
-  });
-
-  return (
-    <div className="space-y-5">
-      {dialog}
-      <div className="flex flex-wrap items-end gap-3 rounded-xl bg-surface p-4 ring-1 ring-inset ring-line">
-        <label className="min-w-[9rem] flex-1">
-          <span className="mb-1 block text-xs text-ink-subtle">Team number</span>
-          <input
-            value={pick}
-            onChange={(e) => setPick(e.target.value.toUpperCase())}
-            placeholder="1234"
-            className={`${inputClass} py-2`}
-          />
-        </label>
-        <label className="min-w-[10rem] flex-1">
-          <span className="mb-1 block text-xs text-ink-subtle">Judge panel</span>
-          <select
-            value={panelId}
-            onChange={(e) => setPanelId(e.target.value)}
-            className={`${inputClass} py-2`}
-          >
-            <option value="" className="bg-surface">
-              — pick a panel —
-            </option>
-            {state.panels.map((p) => (
-              <option key={p.id} value={p.id} className="bg-surface">
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <Button
-          disabled={!chosen || !panelId}
-          onClick={() => chosen && setAdding(chosen)}
-        >
-          Declare conflict
-        </Button>
-        <p className="w-full text-xs text-ink-faint">
-          {pick && !chosen ? (
-            <span className="text-caution-quiet">No team with that number.</span>
-          ) : (
-            "A conflict takes the team off that panel and keeps it off — no interview, no notebook, no notes."
-          )}
-        </p>
-      </div>
-
-      {/* The Judge Advisor asks each panel once and gets a short list back,
-          so take the whole list rather than one dialog per team. */}
-      <div className="space-y-3 rounded-xl bg-surface p-4 ring-1 ring-inset ring-line">
-        <h3 className="text-sm font-semibold text-ink-muted">
-          Ask a panel: &ldquo;any teams you&rsquo;re affiliated with?&rdquo;
-        </h3>
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="min-w-[10rem] flex-1">
-            <span className="mb-1 block text-xs text-ink-subtle">Judge panel</span>
-            <select
-              value={bulkPanel}
-              onChange={(e) => setBulkPanel(e.target.value)}
-              className={`${inputClass} py-2`}
-            >
-              <option value="" className="bg-surface">
-                — pick a panel —
-              </option>
-              {state.panels.map((p) => (
-                <option key={p.id} value={p.id} className="bg-surface">
-                  {p.name} · {p.division}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="min-w-[10rem] flex-1">
-            <span className="mb-1 block text-xs text-ink-subtle">
-              Which judge? (optional)
-            </span>
-            <input
-              value={bulkJudge}
-              onChange={(e) => setBulkJudge(e.target.value)}
-              placeholder="Judge name"
-              className={`${inputClass} py-2`}
-            />
-          </label>
-        </div>
-        <label className="block">
-          <span className="mb-1 block text-xs text-ink-subtle">
-            Team numbers — commas, spaces or one per line
-          </span>
-          <textarea
-            value={bulkNumbers}
-            onChange={(e) => setBulkNumbers(e.target.value.toUpperCase())}
-            rows={3}
-            placeholder="1234, 5678, 9882K"
-            className={inputClass}
-          />
-        </label>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button disabled={busy || !bulkPanel || !bulkNumbers.trim()} onClick={declareBulk}>
-            {busy ? "Recording…" : "Record conflicts"}
-          </Button>
-          <span className="text-xs text-ink-faint">
-            Each of these teams comes off that panel and stays off it — including
-            when you auto-assign.
-          </span>
-        </div>
-
-        {bulkResult ? (
-          <div className="space-y-1 rounded-lg bg-sunken p-3 text-xs">
-            <p className="text-done-quiet">
-              {bulkResult.recorded.length
-                ? `Recorded against ${bulkResult.panel}: ${bulkResult.recorded.join(", ")}`
-                : `Nothing new to record against ${bulkResult.panel}.`}
-            </p>
-            {bulkResult.unassigned.length ? (
-              <p className="text-caution-quiet">
-                Taken off {bulkResult.panel} and now needing a panel:{" "}
-                {bulkResult.unassigned.join(", ")}
-              </p>
-            ) : null}
-            {bulkResult.unchanged.length ? (
-              <p className="text-ink-faint">
-                Already declared: {bulkResult.unchanged.join(", ")}
-              </p>
-            ) : null}
-            {bulkResult.notFound.length ? (
-              <p className="text-danger-quiet">
-                No team with that number — check these: {bulkResult.notFound.join(", ")}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      {stranded.length ? (
-        <div className="rounded-xl bg-danger/12 p-4 text-sm ring-1 ring-inset ring-danger/35">
-          <p className="font-semibold text-danger-quiet">
-            {stranded.length === 1 ? "One team has" : `${stranded.length} teams have`} no
-            panel left to judge them
-          </p>
-          <p className="mt-1 text-xs text-danger-quiet">
-            Every panel in their division is conflicted with them, so auto-assign will
-            skip them. Move a panel into the division, or withdraw a conflict.
-          </p>
-          <p className="mt-2 text-xs text-danger-quiet">
-            {stranded.map((t) => `${t.number} (${t.division})`).join(" · ")}
-          </p>
-        </div>
-      ) : null}
-
-      {/* Grouped by panel, because that is how they are collected: you ask
-          one panel and get one list back, and this is what you read out to
-          check it. A flat roll makes the same team appear twice under
-          different panels with nothing tying either row to the question. */}
-      {byPanel.length ? (
-        <div className="space-y-4">
-          {byPanel.map(({ panel, rows }) => (
-            <div key={panel?.id ?? "gone"} className="rounded-xl ring-1 ring-inset ring-line">
-              <div className="flex flex-wrap items-baseline gap-x-3 border-b border-line px-4 py-2.5">
-                <h3 className="text-sm font-semibold text-ink">
-                  {panel?.name ?? "Not on a panel"}
-                </h3>
-                {panel ? <span className="text-xs text-ink-faint">{panel.division}</span> : null}
-                <span className="ml-auto text-xs text-ink-faint">
-                  {rows.length} {rows.length === 1 ? "conflict" : "conflicts"}
-                </span>
-              </div>
-              <ul className="divide-y divide-line">
-                {rows.map((c) => {
-                  const team = teamById.get(c.team_id);
-                  return (
-                    <li
-                      key={c.id}
-                      className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm"
-                    >
-                      <span className="font-bold tabular-nums">{team?.number ?? "—"}</span>
-                      <span className="min-w-[8rem] flex-1 truncate text-ink-subtle">
-                        {team?.name ?? "team removed"}
-                      </span>
-                      {c.judge_name || (c.judge_id && judgeById.get(c.judge_id)) ? (
-                        <span className="text-ink-faint">
-                          {c.judge_name ?? judgeById.get(c.judge_id ?? "")?.name}
-                        </span>
-                      ) : null}
-                      {c.note ? <span className="text-ink-faint">{c.note}</span> : null}
-                      {team && !team.panel_id ? (
-                        <span className="rounded-md bg-caution/15 px-2 py-0.5 text-[11px] text-caution-quiet">
-                          needs a panel
-                        </span>
-                      ) : null}
-                      <button
-                        onClick={() => withdraw(c.id)}
-                        disabled={busy}
-                        className="ml-auto text-xs text-ink-faint hover:text-danger-quiet"
-                      >
-                        withdraw
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="rounded-xl px-4 py-8 text-center text-sm text-ink-faint ring-1 ring-inset ring-line">
-          No conflicts declared. Ask each panel who they are affiliated with, and record
-          the answers above.
-        </p>
-      )}
-
-      {adding ? (
-        <ConflictDialog
-          team={adding}
-          panelId={panelId}
-          onClose={() => setAdding(null)}
-          onDone={async () => {
-            setAdding(null);
-            setPick("");
-            await refresh();
-          }}
-        />
-      ) : null}
     </div>
   );
 }
@@ -1541,7 +1205,30 @@ function PanelCard({
 
       <input
         defaultValue={panel.judges.join(", ")}
-        onBlur={(e) => onPatch(panel.id, { judges: e.target.value })}
+        onBlur={async (e) => {
+          const field = e.currentTarget;
+          const judges = field.value;
+          if (judges.trim() === panel.judges.join(", ")) return;
+          /* A judge with conflicts joining a panel that holds the team takes
+             it off the panel, so look first (`dryRun`), ask, then save. */
+          try {
+            const saved = await saveJudgesAfterAsking(
+              ask,
+              panel.name,
+              async () =>
+                (
+                  await call<{ takenOff: string[] }>("/api/admin/panels", {
+                    method: "PATCH",
+                    body: { id: panel.id, judges, dryRun: true },
+                  })
+                ).takenOff,
+              () => onPatch(panel.id, { judges }),
+            );
+            if (!saved) field.value = panel.judges.join(", ");
+          } catch (err) {
+            onError((err as Error).message);
+          }
+        }}
         placeholder="Judge names, comma separated"
         className={`${inputClass} py-2 text-sm`}
       />
