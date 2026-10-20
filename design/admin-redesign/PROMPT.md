@@ -23,16 +23,16 @@ The console is being designed **tab by tab**. This file covers:
 8. **Scores** (direction C, "Ranked + compare"). UI only. Also: every
    "Notes" / row click on this console opens the **judge console's team
    sheet** instead of the old NotesDrawer (user decision).
+9. **Activity** (direction B, "Timeline by hour"). **Small data change**
+   (a stored `kind`, team number and actor role on each entry) + UI.
 
-More tabs will be added below as they are designed. Tabs that have no
-section here yet keep their current content, just rendered inside the new
-shell.
+All eight sections are designed; this file is complete.
 
 **Commits, in order:** (1) shell + Floor; (2) Conflicts data; (3) Conflicts
 UI; (4) Referee; (5) Teams; (6) Panels; (7) Import; (8) Scores + team
-sheet. Each is one local
-commit with every check green. If you are only asked to do part of this
-file, do the parts in that order.
+sheet; (9) Activity data; (10) Activity UI. Each is one local commit with
+every check green. If you are only asked to do part of this file, do the
+parts in that order.
 
 ## Sources
 
@@ -71,6 +71,9 @@ file, do the parts in that order.
     panel (8080V vs 1108)
   - `reference-scores-phone.dc.html` — 375 wide: ranked list with two
     picked and the pinned Compare bar
+  - `reference-activity-wide.dc.html` — 1280 wide: Activity timeline by
+    hour (11:00 header shown stuck)
+  - `reference-activity-phone.dc.html` — 375 wide: Activity timeline
   These are self-contained HTML mocks (custom `{{hole}}` template, not
   React). Read their `<style>` blocks for sizes, spacing and colours and
   their markup for structure and copy. Team data in them is sample data.
@@ -79,7 +82,7 @@ file, do the parts in that order.
   judge)" (C chosen), "Judge Advisor · Referee" (C chosen) and "Judge
   Advisor · Teams" (B chosen), "Judge Advisor · Panels" (B chosen),
   "Judge Advisor · Import" (A chosen), "Judge Advisor · Scores" (C
-  chosen). Boards marked "Not chosen" are
+  chosen), "Judge Advisor · Activity" (B chosen). Boards marked "Not chosen" are
   exploration only.
 - **Patterns to reuse, not copy:** the judge console
   (`src/components/judge/`, `.judge` / `.jg-*` in `globals.css`): status
@@ -678,6 +681,64 @@ is disabled while two are ticked; section subtotals match the stored
 values; the higher value per row is bold and ties aren't; the worst
 conduct pill shows on the row; rows open the team sheet (not the old
 drawer).
+
+## Activity (direction B, "Timeline by hour") — small data change + UI
+
+Today's behaviour: `ActivityTab` in `src/app/admin/page.tsx`,
+`GET /api/admin/activity` (latest 150, newest first), polled every 10 s,
+`logActivity` in the stores, `ActivityRow` / `NewActivity` types.
+
+### Phase 9 — Activity data (own commit)
+Today's free-text actions can't be sorted reliably (request steps log as
+"→ Interview in progress", actors as `admin:Alex` / `Priya (Panel 2)`,
+teams only as an id). So:
+- `ActivityRow` / `NewActivity` gain `kind: "request" | "referee" |
+  "conflict" | "setup"` and `actor_role: string | null` ("Judge Advisor",
+  "Panel 2", "Referee", "Front desk", "Team"), with `actor` becoming the
+  plain name. Postgres column(s) via the runtime migration +
+  `supabase/schema.sql`; file store defaults in `migrate()`.
+- Every `logActivity` call passes its kind and role.
+- **Old rows** (no kind): derive it on read — `request_id` set →
+  request; action starts with "flagged" / "corrected a flag" → referee;
+  contains "conflict" → conflict; otherwise setup. Split old actors
+  `role:Name` / `Name (Panel N)` on read the same way.
+- `GET /api/admin/activity` joins the **team number** (`team_number`).
+- **Log what isn't logged today** (each with its kind): removing a flag,
+  withdrawing a conflict, panel add/edit/delete and delete-all, judge
+  roster changes (from the Conflicts data phase), team import, team
+  edit/remove, status override, reset day, wipe everything (log it as the
+  first entry of the new event).
+- Tests: kind and role stored for new entries; the fallback derivation for
+  old rows; team number joined; each newly logged action writes one entry.
+
+### Phase 10 — Activity UI (own commit)
+Per `reference-activity-wide.dc.html`:
+- Title "Activity" with "Updated hh:mm · refreshes every 10 s" on the
+  right.
+- Toolbar: kind chips with counts over the loaded entries (All /
+  Requests / Referee / Conflicts / Setup), a team-number search, and a
+  "Who" select of the actors present. All filtering is client-side over
+  the loaded 150.
+- **Grouped by hour**, newest first: header "11:00–11:59 · 7 events",
+  `position: sticky` under the toolbar. Inside, a vertical line with one
+  dot per entry: request = neutral ink, referee = the flag's severity
+  colour (when the entry names a severity), conflict = caution, setup =
+  accent outline. A small legend at the bottom explains the dots. Row:
+  time, actor (bold) · role (muted), action (severity words as severity
+  pills, e.g. "flagged **Minor**", "corrected a flag: **Warning** →
+  **Minor**"), detail (muted), and a team-number chip that opens the team
+  sheet (no chip when the entry names several teams or none).
+- Footer: "Showing the latest 150 events".
+- Phone (`reference-activity-phone.dc.html`): kind chips scroll
+  horizontally; team search + "Who" button; hour headers in flow; compact
+  two-line rows.
+- **States:** a failed poll shows a caution banner **above the last good
+  log** ("Couldn't refresh — showing what we had at 11:42"), cleared by the
+  next success (today the error replaces the whole log). Empty log:
+  "Nothing logged yet." Filters with no match: "No events match these
+  filters." with a "Clear filters" link.
+- Tests: hour grouping and counts; each filter; the kind dot colours;
+  the banner keeps the old rows visible; the two empty states.
 
 ## Rules
 
