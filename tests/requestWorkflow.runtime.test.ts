@@ -474,7 +474,8 @@ test("the judge and admin consoles say which status they were showing when a but
   assert.match(page("src/app/judge/page.tsx"), /body: \{ action, from: request\.status, \.\.\.extra \}/);
   // The Floor's writes moved out of the page with the Floor itself (src/components/admin/FloorTab.tsx).
   assert.match(page("src/components/admin/FloorTab.tsx"), /body: \{ action, from: request\.status, \.\.\.extra \}/);
-  assert.match(page("src/app/admin/page.tsx"), /body: \{ action, from: request\.status, \.\.\.\(action === "set-status"/);
+  // ...and so does the Teams tab's status override (src/components/admin/teamsLogic.ts).
+  assert.match(page("src/components/admin/teamsLogic.ts"), /body: \{ action, from: request\.status, \.\.\.\(action === "set-status"/);
 });
 
 test("'ready now' is one call on both screens, never cancel-then-create", () => {

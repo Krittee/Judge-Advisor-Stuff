@@ -228,7 +228,7 @@ test("the top bar: Judge Advisor avatar, the admin's name, Live, Sign out, and t
 test("on a phone a slim bar names the current section with its count, Floor's in the orange badge", () => {
   const bar = (markup: string) => markup.match(/<div class="ja-sbar">[\s\S]*?<\/div>/)?.[0] ?? "";
   assert.match(bar(frame()), /<b>Floor<\/b><span class="ja-rb">3 requesting<\/span>/);
-  assert.match(bar(frame({ tab: "teams" })), /<b>Teams<\/b><span class="ja-rc">48<\/span>/);
+  assert.match(bar(frame({ tab: "teams" })), /<b>Teams<\/b><span class="ja-rc">48 teams · 4 panels<\/span>/);
   assert.doesNotMatch(bar(frame({ tab: "import" })), /ja-rb|ja-rc/);
   assert.doesNotMatch(bar(frame({ counts: { floor: 0 } })), /ja-rb/);
 });

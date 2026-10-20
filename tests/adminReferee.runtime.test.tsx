@@ -241,7 +241,7 @@ test("a phone starts on the list, opens a team on a tap, and the back button ret
 
 test("the phone shows one screen at a time and the wide layout shows both, by CSS", () => {
   const css = read("src/app/globals.css");
-  const block = css.slice(css.indexOf("/* Referee (design/admin-redesign"));
+  const block = css.slice(css.indexOf("/* Referee (design/admin-redesign"), css.indexOf("/* Teams (design/admin-redesign"));
   assert.match(block, /@media \(max-width: 1023\.98px\) \{[^}]*\.ja-rf\[data-view="team"\] \.ja-rf-top, \.ja-rf\[data-view="team"\] \.ja-rf-tl \{ display: none; \}/);
   assert.match(block, /\.ja-rf\[data-view="list"\] \.ja-rf-det \{ display: none; \}/);
   // From 1024px nothing is hidden by the view, and the back button goes.
@@ -432,7 +432,7 @@ test("Scores' conduct trip: the page hands the tab its focus team and the admin'
 
 test("the Referee styles are page-scoped, use tokens for both themes, and have no animation", () => {
   const css = read("src/app/globals.css");
-  const block = css.slice(css.indexOf("/* Referee (design/admin-redesign"));
+  const block = css.slice(css.indexOf("/* Referee (design/admin-redesign"), css.indexOf("/* Teams (design/admin-redesign"));
   assert.ok(block.length > 1000);
   assert.doesNotMatch(block, /@keyframes|animation|transition/, "no playful motion");
   assert.doesNotMatch(block, /oklch\(|#[0-9a-f]{3,6}\b|\brgb\(/i, "colours come from the tokens, so light works too");

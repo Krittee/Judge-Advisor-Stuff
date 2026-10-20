@@ -286,6 +286,10 @@ export function AdminFrame({
             <span className="ja-rc">
               {counts[tab]} {counts[tab] === 1 ? "flag" : "flags"}
             </span>
+          ) : tab === "teams" ? (
+            <span className="ja-rc">
+              {counts[tab]} {counts[tab] === 1 ? "team" : "teams"} · {counts.panels ?? 0} {counts.panels === 1 ? "panel" : "panels"}
+            </span>
           ) : (
             <span className="ja-rc">{counts[tab]}</span>
           )

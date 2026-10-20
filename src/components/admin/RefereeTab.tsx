@@ -61,8 +61,8 @@ const BackIcon = () => (
   </Glyph>
 );
 
-/** A severity pill, filled in the kind's colour. A kind the config no longer has is shown plainly. */
-function Pill({ kind, id, children }: { kind: FlagKind | null; id: string; children?: React.ReactNode }) {
+/** A severity pill, filled in the kind's colour. A kind the config no longer has is shown plainly. The Teams tab wears the same pill. */
+export function Pill({ kind, id, children }: { kind: FlagKind | null; id: string; children?: React.ReactNode }) {
   return (
     <span className={`ja-sp ${pillClass(kind?.color ?? "zinc")}`} title={kind?.label}>
       {children ?? kind?.short ?? id}

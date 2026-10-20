@@ -138,12 +138,11 @@ test("the referee page awaits the shared ask() for the setup change before savin
 
 test("each of the admin console's confirmations goes through ask()", () => {
   const src = read("src/app/admin/page.tsx");
-  assert.equal(src.match(/await ask\(/g)?.length, 4);
-  assert.equal(src.match(/useConfirm\(\)/g)?.length, 3, "one hook per component that asks");
-  assert.equal(src.match(/\{dialog\}/g)?.length, 3, "each renders its dialog");
+  // Remove team and the two resets moved to the Teams tab (checked below).
+  assert.equal(src.match(/await ask\(/g)?.length, 2);
+  assert.equal(src.match(/useConfirm\(\)/g)?.length, 1, "one hook per component that asks");
+  assert.equal(src.match(/\{dialog\}/g)?.length, 1, "each renders its dialog");
   const sites: [string, RegExp][] = [
-    ["remove team", /await ask\(`Remove team \$\{team\.number\} and all its requests\?`,\s*\{\s*confirmLabel: "Remove team",\s*danger: true/],
-    ["reset", /await ask\(confirmText, \{ confirmLabel, danger: true \}\)/],
     ["move division", /await ask\(\s*`Move \$\{panel\.name\} to \$\{division\}\?[\s\S]*?confirmLabel: "Move division", danger: true/],
     ["delete panel", /await ask\(`Delete \$\{panel\.name\}\? Its teams become unassigned\.`,\s*\{\s*confirmLabel: "Delete panel",\s*danger: true/],
   ];
@@ -157,6 +156,13 @@ test("each of the admin console's confirmations goes through ask()", () => {
   const conflicts = read("src/components/admin/ConflictsTab.tsx");
   assert.ok(conflicts.includes("withdrawAfterAsking(ask, question,"), "withdraw a conflict asks first");
   assert.match(read("src/components/admin/conflictsLogic.ts"), /await ask\(question, \{ confirmLabel: "Withdraw", danger: true \}\)/);
+  // The Teams tab: Remove team, the status override, discarding unsaved changes, and the two resets.
+  const teams = read("src/components/admin/teamsLogic.ts");
+  assert.match(teams, /await ask\(removeQuestion\(team\), \{ confirmLabel: "Remove team", danger: true \}\)/);
+  assert.match(teams, /await ask\(resetQuestion\(team, status\), \{ confirmLabel: "Reset status" \}\)/);
+  assert.match(teams, /return ask\(discardQuestion\(team\), \{ confirmLabel: "Discard changes", danger: true \}\)/);
+  assert.match(teams, /await ask\(question, \{ confirmLabel, danger: true \}\)/);
+  assert.match(teams, /Remove team \$\{team\.number\} and all its requests\?/);
   const referee = read("src/components/admin/RefereeTab.tsx");
   assert.ok(referee.includes("removeAfterAsking(ask, async () => {"), "remove a flag asks first");
   assert.match(
