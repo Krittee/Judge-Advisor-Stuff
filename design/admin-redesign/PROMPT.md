@@ -141,6 +141,14 @@ neutral text. The current item gets an accent-tinted background and a 3px
 accent bar on the left, and `aria-current="page"`. The rail is a `<nav>`
 with `aria-label="Judge Advisor sections"`.
 
+**Other consoles** (user decision, added after step 1): at the bottom of
+the rail, a small-caps "OTHER CONSOLES" group of quiet links — Queue desk
+(`/queue`), Judge (`/judge`), Referee (`/referee`), Big-screen board
+(`/board`) — each opening in a new tab (`target="_blank"
+rel="noopener"`, with an ↗ mark and "opens in a new tab" in its
+accessible name). Not counted, never marked current. The phone Sections
+sheet shows the same group under its list, above the sign-out line.
+
 ### Phone (< 1024px)
 No rail. The top bar gets a 44px menu button (`aria-label="Sections"`)
 before the avatar. Under the top bar, a slim bar shows the current section
