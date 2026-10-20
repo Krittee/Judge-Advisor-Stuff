@@ -1540,3 +1540,257 @@ body:has(.judge) > .theme-toggle:hover {
   .si-btn[aria-busy="true"]::after { width: 100%; opacity: 0.35; }
   .si-band.is-checking::after { display: none; }
 }
+
+/* ------------------------------------------------------------------ *
+ * Judge Advisor console ("Panel board", design/admin-redesign/)
+ *
+ * The shell -- top bar, grouped side rail, and on a phone the Sections
+ * menu -- and the Floor. Scoped under .admin / .ja-*; the status fills,
+ * avatar, Live dot, language tag and caution box are the judge console's
+ * own .jg-* pieces, reused rather than copied. Below 1024px this is a
+ * phone layout (no rail, one panel at a time behind a switcher); from
+ * 1024px up the rail appears and every panel is a column. The page body
+ * scrolls, because the tabs behind the Floor are still long tables.
+ * Colour is signal: status fills only mean status, caution is the
+ * language gap, --accent is chrome (current section, selected chip, links).
+ * ------------------------------------------------------------------ */
+
+.admin {
+  --jg-field: oklch(0.180 0.013 265);
+  --jg-field-line: oklch(0.520 0.014 265);
+  --jg-ring: color-mix(in oklch, var(--accent) 35%, transparent);
+  --ja-col: var(--jg-field);
+  --ja-accent-t: color-mix(in oklch, var(--accent) 14%, transparent);
+
+  display: flex; height: 100dvh; flex-direction: column; overflow: hidden;
+  background: var(--canvas); color: var(--ink);
+}
+:root[data-theme="light"] .admin {
+  --jg-field: oklch(0.995 0.002 265);
+  --jg-field-line: oklch(0.640 0.012 265);
+  --ja-col: var(--surface-2);
+}
+
+.ja-rb, .ja-sbar b, .ja-sh-top h2, .ja-ch h2, .ja-c1 b, .ja-go, .ja-cs b, .ja-seg button span, .ja-opt b, .ja-pop-h {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* The app's one floating theme toggle, docked into the top bar's corner. */
+body:has(.admin) > .theme-toggle {
+  top: 4px; right: 6px; bottom: auto; width: 44px; height: 44px;
+  border: 0; border-radius: 12px; background: transparent; box-shadow: none; color: var(--ink-subtle);
+}
+body:has(.admin) > .theme-toggle:hover {
+  transform: none; color: var(--ink); background: color-mix(in oklch, var(--accent) 12%, transparent);
+}
+
+/* Top bar */
+.ja-top {
+  display: flex; flex: none; height: 52px; align-items: center; justify-content: space-between;
+  padding: 0 6px 0 4px; border-bottom: 1px solid var(--line);
+}
+.ja-menu { display: grid; flex: none; width: 44px; height: 44px; margin-right: 2px; place-items: center; border-radius: 12px; background: transparent; color: var(--ink); }
+.ja-menu:hover { background: var(--surface-2); }
+.ja-top-r { display: flex; flex: none; align-items: center; gap: 2px; margin-right: 44px; }
+.ja-top-r > button { min-height: 44px; padding: 0 10px; border-radius: 10px; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
+.ja-top-r > button:hover { color: var(--ink); }
+
+/* The current section, on a phone */
+.ja-sbar {
+  position: relative; display: flex; flex: none; height: 44px; align-items: center; gap: 10px;
+  padding: 0 16px 0 17px; background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.ja-sbar::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--accent); }
+.ja-sbar svg { color: var(--accent); }
+.ja-sbar b { font-weight: 700; font-size: 16px; }
+.ja-sbar .ja-rb { height: 24px; padding: 0 10px; border-radius: 12px; line-height: 24px; }
+
+.ja-shell { display: flex; flex: 1; min-height: 0; }
+.ja-main { flex: 1; min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
+.ja-pad { padding: 12px 16px 16px; }
+
+/* The sections, in the rail and in the phone sheet */
+.ja-rail {
+  display: none; flex: none; width: 224px; flex-direction: column; gap: 14px; padding: 16px 0; overflow-y: auto;
+  background: var(--surface); border-right: 1px solid var(--line);
+}
+.ja-rl {
+  margin: 0 0 4px; padding: 0 20px; color: var(--ink-subtle); font-family: var(--font-fira), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 500; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.ja-ri {
+  position: relative; display: flex; width: calc(100% - 12px); height: 44px; align-items: center; gap: 12px;
+  padding: 0 12px 0 20px; border-radius: 0 10px 10px 0; background: transparent; color: var(--ink-subtle);
+  text-align: left; font-weight: 500; font-size: 15px;
+}
+.ja-ri:hover { background: var(--surface-2); color: var(--ink); }
+.ja-ri svg { flex: none; }
+.ja-ri[aria-current] { background: var(--ja-accent-t); color: var(--ink); }
+.ja-ri[aria-current]::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--accent); }
+.ja-ri[aria-current] svg { color: var(--accent); }
+.ja-rc { margin-left: auto; color: var(--ink-subtle); font-weight: 400; font-size: 13px; }
+.ja-rb {
+  flex: none; min-width: 22px; height: 22px; margin-left: auto; padding: 0 6px; border-radius: 11px;
+  background: var(--waiting); color: var(--waiting-ink); text-align: center; font-weight: 500; font-size: 12px; line-height: 22px;
+}
+.ja-sbar .ja-rc { margin-left: auto; }
+
+/* The Sections sheet: a native <dialog>, so it brings its own focus trap and Escape. */
+.ja-sheet {
+  width: 100%; max-width: 32rem; max-height: calc(100dvh - 56px); margin: auto auto 0; padding: 0; overflow: hidden;
+  border: 0; border-top: 1px solid var(--jg-field-line); border-radius: 24px 24px 0 0; background: var(--surface); color: var(--ink);
+}
+.ja-sheet[open] { display: flex; flex-direction: column; }
+.ja-sheet::backdrop { background: oklch(0.100 0.010 265 / 0.68); }
+:root[data-theme="light"] .ja-sheet::backdrop { background: oklch(0.225 0.016 265 / 0.45); }
+.ja-sh-top { display: flex; flex: none; align-items: center; gap: 8px; padding: 4px 8px 4px 20px; }
+.ja-sh-top h2 { flex: 1; font-weight: 700; font-size: 22px; line-height: 1.2; }
+.ja-x { display: grid; flex: none; width: 44px; height: 44px; place-items: center; border-radius: 12px; background: transparent; color: var(--ink-subtle); }
+.ja-x:hover { background: var(--surface-2); color: var(--ink); }
+.ja-sh-list { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 6px; padding: 0 0 8px; overflow-y: auto; }
+.ja-sheet .ja-rl { display: flex; height: 28px; align-items: center; font-size: 12px; }
+.ja-sheet .ja-ri { height: 52px; gap: 14px; padding: 0 14px 0 20px; border-radius: 0 12px 12px 0; font-size: 16px; }
+.ja-sheet .ja-rc { font-size: 14px; }
+.ja-sh-foot {
+  display: flex; flex: none; min-height: 64px; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 8px max(16px, env(safe-area-inset-bottom)) 20px; border-top: 1px solid var(--line);
+}
+.ja-sh-foot p { color: var(--ink-subtle); font-size: 13px; }
+.ja-sh-foot > button { min-height: 44px; padding: 0 12px; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
+.ja-sh-foot > button:hover { color: var(--ink); }
+
+/* Floor: the top strip */
+.ja-floor { display: flex; flex-direction: column; gap: 12px; }
+.ja-strip { display: flex; flex-direction: column; gap: 12px; }
+.ja-cs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.ja-cs > div { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 2px 9px; }
+.ja-cs > div + div { border-left: 1px solid var(--line); }
+.ja-cs b { font-weight: 700; font-size: 26px; line-height: 1; }
+.ja-cs span { display: flex; align-items: center; gap: 5px; color: var(--ink-subtle); font-size: 11.5px; white-space: nowrap; }
+.ja-board {
+  display: inline-flex; flex: none; align-self: flex-start; min-height: 44px; align-items: center; padding: 0 14px;
+  border: 1.5px solid var(--jg-field-line); border-radius: 12px; color: var(--accent);
+  font-weight: 500; font-size: 14px; text-decoration: none; white-space: nowrap;
+}
+.ja-board:hover { background: var(--surface-2); }
+
+/* Floor: the phone's panel switcher */
+.ja-seg { display: flex; gap: 4px; padding: 4px; overflow-x: auto; border: 1.5px solid var(--line); border-radius: 14px; background: var(--jg-field); }
+.ja-seg button {
+  position: relative; display: flex; flex: 1 0 64px; min-width: 0; height: 52px; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1px; padding: 0 4px; border-radius: 10px; background: transparent; line-height: 1.15;
+}
+.ja-seg button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 15px; }
+.ja-seg button small { color: var(--ink-subtle); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
+.ja-seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.ja-seg button[aria-pressed="true"] small { color: var(--accent-ink); }
+.ja-pip { position: absolute; top: 6px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--waiting); box-shadow: 0 0 0 2px var(--jg-field); }
+.ja-pip.ja-gap { right: auto; left: 7px; background: var(--caution); }
+.ja-seg button[aria-pressed="true"] .ja-pip { box-shadow: 0 0 0 2px var(--accent); }
+
+/* Floor: a panel's column (on a phone, only the selected one) */
+.ja-cols { display: block; }
+.ja-col { min-width: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; background: var(--ja-col); }
+.ja-col[data-selected="false"] { display: none; }
+.ja-ch { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; padding: 12px 14px 10px; border-bottom: 1px solid var(--line); }
+.ja-ch h2 { font-weight: 700; font-size: 22px; line-height: 1.1; }
+.ja-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
+.ja-jn { flex: 1 0 100%; font-size: 14px; }
+.ja-ld { flex: 1 0 100%; color: var(--ink-subtle); font-size: 13px; }
+.ja-wt { color: var(--waiting-quiet); font-weight: 500; }
+.ja-gapp {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 2px 9px 2px 7px; border-radius: 999px;
+  border: 1px solid color-mix(in oklch, var(--caution) 35%, transparent); background: color-mix(in oklch, var(--caution) 12%, transparent);
+  color: var(--caution-quiet); font-weight: 500; font-size: 12px; line-height: 1.5;
+}
+.ja-gapp svg { flex: none; width: 12px; height: 12px; }
+.jg-ptag.ja-warn { border-color: color-mix(in oklch, var(--caution) 35%, transparent); background: color-mix(in oklch, var(--caution) 12%, transparent); color: var(--caution-quiet); }
+.ja-cl { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+.ja-none { margin: 0; padding: 20px 12px; color: var(--ink-faint); text-align: center; font-size: 14px; }
+
+/* Floor: a team's card */
+.ja-card { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.ja-w { border-color: color-mix(in oklch, var(--waiting) 45%, transparent); background: color-mix(in oklch, var(--waiting) 12%, transparent); }
+.ja-c1 { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
+.ja-c1 b { flex: none; font-weight: 700; font-size: 22px; line-height: 1.2; }
+.ja-cn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+.ja-c2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.ja-tm { font-weight: 500; font-size: 14px; }
+.ja-lw { padding: 7px 10px; gap: 8px; font-size: 12.5px; }
+.ja-lw p { margin: 0; }
+.ja-c4 { display: flex; align-items: center; gap: 8px; }
+.ja-go {
+  display: inline-flex; flex: 1; min-width: 0; height: 44px; align-items: center; justify-content: center;
+  border-radius: 12px; background: var(--c); color: var(--ci); font-weight: 700; font-size: 16px; white-space: nowrap;
+}
+.ja-go:disabled { opacity: 0.6; }
+.ja-mw { position: relative; flex: none; }
+.ja-more {
+  display: grid; flex: none; width: 44px; height: 44px; place-items: center;
+  border: 1.5px solid var(--jg-field-line); border-radius: 12px; background: transparent; color: var(--ink);
+}
+.ja-more:hover { background: var(--surface-2); }
+.ja-more[aria-expanded="true"] { background: var(--surface); border-color: var(--accent); }
+
+/* Floor: the "⋯" popover, opening under its button and lined up with the card's right edge */
+.ja-pop {
+  position: absolute; z-index: 5; top: calc(100% + 8px); right: 0; display: flex; width: min(264px, calc(100vw - 32px)); flex-direction: column; gap: 6px;
+  padding: 10px; border: 1.5px solid var(--jg-field-line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-key);
+}
+.ja-pop-h { margin: 0 0 2px; font-weight: 600; font-size: 14px; }
+.ja-pop-c { margin: 2px 0 0; color: var(--ink-subtle); font-size: 12px; }
+.ja-pi {
+  display: flex; width: 100%; min-height: 44px; align-items: center; padding: 0 10px; border-radius: 10px; background: transparent;
+  color: var(--ink); text-align: left; font-weight: 500; font-size: 15px;
+}
+.ja-pi:hover:not(:disabled) { background: var(--surface-2); }
+.ja-pi:disabled { color: var(--ink-faint); }
+.ja-pi.ja-danger { color: var(--danger-quiet); }
+.ja-opt {
+  display: flex; width: 100%; min-height: 44px; align-items: center; gap: 8px; padding: 0 10px;
+  border: 1.5px solid var(--jg-field-line); border-radius: 10px; background: var(--jg-field); color: var(--ink); text-align: left;
+}
+.ja-opt:hover:not(:disabled), .ja-opt:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--jg-ring); }
+.ja-opt b { font-weight: 600; font-size: 15px; }
+.ja-opt:disabled { opacity: 0.6; }
+
+/* From 1024px: the rail, and every panel as a column */
+@media (min-width: 1024px) {
+  body:has(.admin) > .theme-toggle { top: 6px; right: 8px; }
+
+  .ja-top { height: 56px; padding: 0 12px 0 20px; }
+  .ja-menu, .ja-sbar { display: none; }
+  .ja-top-r > button { min-height: 36px; }
+  .ja-rail { display: flex; }
+  .ja-pad { padding: 12px 20px 16px; }
+
+  .ja-floor { gap: 10px; }
+  .ja-strip { flex-direction: row; align-items: center; gap: 32px; height: 48px; }
+  .ja-cs { display: flex; gap: 32px; border: 0; border-radius: 0; background: transparent; }
+  .ja-cs > div { flex-direction: row; gap: 10px; padding: 0; }
+  .ja-cs > div + div { border-left: 0; }
+  .ja-cs b { font-size: 28px; }
+  .ja-cs span { gap: 6px; font-size: 13px; }
+  .ja-board { min-height: 36px; margin-left: auto; align-self: auto; border-radius: 10px; }
+  .ja-seg { display: none; }
+
+  .ja-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .ja-col[data-selected="false"] { display: flex; }
+  .ja-ch { padding: 12px 12px 10px; }
+  .ja-ch h2 { font-size: 20px; }
+  .ja-tags { order: 5; margin: 6px 0 0; }
+  .ja-gapp { order: 6; margin-left: auto; }
+  .ja-jn { font-size: 13px; }
+  .ja-ld { font-size: 12.5px; }
+  .ja-cl { padding: 8px; }
+
+  .ja-card { gap: 6px; padding: 9px 10px; }
+  .ja-c1 b { font-size: 20px; }
+  .ja-cn { font-size: 14px; }
+  .ja-tm { font-size: 13px; }
+  .ja-go { height: 36px; border-radius: 10px; font-size: 14px; }
+  .ja-more { width: 36px; height: 36px; border-radius: 10px; }
+}
+
+/* The Floor's list tags sit where the column header puts them; inside the popover's option they sit at its right. */
+.ja-opt .ja-tags { order: 0; margin: 0 0 0 auto; }

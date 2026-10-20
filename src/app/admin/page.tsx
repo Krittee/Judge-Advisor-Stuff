@@ -4,33 +4,28 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { liveRequestFor } from "@/lib/data";
 import { divisionsCompatible } from "@/lib/presets";
-import { TabBar, type TabItem } from "@/components/nav";
-import { canTransition, NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
+import { AdminFrame, type AdminTab as Tab } from "@/components/admin/AdminFrame";
+import { FloorTab } from "@/components/admin/FloorTab";
+import { canTransition, STATUS_META, type Status } from "@/lib/status";
 import { call, useAppState, useScores } from "@/components/useAppState";
 import {
   Banner,
   BookingTime,
   Button,
-  Elapsed,
   formatClock,
   inputClass,
   StatusChip,
-  StatusLegend,
-  TopBar,
 } from "@/components/ui";
-import { NotesDrawer, SignOutButton } from "@/components/judging";
+import { NotesDrawer } from "@/components/judging";
 import { Rankings } from "@/components/Rankings";
 import { ConflictDialog } from "@/components/ConflictDialog";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { CategoryChip, CategorySelect } from "@/components/CategoryChip";
-import { LanguageCover, LanguageTag } from "@/components/Language";
 import { FlagList, FlagSummary } from "@/components/Flags";
 import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
 import type { FlagReport } from "@/lib/flagValidation";
 import type { ActivityRow, FlagRow, Panel, RequestRow, Team } from "@/lib/types";
-
-type Tab = "floor" | "scores" | "teams" | "panels" | "conflicts" | "flags" | "import" | "log";
 
 /** The Judge Advisor's console: every panel at once, and the tools to unstick it. */
 export default function AdminPage() {
@@ -64,105 +59,90 @@ export default function AdminPage() {
     return <p className="p-10 text-center text-ink-faint">Loading…</p>;
   }
 
-  /* Ordered by the Judge Advisor's day rather than alphabetically, and
-     grouped: what is happening now, then the roster behind it, then the
-     record of both. The counts are what turn eight words into something
-     you can triage -- "Conflicts" says nothing, "Conflicts 2" sends you
-     there. Only teams actually waiting count as urgent; a total that is
-     merely large is not a reason to look. */
-  const waiting = state.requests.filter((r) => r.status === "requested").length;
-  const tabs: TabItem<Tab>[] = [
-    { id: "floor", label: "Floor", count: waiting, urgent: waiting > 0 },
-    { id: "conflicts", label: "Conflicts", count: state.conflicts.length },
-    { id: "flags", label: "Referee", count: state.flags.length },
-    { id: "teams", label: "Teams", count: state.teams.length, startsGroup: true },
-    { id: "panels", label: "Panels", count: state.panels.length },
-    { id: "import", label: "Import" },
-    { id: "scores", label: "Scores", startsGroup: true },
-    { id: "log", label: "Activity" },
-  ];
+  /* The shell orders the sections by the Judge Advisor's day rather than
+     alphabetically, and groups them: what is happening now, then the roster
+     behind it, then the record of both. The counts are what turn eight
+     words into something you can triage -- "Conflicts" says nothing,
+     "Conflicts 2" sends you there. Floor's is only the teams actually
+     waiting; a total that is merely large is not a reason to look. */
+  const counts = {
+    floor: state.requests.filter((r) => r.status === "requested").length,
+    conflicts: state.conflicts.length,
+    flags: state.flags.length,
+    teams: state.teams.length,
+    panels: state.panels.length,
+  };
 
   return (
     <>
-      <TopBar
-        title="Judge Queue"
-        subtitle="Judge Advisor"
+      <AdminFrame
+        name={session?.name}
         online={online}
-        role={state.viewer.role}
-        current="/admin"
-        right={<SignOutButton to="/admin/login" />}
-      />
+        tab={tab}
+        counts={counts}
+        onTab={(id) => {
+          // A marked team belongs to the trip you took to see it.
+          if (id !== tab) setFocusFlagTeam(null);
+          setTab(id);
+        }}
+      >
+        {/* The Floor fills the width the rail leaves; the older tabs keep the width and padding they had. */}
+        <div className={tab === "floor" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
+          {error ? (
+            <div className="mb-4">
+              <Banner kind="error" onDismiss={() => setError(null)}>
+                {error}
+              </Banner>
+            </div>
+          ) : null}
 
-      <nav className="app-header sticky top-[53px] z-10 border-b border-line backdrop-blur">
-        <div className="mx-auto max-w-7xl px-3 py-1.5">
-          <TabBar
-            label="Judge Advisor sections"
-            items={tabs}
-            active={tab}
-            onSelect={(id) => {
-              // A marked team belongs to the trip you took to see it.
-              if (id !== tab) setFocusFlagTeam(null);
-              setTab(id);
-            }}
-          />
+          {tab === "floor" ? (
+            <FloorTab state={state} refresh={refresh} onError={setError} onNotes={setNotesFor} />
+          ) : null}
+          {tab === "scores" ? (
+            <Rankings
+              teams={state.teams}
+              categories={state.categories}
+              scores={scoreData.scores}
+              rubricList={scoreData.rubrics}
+              loaded={scoreData.loaded}
+              error={scoreData.error}
+              panelName={Object.fromEntries(state.panels.map((p) => [p.id, p.name]))}
+              onOpenTeam={setNotesFor}
+              flags={state.flags}
+              flagKinds={state.flagKinds}
+              onOpenFlags={(team) => {
+                setFocusFlagTeam(team.id);
+                setTab("flags");
+              }}
+            />
+          ) : null}
+          {tab === "teams" ? <TeamsTab state={state} refresh={refresh} onError={setError} /> : null}
+          {tab === "panels" ? (
+            <PanelsTab
+              refresh={refresh}
+              onError={setError}
+              divisions={state.divisions}
+              languages={state.languages}
+            />
+          ) : null}
+          {tab === "conflicts" ? (
+            <ConflictsTab state={state} refresh={refresh} onError={setError} />
+          ) : null}
+          {tab === "flags" ? (
+            <FlagsTab
+              state={state}
+              refresh={refresh}
+              onError={setError}
+              focusTeamId={focusFlagTeam}
+            />
+          ) : null}
+          {tab === "import" ? (
+            <ImportTab refresh={refresh} onError={setError} divisions={state.divisions} />
+          ) : null}
+          {tab === "log" ? <ActivityTab /> : null}
         </div>
-      </nav>
-
-      <main className="mx-auto max-w-7xl px-4 py-5">
-        {error ? (
-          <div className="mb-4">
-            <Banner kind="error" onDismiss={() => setError(null)}>
-              {error}
-            </Banner>
-          </div>
-        ) : null}
-
-        {tab === "floor" ? (
-          <FloorTab state={state} refresh={refresh} onError={setError} onNotes={setNotesFor} />
-        ) : null}
-        {tab === "scores" ? (
-          <Rankings
-            teams={state.teams}
-            categories={state.categories}
-            scores={scoreData.scores}
-            rubricList={scoreData.rubrics}
-            loaded={scoreData.loaded}
-            error={scoreData.error}
-            panelName={Object.fromEntries(state.panels.map((p) => [p.id, p.name]))}
-            onOpenTeam={setNotesFor}
-            flags={state.flags}
-            flagKinds={state.flagKinds}
-            onOpenFlags={(team) => {
-              setFocusFlagTeam(team.id);
-              setTab("flags");
-            }}
-          />
-        ) : null}
-        {tab === "teams" ? <TeamsTab state={state} refresh={refresh} onError={setError} /> : null}
-        {tab === "panels" ? (
-          <PanelsTab
-            refresh={refresh}
-            onError={setError}
-            divisions={state.divisions}
-            languages={state.languages}
-          />
-        ) : null}
-        {tab === "conflicts" ? (
-          <ConflictsTab state={state} refresh={refresh} onError={setError} />
-        ) : null}
-        {tab === "flags" ? (
-          <FlagsTab
-            state={state}
-            refresh={refresh}
-            onError={setError}
-            focusTeamId={focusFlagTeam}
-          />
-        ) : null}
-        {tab === "import" ? (
-          <ImportTab refresh={refresh} onError={setError} divisions={state.divisions} />
-        ) : null}
-        {tab === "log" ? <ActivityTab /> : null}
-      </main>
+      </AdminFrame>
 
       {notesFor ? (
         <NotesDrawer
@@ -176,194 +156,11 @@ export default function AdminPage() {
   );
 }
 
-/* ==================================================================== */
-/* Floor — live view of every panel, with the controls to unjam it       */
-/* ==================================================================== */
-
 type TabProps = {
   state: ReturnType<typeof useAppState>["state"];
   refresh: () => Promise<void>;
   onError: (m: string | null) => void;
 };
-
-function FloorTab({
-  state,
-  refresh,
-  onError,
-  onNotes,
-}: TabProps & { onNotes: (t: Team) => void }) {
-  const [busy, setBusy] = useState<string | null>(null);
-
-  const rows = useMemo(() => {
-    return state.teams
-      .map((team) => ({ team, request: liveRequestFor(team.id, state.requests) }))
-      .filter((r) => r.request)
-      .sort((a, b) => {
-        const ra = STATUS_META[a.request!.status].order;
-        const rb = STATUS_META[b.request!.status].order;
-        return ra - rb || a.request!.requested_at.localeCompare(b.request!.requested_at);
-      });
-  }, [state.teams, state.requests]);
-
-  const counts = useMemo(() => {
-    const c: Record<string, number> = {};
-    for (const r of state.requests) c[r.status] = (c[r.status] ?? 0) + 1;
-    return c;
-  }, [state.requests]);
-
-  async function act(request: RequestRow, action: string, extra: Record<string, unknown> = {}) {
-    setBusy(request.id);
-    onError(null);
-    try {
-      // `from`: the status this row is showing, so a stale screen is refused.
-      await call(`/api/requests/${request.id}`, {
-        method: "PATCH",
-        body: { action, from: request.status, ...extra },
-      });
-      await refresh();
-    } catch (e) {
-      onError((e as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-        <div className="flex flex-wrap gap-x-6 gap-y-3">
-          {(["requested", "acknowledged", "interviewing", "completed"] as Status[]).map((s) => (
-            <div key={s}>
-              <div className="text-2xl font-bold tabular-nums">{counts[s] ?? 0}</div>
-              <div className="flex items-center gap-1.5 text-xs text-ink-faint">
-                <span className={`h-2 w-2 rounded-full ${STATUS_META[s].dot}`} />
-                {STATUS_META[s].short}
-              </div>
-            </div>
-          ))}
-        </div>
-        <a
-          href="/board"
-          target="_blank"
-          className="ml-auto rounded-lg bg-surface px-3 py-2 text-sm ring-1 ring-inset ring-line hover:bg-surface-2"
-        >
-          Open big-screen board ↗
-        </a>
-      </div>
-
-      <StatusLegend />
-
-      {!rows.length ? (
-        <Banner kind="info">Nothing in flight. Teams will appear here as they request judges.</Banner>
-      ) : null}
-
-      <ul className="space-y-2">
-        {rows.map(({ team, request }) => {
-          const panel = state.panels.find((p) => p.id === request!.panel_id);
-          return (
-            <li
-              key={request!.id}
-              className={`flex flex-wrap items-center gap-3 rounded-xl px-4 py-3 ring-1 ring-inset ${
-                request!.status === "requested"
-                  ? "bg-waiting/12 ring-waiting/45"
-                  : "bg-surface ring-line"
-              }`}
-            >
-              <span className="w-16 text-xl font-bold tabular-nums">{team.number}</span>
-              <span className="min-w-[8rem] flex-1 truncate text-sm text-ink-muted">
-                {team.name}
-              </span>
-
-              <select
-                value={request!.panel_id ?? ""}
-                onChange={(e) => act(request!, "reassign", { panelId: e.target.value })}
-                className="rounded-lg bg-surface px-2 py-1.5 text-xs ring-1 ring-inset ring-line"
-                title="Move this interview to another panel"
-              >
-                {/* Only somewhere this interview could actually go: the
-                    team's own division, and never a panel declared
-                    conflicted with them. The API refuses both, so offering
-                    them here only produces an error to undo. */}
-                {state.panels
-                  .filter(
-                    (p) =>
-                      (divisionsCompatible(team.division, p.division) &&
-                        !state.conflicts.some(
-                          (c) => c.panel_id === p.id && c.team_id === team.id,
-                        )) ||
-                      // Never drop the current value: a select whose value is
-                      // missing from its options shows a different panel than
-                      // the one actually holding the interview.
-                      p.id === request!.panel_id,
-                  )
-                  .map((p) => (
-                    <option key={p.id} value={p.id} className="bg-surface">
-                      {p.name}
-                    </option>
-                  ))}
-              </select>
-
-              <LanguageTag
-                language={request!.language}
-                languages={state.languages}
-                size="md"
-              />
-              <StatusChip status={request!.status} size="sm" />
-              <FlagSummary
-                flags={state.flags.filter((f) => f.team_id === team.id)}
-                kinds={state.flagKinds}
-              />
-              <span className="w-16 text-xs text-ink-faint">
-                <Elapsed since={request!.requested_at} />
-              </span>
-              {request!.kind === "slot" ? (
-                <BookingTime slotStart={request!.slot_start} status={request!.status} size="sm" label="Booked" />
-              ) : null}
-
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => onNotes(team)}>
-                  Notes
-                </Button>
-                {NEXT_STATUS[request!.status] ? (
-                  <Button
-                    size="sm"
-                    variant={NEXT_STATUS[request!.status] === "completed" ? "success" : "primary"}
-                    disabled={busy === request!.id}
-                    onClick={() => act(request!, "advance")}
-                  >
-                    {STATUS_META[NEXT_STATUS[request!.status]!].short}
-                  </Button>
-                ) : null}
-                <button
-                  onClick={() => act(request!, "cancel")}
-                  disabled={busy === request!.id}
-                  className="text-xs text-ink-faint hover:text-danger-quiet"
-                >
-                  cancel
-                </button>
-              </div>
-
-              {panel ? (
-                <span className="w-full text-xs text-ink-faint">
-                  {panel.judges.join(", ") || "no judges listed"}
-                </span>
-              ) : null}
-              {/* A request in a language its panel has not said it covers
-                  is worth surfacing here, where it can be reassigned. */}
-              {panel ? (
-                <LanguageCover
-                  panel={panel}
-                  languages={state.languages}
-                  asking={request!.language}
-                />
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
 
 /* ==================================================================== */
 /* Teams — the roster and who judges whom                                */

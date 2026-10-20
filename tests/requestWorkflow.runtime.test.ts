@@ -472,7 +472,8 @@ const page = (path: string) => readFileSync(join(root, path), "utf8");
 
 test("the judge and admin consoles say which status they were showing when a button was pressed", () => {
   assert.match(page("src/app/judge/page.tsx"), /body: \{ action, from: request\.status, \.\.\.extra \}/);
-  assert.match(page("src/app/admin/page.tsx"), /body: \{ action, from: request\.status, \.\.\.extra \}/);
+  // The Floor's writes moved out of the page with the Floor itself (src/components/admin/FloorTab.tsx).
+  assert.match(page("src/components/admin/FloorTab.tsx"), /body: \{ action, from: request\.status, \.\.\.extra \}/);
   assert.match(page("src/app/admin/page.tsx"), /body: \{ action, from: request\.status, \.\.\.\(action === "set-status"/);
 });
 
