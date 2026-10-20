@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { liveRequestFor } from "@/lib/data";
 import { divisionsCompatible } from "@/lib/presets";
@@ -9,6 +9,7 @@ import { AdminFrame, railCounts, type AdminTab as Tab } from "@/components/admin
 import { ConflictsTab } from "@/components/admin/ConflictsTab";
 import { saveJudgesAfterAsking } from "@/components/admin/conflictsLogic";
 import { FloorTab } from "@/components/admin/FloorTab";
+import { RefereeTab } from "@/components/admin/RefereeTab";
 import { canTransition, STATUS_META, type Status } from "@/lib/status";
 import { call, useAppState, useScores } from "@/components/useAppState";
 import {
@@ -23,11 +24,9 @@ import { NotesDrawer } from "@/components/judging";
 import { Rankings } from "@/components/Rankings";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { CategoryChip, CategorySelect } from "@/components/CategoryChip";
-import { FlagList, FlagSummary } from "@/components/Flags";
 import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
-import type { FlagReport } from "@/lib/flagValidation";
-import type { ActivityRow, FlagRow, Panel, RequestRow, Team } from "@/lib/types";
+import type { ActivityRow, Panel, RequestRow, Team } from "@/lib/types";
 
 /** The Judge Advisor's console: every panel at once, and the tools to unstick it. */
 export default function AdminPage() {
@@ -83,8 +82,8 @@ export default function AdminPage() {
           setTab(id);
         }}
       >
-        {/* The Floor and Conflicts fill the width the rail leaves; the older tabs keep the width and padding they had. */}
-        <div className={tab === "floor" || tab === "conflicts" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
+        {/* The redesigned tabs fill the width the rail leaves; the older ones keep the width and padding they had. */}
+        <div className={tab === "floor" || tab === "conflicts" || tab === "flags" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
           {error ? (
             <div className="mb-4">
               <Banner kind="error" onDismiss={() => setError(null)}>
@@ -127,11 +126,12 @@ export default function AdminPage() {
             <ConflictsTab state={state} refresh={refresh} onError={setError} />
           ) : null}
           {tab === "flags" ? (
-            <FlagsTab
+            <RefereeTab
               state={state}
               refresh={refresh}
               onError={setError}
               focusTeamId={focusFlagTeam}
+              adminName={session?.name}
             />
           ) : null}
           {tab === "import" ? (
@@ -570,149 +570,6 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
       <StorageHealth />
 
       <DangerZone refresh={refresh} onError={onError} />
-    </div>
-  );
-}
-
-/**
- * What the referees have recorded.
- *
- * Read-only for the Judge Advisor except for removal: flags are the
- * referees' record of the field, and the console is where you see the
- * whole picture and strike anything raised in error.
- */
-function FlagsTab({
-  state,
-  refresh,
-  onError,
-  focusTeamId,
-}: TabProps & { focusTeamId?: string | null }) {
-  const [busy, setBusy] = useState(false);
-  const { ask, dialog } = useConfirm();
-
-  const teamById = useMemo(() => new Map(state.teams.map((t) => [t.id, t])), [state.teams]);
-
-  async function remove(id: string) {
-    if (
-      !(await ask("Remove this flag? The judges will stop seeing it.", {
-        confirmLabel: "Remove flag",
-        danger: true,
-      }))
-    ) {
-      return;
-    }
-    setBusy(true);
-    onError(null);
-    try {
-      await call(`/api/flags?id=${id}`, { method: "DELETE" });
-      await refresh();
-    } catch (e) {
-      onError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function edit(id: string, patch: FlagReport) {
-    onError(null);
-    try {
-      await call(`/api/flags`, { method: "PATCH", body: { id, ...patch } });
-      await refresh();
-    } catch (e) {
-      onError((e as Error).message);
-      throw e; // let the flag's own inline form show it too
-    }
-  }
-
-  /* Grouped by team, worst first: the question this screen answers is
-     "who has been flagged, and how badly", not "what happened at 2:14". */
-  const byTeam = useMemo(() => {
-    const groups = new Map<string, FlagRow[]>();
-    for (const f of state.flags) groups.set(f.team_id, [...(groups.get(f.team_id) ?? []), f]);
-    return [...groups.entries()]
-      .map(([teamId, flags]) => ({
-        team: teamById.get(teamId),
-        flags,
-        worst: Math.max(
-          ...flags.map((f) => state.flagKinds.find((k) => k.id === f.kind)?.severity ?? 0),
-        ),
-      }))
-      .sort((a, b) => b.worst - a.worst || b.flags.length - a.flags.length);
-  }, [state.flags, state.flagKinds, teamById]);
-
-  const counts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const f of state.flags) m.set(f.kind, (m.get(f.kind) ?? 0) + 1);
-    return m;
-  }, [state.flags]);
-
-  /* Arriving from the Conduct column on Scores: bring that team into view
-     and ring it, because on a long list "we switched tabs" is not the same
-     as "here is the team you clicked". */
-  const focusRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    focusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    // Deliberately no timeout clearing the ring: someone reads a team's
-    // flags for as long as the discussion takes, and a marker that fades
-    // after a couple of seconds is gone exactly when they look up again.
-    // It clears when they leave the tab or click through to another team.
-  }, [focusTeamId]);
-
-  return (
-    <div className="space-y-5">
-      {dialog}
-      <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl bg-surface p-4 ring-1 ring-inset ring-line">
-        {[...state.flagKinds]
-          .sort((a, b) => b.severity - a.severity)
-          .map((k) => (
-            <div key={k.id}>
-              <div className="text-2xl font-bold tabular-nums">{counts.get(k.id) ?? 0}</div>
-              <div className="text-xs text-ink-faint">{k.label}</div>
-            </div>
-          ))}
-        <p className="w-full text-xs text-ink-faint">
-          Recorded by referees on their own page. Judges see these against the teams they
-          are judging; teams and the queue desk do not.
-        </p>
-      </div>
-
-      {!byTeam.length ? (
-        <p className="rounded-xl px-4 py-8 text-center text-sm text-ink-faint ring-1 ring-inset ring-line">
-          No referee has flagged anything yet.
-        </p>
-      ) : (
-        <div className="space-y-4">
-          {byTeam.map(({ team, flags }) => {
-            const focused = Boolean(team && team.id === focusTeamId);
-            return (
-            <div
-              key={team?.id ?? "gone"}
-              ref={focused ? focusRef : undefined}
-              className={`rounded-xl ring-1 ring-inset transition ${
-                focused ? "ring-2 ring-accent bg-accent/5" : "ring-line"
-              }`}
-            >
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-4 py-2.5">
-                <span className="font-bold tabular-nums">{team?.number ?? "—"}</span>
-                <span className="min-w-0 flex-1 truncate text-sm text-ink-subtle">
-                  {team?.name ?? "team removed"}
-                </span>
-                <FlagSummary flags={flags} kinds={state.flagKinds} />
-              </div>
-              <div className={`p-3 ${busy ? "opacity-60" : ""}`}>
-                <FlagList
-                  flags={flags}
-                  kinds={state.flagKinds}
-                  fieldCount={state.refereeSetup?.field_count}
-                  onRemove={remove}
-                  onEdit={edit}
-                />
-              </div>
-            </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

@@ -101,6 +101,18 @@ function FlagChip({
   );
 }
 
+/** How many flags of each kind a set of flags holds, worst first. A kind the
+ *  flags do not use is left out, and so is a kind the config no longer has. */
+export function kindCounts(flags: FlagRow[], kinds: FlagKind[]): { kind: FlagKind; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const f of flags) counts.set(f.kind, (counts.get(f.kind) ?? 0) + 1);
+
+  return [...counts.entries()]
+    .map(([id, count]) => ({ kind: kindOf(id, kinds), count }))
+    .filter((x): x is { kind: FlagKind; count: number } => x.kind !== null)
+    .sort((a, b) => b.kind.severity - a.kind.severity);
+}
+
 /** One line per kind a team has been flagged with, worst first. */
 export function FlagSummary({
   flags,
@@ -113,13 +125,7 @@ export function FlagSummary({
 }) {
   if (!flags.length) return null;
 
-  const counts = new Map<string, number>();
-  for (const f of flags) counts.set(f.kind, (counts.get(f.kind) ?? 0) + 1);
-
-  const ordered = [...counts.entries()]
-    .map(([id, count]) => ({ kind: kindOf(id, kinds), count }))
-    .filter((x): x is { kind: FlagKind; count: number } => x.kind !== null)
-    .sort((a, b) => b.kind.severity - a.kind.severity);
+  const ordered = kindCounts(flags, kinds);
 
   return (
     <span className="inline-flex flex-wrap items-center gap-1">

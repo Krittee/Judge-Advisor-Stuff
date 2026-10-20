@@ -646,7 +646,7 @@ test("the page wraps every tab in the frame, keeps its session gate, polling, fo
   // A marked team belongs to the trip you took to see it.
   assert.match(page, /if \(id !== tab\) setFocusFlagTeam\(null\);\s*setTab\(id\);/);
   assert.match(page, /setFocusFlagTeam\(team\.id\);\s*setTab\("flags"\);/);
-  for (const tab of ["Rankings", "TeamsTab", "PanelsTab", "ConflictsTab", "FlagsTab", "ImportTab", "ActivityTab"]) {
+  for (const tab of ["Rankings", "TeamsTab", "PanelsTab", "ConflictsTab", "RefereeTab", "ImportTab", "ActivityTab"]) {
     assert.ok(page.includes(`<${tab}`), `${tab} is still rendered inside the frame`);
   }
   assert.ok(page.includes("<FloorTab "), "the new Floor");

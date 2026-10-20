@@ -126,9 +126,10 @@ test("the Activity tab clears its error once a poll succeeds", () => {
 
 /* ---- BUG-032: the flags memo must not close over all of `state` -------- */
 
-test("the Referee tab's byTeam memo has no `typeof state` type query", () => {
-  const admin = code(read("src/app/admin/page.tsx"));
-  const memo = admin.match(/const byTeam = useMemo\(([\s\S]*?)\n  \}, \[/)?.[1] ?? "";
-  assert.ok(memo.length > 100, "could not find the byTeam memo");
+test("the Referee tab's flagged-teams memo has no `typeof state` type query", () => {
+  const tab = code(read("src/components/admin/RefereeTab.tsx"));
+  const memo = tab.match(/const rows = useMemo\(([\s\S]*?)\n  \);/)?.[1] ?? "";
+  assert.ok(memo.length > 20, "could not find the flagged-teams memo");
   assert.ok(!/typeof state\b/.test(memo), "`typeof state` makes exhaustive-deps ask for all of state");
+  assert.ok(/\[flags, kinds, teams\]/.test(memo), "its inputs are the three lists it reads, not the whole state");
 });
