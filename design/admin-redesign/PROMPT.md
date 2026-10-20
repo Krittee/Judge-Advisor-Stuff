@@ -18,14 +18,17 @@ The console is being designed **tab by tab**. This file covers:
 5. **Teams** (direction B, "Table + team drawer"). UI only.
 6. **Panels** (direction B, "Roster board"). UI only, but it **needs the
    judge roster** from the Conflicts data phase.
+7. **Import** (direction A, "One box"). UI, plus a small change to the
+   import response (per-line skip reasons, new/updated counts).
 
 More tabs will be added below as they are designed. Tabs that have no
 section here yet keep their current content, just rendered inside the new
 shell.
 
 **Commits, in order:** (1) shell + Floor; (2) Conflicts data; (3) Conflicts
-UI; (4) Referee; (5) Teams; (6) Panels. Each is one local commit with every check green. If you are only asked
-to do part of this file, do the parts in that order.
+UI; (4) Referee; (5) Teams; (6) Panels; (7) Import. Each is one local
+commit with every check green. If you are only asked to do part of this
+file, do the parts in that order.
 
 ## Sources
 
@@ -57,15 +60,18 @@ to do part of this file, do the parts in that order.
   - `reference-panels-phone.dc.html` — 375 wide: Panels, Judges segment
   - `reference-panels-add-judge-confirm.dc.html` — 375 wide: adding a
     judge who has conflicts with teams on that panel
+  - `reference-import-wide.dc.html` — 1280 wide: Import, filled box +
+    result
+  - `reference-import-phone.dc.html` — 375 wide: Import
   These are self-contained HTML mocks (custom `{{hole}}` template, not
   React). Read their `<style>` blocks for sizes, spacing and colours and
   their markup for structure and copy. Team data in them is sample data.
 - **Live canvas:** https://claude.ai/artifact/Nhv45XWtvnnjLwCC768jWc, row
   "Judge Advisor · Floor" (A chosen) and "Judge Advisor · Conflicts (by
   judge)" (C chosen), "Judge Advisor · Referee" (C chosen) and "Judge
-  Advisor · Teams" (B chosen), "Judge Advisor · Panels" (B chosen). Boards
-  marked "Not chosen" are exploration
-  only.
+  Advisor · Teams" (B chosen), "Judge Advisor · Panels" (B chosen),
+  "Judge Advisor · Import" (A chosen). Boards marked "Not chosen" are
+  exploration only.
 - **Patterns to reuse, not copy:** the judge console
   (`src/components/judge/`, `.judge` / `.jg-*` in `globals.css`): status
   pills, flag pills, the advance-button colour rule, `cancelCopy` /
@@ -550,6 +556,56 @@ judge with `takenOff` opens the confirm and Cancel restores the select
 and sends nothing; moving without `takenOff` saves directly; "+ New
 judge" adds with no panel; Remove from roster asks first; Delete panel
 leaves its judges in the roster with no panel; the two-click Delete all.
+
+## Import (direction A, "One box")
+
+Today's behaviour: `ImportTab` in `src/app/admin/page.tsx`,
+`readSpreadsheet` (`src/lib/spreadsheet.ts`), `POST /api/admin/teams`
+(`parseTeams` / `splitRow` in `src/app/api/admin/teams/route.ts`).
+
+### Keep
+- Choose a file (.xlsx .csv .tsv .txt), drag-and-drop onto the box, or
+  paste — all land in the same mono textarea. After a file loads, the
+  info line "Loaded <file> · N rows".
+- Format: `number, name, pit, division` (optional fifth column: notebook
+  type, as today). Tabs work; a header row is skipped; re-importing
+  updates teams instead of duplicating them; a blank division falls back
+  to the first configured one.
+- "Spread across panels evenly" + "max N per panel" (disabled when off).
+- Import is disabled while the box is empty and reads "Importing…" while
+  busy.
+
+### Layout
+Per `reference-import-wide.dc.html`: a **format card** (the format line
+in mono on the left, three short bullets on the right: division per team,
+pit like A1, re-importing updates), then the **drop-zone card** (Choose a
+file + "or drag one here · .xlsx .csv .tsv · or paste below", the
+textarea; the whole card shows the accent dashed border while dragging),
+the info line, the options row with **Import** (accent) on the right,
+then the result. Phone (`reference-import-phone.dc.html`): the same,
+stacked, Import full width.
+
+### Result (small API change)
+- `POST /api/admin/teams` returns, in addition to today's fields,
+  `created` and `updated` counts (an existing team number is an update)
+  and `skippedLines: { line: number; text: string; reason: string }[]`.
+  `parseTeams` records the reason instead of only counting:
+  - "no team number" (blank first cell),
+  - "no digit in the team number" (header-like),
+  - "team number has characters other than A–Z, 0–9 and -".
+  The **first line** being skipped for having no digit is a header row:
+  skip it silently (not reported), as today. Keep `skipped` for
+  compatibility.
+- Success box (done green): "Imported **46 teams**, 12 new · 34 updated ·
+  assigned 9 to panels." (the "assigned" part only when auto-assign was
+  on).
+- When lines were skipped, a caution box under it: "**2 lines skipped**"
+  and one entry per line: "Line 17 · no team number".
+
+### Tests (must fail if reverted)
+`parseTeams` reports each skip reason with its line number and doesn't
+report a header row; the route returns `created` / `updated`; the UI shows
+both boxes; Import stays disabled on an empty box.
 
 ## Rules
 
