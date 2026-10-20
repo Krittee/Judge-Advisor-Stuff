@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Judge Advisor referee · team list · phone · dark</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Fira+Sans:wght@400;500&amp;display=swap">
+<style>
+.jq{--canvas:oklch(0.165 0.012 265);--surface:oklch(0.205 0.014 265);--ink:oklch(0.955 0.005 265);--muted:oklch(0.670 0.013 265);--line:oklch(0.320 0.016 265);--accent:oklch(0.680 0.140 258);--on-accent:oklch(0.165 0.012 265);--ring:oklch(0.680 0.140 258 / 0.35);--field:oklch(0.180 0.013 265);--field-line:oklch(0.520 0.014 265);--waiting:oklch(0.735 0.185 58);--waiting-ink:oklch(0.240 0.060 58);--enroute:oklch(0.720 0.140 232);--enroute-ink:oklch(0.220 0.050 232);--active:oklch(0.680 0.170 300);--active-ink:oklch(0.220 0.060 300);--done:oklch(0.745 0.140 158);--done-ink:oklch(0.225 0.055 158);--booked:oklch(0.330 0.020 265);--booked-ink:oklch(0.860 0.012 265);--booked-line:oklch(0.440 0.020 265);--waiting-t:oklch(0.735 0.185 58 / 0.12);--waiting-r:oklch(0.735 0.185 58 / 0.45);--active-t:oklch(0.680 0.170 300 / 0.12);--active-r:oklch(0.680 0.170 300 / 0.45);--caution-bg:oklch(0.790 0.150 82 / 0.12);--caution-line:oklch(0.790 0.150 82 / 0.35);--caution-ink:oklch(0.840 0.100 82);--warn:oklch(0.790 0.150 82);--top-t:oklch(0.760 0.130 175 / 0.14);--top-l:oklch(0.760 0.130 175 / 0.40);--top-i:oklch(0.850 0.110 175);--strong-t:oklch(0.780 0.100 210 / 0.14);--strong-l:oklch(0.780 0.100 210 / 0.40);--strong-i:oklch(0.850 0.080 210);--middle-t:oklch(0.800 0.130 88 / 0.14);--middle-l:oklch(0.800 0.130 88 / 0.40);--middle-i:oklch(0.860 0.100 88);--emerging-t:oklch(0.700 0.010 265 / 0.16);--emerging-l:oklch(0.700 0.010 265 / 0.40);--emerging-i:oklch(0.820 0.008 265);--accent-t:oklch(0.680 0.140 258 / 0.14);--good:oklch(0.745 0.140 158);--minor:oklch(0.735 0.185 58);--major:oklch(0.640 0.200 18);--dq:oklch(0.300 0.010 265);--dq-line:oklch(0.440 0.020 265);--sev-ink:oklch(0.165 0.012 265);position:relative;box-sizing:border-box;width:375px;height:812px;overflow:hidden;display:flex;flex-direction:column;background:var(--canvas);color:var(--ink);font-family:'Fira Sans',system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+.jq *,.jq *::before,.jq *::after{box-sizing:border-box}
+:where(.jq) :is(h1,h2,h3,p,ul,ol,li,table,blockquote){margin:0;padding:0}
+:where(.jq) :is(ul,ol){list-style:none}
+.jq :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rule{flex:none;height:1px;background:var(--line)}
+.av{flex:none;width:28px;height:28px;display:block}
+.av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:22%;box-shadow:0 0 0 2px var(--accent)}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.who-t{display:flex;flex-direction:column;line-height:1.15}
+.who-t b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.who-t span{font-size:12px;color:var(--muted)}
+.top-r{display:flex;align-items:center;gap:2px}
+.live{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--done)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--done)}
+.signout{padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:14px;text-decoration:underline;cursor:pointer}
+.ptag{display:inline-flex;align-items:center;flex:none;height:24px;padding:0 7px;border:1px solid var(--line);border-radius:6px;color:var(--muted);font-size:12px;font-weight:500;letter-spacing:.04em;white-space:nowrap}
+.ptag.ma{border-color:var(--field-line);color:var(--ink)}
+.pill{display:inline-flex;align-items:center;gap:4px;flex:none;padding:2px 9px 2px 7px;border-radius:999px;font-size:12px;font-weight:500;line-height:1.5;white-space:nowrap}
+.pill svg{flex:none}
+.p-warn{background:var(--caution-bg);border:1px solid var(--caution-line);color:var(--caution-ink)}
+.quiet{flex:none;border:0;background:transparent;color:var(--muted);text-decoration:underline;white-space:nowrap;cursor:pointer}
+.caution{display:flex;gap:10px;align-items:flex-start;padding:8px 12px;border-radius:12px;background:var(--caution-bg);border:1px solid var(--caution-line);color:var(--caution-ink);font-size:14px;line-height:1.4}
+.caution svg{flex:none;margin-top:2px}
+.caution b{font-weight:500;color:var(--warn)}
+.sec{display:flex;align-items:center;gap:8px;min-height:24px;font-size:12px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rb{flex:none;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--waiting);color:var(--waiting-ink);font-size:12px;font-weight:500;line-height:22px;text-align:center;font-variant-numeric:tabular-nums}
+.s-good{--c:var(--good);--ci:var(--sev-ink)}
+.s-warn{--c:var(--warn);--ci:var(--sev-ink)}
+.s-minor{--c:var(--minor);--ci:var(--sev-ink)}
+.s-major{--c:var(--major);--ci:var(--sev-ink)}
+.s-dq{--c:var(--dq);--ci:oklch(0.955 0.005 265);--cb:var(--dq-line)}
+.sp{display:inline-flex;align-items:center;flex:none;height:24px;padding:0 10px;border-radius:999px;background:var(--c);border:1px solid var(--cb,var(--c));color:var(--ci);font-size:12px;font-weight:500;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dot{flex:none;display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 0 1px var(--cb,transparent)}
+.ru{display:inline-flex;align-items:center;flex:none;height:24px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--ink);font-family:Archivo,sans-serif;font-weight:600;font-size:13px;letter-spacing:.02em}
+.from{display:inline-flex;align-items:center;gap:6px;flex:none;height:24px;padding:0 9px;border:1px solid var(--accent);border-radius:6px;background:var(--accent-t);color:var(--ink);font-size:12px;font-weight:500;white-space:nowrap}
+.from svg{color:var(--accent)}
+.cap{font-size:13px;line-height:1.45;color:var(--muted)}
+.input{display:block;width:100%;margin:0;border:1.5px solid var(--field-line);border-radius:10px;background:var(--field);color:var(--ink);font-family:inherit;font-size:15px;padding:0 12px}
+.input::placeholder{color:var(--muted);opacity:1}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.srch{position:relative}
+.srch svg{position:absolute;left:12px;top:50%;margin-top:-8px;pointer-events:none;color:var(--muted)}
+.srch .input{padding-left:36px;-webkit-appearance:none;appearance:none}
+.fchips{display:flex;flex-wrap:wrap;gap:6px}
+.fchip{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--field-line);background:var(--field);color:var(--ink);font-family:Archivo,sans-serif;font-weight:600;font-size:14px;white-space:nowrap;cursor:pointer}
+.fchip .fn{font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
+.fchip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.fchip[aria-pressed="true"] .fn{color:var(--on-accent)}
+.top{flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 6px 0 4px}
+.menu{flex:none;width:44px;height:44px;margin-right:2px;border:0;border-radius:12px;background:transparent;color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.signout{min-height:44px}
+.sbar{position:relative;flex:none;height:44px;display:flex;align-items:center;gap:10px;padding:0 16px 0 17px;background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.sbar::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.sbar svg{color:var(--accent)}
+.sbar b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.sbar .rc{margin-left:auto;font-size:13px;color:var(--muted)}
+.body{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:12px 16px 16px}
+.body>*{flex:none}
+.q{min-height:44px;min-width:56px;padding:0 6px;font-size:14px}
+.cs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.cs>div{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 2px 9px}
+.cs>div+div{border-left:1px solid var(--line)}
+.cs b{font-family:Archivo,sans-serif;font-weight:700;font-size:24px;line-height:1;font-variant-numeric:tabular-nums}
+.cs span{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.tl{border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.jh{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:8px 16px;border-bottom:1px solid var(--line)}
+.jh h2{font-family:Archivo,sans-serif;font-weight:700;font-size:18px;line-height:1.2}
+.gn2{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tl li+li{border-top:1px solid var(--line)}
+.jr{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto auto 16px;align-items:center;gap:10px;min-height:60px;padding:6px 14px;color:var(--ink);text-decoration:none}
+.jr .c1{display:flex;align-items:baseline;gap:8px;min-width:0}
+.jr .c1 b{flex:none;font-family:Archivo,sans-serif;font-weight:700;font-size:20px;line-height:1.2;font-variant-numeric:tabular-nums}
+.jr .c1 span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
+.jr .ct{display:inline-flex;align-items:center;justify-content:flex-end;gap:5px;min-width:30px;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.jr svg{color:var(--muted)}
+.tl li.fx{margin:3px;border-radius:12px;background-image:linear-gradient(var(--accent-t),var(--accent-t));box-shadow:inset 0 0 0 2px var(--accent);border-top-color:transparent}
+.tl li.fx + li{border-top-color:transparent}
+.tl li.fx .jr{padding-left:11px;padding-right:11px}
+</style>
+</helmet>
+<div class="jq" data-theme="dark">
+<header class="top">
+<div class="who"><button type="button" class="menu" aria-label="Sections"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></button><span class="av"><img src="/avatars/judge-advisor.jpg" alt="" width="28" height="28"></span><span class="who-t"><b>Judge Advisor</b><span>Alex Morgan</span></span></div>
+<div class="top-r"><span class="live"><i aria-hidden="true"></i>Live</span><button type="button" class="signout">Sign out</button></div>
+</header>
+<div class="rule" aria-hidden="true"></div>
+<div class="sbar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4L17 12H5"></path></svg><b>Referee</b><span class="rc">9 flags</span></div>
+<main class="body">
+<h1 class="sr">Referee</h1>
+<section class="cs" aria-label="Flags by severity">
+<div><b>1</b><span aria-hidden="true"><i class="dot s-dq"></i>DQ</span><span class="sr">Disqualified</span></div>
+<div><b>1</b><span aria-hidden="true"><i class="dot s-major"></i>Major</span><span class="sr">Major violation</span></div>
+<div><b>2</b><span aria-hidden="true"><i class="dot s-minor"></i>Minor</span><span class="sr">Minor violation</span></div>
+<div><b>3</b><span aria-hidden="true"><i class="dot s-warn"></i>Warning</span><span class="sr">Warning</span></div>
+<div><b>2</b><span aria-hidden="true"><i class="dot s-good"></i>Good</span><span class="sr">Good conduct</span></div>
+</section>
+<p class="cap">Recorded by referees on their own page. Judges see these against the teams they are judging; teams and the queue desk do not.</p>
+<nav class="tl" aria-label="Flagged teams">
+<div class="jh"><h2>Flagged teams</h2><span class="gn2">5</span></div>
+<ul>
+<li><a class="jr" href="#"><span class="c1"><b>1101R</b><span>Rookies</span></span><span class="sp s-dq">DQ</span><span class="ct"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4L17 12H5"></path></svg>2<span class="sr"> flags</span></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a></li>
+<li class="fx"><a class="jr" href="#"><span class="c1"><b>9882K</b><span>Torque Titans</span></span><span class="sp s-minor">Minor</span><span class="ct"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4L17 12H5"></path></svg>2<span class="sr"> flags</span></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a></li>
+<li><a class="jr" href="#"><span class="c1"><b>6036D</b><span>Nuts &amp; Bolts</span></span><span class="sp s-minor">Minor</span><span class="ct"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4L17 12H5"></path></svg>1<span class="sr"> flag</span></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a></li>
+<li><a class="jr" href="#"><span class="c1"><b>1108</b><span>Circuit Breakers</span></span><span class="sp s-warn">Warning</span><span class="ct"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4L17 12H5"></path></svg>3<span class="sr"> flags</span></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a></li>
+<li><a class="jr" href="#"><span class="c1"><b>2011A</b><span>Gear Gremlins</span></span><span class="sp s-good">Good</span><span class="ct"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4L17 12H5"></path></svg>1<span class="sr"> flag</span></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a></li>
+</ul>
+</nav>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":375,"height":812}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

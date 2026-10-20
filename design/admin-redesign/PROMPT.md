@@ -14,13 +14,14 @@ The console is being designed **tab by tab**. This file covers:
 2. **Floor** (direction A, "Panel board"). UI only.
 3. **Conflicts** (direction C, "One form + table") — conflicts move from
    panels to individual judges. **Data + UI**, see its section.
+4. **Referee** (direction C, "Team + history"). UI only.
 
 More tabs will be added below as they are designed. Tabs that have no
 section here yet keep their current content, just rendered inside the new
 shell.
 
 **Commits, in order:** (1) shell + Floor; (2) Conflicts data; (3) Conflicts
-UI. Each is one local commit with every check green. If you are only asked
+UI; (4) Referee. Each is one local commit with every check green. If you are only asked
 to do part of this file, do the parts in that order.
 
 ## Sources
@@ -35,12 +36,18 @@ to do part of this file, do the parts in that order.
     judge + pinned record form
   - `reference-conflicts-phone.dc.html` — 375 wide: Conflicts with the
     record sheet open
+  - `reference-referee-wide.dc.html` — 1280 wide: Referee, flagged teams
+    + the selected team's history
+  - `reference-referee-phone.dc.html` — 375 wide: Referee, flagged-team
+    list
+  - `reference-referee-edit-sheet.dc.html` — 375 wide: the "Correct flag"
+    sheet (also used at 1280 as a dialog)
   These are self-contained HTML mocks (custom `{{hole}}` template, not
   React). Read their `<style>` blocks for sizes, spacing and colours and
   their markup for structure and copy. Team data in them is sample data.
 - **Live canvas:** https://claude.ai/artifact/Nhv45XWtvnnjLwCC768jWc, row
   "Judge Advisor · Floor" (A chosen) and "Judge Advisor · Conflicts (by
-  judge)" (C chosen). Boards marked "Not chosen" are exploration only.
+  judge)" (C chosen) and "Judge Advisor · Referee" (C chosen). Boards marked "Not chosen" are exploration only.
 - **Patterns to reuse, not copy:** the judge console
   (`src/components/judge/`, `.judge` / `.jg-*` in `globals.css`): status
   pills, flag pills, the advance-button colour rule, `cancelCopy` /
@@ -312,6 +319,80 @@ conflicts for a judge on a panel and see a team come off it; record one for
 a judge with no panel and see no block until you add them to a panel in
 the Panels tab (which asks first); withdraw one; the Floor "Move to panel…"
 list and the judge console both honour the block.
+
+## Referee (direction C, "Team + history") — UI only
+
+Today's behaviour: `FlagsTab` in `src/app/admin/page.tsx`, `FlagList` /
+`FlagSummary` / the inline edit in `src/components/Flags.tsx`,
+`MatchFields`, `src/lib/refereeHistory.ts` (repeat detection). Reuse the
+referee console's pieces for the sheet (`src/components/referee/` —
+`MatchSheet`, `SeverityButtons`) rather than copying them.
+
+### Keep
+- Counts per severity across the event (from `flagKinds`, worst first).
+- The caption: "Recorded by referees on their own page. Judges see these
+  against the teams they are judging; teams and the queue desk do not."
+- Remove asks first ("Remove this flag? The judges will stop seeing it.").
+- A correction can only produce values the referee's own form could
+  (same match types for the ruleset, fields 1..N from the event setup,
+  rules from the ruleset); legacy values on old flags are sent back as they
+  are, as `FlagList` does today.
+- Arriving from Scores' conduct link (`focusFlagTeam`) selects that team
+  and scrolls it into view; it stays selected until you pick another team
+  or leave the section.
+- Empty state: "No referee has flagged anything yet."
+
+### Layout (≥1024px)
+- **Count strip** across the top: five big numbers with severity dots
+  (Disqualified, Major violation, Minor violation, Warning, Good conduct),
+  then the caption.
+- **Left column (~340px), "Flagged teams":** one row per team with flags,
+  sorted worst severity first, then most flags. Row: team number, name,
+  the worst severity as a pill, and a flag icon + count. The selected row
+  gets the accent bar and tint (as the rail). Default selection: the
+  focused team if arriving from Scores, else the first row.
+- **Right pane, the selected team:** number + name, tags (division, pit,
+  panel), severity summary pills ("Minor ×1", "Warning ×1"). A caution
+  box when a rule repeats, built from `refereeHistory`: "**Repeated.** GG17
+  twice: Q12 (Warning), Q19 (Minor)". Then **History, newest first** as a
+  vertical timeline: time on the left, a dot in the severity colour, and a
+  card with severity pill, match · field, rule chips, a "Repeated" caution
+  tag on the repeating rule, a neutral "Match affecting" tag when set, the
+  note, the referee's name, and quiet Edit / Remove.
+
+### Phone (<1024px)
+The count strip becomes a 5-cell row; below it the flagged-teams list
+(full width). Tapping a team opens its history as a full screen with a
+back button (same content as the right pane). Arriving from Scores opens
+that team directly.
+
+### Correct flag sheet
+Edit opens a `<dialog>` — a bottom sheet on a phone, a centred dialog at
+≥1024px — titled "Correct flag · <team>", per
+`reference-referee-edit-sheet.dc.html`: match type segment + match number,
+field chips (from the event setup's field count), rule chips + "All rules"
+picker, match-affecting switch (Minor and Major only, as the referee
+console), note, and the five compact severity buttons.
+
+**Behaviour change, on purpose:** severity buttons only **select**; a
+pinned **"Save correction"** (accent) saves the whole correction. This
+matches the referee console (select, then confirm) instead of today's
+"tapping a severity saves". Under the button, muted: "Logged as a
+correction by <admin name>". The PATCH body and the activity log entry
+stay as today.
+
+### Colour
+Severity colours only on severity pills, dots and buttons; caution for
+"Repeated"; accent for selection, focus and the save button. Use dark ink
+on the Major (red) fill wherever white would fall under 4.5:1 at its text
+size (it measures about 3.5:1 at 12px); check the same pill in the referee
+console and fix it there too if it uses white.
+
+### Tests (must fail if reverted)
+Team ordering (worst first, then count); default selection with and
+without `focusFlagTeam`; the repeat box text from `refereeHistory`;
+severity buttons in the sheet don't save until "Save correction"; Remove
+asks first and sends nothing when declined; phone list → team → back.
 
 ## Rules
 
