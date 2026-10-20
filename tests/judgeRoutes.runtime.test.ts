@@ -513,3 +513,45 @@ test("removing a judge removes their conflicts and says how many", async () => {
   assert.deepEqual((await w.db.listConflicts()).map((c) => c.id), [stays.id]);
   assert.ok(!(await actions(w)).includes("withdrew a conflict of interest"), "removal is logged as the judge's, once");
 });
+
+/* ===== the Panels tab's Delete panel and Delete all ===================== */
+
+test("Delete panel through the route leaves its judges on the roster with no panel, and keeps their conflicts", async () => {
+  const w = await world();
+  const sam = await w.db.addJudge({ name: "Sam Okafor" });
+  await w.db.updateJudge(w.priya.id, { panel_id: w.p2.id });
+  await w.db.updateJudge(sam.id, { panel_id: w.p2.id });
+  const keeps = await conflictWith(w, w.priya, w.hawks);
+  const legacy = await w.db.addConflict({ panelId: w.p2.id, teamId: w.loose.id, judgeName: null, note: null, declaredBy: "admin:JA" });
+
+  assert.equal((await hit(panelsRoute, "DELETE", QUEUER, `/api/admin/panels?id=${w.p2.id}`)).status, 403, "the Judge Advisor's alone");
+  assert.equal((await w.db.listPanels()).length, 3);
+
+  const res = await hit(panelsRoute, "DELETE", ADMIN, `/api/admin/panels?id=${w.p2.id}`);
+  assert.deepEqual([res.status, res.body.deleted], [200, 1]);
+
+  assert.deepEqual((await w.db.listPanels()).map((p) => p.id), [w.p1.id, w.p3.id], "only that panel went");
+  const judges = await w.db.listJudges();
+  assert.deepEqual(judges.map((j) => j.name).sort(), ["Priya Nair", "Sam Okafor"], "the judges are still on the roster");
+  assert.deepEqual(judges.map((j) => j.panel_id), [null, null], "on no panel");
+  const left = (await w.db.listConflicts()).map((c) => c.id);
+  assert.ok(left.includes(keeps.id), "a judge's conflict stays with the judge");
+  assert.ok(!left.includes(legacy.id), "a whole-panel conflict named a panel that is gone");
+  // With no panel the judge blocks nobody until they are put on one again.
+  const reassign = await roster(ADMIN, "PATCH", { id: w.priya.id, panelId: w.p3.id, dryRun: true });
+  assert.deepEqual(reassign.body.takenOff, [], "no team is held by Panel 3 that Priya's conflict names");
+  assert.ok((await actions(w)).every((a) => a !== "removed a judge"), "no judge was removed");
+});
+
+test("Delete all panels through the route clears the panels and leaves every judge on the roster, on none", async () => {
+  const w = await world();
+  await w.db.updateJudge(w.priya.id, { panel_id: w.p1.id });
+  const keeps = await conflictWith(w, w.priya, w.bolts);
+
+  const res = await hit(panelsRoute, "DELETE", ADMIN, "/api/admin/panels?all=true");
+  assert.deepEqual([res.status, res.body.deleted], [200, 3]);
+  assert.deepEqual(await w.db.listPanels(), []);
+  assert.deepEqual((await w.db.listJudges()).map((j) => [j.name, j.panel_id]), [["Priya Nair", null]]);
+  assert.deepEqual((await w.db.listConflicts()).map((c) => c.id), [keeps.id]);
+  assert.equal((await teamNow(w, w.hawks)).panel_id, null, "teams stay, unassigned");
+});

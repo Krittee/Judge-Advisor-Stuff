@@ -245,13 +245,54 @@ test("the page uses the tab, counts judge conflicts only, and the old tab and it
   assert.ok(!page.includes("ConflictDialog"));
 });
 
-test("the Panels judges field looks first (dryRun), asks if teams would come off, then saves", () => {
-  assert.ok(page.includes("saveJudgesAfterAsking("));
-  assert.match(page, /body: \{ id: panel\.id, judges, dryRun: true \}/);
-  assert.match(page, /\(\) => onPatch\(panel\.id, \{ judges \}\)/);
-  assert.ok(!page.includes("onPatch(panel.id, { judges: e.target.value })"), "no save that skips the question");
-  // Declining puts the typed text back.
-  assert.match(page, /if \(!saved\) field\.value = panel\.judges\.join\(", "\);/);
+test("the Panels tab has no judges text field any more: a move looks first (dryRun) and asks inside the roster board", () => {
+  const panelsTab = read("src/components/admin/PanelsTab.tsx");
+  const panelsLogic = read("src/components/admin/panelsLogic.ts");
+  assert.ok(!page.includes("saveJudgesAfterAsking(") && !page.includes("Judge names, comma separated"));
+  assert.ok(!panelsTab.includes("Judge names, comma separated") && !panelsTab.includes("saveJudgesAfterAsking"), "the roster replaced the field");
+  assert.match(panelsLogic, /body: \{ \.\.\.body, dryRun: true \}/);
+  assert.ok(panelsTab.includes("moveJudgeShowing("));
+});
+
+/* ---- arriving from Panels --------------------------------------------------- */
+
+const arrive = (focus: string | null, over: Partial<AppState> = {}) =>
+  renderToStaticMarkup(
+    <ConflictsTab
+      state={{ panels, teams, judges: roster, conflicts: mock, ...over } as unknown as AppState}
+      refresh={async () => {}}
+      onError={() => {}}
+      focusJudgeId={focus}
+    />,
+  );
+
+test("the 'N conflicts' link on Panels lands here with that judge's group marked and focusable, and the form on them", () => {
+  const m = arrive(priya.id);
+  assert.match(m, /<section class="ja-grp ja-fx" tabindex="-1" aria-labelledby="g-j-priya">/);
+  assert.equal(m.match(/ja-fx/g)?.length, 1, "only that judge's group");
+  assert.doesNotMatch(group(m, "Lee Chen"), /ja-fx/);
+  const select = aside(m).match(/<select[\s\S]*?<\/select>/)?.[0] ?? "";
+  assert.match(select, /<option value="j-priya" selected="">Priya Nair<\/option>/, "the Judge select is on them");
+  assert.doesNotMatch(select, /Choose a judge/);
+  assert.match(text(aside(m)), /Blocks Panel 2/);
+});
+
+test("without a focus, or with a judge who has no conflicts or is gone, nothing is marked and the form waits for a choice", () => {
+  for (const focus of [null, dana.id, "j-gone"]) {
+    const m = arrive(focus);
+    assert.doesNotMatch(m, /ja-fx|tabindex="-1"/, `focus ${focus}`);
+  }
+  assert.match(aside(arrive(null)), /<option value="" disabled="" selected="">Choose a judge…<\/option>/);
+  // A judge with no conflicts is still a valid pick for the form (their group just is not there).
+  assert.match(aside(arrive(dana.id)), /<option value="j-dana" selected="">Dana Ruiz<\/option>/);
+  assert.match(aside(arrive("j-gone")), /Choose a judge…/, "an unknown id is not a choice");
+});
+
+test("the tab scrolls the marked group into view after the frame's own scroll-to-top, and the page hands it the focus", () => {
+  assert.match(src, /el\.focus\(\{ preventScroll: true \}\);\s*const frame = requestAnimationFrame\(\(\) => el\.scrollIntoView\?\.\(\{ block: "nearest" \}\)\);/);
+  assert.match(src, /\}, \[focusJudgeId\]\);/);
+  assert.ok(src.includes("useRecorder(state.judges, refresh, focusJudgeId ?? \"\")"));
+  assert.ok(page.includes("focusJudgeId={focusJudge}"));
 });
 
 test("the Conflicts styles are page-scoped, use tokens for both themes, and have no animation", () => {

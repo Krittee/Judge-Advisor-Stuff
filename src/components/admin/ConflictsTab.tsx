@@ -58,8 +58,8 @@ const RESULT_ICON = {
 } as const;
 
 /** The record form's state, shared by the pinned panel (wide) and the bottom sheet (phone), which show one form at a time. */
-function useRecorder(judges: AppState["judges"], refresh: () => Promise<void>) {
-  const [picked, setPicked] = useState("");
+function useRecorder(judges: AppState["judges"], refresh: () => Promise<void>, startOn = "") {
+  const [picked, setPicked] = useState(startOn);
   const [name, setName] = useState("");
   const [judgeNote, setJudgeNote] = useState("");
   const [teamNumbers, setTeamNumbers] = useState("");
@@ -114,10 +114,13 @@ export function ConflictsTab({
   state,
   refresh,
   onError,
+  focusJudgeId = null,
 }: {
   state: AppState;
   refresh: () => Promise<void>;
   onError: (message: string | null) => void;
+  /** The judge the Panels tab's "N conflicts" pill sent you for: their group is marked and the record form starts on them. */
+  focusJudgeId?: string | null;
 }) {
   const { ask, dialog } = useConfirm();
   const [withdrawing, setWithdrawing] = useState<string | null>(null);
@@ -126,7 +129,7 @@ export function ConflictsTab({
   const sheetTitle = useId();
   const asideId = useId();
   const sheetId = useId();
-  const rec = useRecorder(state.judges, refresh);
+  const rec = useRecorder(state.judges, refresh, focusJudgeId ?? "");
 
   const blocks = useMemo(() => panelBlocks(state.conflicts, state.judges), [state.conflicts, state.judges]);
   const { byJudge, legacy } = useMemo(
@@ -134,6 +137,17 @@ export function ConflictsTab({
     [state.conflicts, state.judges, state.panels, state.teams, blocks],
   );
   const stranded = useMemo(() => strandedTeams(state.teams, state.panels, blocks), [state.teams, state.panels, blocks]);
+
+  // Arriving from Panels: bring that judge's group into view and put the keyboard on it. The frame scrolls a new section to its top in
+  // an effect of its own that runs after this one, so the scroll waits a frame.
+  const focusGroup = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = focusGroup.current;
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    const frame = requestAnimationFrame(() => el.scrollIntoView?.({ block: "nearest" }));
+    return () => cancelAnimationFrame(frame);
+  }, [focusJudgeId]);
 
   // A native <dialog> opened with showModal(), as the judge's team sheet is.
   useEffect(() => {
@@ -207,7 +221,13 @@ export function ConflictsTab({
             </h2>
             <div className="ja-gl">
               {byJudge.map(({ judge, panel, rows }) => (
-                <section key={judge.id} className="ja-grp" aria-labelledby={`g-${judge.id}`}>
+                <section
+                  key={judge.id}
+                  ref={judge.id === focusJudgeId ? focusGroup : undefined}
+                  className={judge.id === focusJudgeId ? "ja-grp ja-fx" : "ja-grp"}
+                  tabIndex={judge.id === focusJudgeId ? -1 : undefined}
+                  aria-labelledby={`g-${judge.id}`}
+                >
                   <header className="ja-gh">
                     <h3 id={`g-${judge.id}`}>{judge.name}</h3>
                     {panel ? <span className="jg-ptag">{panelTag(panel)}</span> : null}

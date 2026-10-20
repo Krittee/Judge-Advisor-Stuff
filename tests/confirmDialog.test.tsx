@@ -138,21 +138,28 @@ test("the referee page awaits the shared ask() for the setup change before savin
 
 test("each of the admin console's confirmations goes through ask()", () => {
   const src = read("src/app/admin/page.tsx");
-  // Remove team and the two resets moved to the Teams tab (checked below).
-  assert.equal(src.match(/await ask\(/g)?.length, 2);
-  assert.equal(src.match(/useConfirm\(\)/g)?.length, 1, "one hook per component that asks");
-  assert.equal(src.match(/\{dialog\}/g)?.length, 1, "each renders its dialog");
+  // Every question moved into a tab (checked below); the page itself asks none.
+  assert.equal(src.match(/await ask\(/g)?.length ?? 0, 0);
+  assert.ok(!src.includes("useConfirm()"), "the page has no hook of its own to render");
+  // The Panels tab: the division change, Delete panel and Remove from roster, all through ask(); the add-judge one is its own dialog.
+  const panelsLogic = read("src/components/admin/panelsLogic.ts");
   const sites: [string, RegExp][] = [
-    ["move division", /await ask\(\s*`Move \$\{panel\.name\} to \$\{division\}\?[\s\S]*?confirmLabel: "Move division", danger: true/],
-    ["delete panel", /await ask\(`Delete \$\{panel\.name\}\? Its teams become unassigned\.`,\s*\{\s*confirmLabel: "Delete panel",\s*danger: true/],
+    ["move division", /await ask\(divisionQuestion\(panelName, division\), \{ confirmLabel: "Move division", danger: true \}\)/],
+    ["delete panel", /await ask\(deletePanelQuestion\(panel\.name\), \{ confirmLabel: "Delete panel", danger: true \}\)/],
+    ["remove judge", /await ask\(removeJudgeQuestion\(judge\.name, conflicts\), \{ confirmLabel: "Remove from roster", danger: true \}\)/],
   ];
-  for (const [name, re] of sites) assert.match(src, re, `${name} does not ask through ask()`);
-  // The select snaps back while the question is open, so the choice is read first.
-  assert.ok(src.indexOf("const division = e.target.value;") < src.indexOf("await ask(\n"));
-  assert.ok(!src.includes("onPatch(panel.id, { division: e.target.value })"));
+  for (const [name, re] of sites) assert.match(panelsLogic, re, `${name} does not ask through ask()`);
+  assert.match(panelsLogic, /Move \$\{panelName\} to \$\{division\}\?\\n\\n/);
+  const panelsTab = read("src/components/admin/PanelsTab.tsx");
+  assert.equal(panelsTab.match(/useConfirm\(\)/g)?.length, 1, "one hook, one rendered dialog");
+  assert.equal(panelsTab.match(/\{dialog\}/g)?.length, 1);
+  assert.ok(panelsTab.includes("changeDivisionAfterAsking(ask, panel.name, division,"));
+  assert.ok(panelsTab.includes("deletePanelAfterAsking(ask, call, panel)"));
+  assert.ok(panelsTab.includes("removeJudgeAfterAsking(ask, call, judge,"));
+  // The select snaps back while the question is open, so the choice is read from the event, as it happens.
+  assert.ok(panelsTab.includes("onChange={(e) => onDivision(panel, e.target.value)}"));
 
-  // Three more ask from elsewhere: the Panels judges field (inside the page), Withdraw (in the Conflicts tab) and Remove flag (in the Referee tab).
-  assert.match(src, /saveJudgesAfterAsking\(\s*ask,/, "the judges field asks before it takes teams off a panel");
+  // Two more ask from elsewhere: Withdraw (in the Conflicts tab) and Remove flag (in the Referee tab).
   const conflicts = read("src/components/admin/ConflictsTab.tsx");
   assert.ok(conflicts.includes("withdrawAfterAsking(ask, question,"), "withdraw a conflict asks first");
   assert.match(read("src/components/admin/conflictsLogic.ts"), /await ask\(question, \{ confirmLabel: "Withdraw", danger: true \}\)/);
