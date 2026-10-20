@@ -119,7 +119,11 @@ export async function saveTeam(call: Call, team: Team, draft: TeamDraft): Promis
   return true;
 }
 
-/** The panels the select offers: the Floor's allowed list (division and conflicts, plus the team's own). One that holds the team but is now blocked is marked. */
+/**
+ * The panels the select offers: the Floor's allowed list (division and conflicts), plus the team's own.
+ * The Floor stops offering a panel that has become blocked as a place to move to; here it must stay
+ * so the select shows where the team really is, marked, instead of reading "— none —".
+ */
 export function panelOptions(
   team: Team,
   panels: PublicPanel[],
@@ -127,11 +131,10 @@ export function panelOptions(
   judges: JudgeRow[],
 ): { id: string; name: string; blocked: boolean }[] {
   const blocks = panelBlocks(conflicts, judges);
-  return allowedPanels(team, team.panel_id, panels, conflicts, judges).map((p) => ({
-    id: p.id,
-    name: p.name,
-    blocked: isPanelBlocked(blocks, p.id, team.id),
-  }));
+  const allowed = new Set(allowedPanels(team, team.panel_id, panels, conflicts, judges).map((p) => p.id));
+  return panels
+    .filter((p) => allowed.has(p.id) || p.id === team.panel_id)
+    .map((p) => ({ id: p.id, name: p.name, blocked: isPanelBlocked(blocks, p.id, team.id) }));
 }
 
 /* ---- closing with unsaved changes ------------------------------------------ */

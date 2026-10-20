@@ -111,7 +111,7 @@ export async function PATCH(request: Request) {
     const before = roster;
     const panel = await db.updatePanel(id, patch);
     if (patch.judges) {
-      await takeOffPanel(id, takeOff);
+      await takeOffPanel(takeOff);
       await logJudgeChanges(session, panel, before, patch.judges, takeOff.map((t) => t.number));
     }
     return NextResponse.json({ panel, takenOff: takeOff.map((t) => t.number) });

@@ -1,6 +1,6 @@
 import { store } from "./db";
 import type { Session } from "./auth";
-import { blockedAndHeld, blockedTeams, isPanelBlocked, panelBlocks, type PanelBlock } from "./roster";
+import { blockedAndAssigned, blockedTeams, isPanelBlocked, panelBlocks, type PanelBlock } from "./roster";
 import type { JudgeRow, Team } from "./types";
 
 // The rule lives in roster.ts (client-safe); server code imports it from here.
@@ -15,28 +15,20 @@ export async function loadBlocks(): Promise<PanelBlock[]> {
 
 /**
  * The teams a panel would have to give up if the roster became `judgesAfter`:
- * ones it holds (assigned, or with a live request or booking) that the new
- * roster blocks it from and the current one does not. Reads only.
+ * ones assigned to it that the new roster blocks it from and the current one
+ * does not. Reads only. This is the list `takeOffPanel` writes, so what is
+ * reported is what changes.
  */
 export async function teamsToTakeOff(panelId: string, judgesAfter: JudgeRow[]): Promise<Team[]> {
   const db = store();
-  const [conflicts, judgesNow, teams, requests] = await Promise.all([
-    db.listConflicts(),
-    db.listJudges(),
-    db.listTeams(),
-    db.listRequests(),
-  ]);
+  const [conflicts, judgesNow, teams] = await Promise.all([db.listConflicts(), db.listJudges(), db.listTeams()]);
   const already = blockedTeams(panelBlocks(conflicts, judgesNow), panelId);
-  return blockedAndHeld(panelId, panelBlocks(conflicts, judgesAfter), teams, requests).filter(
-    (t) => !already.has(t.id),
-  );
+  return blockedAndAssigned(panelId, panelBlocks(conflicts, judgesAfter), teams).filter((t) => !already.has(t.id));
 }
 
-/** Take them off the panel the way declaring a conflict always has: the team loses its panel. */
-export async function takeOffPanel(panelId: string, teams: Team[]): Promise<void> {
-  for (const team of teams) {
-    if (team.panel_id === panelId) await store().updateTeam(team.id, { panel_id: null });
-  }
+/** Take them off their panel the way declaring a conflict always has: the team loses its panel. */
+export async function takeOffPanel(teams: Team[]): Promise<void> {
+  for (const team of teams) await store().updateTeam(team.id, { panel_id: null });
 }
 
 /**

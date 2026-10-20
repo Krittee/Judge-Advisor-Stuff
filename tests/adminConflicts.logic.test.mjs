@@ -10,7 +10,6 @@ import {
   panelTag,
   recordConflicts,
   resultLines,
-  saveJudgesAfterAsking,
   strandedTeams,
   withdrawAfterAsking,
   withdrawQuestion,
@@ -296,42 +295,4 @@ test("Withdraw asks first: declining sends nothing, confirming sends once, and t
   no.settle(false);
   assert.equal(await declined, false);
   assert.deepEqual(sent, ["delete"], "declining sends nothing");
-});
-
-/* ---- the Panels tab's judges field ----------------------------------------- */
-
-test("saving a panel's judges asks first when the dry run reports teams coming off, and saves only on a yes", async () => {
-  const log = [];
-  const ask = createConfirmer((p) => p && log.push(["asked", p.question, p.confirmLabel]));
-
-  const saved = saveJudgesAfterAsking(ask.ask, "Panel 2", async () => (log.push(["preview"]), ["9882K", "7700B"]), async () => void log.push(["save"]));
-  await new Promise((r) => setImmediate(r));
-  assert.equal(log[0][0], "preview", "it looks before it asks");
-  assert.equal(log[1][0], "asked");
-  assert.match(log[1][1], /9882K, 7700B off Panel 2/);
-  assert.match(log[1][1], /another panel/);
-  assert.ok(!log.some(([what]) => what === "save"), "nothing is saved while the question is open");
-  ask.settle(true);
-  assert.equal(await saved, true);
-  assert.equal(log.at(-1)[0], "save");
-});
-
-test("declining the judges question saves nothing", async () => {
-  const log = [];
-  const ask = createConfirmer(() => {});
-  const saved = saveJudgesAfterAsking(ask.ask, "Panel 2", async () => ["9882K"], async () => void log.push("save"));
-  await new Promise((r) => setImmediate(r));
-  ask.settle(false);
-  assert.equal(await saved, false);
-  assert.deepEqual(log, []);
-});
-
-test("with nothing to take off the judges save at once, without a question", async () => {
-  const log = [];
-  const ask = async () => {
-    log.push("asked");
-    return true;
-  };
-  assert.equal(await saveJudgesAfterAsking(ask, "Panel 2", async () => [], async () => void log.push("save")), true);
-  assert.deepEqual(log, ["save"]);
 });

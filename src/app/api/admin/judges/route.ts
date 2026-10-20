@@ -11,10 +11,12 @@ export const dynamic = "force-dynamic";
  *
  * A panel's judges are the roster judges sitting on it, and a conflict
  * belongs to a judge, so moving a judge moves their blocks with them.
- * Putting a conflicted judge on a panel that already holds the team takes
+ * Putting a conflicted judge on a panel that has the team assigned takes
  * the team off it (as declaring the conflict does), so PATCH reports
- * `takenOff` -- the numbers of those teams -- and takes `dryRun: true` to
- * report it without writing, for a screen that asks first.
+ * `takenOff` -- the numbers of exactly the teams that lose their panel --
+ * and takes `dryRun: true` to report it without writing, for a screen that
+ * asks first. A live request already on the panel is not touched; the Floor
+ * flags it for the Judge Advisor to move.
  */
 export async function GET() {
   if (!canAdminister(await getSession())) return refuse();
@@ -81,7 +83,7 @@ export async function PATCH(request: Request) {
     if (body.dryRun === true) return NextResponse.json({ judge, takenOff, dryRun: true });
 
     const updated = await db.updateJudge(id, patch);
-    if (joining) await takeOffPanel(joining, takeOff);
+    if (joining) await takeOffPanel(takeOff);
 
     const actor = actorLabel(session);
     if (updated.name !== judge.name) {

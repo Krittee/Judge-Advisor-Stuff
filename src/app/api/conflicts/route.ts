@@ -3,7 +3,7 @@ import { actorLabel, canAdminister, canReadNotes, getSession } from "@/lib/auth"
 import type { Session } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { conflictsFor, isPanelBlocked, panelBlocks, takeOffPanel } from "@/lib/conflicts";
-import { blockedAndHeld } from "@/lib/roster";
+import { blockedAndAssigned } from "@/lib/roster";
 import { danglingSuffixes, parseTeamNumberList } from "@/lib/teamNumber";
 
 export const dynamic = "force-dynamic";
@@ -263,8 +263,9 @@ async function declareMany(
  * connection to the team, so it applies only when exactly one team is given.
  * Every number comes back under exactly one of `recorded`, `unchanged` (this
  * judge already has it) and `notFound`; `takenOff` is the recorded teams that
- * came off the judge's current panel -- held by it, assigned or with a live
- * request or booking -- and now need a panel. A judge with no panel blocks
+ * were assigned to the judge's current panel and came off it -- exactly the
+ * teams that lose their panel, and now need one. A live request on the panel
+ * is left where it is (the Floor flags it). A judge with no panel blocks
  * nobody yet, so nothing comes off.
  *
  * A judge session may record only for a judge on their own panel.
@@ -321,17 +322,16 @@ async function declareForJudge(session: Session | null, body: Record<string, unk
     throw e;
   }
 
-  // The recorded teams the judge's panel is holding come off it. Worked out
+  // The recorded teams assigned to the judge's panel come off it. Worked out
   // from the roster as it is now, before any team is touched.
   let takeOff: typeof teams = [];
   if (judge.panel_id && recorded.length) {
-    const [conflicts, requests] = await Promise.all([db.listConflicts(), db.listRequests()]);
-    takeOff = blockedAndHeld(judge.panel_id, panelBlocks(conflicts, judges), teams, requests).filter(
-      (t) => recordedIds.has(t.id),
+    takeOff = blockedAndAssigned(judge.panel_id, panelBlocks(await db.listConflicts(), judges), teams).filter((t) =>
+      recordedIds.has(t.id),
     );
   }
   const takenOff = takeOff.map((t) => t.number);
-  if (judge.panel_id) await takeOffPanel(judge.panel_id, takeOff);
+  await takeOffPanel(takeOff);
 
   if (recorded.length) {
     const panelName = (await db.listPanels()).find((p) => p.id === judge.panel_id)?.name;

@@ -18,6 +18,7 @@ import {
   chipLabel,
   chipSpeech,
   columnKey,
+  conflictNote,
   coverTags,
   defaultColumnKey,
   divisionTag,
@@ -359,6 +360,8 @@ function Card({
   const view = menu?.id === request.id ? menu.view : null;
   const reasonId = useId();
 
+  const conflict = conflictNote(panel, team, conflicts, judges);
+
   // Where this interview may go: the current panel is where it already is.
   const targets = view
     ? allowedPanels(team, request.panel_id, panels, conflicts, judges).filter((p) => p.id !== request.panel_id)
@@ -374,9 +377,9 @@ function Card({
       <div className="ja-c2">
         <StatusPill status={status} short />
         {status === "scheduled" ? (
-          <span className="ja-tm">{formatClock(request.slot_start)}</span>
+          <span className="ja-ctm">{formatClock(request.slot_start)}</span>
         ) : since ? (
-          <span className={`ja-tm${status === "requested" ? " ja-wt" : ""}`}>
+          <span className={`ja-ctm${status === "requested" ? " ja-wt" : ""}`}>
             {formatMinutes(minutesSince(since, now))}
           </span>
         ) : null}
@@ -387,6 +390,13 @@ function Card({
         ) : null}
         <FlagSummary flags={mine} kinds={flagKinds} />
       </div>
+
+      {conflict ? (
+        <div className="jg-caution ja-lw" role="note">
+          <WarnIcon />
+          <p>{conflict}</p>
+        </div>
+      ) : null}
 
       {gap && panel ? (
         <div className="jg-caution ja-lw" role="note">

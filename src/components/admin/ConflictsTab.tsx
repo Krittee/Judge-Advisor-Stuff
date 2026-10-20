@@ -371,13 +371,13 @@ function Row({
   const { conflict, team } = line;
   return (
     <li className="ja-cr">
-      <div className="ja-cm">
-        <p className="ja-c1">
+      <div className="ja-cf-cm">
+        <p className="ja-cf-c1">
           <b>{team?.number ?? "—"}</b>
           <span className="ja-tn">{team?.name ?? "team removed"}</span>
         </p>
         {conflict.note || tag || (team && !team.panel_id) ? (
-          <p className="ja-c2">
+          <p className="ja-cf-c2">
             {conflict.note ? <span className="ja-nt">“{conflict.note}”</span> : null}
             {tag ? <span className="jg-ptag ja-nt">{tag}</span> : null}
             {team && !team.panel_id ? (

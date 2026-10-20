@@ -1553,8 +1553,15 @@ body:has(.judge) > .theme-toggle:hover {
  * scrolls, because the tabs behind the Floor are still long tables.
  * Colour is signal: status fills only mean status, caution is the
  * language gap, --accent is chrome (current section, selected chip, links).
+ *
+ * One stylesheet serves every tab, so a class one tab styles is a class the
+ * others' markup can pick up. Each feature's CSS opens with an @ja-block
+ * marker comment, and a class is styled bare by one block only: another tab
+ * takes its own prefix (.ja-cf-, .ja-tm-, .ja-pn-, .ja-rf-) or anchors a rule on
+ * a class of its own. tests/adminCssScope.test.mjs fails on a second definition.
  * ------------------------------------------------------------------ */
 
+/* @ja-block shell */
 .admin {
   --jg-field: oklch(0.180 0.013 265);
   --jg-field-line: oklch(0.520 0.014 265);
@@ -1571,7 +1578,7 @@ body:has(.judge) > .theme-toggle:hover {
   --ja-col: var(--surface-2);
 }
 
-.ja-rb, .ja-sbar b, .ja-sh-top h2, .ja-ch h2, .ja-c1 b, .ja-go, .ja-cs b, .ja-seg button span, .ja-opt b, .ja-pop-h {
+.ja-rb, .ja-sbar b, .ja-sh-top h2 {
   font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -1659,6 +1666,22 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-sh-foot > button { min-height: 44px; padding: 0 12px; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
 .ja-sh-foot > button:hover { color: var(--ink); }
 
+/* From 1024px: the rail */
+@media (min-width: 1024px) {
+  body:has(.admin) > .theme-toggle { top: 6px; right: 8px; }
+
+  .ja-top { height: 56px; padding: 0 12px 0 20px; }
+  .ja-menu, .ja-sbar { display: none; }
+  .ja-top-r > button { min-height: 36px; }
+  .ja-rail { display: flex; }
+  .ja-pad { padding: 12px 20px 16px; }
+}
+
+/* @ja-block floor */
+.ja-ch h2, .ja-c1 b, .ja-go, .ja-cs b, .ja-seg button span, .ja-opt b, .ja-pop-h {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+
 /* Floor: the top strip */
 .ja-floor { display: flex; flex-direction: column; gap: 12px; }
 .ja-strip { display: flex; flex-direction: column; gap: 12px; }
@@ -1675,7 +1698,8 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-board:hover { background: var(--surface-2); }
 
 /* Floor: the phone's panel switcher */
-.ja-seg { display: flex; gap: 4px; padding: 4px; overflow-x: auto; border: 1.5px solid var(--line); border-radius: 14px; background: var(--jg-field); }
+.ja-seg { display: flex; gap: 4px; padding: 4px; overflow-x: auto; scrollbar-width: none; border: 1.5px solid var(--line); border-radius: 14px; background: var(--jg-field); }
+.ja-seg::-webkit-scrollbar { display: none; }
 .ja-seg button {
   position: relative; display: flex; flex: 1 0 64px; min-width: 0; height: 52px; flex-direction: column; align-items: center; justify-content: center;
   gap: 1px; padding: 0 4px; border-radius: 10px; background: transparent; line-height: 1.15;
@@ -1715,7 +1739,7 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-c1 b { flex: none; font-weight: 700; font-size: 22px; line-height: 1.2; }
 .ja-cn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
 .ja-c2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-.ja-tm { font-weight: 500; font-size: 14px; }
+.ja-ctm { font-weight: 500; font-size: 14px; }
 .ja-lw { padding: 7px 10px; gap: 8px; font-size: 12.5px; }
 .ja-lw p { margin: 0; }
 .ja-c4 { display: flex; align-items: center; gap: 8px; }
@@ -1754,16 +1778,8 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-opt b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 15px; }
 .ja-opt:disabled { opacity: 0.6; }
 
-/* From 1024px: the rail, and every panel as a column */
+/* From 1024px: every panel as a column */
 @media (min-width: 1024px) {
-  body:has(.admin) > .theme-toggle { top: 6px; right: 8px; }
-
-  .ja-top { height: 56px; padding: 0 12px 0 20px; }
-  .ja-menu, .ja-sbar { display: none; }
-  .ja-top-r > button { min-height: 36px; }
-  .ja-rail { display: flex; }
-  .ja-pad { padding: 12px 20px 16px; }
-
   .ja-floor { gap: 10px; }
   .ja-strip { flex-direction: row; align-items: center; gap: 32px; height: 48px; }
   .ja-cs { display: flex; gap: 32px; border: 0; border-radius: 0; background: transparent; }
@@ -1787,7 +1803,7 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-card { gap: 6px; padding: 9px 10px; }
   .ja-c1 b { font-size: 20px; }
   .ja-cn { font-size: 14px; }
-  .ja-tm { font-size: 13px; }
+  .ja-ctm { font-size: 13px; }
   .ja-go { height: 36px; border-radius: 10px; font-size: 14px; }
   .ja-more { width: 36px; height: 36px; border-radius: 10px; }
 }
@@ -1795,6 +1811,7 @@ body:has(.admin) > .theme-toggle:hover {
 /* The Floor's list tags sit where the column header puts them; inside the popover's option they sit at its right. */
 .ja-opt .ja-tags { order: 0; margin: 0 0 0 auto; }
 
+/* @ja-block shell */
 /* Other consoles: quiet links at the foot of the rail and of the Sections sheet. Not sections: no count, never current. */
 .ja-rail .ja-oc { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); }
 .ja-ol {
@@ -1804,8 +1821,9 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-ol:hover { background: var(--surface-2); color: var(--ink); }
 .ja-sheet .ja-ol { height: 48px; padding: 0 14px 0 20px; border-radius: 0 12px 12px 0; font-size: 15px; }
 
+/* @ja-block conflicts */
 /* Conflicts (design/admin-redesign/reference-conflicts-*.dc.html): the list by judge, and the form to record more */
-.ja-cf-main h2, .ja-fc h2, .ja-gh h3, .ja-c1 b, .ja-str-t b, .ja-prim { font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; }
+.ja-cf-main h2, .ja-fc h2, .ja-gh h3, .ja-cf-c1 b, .ja-str-t b, .ja-prim { font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; }
 .ja-pad:has(> .ja-cf) { display: flex; min-height: 100%; flex-direction: column; padding-bottom: 0; }
 .ja-cf { display: flex; flex: 1; flex-direction: column; gap: 12px; }
 .ja-cf-main { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 12px; }
@@ -1836,11 +1854,11 @@ body:has(.admin) > .theme-toggle:hover {
 
 .ja-cr { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 14px; }
 .ja-cr + .ja-cr { border-top: 1px solid var(--line); }
-.ja-cm { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
-.ja-c1 { display: flex; min-width: 0; align-items: baseline; gap: 8px; margin: 0; }
-.ja-c1 b { flex: none; font-weight: 700; font-size: 22px; line-height: 1.2; }
+.ja-cf-cm { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.ja-cf-c1 { display: flex; min-width: 0; align-items: baseline; gap: 8px; margin: 0; }
+.ja-cf-c1 b { flex: none; font-weight: 700; font-size: 22px; line-height: 1.2; }
 .ja-tn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
-.ja-c2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; color: var(--ink-subtle); font-size: 13.5px; line-height: 1.4; }
+.ja-cf-c2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; color: var(--ink-subtle); font-size: 13.5px; line-height: 1.4; }
 .ja-pill {
   display: inline-flex; flex: none; align-items: center; gap: 4px; padding: 2px 9px 2px 7px; border-radius: 999px;
   border: 1px solid color-mix(in oklch, var(--caution) 35%, transparent); background: color-mix(in oklch, var(--caution) 12%, transparent);
@@ -1908,7 +1926,7 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-pin { display: none; }
   .ja-gh .ja-blk { flex-basis: auto; margin-left: 6px; }
   .ja-cr { padding: 10px 16px; }
-  .ja-c1 b { font-size: 20px; }
+  .ja-cf-c1 b { font-size: 20px; }
   .ja-wd { height: 32px; padding: 0 12px; border-radius: 8px; font-size: 13px; }
   .ja-in { height: 40px; font-size: 15px; }
   .ja-ta { height: auto; }
@@ -1918,14 +1936,15 @@ body:has(.admin) > .theme-toggle:hover {
 /* Wide enough for a table row: number, name, note, pill and Withdraw on one line. */
 @media (min-width: 1280px) {
   .ja-cr { display: grid; grid-template-columns: 84px minmax(0, 1fr) minmax(0, 1.2fr) 118px 92px; min-height: 56px; }
-  .ja-cm, .ja-c1, .ja-c2 { display: contents; }
-  .ja-c1 b { grid-column: 1; }
+  .ja-cf-cm, .ja-cf-c1, .ja-cf-c2 { display: contents; }
+  .ja-cf-c1 b { grid-column: 1; }
   .ja-tn { grid-column: 2; }
   .ja-nt { grid-column: 3; min-width: 0; }
   .ja-fg { grid-column: 4; justify-self: end; }
   .ja-wd { grid-column: 5; justify-self: end; }
 }
 
+/* @ja-block referee */
 /* Referee (design/admin-redesign/reference-referee-*.dc.html): the flagged teams, one team's history, and the Correct flag sheet.
    A severity's fill and ink come from the tone classes in the markup (toneSolid, toneRail); this only sizes and places them. */
 .ja-rf-jh h2, .ja-rf-c1 b, .ja-rf-dh h2 b, .ja-rf-chip, .ja-rf-ru, .ja-sv {
@@ -2090,9 +2109,10 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-rfs .jg-grab { display: none; }
 }
 
+/* @ja-block teams */
 /* Teams (design/admin-redesign/reference-teams-*.dc.html): the roster as a table with a drawer (a list and a sheet on a phone), and Event data.
    Colour is signal: a status wears its fill, a flag its severity's (the Referee tab's pill), caution is "Unassigned", danger is "no panel left" and storage that is down. */
-.ja-tm-rb, .ja-tm-l1 b, .ja-tm-drh h2 b, .ja-ev-t {
+.ja-tm-rb, .ja-tm-l1 b, .ja-tm-drh h2 b {
   font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
 .ja-tm { display: flex; min-width: 0; flex-direction: column; }
@@ -2131,7 +2151,8 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-tm-ghost:disabled { opacity: 0.5; }
 
 /* The notebook and panel-load chips: a row each, scrolling sideways on a phone */
-.ja-tm-chr { display: flex; align-items: center; gap: 6px; overflow-x: auto; }
+.ja-tm-chr { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.ja-tm-chr::-webkit-scrollbar { display: none; }
 .ja-tm-cl { flex: none; width: 68px; color: var(--ink-subtle); font-weight: 500; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; }
 .ja-tm-ch {
   display: inline-flex; flex: none; height: 28px; align-items: center; gap: 6px; padding: 0 11px; border-radius: 999px;
@@ -2223,12 +2244,13 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-tm-ff { display: flex; flex-direction: column; gap: 8px; }
 .ja-tm-ff .jg-quiet { align-self: center; }
 
+/* @ja-block eventdata */
 /* Event data: closed until opened; danger-coloured and saying so when storage is not reachable */
 .ja-ev { flex: none; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .ja-ev h2 { margin: 0; font: inherit; }
 .ja-ev-b { display: flex; width: 100%; min-height: 56px; align-items: center; gap: 10px; padding: 0 18px 0 14px; border-radius: 14px; background: transparent; text-align: left; }
 .ja-ev-b svg { flex: none; color: var(--ink-subtle); }
-.ja-ev-t { font-weight: 600; font-size: 16px; }
+.ja-ev-t { font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 16px; }
 .ja-ev-s { color: var(--ink-subtle); font-size: 13px; }
 .ja-ev[data-down="true"] { border-color: color-mix(in oklch, var(--danger) 45%, transparent); background: color-mix(in oklch, var(--danger) 14%, transparent); }
 .ja-ev[data-down="true"] .ja-ev-s, .ja-ev[data-down="true"] .ja-ev-b svg { color: var(--danger-quiet); }
@@ -2251,7 +2273,13 @@ body:has(.admin) > .theme-toggle:hover {
 }
 .ja-dbtn:hover:not(:disabled) { background: color-mix(in oklch, var(--danger) 14%, transparent); }
 .ja-dbtn:disabled { opacity: 0.5; }
+@media (min-width: 1024px) {
+  .ja-dzr { flex-direction: row; align-items: center; gap: 20px; }
+  .ja-dzr > div { min-width: 0; flex: 1; }
+  .ja-dbtn { height: 36px; }
+}
 
+/* @ja-block teams */
 @media (min-width: 1024px) {
   .ja-tm { align-items: flex-start; flex-direction: row; gap: 12px; }
   .ja-tm-main { min-width: 0; flex: 1; }
@@ -2287,16 +2315,13 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-tm-drf { display: flex; flex: none; flex-direction: column; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--line); background: var(--surface); }
   .ja-tm-od { min-height: 32px; font-size: 14px; }
   .ja-tm-rmb { height: 36px; }
-
-  .ja-dzr { flex-direction: row; align-items: center; gap: 20px; }
-  .ja-dzr > div { min-width: 0; flex: 1; }
-  .ja-dbtn { height: 36px; }
 }
 /* Narrower than 1280 with the drawer open, the least-needed columns step aside. */
 @media (min-width: 1024px) and (max-width: 1279.98px) {
   .ja-tm[data-open="true"] .ja-tm-lo { display: none; }
 }
 
+/* @ja-block panels */
 /* Panels (design/admin-redesign/reference-panels-*.dc.html): the judge roster beside the panel cards, and the dialogs behind them.
    Colour is signal: caution is "No judges yet" and the take-teams-off question, danger is Delete; accent is chrome (the Judges | Panels switch, a language that is on, Edit). */
 .ja-pn-rh h2, .ja-pn-ch h3, .ja-pn-cv, .ja-pn-seg button span, .ja-pn-r1 b, .ja-pn-cf h2 {

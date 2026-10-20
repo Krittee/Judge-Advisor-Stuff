@@ -1,4 +1,4 @@
-import type { ConflictRow, JudgeRow, RequestRow, Team } from "./types";
+import type { ConflictRow, JudgeRow, Team } from "./types";
 
 /**
  * The one rule for "may this panel meet this team?", and the judge roster
@@ -54,28 +54,13 @@ export function conflictsFor<C extends { id: string }>(
 export const judgeKey = (name: string): string => name.trim().toLowerCase();
 
 /**
- * Teams that a panel holds and may not meet: assigned to it, or with a live
- * request or booking on it. These are the ones that come off the panel when
- * a conflicted judge joins it.
+ * Teams assigned to this panel that it may not meet. These are the ones that
+ * come off the panel -- lose their panel_id -- when a conflicted judge joins
+ * it, and exactly the ones, because that is all the write changes. A live
+ * request or booking on the panel does not make a team "taken off": that
+ * request stays where it is, and the Floor flags it until it is moved.
  */
-export function blockedAndHeld(
-  panelId: string,
-  blocks: PanelBlock[],
-  teams: Team[],
-  requests: Pick<RequestRow, "team_id" | "panel_id" | "status">[],
-): Team[] {
+export function blockedAndAssigned(panelId: string, blocks: PanelBlock[], teams: Team[]): Team[] {
   const blocked = blockedTeams(blocks, panelId);
-  const inFlight = new Set(
-    requests
-      .filter(
-        (r) =>
-          r.panel_id === panelId &&
-          (r.status === "requested" ||
-            r.status === "acknowledged" ||
-            r.status === "interviewing" ||
-            r.status === "scheduled"),
-      )
-      .map((r) => r.team_id),
-  );
-  return teams.filter((t) => blocked.has(t.id) && (t.panel_id === panelId || inFlight.has(t.id)));
+  return teams.filter((t) => t.panel_id === panelId && blocked.has(t.id));
 }

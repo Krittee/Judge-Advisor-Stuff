@@ -9,6 +9,7 @@ import {
   chipLabel,
   chipSpeech,
   columnKey,
+  conflictNote,
   coverTags,
   defaultColumnKey,
   gapNote,
@@ -207,11 +208,31 @@ test("a team can be moved to its own division's panels, and keeps its current pa
   assert.deepEqual(allowedPanels(t, "p1", panels, []).map((p) => p.id), ["p1", "p2", "p3"]);
 });
 
-test("a panel declared conflicted with the team is not offered, but is kept if it is the current panel", () => {
+test("a panel declared conflicted with the team is not offered, and neither is the current panel once it is blocked", () => {
   const t = team("9882K", "p2");
-  const conflicts = [{ panel_id: "p3", team_id: t.id }, { panel_id: "p2", team_id: "someone-else" }];
-  assert.deepEqual(allowedPanels(t, "p2", panels, conflicts).map((p) => p.id), ["p2"]);
-  assert.deepEqual(allowedPanels(t, "p3", panels, conflicts).map((p) => p.id), ["p2", "p3"], "never drops the current value");
+  const conflicts = [{ id: "c1", panel_id: "p3", judge_id: null, team_id: t.id }, { id: "c2", panel_id: "p2", judge_id: null, team_id: "someone-else" }];
+  assert.deepEqual(allowedPanels(t, "p2", panels, conflicts).map((p) => p.id), ["p2"], "p3 is blocked; p2's conflict is with someone else");
+  assert.deepEqual(
+    allowedPanels(t, "p3", panels, conflicts).map((p) => p.id),
+    ["p2"],
+    "the interview is on Panel 3, which a conflict now blocks: it has to leave, so Panel 3 is not a place to move it",
+  );
+  assert.deepEqual(allowedPanels(t, "p3", panels, [...conflicts, { id: "c3", panel_id: "p2", judge_id: null, team_id: t.id }]), [], "nowhere left");
+});
+
+test("a live request on a panel a conflict now blocks gets the 'move it' note, whether the block is the panel's or a judge's", () => {
+  const t = team("1101A", "p2");
+  const whole = [{ id: "c1", panel_id: "p2", judge_id: null, team_id: t.id }];
+  assert.equal(conflictNote(p2, t, whole), "Panel 2 has a conflict with 1101A — move it");
+
+  const byJudge = [{ id: "c2", panel_id: null, judge_id: "j1", team_id: t.id }];
+  assert.equal(conflictNote(p2, t, byJudge, [{ id: "j1", panel_id: "p2" }]), "Panel 2 has a conflict with 1101A — move it");
+  assert.equal(conflictNote(p2, t, byJudge, [{ id: "j1", panel_id: "p3" }]), null, "the judge is on another panel: nothing blocks Panel 2");
+  assert.equal(conflictNote(p2, t, byJudge, [{ id: "j1", panel_id: null }]), null, "a judge with no panel blocks nobody yet");
+
+  assert.equal(conflictNote(p2, t, [{ id: "c3", panel_id: "p2", judge_id: null, team_id: "someone-else" }]), null, "a conflict with another team");
+  assert.equal(conflictNote(p2, t, []), null);
+  assert.equal(conflictNote(null, t, whole), null, "a request whose panel was deleted has no panel to blame");
 });
 
 test("a Blended panel may judge anyone, and a Blended team may go to any panel", () => {

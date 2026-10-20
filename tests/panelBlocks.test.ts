@@ -6,14 +6,14 @@ import { join } from "node:path";
 import * as conflicts from "../src/lib/conflicts";
 import { allowedPanels } from "../src/components/admin/floorLogic";
 import {
-  blockedAndHeld,
+  blockedAndAssigned,
   blockedTeams,
   conflictsFor,
   isPanelBlocked,
   judgeKey,
   panelBlocks,
 } from "../src/lib/roster";
-import type { ConflictRow, JudgeRow, PublicPanel, RequestRow, Team } from "../src/lib/types";
+import type { ConflictRow, JudgeRow, PublicPanel, Team } from "../src/lib/types";
 
 /* The one rule for "may this panel meet this team?", run for real against
    src/lib/roster.ts (re-exported from src/lib/conflicts.ts). */
@@ -118,26 +118,20 @@ const team = (id: string, panel_id: string | null): Team => ({
   pit: null,
   created_at: "2026-10-20T08:00:00.000Z",
 });
-const req = (team_id: string, panel_id: string | null, status: RequestRow["status"]) =>
-  ({ team_id, panel_id, status }) as RequestRow;
 
-test("a panel gives up the blocked teams it holds: assigned, or in flight on it", () => {
+test("a panel gives up only the blocked teams assigned to it: those are the ones whose panel the write clears", () => {
   const blocks = panelBlocks(
-    [byJudge("c1", "j1", "t1"), byJudge("c2", "j1", "t2"), byJudge("c3", "j1", "t3"), byJudge("c4", "j1", "t4")],
+    [byJudge("c1", "j1", "t1"), byJudge("c2", "j1", "t2"), byJudge("c3", "j1", "t3")],
     [judge("j1", "p2")],
   );
-  const teams = [team("t1", "p2"), team("t2", null), team("t3", null), team("t4", "p3"), team("t5", "p2")];
-  const requests = [
-    req("t2", "p2", "requested"), // waiting on Panel 2
-    req("t3", "p2", "completed"), // finished: history, not held
-    req("t4", "p3", "interviewing"), // on another panel
+  const teams = [
+    team("t1", "p2"), // assigned here and blocked: comes off
+    team("t2", null), // blocked, assigned nowhere (it may have a live request here; takeOffPanel does not change it)
+    team("t3", "p3"), // blocked, assigned to another panel
+    team("t4", "p2"), // assigned here, not blocked
   ];
-  assert.deepEqual(
-    blockedAndHeld("p2", blocks, teams, requests).map((t) => t.id),
-    ["t1", "t2"],
-    "t5 is held but not blocked; t3's interview is over; t4 is someone else's",
-  );
-  assert.deepEqual(blockedAndHeld("p2", blocks, teams, [req("t3", "p2", "scheduled")]).map((t) => t.id), ["t1", "t3"], "a booking counts");
+  assert.deepEqual(blockedAndAssigned("p2", blocks, teams).map((t) => t.id), ["t1"]);
+  assert.deepEqual(blockedAndAssigned("p3", blocks, teams), [], "Panel 3 has no judge with a conflict");
 });
 
 /* ---- every check goes through it ------------------------------------------ */
@@ -158,7 +152,7 @@ test("the Floor's Move to panel list uses the rule: a judge's conflict removes t
   assert.deepEqual(allowedPanels(t, "p1", panels, c, [judge("j1", "p2")]).map((p) => p.id), ["p1", "p3"]);
   assert.deepEqual(allowedPanels(t, "p1", panels, c, [judge("j1", "p3")]).map((p) => p.id), ["p1", "p2"], "moved to Panel 3");
   assert.deepEqual(allowedPanels(t, "p1", panels, c, [judge("j1", null)]).map((p) => p.id), ["p1", "p2", "p3"], "no panel, no block");
-  assert.deepEqual(allowedPanels(t, "p2", panels, c, [judge("j1", "p2")]).map((p) => p.id), ["p1", "p2", "p3"], "never drops the current panel, even a blocked one");
+  assert.deepEqual(allowedPanels(t, "p2", panels, c, [judge("j1", "p2")]).map((p) => p.id), ["p1", "p3"], "a request already on the blocked panel is not offered that panel to stay on");
 });
 
 /* The rule must live once. Anything under src reading a conflict's panel_id

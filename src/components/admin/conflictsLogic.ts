@@ -213,30 +213,3 @@ export async function withdrawAfterAsking(
   if (yes) await withdraw();
   return yes;
 }
-
-/**
- * The Panels tab's judges field: look first (`preview` is the dry run, the
- * numbers of teams the new list would take off this panel), ask if there are
- * any, and save only on a yes or when there is nothing to take off. Returns
- * whether it saved.
- */
-export async function saveJudgesAfterAsking(
-  ask: Ask,
-  panelName: string,
-  preview: () => Promise<string[]>,
-  save: () => Promise<void>,
-): Promise<boolean> {
-  const takenOff = await preview();
-  if (takenOff.length) {
-    const them = takenOff.join(", ");
-    const yes = await ask(
-      `Saving these judges takes ${them} off ${panelName}.\n\n` +
-        `A judge you are adding has a conflict with ${plural(takenOff.length, "that team", "those teams")}. ` +
-        `${plural(takenOff.length, "It", "They")} will need another panel.`,
-      { confirmLabel: "Save and take off", danger: true },
-    );
-    if (!yes) return false;
-  }
-  await save();
-  return true;
-}

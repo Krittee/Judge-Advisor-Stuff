@@ -260,21 +260,21 @@ test("dryRun reports which teams would come off the panel and writes nothing; th
   const w = await world();
   const tidy = await w.db.addJudge({ name: "Sam Okafor" });
   await conflictWith(w, w.priya, w.bolts); //  assigned to Panel 2
-  await conflictWith(w, w.priya, w.loose); //  no panel, but a live request on Panel 2
+  await conflictWith(w, w.priya, w.loose); //  no panel, but a live request on Panel 2: not "taken off", nothing changes for it
   const waiting = await live(w, w.loose, w.p2);
   const before = await actions(w);
 
   const dry = await roster(ADMIN, "PATCH", { id: w.priya.id, panelId: w.p2.id, dryRun: true });
   assert.equal(dry.status, 200);
   assert.equal(dry.body.dryRun, true);
-  assert.deepEqual([...dry.body.takenOff].sort(), ["1234", "7700B"]);
+  assert.deepEqual(dry.body.takenOff, ["7700B"], "only the team whose panel would be cleared; 1234's request is the Floor's to flag");
   assert.equal((await judgeNow(w, w.priya)).panel_id, null, "the judge did not move");
   assert.equal((await teamNow(w, w.bolts)).panel_id, w.p2.id, "no team came off");
   assert.deepEqual(await actions(w), before, "and nothing was logged");
 
   const real = await roster(ADMIN, "PATCH", { id: w.priya.id, panelId: w.p2.id });
   assert.equal(real.status, 200);
-  assert.deepEqual([...real.body.takenOff].sort(), ["1234", "7700B"]);
+  assert.deepEqual(real.body.takenOff, ["7700B"]);
   assert.equal((await judgeNow(w, w.priya)).panel_id, w.p2.id);
   assert.equal((await teamNow(w, w.bolts)).panel_id, null, "7700B came off Panel 2 and needs a panel");
   assert.equal(
@@ -282,6 +282,7 @@ test("dryRun reports which teams would come off the panel and writes nothing; th
     w.p2.id,
     "a request already in flight stays where it is until the Judge Advisor moves it, as when a conflict is declared",
   );
+  assert.equal((await teamNow(w, w.loose)).panel_id, null, "and its team was not touched, so it is not reported");
 
   // A judge without a conflict on anything brings nothing with them.
   const calm = await roster(ADMIN, "PATCH", { id: tidy.id, panelId: w.p2.id, dryRun: true });
@@ -289,6 +290,73 @@ test("dryRun reports which teams would come off the panel and writes nothing; th
   // Moving to a panel that holds none of her teams takes nobody off; neither does staying put.
   assert.deepEqual((await roster(ADMIN, "PATCH", { id: w.priya.id, panelId: w.p3.id, dryRun: true })).body.takenOff, []);
   assert.deepEqual((await roster(ADMIN, "PATCH", { id: w.priya.id, panelId: w.p2.id })).body.takenOff, []);
+});
+
+/** Every team's panel, by number. */
+const panelsOf = async (w: World) => Object.fromEntries((await w.db.listTeams()).map((t) => [t.number, t.panel_id]));
+/** The numbers of the teams that had a panel before and have none now. */
+const lost = (before: Record<string, string | null>, after: Record<string, string | null>) =>
+  Object.keys(before).filter((n) => before[n] && !after[n]).sort();
+
+test("takenOff is exactly the teams that lose their panel, the same on the judges PATCH, POST /api/conflicts and the panels PATCH", async () => {
+  // Priya conflicts with all three teams, and Panel 2 is the one she joins. 7700B is assigned to Panel 2 and comes off it.
+  // 9882K is assigned to Panel 1 and 1234 to nobody, but both have a live request on Panel 2: neither's panel changes.
+  const conflictAll = async (w: World) => {
+    for (const team of [w.hawks, w.bolts, w.loose]) await conflictWith(w, w.priya, team);
+  };
+  const ways: {
+    name: string;
+    setup: (w: World) => Promise<unknown>;
+    run: (w: World, dryRun: boolean) => Promise<Reply>;
+    hasDryRun: boolean;
+  }[] = [
+    {
+      name: "judges PATCH",
+      setup: conflictAll,
+      run: (w, dryRun) => roster(ADMIN, "PATCH", { id: w.priya.id, panelId: w.p2.id, dryRun }),
+      hasDryRun: true,
+    },
+    {
+      name: "panels PATCH",
+      setup: conflictAll,
+      run: (w, dryRun) => hit(panelsRoute, "PATCH", ADMIN, "/api/admin/panels", { id: w.p2.id, judges: "Priya Nair", dryRun }),
+      hasDryRun: true,
+    },
+    {
+      name: "POST /api/conflicts",
+      setup: (w) => w.db.updateJudge(w.priya.id, { panel_id: w.p2.id }),
+      run: (w) => conflictsApi(ADMIN, "POST", { judgeId: w.priya.id, teamNumbers: "9882K, 7700B, 1234" }),
+      hasDryRun: false,
+    },
+  ];
+
+  for (const way of ways) {
+    const w = await world();
+    await live(w, w.hawks, w.p2);
+    await live(w, w.loose, w.p2);
+    await way.setup(w);
+    const before = await panelsOf(w);
+    assert.deepEqual(before, { "9882K": w.p1.id, "7700B": w.p2.id, "1234": null }, way.name);
+    const requestsBefore = (await w.db.listRequests()).map((r) => [r.id, r.team_id, r.panel_id, r.status]);
+
+    if (way.hasDryRun) {
+      const dry = await way.run(w, true);
+      assert.deepEqual(dry.body.takenOff, ["7700B"], `${way.name}: the dry run names only the team that would lose its panel`);
+      assert.deepEqual(await panelsOf(w), before, `${way.name}: and writes nothing`);
+    }
+
+    const res = await way.run(w, false);
+    assert.equal(res.status, 200, way.name);
+    const after = await panelsOf(w);
+    assert.deepEqual(res.body.takenOff, ["7700B"], way.name);
+    assert.deepEqual(res.body.takenOff, lost(before, after), `${way.name}: what it reports is what changed`);
+    assert.equal(after["9882K"], w.p1.id, `${way.name}: assigned elsewhere, so untouched`);
+    assert.deepEqual(
+      (await w.db.listRequests()).map((r) => [r.id, r.team_id, r.panel_id, r.status]),
+      requestsBefore,
+      `${way.name}: the live requests stay where they are`,
+    );
+  }
 });
 
 /* ===== POST /api/conflicts, the roster way ============================== */

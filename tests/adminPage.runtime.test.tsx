@@ -374,7 +374,7 @@ test("a requesting card has the waiting tint, its wait in orange, and an On our 
   const c = cardOf(board(), "9882K");
   assert.match(c, /^<article class="ja-card ja-w" aria-label="9882K Torque Titans">/);
   assert.match(c, /<div class="ja-c1"><b>9882K<\/b><span class="ja-cn">Torque Titans<\/span><\/div>/);
-  assert.match(c, /<span class="jg-sc jg-s-requested">Requesting<\/span><span class="ja-tm ja-wt">8 min<\/span>/);
+  assert.match(c, /<span class="jg-sc jg-s-requested">Requesting<\/span><span class="ja-ctm ja-wt">8 min<\/span>/);
   // The button wears the colour of the status it moves the team to.
   assert.match(c, /<button type="button" class="ja-go jg-s-acknowledged">On our way<\/button>/);
   // The referee flag rides on the card.
@@ -394,12 +394,12 @@ test("the big button is Start interview on the way, Finish in the room, and On o
 
 test("each status shows its own clock: time on the way, time in the room, the slot for a booking", () => {
   const markup = board();
-  assert.match(cardOf(markup, "3141P"), /jg-sc jg-s-acknowledged">On the way<\/span><span class="ja-tm">3 min<\/span>/);
-  assert.match(cardOf(markup, "2011A"), /jg-sc jg-s-interviewing">Interviewing<\/span><span class="ja-tm">7 min<\/span>/);
+  assert.match(cardOf(markup, "3141P"), /jg-sc jg-s-acknowledged">On the way<\/span><span class="ja-ctm">3 min<\/span>/);
+  assert.match(cardOf(markup, "2011A"), /jg-sc jg-s-interviewing">Interviewing<\/span><span class="ja-ctm">7 min<\/span>/);
   const booked = cardOf(markup, "4410C");
-  assert.match(booked, /jg-sc jg-s-scheduled">Booked<\/span><span class="ja-tm">\d{1,2}:\d{2}/);
+  assert.match(booked, /jg-sc jg-s-scheduled">Booked<\/span><span class="ja-ctm">\d{1,2}:\d{2}/);
   assert.doesNotMatch(booked, /ja-wt|ja-w"/);
-  assert.match(cardOf(board({ requests: requests.map((r) => (r.id === "r-9882K" ? { ...r, requested_at: ago(0) } : r)) }), "9882K"), /ja-tm ja-wt">just now/);
+  assert.match(cardOf(board({ requests: requests.map((r) => (r.id === "r-9882K" ? { ...r, requested_at: ago(0) } : r)) }), "9882K"), /ja-ctm ja-wt">just now/);
 });
 
 test("a language the panel does not cover is a caution box on the card and a caution tag; a covered one is plain", () => {
@@ -504,6 +504,33 @@ test("with nowhere else to go the Move row is disabled and says why", () => {
   // Notes and Cancel are still there.
   assert.match(pop, />Notes</);
   assert.match(pop, />Cancel request</);
+});
+
+test("a live request left on a panel a conflict now blocks says so on its card, and can still be moved to the other panels", () => {
+  const priya: JudgeRow = { id: "j1", name: "Priya Nair", note: null, panel_id: "p3", created_at: ago(90) };
+  const conflicts: ConflictRow[] = [{ id: "c1", panel_id: null, judge_id: "j1", team_id: sparky.id, judge_name: null, note: null, declared_by: "Alex", created_at: ago(60) }];
+  const popOf = (view: "root" | "move", over: Parameters<typeof board>[0] = {}) =>
+    cardOf(board({ conflicts, judges: [priya], ...over, menu: { id: "r-5150Z", view } }), "5150Z").match(/<div class="ja-pop"[\s\S]*?<\/div>(?:<\/div>)?/)?.[0] ?? "";
+
+  // Sparky's request is still in Panel 3's column, with the line; nobody else's card has it.
+  const markup = board({ conflicts, judges: [priya] });
+  assert.match(columnOf(markup, "Panel 3"), /aria-label="5150Z /);
+  assert.match(cardOf(markup, "5150Z"), /<div class="jg-caution ja-lw" role="note"><svg[\s\S]*?<\/svg><p>Panel 3 has a conflict with 5150Z — move it<\/p><\/div>/);
+  assert.equal((markup.match(/has a conflict with/g) ?? []).length, 1);
+  assert.doesNotMatch(board(), /has a conflict with/, "no conflict, no line");
+  // It sits beside the language caution, not instead of it (Panel 3 cannot cover Thai either).
+  assert.match(cardOf(markup, "5150Z"), /interviews in English only/);
+
+  // Move to panel… stays enabled and offers the other Middle School panel, not the blocked one it is on.
+  assert.doesNotMatch(popOf("root"), /disabled/);
+  const move = popOf("move");
+  assert.deepEqual([...move.matchAll(/<button type="button" class="ja-opt"[^>]*><b>(.*?)<\/b>/g)].map((m) => m[1]), ["Panel 2"]);
+
+  // With the other panel blocked as well there is nowhere to go, and the row says so.
+  const both = [...conflicts, { ...conflicts[0], id: "c2", judge_id: "j2" }];
+  const root = popOf("root", { conflicts: both, judges: [priya, { ...priya, id: "j2", panel_id: "p2" }] });
+  assert.match(root, /<button type="button" class="ja-pi" disabled="" aria-describedby="[^"]+">Move to panel…<\/button>/);
+  assert.match(root, /No other Middle School panel without a conflict/);
 });
 
 /* ---- the phone's panel switcher ------------------------------------------ */

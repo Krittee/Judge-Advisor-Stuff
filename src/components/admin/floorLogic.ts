@@ -106,7 +106,8 @@ export function uncoveredLanguages(panel: Pick<PublicPanel, "languages"> | null,
  * Where this interview may be moved: panels in the team's division (or a
  * blended one) that are not blocked from it -- by a whole-panel conflict, or
  * by a conflict of any judge sitting on the panel; the API refuses the rest
- * -- plus the panel it is on now.
+ * -- plus the panel it is on now, unless a conflict has since blocked that
+ * one too: the interview has to leave it, so it is not offered as a target.
  */
 export function allowedPanels(
   team: Pick<Team, "id" | "division">,
@@ -118,9 +119,24 @@ export function allowedPanels(
   const blocks = panelBlocks(conflicts, judges);
   return panels.filter(
     (p) =>
-      p.id === currentPanelId ||
-      (divisionsCompatible(team.division, p.division) && !isPanelBlocked(blocks, p.id, team.id)),
+      !isPanelBlocked(blocks, p.id, team.id) && (p.id === currentPanelId || divisionsCompatible(team.division, p.division)),
   );
+}
+
+/**
+ * "Panel A has a conflict with 1101 — move it": the line on a card whose live
+ * request sits on a panel that a conflict now bars from the team (the conflict
+ * came after the request, or the judge moved there). Declaring it does not
+ * move the request, so the Floor says so until the Judge Advisor does.
+ */
+export function conflictNote(
+  panel: Pick<PublicPanel, "id" | "name"> | null,
+  team: Pick<Team, "id" | "number">,
+  conflicts: Pick<ConflictRow, "id" | "panel_id" | "judge_id" | "team_id">[],
+  judges: Pick<JudgeRow, "id" | "panel_id">[] = [],
+): string | null {
+  if (!panel || !isPanelBlocked(panelBlocks(conflicts, judges), panel.id, team.id)) return null;
+  return `${panel.name} has a conflict with ${team.number} — move it`;
 }
 
 /** The column the phone opens on: the longest-waiting request's panel, else the first. */
