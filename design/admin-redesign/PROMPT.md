@@ -16,13 +16,15 @@ The console is being designed **tab by tab**. This file covers:
    panels to individual judges. **Data + UI**, see its section.
 4. **Referee** (direction C, "Team + history"). UI only.
 5. **Teams** (direction B, "Table + team drawer"). UI only.
+6. **Panels** (direction B, "Roster board"). UI only, but it **needs the
+   judge roster** from the Conflicts data phase.
 
 More tabs will be added below as they are designed. Tabs that have no
 section here yet keep their current content, just rendered inside the new
 shell.
 
 **Commits, in order:** (1) shell + Floor; (2) Conflicts data; (3) Conflicts
-UI; (4) Referee; (5) Teams. Each is one local commit with every check green. If you are only asked
+UI; (4) Referee; (5) Teams; (6) Panels. Each is one local commit with every check green. If you are only asked
 to do part of this file, do the parts in that order.
 
 ## Sources
@@ -50,13 +52,19 @@ to do part of this file, do the parts in that order.
   - `reference-teams-event-data.dc.html` — **only for the expanded "Event
     data" section at the bottom** (its table is the rejected direction A —
     ignore it)
+  - `reference-panels-wide.dc.html` — 1280 wide: judge roster beside the
+    panel cards
+  - `reference-panels-phone.dc.html` — 375 wide: Panels, Judges segment
+  - `reference-panels-add-judge-confirm.dc.html` — 375 wide: adding a
+    judge who has conflicts with teams on that panel
   These are self-contained HTML mocks (custom `{{hole}}` template, not
   React). Read their `<style>` blocks for sizes, spacing and colours and
   their markup for structure and copy. Team data in them is sample data.
 - **Live canvas:** https://claude.ai/artifact/Nhv45XWtvnnjLwCC768jWc, row
   "Judge Advisor · Floor" (A chosen) and "Judge Advisor · Conflicts (by
   judge)" (C chosen), "Judge Advisor · Referee" (C chosen) and "Judge
-  Advisor · Teams" (B chosen). Boards marked "Not chosen" are exploration
+  Advisor · Teams" (B chosen), "Judge Advisor · Panels" (B chosen). Boards
+  marked "Not chosen" are exploration
   only.
 - **Patterns to reuse, not copy:** the judge console
   (`src/components/judge/`, `.judge` / `.jg-*` in `globals.css`): status
@@ -315,9 +323,9 @@ Visual spec: `reference-conflicts-wide.dc.html` (1280) and
   judge on the panel, not one judge.", rows with team, panel tag, Withdraw.
 - **Empty state:** "No conflicts yet. Ask each judge which teams they're
   affiliated with, and record the answers."
-- **Panels tab (until its redesign):** saving a panel's judges asks first
-  when `dryRun` reports `takenOff` ("Adding Priya Nair takes 9882K off
-  Panel 2 — she has a conflict with them."), then saves.
+- **Panels tab:** if the Panels section below isn't built yet, saving a
+  panel's judges text asks first when `dryRun` reports `takenOff`, then
+  saves. The Panels redesign replaces that with the roster board.
 
 **UI tests (must fail if reverted):** the judge select groups by panel and
 creates a new judge via "+ New judge…"; the result box shows all four
@@ -474,6 +482,74 @@ disabled with no changes; status override asks first and uses reopen /
 cancel / set-status as today; Remove asks first; the panel select hides
 blocked and other-division panels; the "no panel left" pill; Event data is
 closed by default and turns danger when storage fails.
+
+## Panels (direction B, "Roster board") — UI only
+
+Needs the judge roster and `dryRun`/`takenOff` from the Conflicts data
+phase. Today's behaviour: `PanelsTab`, `PanelCard`, `DeleteAllPanels` in
+`src/app/admin/page.tsx`; `/api/admin/panels` (POST create, PATCH, PUT
+presets, DELETE).
+
+### Keep
+- Add panel (name + division); "Add preset panels" with its caption
+  ("Creates anything in config/event.json that is missing. Never
+  overwrites a panel you already have.").
+- Each panel's **judge sign-in code**, shown large with a Copy button.
+- "Interviews in" language toggles; "Not stated — no request will be
+  flagged." when none.
+- Division change asks first ("Move Panel 3 to HS? Its MS teams become
+  unassigned.").
+- Booking slot grid: first slot start, minutes each, how many ("0 for
+  walk-up queue only"), Save slot grid; header "Booking slots (8)" /
+  "(off)".
+- Delete panel asks first ("Delete Panel 3? Its teams become
+  unassigned."). Deleting a panel sets its judges' `panel_id` to null; it
+  never deletes judges or their conflicts.
+- Delete all panels: two clicks (arm, then "Every judge code stops working
+  immediately. Your teams stay, unassigned." with Delete all / Cancel).
+
+### Layout (≥1024px)
+- **Left column (~380px), "Judges · N"** with "+ New judge" (name + optional
+  note; adds to the roster only, panel "— none —"). Rows grouped: "Not on a
+  panel (n)" first, then one group per panel ("Panel 2 · MS (2)"). Each
+  row: name, a neutral "N conflicts" pill (links to Conflicts with that
+  judge selected), and a compact **Panel select** (— none — / Panel 1…N).
+  Changing the select moves the judge:
+  - run the `dryRun` first; if it reports `takenOff`, open the confirm in
+    `reference-panels-add-judge-confirm.dc.html` — "Add Priya Nair to
+    Panel 3?", "She has conflicts with 2 teams on Panel 3. Adding her takes
+    them off it.", the team list with notes, caution "They'll need another
+    panel.", Cancel (focused) / **"Add and take teams off"** (accent). On
+    Cancel the select snaps back.
+  - with nothing to take off, it saves at once (no confirm). Moving a
+    judge to "— none —" also saves at once.
+  - a row overflow "⋯" holds Rename and **Remove from roster** (asks first;
+    if they have conflicts: "Removing Jordan Kim also withdraws 1
+    conflict.").
+- **Right: panel cards** (2-column grid): name, division tag, team count;
+  code block + Copy; "Judges · set from the roster" (read-only names, or
+  "No judges yet" in caution — a panel with no judges can't sign in
+  anyone useful); languages toggles; a one-line slots summary ("8 slots
+  from 10:00 · 20 min" / "Booking slots off") with **Edit** opening a small
+  dialog holding the slot-grid fields; division select (asks first);
+  Delete panel (danger-quiet).
+- Under the cards: the Add panel form. At the bottom: Add preset panels +
+  caption, and Delete all panels.
+
+### Phone (<1024px)
+A segmented control **Judges | Panels** at the top.
+- **Judges** (`reference-panels-phone.dc.html`): helper "Pick a panel for
+  each judge. A judge sits on one panel at most.", the grouped roster with
+  a Panel select per row, "+ New judge" pinned at the bottom.
+- **Panels** (not mocked): the same panel cards stacked full width, then
+  Add panel, presets and Delete all at the end.
+
+### Tests (must fail if reverted)
+Roster grouping (not on a panel first, then by panel order); moving a
+judge with `takenOff` opens the confirm and Cancel restores the select
+and sends nothing; moving without `takenOff` saves directly; "+ New
+judge" adds with no panel; Remove from roster asks first; Delete panel
+leaves its judges in the roster with no panel; the two-click Delete all.
 
 ## Rules
 
