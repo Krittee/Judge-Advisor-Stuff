@@ -15,13 +15,14 @@ The console is being designed **tab by tab**. This file covers:
 3. **Conflicts** (direction C, "One form + table") — conflicts move from
    panels to individual judges. **Data + UI**, see its section.
 4. **Referee** (direction C, "Team + history"). UI only.
+5. **Teams** (direction B, "Table + team drawer"). UI only.
 
 More tabs will be added below as they are designed. Tabs that have no
 section here yet keep their current content, just rendered inside the new
 shell.
 
 **Commits, in order:** (1) shell + Floor; (2) Conflicts data; (3) Conflicts
-UI; (4) Referee. Each is one local commit with every check green. If you are only asked
+UI; (4) Referee; (5) Teams. Each is one local commit with every check green. If you are only asked
 to do part of this file, do the parts in that order.
 
 ## Sources
@@ -42,12 +43,21 @@ to do part of this file, do the parts in that order.
     list
   - `reference-referee-edit-sheet.dc.html` — 375 wide: the "Correct flag"
     sheet (also used at 1280 as a dialog)
+  - `reference-teams-wide.dc.html` — 1280 wide: Teams table with the
+    9882K drawer open
+  - `reference-teams-phone.dc.html` — 375 wide: Teams list with the edit
+    sheet open
+  - `reference-teams-event-data.dc.html` — **only for the expanded "Event
+    data" section at the bottom** (its table is the rejected direction A —
+    ignore it)
   These are self-contained HTML mocks (custom `{{hole}}` template, not
   React). Read their `<style>` blocks for sizes, spacing and colours and
   their markup for structure and copy. Team data in them is sample data.
 - **Live canvas:** https://claude.ai/artifact/Nhv45XWtvnnjLwCC768jWc, row
   "Judge Advisor · Floor" (A chosen) and "Judge Advisor · Conflicts (by
-  judge)" (C chosen) and "Judge Advisor · Referee" (C chosen). Boards marked "Not chosen" are exploration only.
+  judge)" (C chosen), "Judge Advisor · Referee" (C chosen) and "Judge
+  Advisor · Teams" (B chosen). Boards marked "Not chosen" are exploration
+  only.
 - **Patterns to reuse, not copy:** the judge console
   (`src/components/judge/`, `.judge` / `.jg-*` in `globals.css`): status
   pills, flag pills, the advance-button colour rule, `cancelCopy` /
@@ -393,6 +403,77 @@ Team ordering (worst first, then count); default selection with and
 without `focusFlagTeam`; the repeat box text from `refereeHistory`;
 severity buttons in the sheet don't save until "Save correction"; Remove
 asks first and sends nothing when declined; phone list → team → back.
+
+## Teams (direction B, "Table + team drawer") — UI only
+
+Today's behaviour: `TeamsTab`, `EditableCell`, `StorageHealth`,
+`DangerZone` in `src/app/admin/page.tsx`; `PATCH /api/admin/teams`;
+`resetRequestStatus` (reopen / cancel / set-status, held to
+`canTransition`).
+
+### Keep
+- Filter by number or name; Division and Notebook selects; "48 teams · 4
+  panels".
+- Auto-assign: "Max per panel" (1–40) + "Auto-assign N unassigned",
+  disabled at 0; it works within each division and skips conflicted panels
+  (after the Conflicts data phase: through `panelBlocks`).
+- Notebook count chips; per-panel load chips, plus "Unassigned N" in
+  caution.
+- Editing number, name, pit, notebook and panel, with the server's refusals
+  shown (duplicate number, conflicted panel, other division). The panel
+  select offers only compatible panels without a block, plus "— none —".
+- The interview status override, using `resetRequestStatus`'s action
+  choice exactly as today, and asking first.
+- Remove team asks first: "Remove team 9882K and all its requests?"
+- Pit hint: "Pits read as a letter and a number (A1), which places a team
+  on the board's floor plan."
+
+### Layout (≥1024px)
+- Toolbar, chips and helper line ("Select a team to edit its number, name,
+  pit, panel and notebook.") as `reference-teams-wide.dc.html`.
+- **Read-only table**: team, name, pit, notebook, division, panel (or a
+  caution "Unassigned" pill / a danger "no panel left" pill when every
+  compatible panel is blocked), booked time, interview status pill, flag
+  pills (**severity colours**, as on the Referee tab — not caution).
+  Rows are buttons: clicking one opens the drawer; the selected row gets
+  the accent bar and tint. Keyboard: Enter/Space opens, Escape closes.
+- **Drawer** (~368px, right side, pushes the table narrower rather than
+  covering it) for the selected team, titled "Edit team · <number> <name>":
+  - Team number + Pit side by side, Name; pit hint under them.
+  - Division (read-only tag) and Booked (read-only).
+  - Notebook select.
+  - Judge panel select + helper "<division> panels without a conflict".
+  - Interview: status pill + "Reset to…" select, and a caution box
+    "Overrides what judges set. Use when a status is stuck." Choosing a
+    value asks first, then applies immediately (it is not part of Save).
+  - Flags: severity pills + "Open in Referee ↗" (switches to the Referee
+    section with that team selected, like Scores' conduct link).
+  - "Remove team" (danger-quiet) + "Asks first. Removes <n> and all its
+    requests."
+  - Pinned **"Save changes"** (accent) saves number, name, pit, notebook
+    and panel together in one PATCH; disabled until something changed.
+    Closing the drawer with unsaved changes asks first.
+
+### Phone (<1024px)
+Filter box + a "Filters" button (opens the division/notebook selects in a
+sheet; badge shows how many are active) + Auto-assign. Rows become compact
+two-line rows. Tapping a row opens the same editor as a bottom-sheet
+`<dialog>` (`reference-teams-phone.dc.html`).
+
+### Event data (bottom of Teams, collapsed)
+A `<details>`-style section "Event data · Storage and resets", closed by
+default, holding today's `StorageHealth` and `DangerZone` ("Reset the
+day", "Wipe everything", both asking first), styled as the expanded state
+in `reference-teams-event-data.dc.html`. **If storage is unreachable**, the
+collapsed summary row turns danger-coloured and says "Storage is not
+reachable" so the failure is never hidden; open it for the details.
+
+### Tests (must fail if reverted)
+Drawer opens from a row and saves all five fields in one PATCH; Save is
+disabled with no changes; status override asks first and uses reopen /
+cancel / set-status as today; Remove asks first; the panel select hides
+blocked and other-division panels; the "no panel left" pill; Event data is
+closed by default and turns danger when storage fails.
 
 ## Rules
 
