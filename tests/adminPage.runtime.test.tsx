@@ -9,7 +9,7 @@ import { FloorBoard, FloorTab, type FloorActions, type FloorMenu } from "../src/
 import { buildColumns, defaultColumnKey } from "../src/components/admin/floorLogic";
 import { cancelAfterAsking } from "../src/components/judge/logic";
 import { createConfirmer, type Pending } from "../src/components/ConfirmDialog";
-import type { AppState, ConflictRow, FlagRow, PublicPanel, RequestRow, Team } from "../src/lib/types";
+import type { AppState, ConflictRow, FlagRow, JudgeRow, PublicPanel, RequestRow, Team } from "../src/lib/types";
 
 /* The Judge Advisor console's shell and Floor, rendered to markup. Behaviour
    that needs a browser (the <dialog> opening, taps, the popover's Escape) has
@@ -121,6 +121,7 @@ function board(
     requests?: RequestRow[];
     panels?: PublicPanel[];
     conflicts?: ConflictRow[];
+    judges?: JudgeRow[];
     flags?: FlagRow[];
     busy?: string | null;
     menu?: FloorMenu | null;
@@ -139,6 +140,7 @@ function board(
       flagKinds={flagKinds}
       panels={over.panels ?? panels}
       conflicts={over.conflicts ?? []}
+      judges={over.judges ?? []}
       now={NOW}
       busy={over.busy ?? null}
       menu={over.menu ?? null}
@@ -397,12 +399,23 @@ test("Move to panel… lists only panels in the team's division without a confli
   assert.doesNotMatch(pop, /Panel 1|Panel 3|Panel 4/, "High School and Elementary panels are out, and so is where it already is");
 
   // A conflict with Panel 2 takes it out too.
-  const conflicted = move({ conflicts: [{ id: "c1", panel_id: "p2", team_id: sparky.id, judge_name: null, note: null, declared_by: "Alex", created_at: ago(60) }] });
+  const conflicted = move({ conflicts: [{ id: "c1", panel_id: "p2", judge_id: null, team_id: sparky.id, judge_name: null, note: null, declared_by: "Alex", created_at: ago(60) }] });
   assert.doesNotMatch(conflicted, /ja-opt/);
 });
 
+test("Move to panel… honours a judge's conflict through the panel the judge is on, and lifts it when the judge is off that panel", () => {
+  const move = (b: Parameters<typeof board>[0]) =>
+    cardOf(board({ ...b, menu: { id: "r-5150Z", view: "move" } }), "5150Z").match(/<div class="ja-pop"[\s\S]*?<\/div><\/div>/)?.[0] ?? "";
+  const priya = (panel_id: string | null): JudgeRow => ({ id: "j1", name: "Priya Nair", note: null, panel_id, created_at: ago(90) });
+  const conflicts: ConflictRow[] = [{ id: "c1", panel_id: null, judge_id: "j1", team_id: sparky.id, judge_name: null, note: null, declared_by: "Alex", created_at: ago(60) }];
+
+  assert.doesNotMatch(move({ conflicts, judges: [priya("p2")] }), /ja-opt/, "Priya is on Panel 2, so Panel 2 is blocked");
+  assert.match(move({ conflicts, judges: [priya("p4")] }), /<b>Panel 2<\/b>/, "moved to another panel, the block went with her");
+  assert.match(move({ conflicts, judges: [priya(null)] }), /<b>Panel 2<\/b>/, "with no panel she blocks nobody yet");
+});
+
 test("with nowhere else to go the Move row is disabled and says why", () => {
-  const conflicts: ConflictRow[] = [{ id: "c1", panel_id: "p2", team_id: sparky.id, judge_name: null, note: null, declared_by: "Alex", created_at: ago(60) }];
+  const conflicts: ConflictRow[] = [{ id: "c1", panel_id: "p2", judge_id: null, team_id: sparky.id, judge_name: null, note: null, declared_by: "Alex", created_at: ago(60) }];
   const pop = cardOf(board({ conflicts, menu: { id: "r-5150Z", view: "root" } }), "5150Z").match(/<div class="ja-pop"[\s\S]*?<\/div>/)?.[0] ?? "";
   assert.match(pop, /<button type="button" class="ja-pi" disabled="" aria-describedby="([^"]+)">Move to panel…<\/button>/);
   const id = /aria-describedby="([^"]+)"/.exec(pop)![1];

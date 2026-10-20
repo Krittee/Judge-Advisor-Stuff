@@ -24,6 +24,7 @@ drop table if exists scores    cascade;
 drop table if exists referee_setup cascade;
 drop table if exists flags     cascade;
 drop table if exists conflicts cascade;
+drop table if exists judges    cascade;
 drop table if exists notes     cascade;
 drop table if exists requests  cascade;
 drop table if exists teams     cascade;
@@ -37,7 +38,7 @@ create table panels (
   name          text not null,
   code          text not null unique,          -- login code the judges type
   division      text not null default 'Division 1',
-  judges        text[] not null default '{}',  -- judge names, for display
+  judges        text[] not null default '{}',  -- legacy: the roster (judges table) owns a panel's judges now
   languages     text[] not null default '{}',  -- language ids this panel covers
   sort_order    int not null default 0,
 
@@ -48,6 +49,23 @@ create table panels (
 
   created_at    timestamptz not null default now()
 );
+
+-- ---------------------------------------------------------------------
+-- Judge roster. A panel's judges are the roster judges sitting on it; a
+-- judge sits on at most one panel. Names are unique ignoring case. seq only
+-- keeps roster order (now() is the same for every row of one statement).
+-- ---------------------------------------------------------------------
+create table judges (
+  id         uuid primary key default gen_random_uuid(),
+  seq        bigint generated always as identity,
+  name       text not null,
+  note       text,
+  panel_id   uuid references panels(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create unique index judges_name_unique on judges (lower(name));
+create index judges_panel_idx on judges (panel_id);
 
 -- ---------------------------------------------------------------------
 -- Teams. number is text so identifiers like "9882K" work.
@@ -135,19 +153,26 @@ create table notes (
 create index notes_team_idx on notes (team_id);
 
 -- ---------------------------------------------------------------------
--- Conflicts of interest — a panel that must stay away from a team.
+-- Conflicts of interest — a panel must stay away from a team when any
+-- judge on it has a conflict with it. Exactly one of judge_id (a judge's
+-- conflict) and panel_id (a whole-panel conflict, from before there was a
+-- roster). Removing a panel removes its whole-panel conflicts, never a
+-- judge's.
 -- ---------------------------------------------------------------------
 create table conflicts (
   id          uuid primary key default gen_random_uuid(),
-  panel_id    uuid not null references panels(id) on delete cascade,
+  panel_id    uuid references panels(id) on delete cascade,
+  judge_id    uuid references judges(id) on delete cascade,
   team_id     uuid not null references teams(id) on delete cascade,
   judge_name  text,
   note        text,
   declared_by text not null,
   created_at  timestamptz not null default now(),
-  unique (panel_id, team_id)
+  unique (panel_id, team_id),
+  constraint conflicts_one_owner check ((panel_id is null) <> (judge_id is null))
 );
 
+create unique index conflicts_judge_team_unique on conflicts (judge_id, team_id);
 create index conflicts_panel_idx on conflicts (panel_id);
 create index conflicts_team_idx  on conflicts (team_id);
 
@@ -249,6 +274,7 @@ alter table teams     enable row level security;
 alter table requests  enable row level security;
 alter table notes     enable row level security;
 alter table conflicts enable row level security;
+alter table judges    enable row level security;
 alter table flags     enable row level security;
 alter table referee_setup enable row level security;
 alter table scores    enable row level security;

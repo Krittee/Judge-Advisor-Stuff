@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { canAdminister, getSession } from "@/lib/auth";
+import { actorLabel, canAdminister, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
+import { takeOffPanel, teamsToTakeOff } from "@/lib/conflicts";
+import { judgeKey } from "@/lib/roster";
 import type { Panel } from "@/lib/types";
 import { languages as configLanguages, presetDivisions } from "@/lib/presets";
 import { normalizePanelCode } from "@/lib/panelCode";
@@ -74,13 +76,77 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    return NextResponse.json({ panel: await store().updatePanel(id, patch) });
+    const db = store();
+
+    /* The judges field is the roster's now: each name is found or added and
+       put on this panel, and anyone else on it is taken off. A judge with a
+       conflict who joins a panel that holds the team takes it off, so that
+       is worked out first and `dryRun` reports it without writing. */
+    let takeOff: Awaited<ReturnType<typeof teamsToTakeOff>> = [];
+    let roster: Awaited<ReturnType<typeof db.listJudges>> = [];
+    if (patch.judges || body.dryRun === true) {
+      const panel = (await db.listPanels()).find((p) => p.id === id);
+      if (!panel) {
+        return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
+      }
+      roster = await db.listJudges();
+      if (patch.judges) {
+        const wanted = new Set(patch.judges.map(judgeKey));
+        takeOff = await teamsToTakeOff(
+          id,
+          roster.map((j) =>
+            wanted.has(judgeKey(j.name))
+              ? { ...j, panel_id: id }
+              : j.panel_id === id
+                ? { ...j, panel_id: null }
+                : j,
+          ),
+        );
+      }
+      if (body.dryRun === true) {
+        return NextResponse.json({ takenOff: takeOff.map((t) => t.number), dryRun: true });
+      }
+    }
+
+    const before = roster;
+    const panel = await db.updatePanel(id, patch);
+    if (patch.judges) {
+      await takeOffPanel(id, takeOff);
+      await logJudgeChanges(session, panel, before, patch.judges, takeOff.map((t) => t.number));
+    }
+    return NextResponse.json({ panel, takenOff: takeOff.map((t) => t.number) });
   } catch (e) {
     if (e instanceof StoreError) {
       return NextResponse.json({ error: e.message }, { status: e.status });
     }
     throw e;
   }
+}
+
+/** Who joined, was added to, or left this panel through its judges field -- the roster's activity, one line each. */
+async function logJudgeChanges(
+  session: Awaited<ReturnType<typeof getSession>>,
+  panel: Panel,
+  before: { name: string; panel_id: string | null }[],
+  names: string[],
+  takenOff: string[],
+) {
+  const wanted = new Set(names.map(judgeKey));
+  const known = new Map(before.map((j) => [judgeKey(j.name), j]));
+  const actor = actorLabel(session);
+  const log = (action: string, detail: string) => store().logActivity({ actor, action, detail });
+
+  for (const name of names) {
+    const was = known.get(judgeKey(name));
+    if (!was) await log("added a judge", `${name} · ${panel.name}`);
+    else if (was.panel_id !== panel.id) await log("moved a judge", `${was.name} → ${panel.name}`);
+  }
+  for (const j of before) {
+    if (j.panel_id === panel.id && !wanted.has(judgeKey(j.name))) {
+      await log("moved a judge", `${j.name} off ${panel.name}`);
+    }
+  }
+  if (takenOff.length) await log("took teams off a panel", `${panel.name} · ${takenOff.join(", ")}`);
 }
 
 /** Create any preset panel from config/event.json that does not exist yet. */

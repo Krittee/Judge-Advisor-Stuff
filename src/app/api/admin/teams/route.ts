@@ -4,6 +4,7 @@ import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
 import { divisionsCompatible, presetDivisions, resolveCategory } from "@/lib/presets";
 import { normalizePit } from "@/lib/pit";
 import { store, StoreError } from "@/lib/db";
+import { isPanelBlocked, loadBlocks } from "@/lib/conflicts";
 
 export const dynamic = "force-dynamic";
 
@@ -109,10 +110,10 @@ export async function PATCH(request: Request) {
     // declared conflict silently, so that is refused here as well.
     if (body.panelId) {
       const panelId = String(body.panelId);
-      const [panels, teams, conflicts] = await Promise.all([
+      const [panels, teams, blocks] = await Promise.all([
         store().listPanels(),
         store().listTeams(),
-        store().listConflicts(),
+        loadBlocks(),
       ]);
 
       const panel = panels.find((p) => p.id === panelId);
@@ -139,7 +140,7 @@ export async function PATCH(request: Request) {
         );
       }
 
-      if (conflicts.some((c) => c.panel_id === panelId && c.team_id === teamId)) {
+      if (isPanelBlocked(blocks, panelId, teamId)) {
         return NextResponse.json(
           { error: "That panel has a declared conflict of interest with this team." },
           { status: 409 },

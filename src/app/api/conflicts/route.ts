@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { actorLabel, canAdminister, canReadNotes, getSession } from "@/lib/auth";
 import type { Session } from "@/lib/auth";
-import { store } from "@/lib/db";
+import { store, StoreError } from "@/lib/db";
+import { conflictsFor, isPanelBlocked, panelBlocks, takeOffPanel } from "@/lib/conflicts";
+import { blockedAndHeld } from "@/lib/roster";
 import { danglingSuffixes, parseTeamNumberList } from "@/lib/teamNumber";
 
 export const dynamic = "force-dynamic";
@@ -10,9 +12,11 @@ export const dynamic = "force-dynamic";
  * Conflicts of interest.
  *
  * A judge affiliated with a team must stay away from it entirely — no
- * interview, no notebook, no notes. Held against the panel rather than
- * the person, because a panel code is what judges sign in with and so the
- * panel is the only unit anything can be enforced against.
+ * interview, no notebook, no notes. A conflict belongs to a judge on the
+ * Judge Advisor's roster, and the panel that judge sits on is the unit
+ * anything is enforced against, because a panel code is what judges sign
+ * in with. An older kind, against a whole panel, still works and still
+ * blocks it.
  *
  * Judges may declare one for their own panel; only the Judge Advisor can
  * withdraw one, so nobody can quietly clear a conflict they declared and
@@ -24,10 +28,13 @@ export async function GET() {
     return NextResponse.json({ error: "Not authorised." }, { status: 403 });
   }
 
-  const all = await store().listConflicts();
+  const db = store();
+  const [all, judges] = await Promise.all([db.listConflicts(), db.listJudges()]);
   return NextResponse.json({
     conflicts:
-      session?.role === "judge" ? all.filter((c) => c.panel_id === session.panelId) : all,
+      session?.role === "judge"
+        ? conflictsFor(session.panelId, all, panelBlocks(all, judges))
+        : all,
   });
 }
 
@@ -38,6 +45,10 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}));
+
+  // The roster way: one judge, and the teams they are affiliated with.
+  if (body.judgeId !== undefined) return declareForJudge(session, body);
+
   const teamId = String(body.teamId ?? "");
 
   // A judge can only declare against their own panel; the Judge Advisor
@@ -105,8 +116,61 @@ export async function DELETE(request: Request) {
   const id = new URL(request.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required." }, { status: 400 });
 
-  const removed = await store().removeConflict(id);
+  const db = store();
+  const [conflicts, teams, panels, judges] = await Promise.all([
+    db.listConflicts(),
+    db.listTeams(),
+    db.listPanels(),
+    db.listJudges(),
+  ]);
+  const conflict = conflicts.find((c) => c.id === id);
+
+  const removed = await db.removeConflict(id);
+  if (removed && conflict) {
+    const team = teams.find((t) => t.id === conflict.team_id);
+    const who = conflict.judge_id
+      ? judges.find((j) => j.id === conflict.judge_id)?.name
+      : panels.find((p) => p.id === conflict.panel_id)?.name;
+    await db.logActivity({
+      teamId: conflict.team_id,
+      actor: actorLabel(session),
+      action: "withdrew a conflict of interest",
+      detail: `Team ${team?.number ?? "?"} · ${who ?? conflict.judge_name ?? "unknown"}`,
+    });
+  }
   return NextResponse.json({ ok: true, removed });
+}
+
+/**
+ * The team numbers out of a pasted list, or the refusal to send back.
+ *
+ * Refuses the whole list rather than record part of it: a stray space in
+ * "9882 K" would otherwise conflict team 9882 and leave 9882K judgeable.
+ */
+function readTeamNumbers(input: string): { numbers: string[] } | { refusal: NextResponse } {
+  const numbers = parseTeamNumberList(input);
+  if (!numbers.length) {
+    return { refusal: NextResponse.json({ error: "No team numbers found." }, { status: 400 }) };
+  }
+
+  const adrift = danglingSuffixes(input);
+  if (adrift.length) {
+    return {
+      refusal: NextResponse.json(
+        {
+          error:
+            `"${adrift.join('", "')}" ${adrift.length === 1 ? "is" : "are"} not a team number. ` +
+            `If you meant a letter suffix, write it with no space — 9882K, not 9882 K. ` +
+            `Nothing was recorded.`,
+        },
+        { status: 400 },
+      ),
+    };
+  }
+  if (numbers.length > 200) {
+    return { refusal: NextResponse.json({ error: "That is too many at once." }, { status: 400 }) };
+  }
+  return { numbers };
 }
 
 /**
@@ -130,10 +194,11 @@ async function declareMany(
   }
 
   const db = store();
-  const [teams, panels, existing] = await Promise.all([
+  const [teams, panels, existing, judges] = await Promise.all([
     db.listTeams(),
     db.listPanels(),
     db.listConflicts(),
+    db.listJudges(),
   ]);
 
   const panel = panels.find((p) => p.id === panelId);
@@ -141,46 +206,24 @@ async function declareMany(
     return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
   }
 
-  const numbers = parseTeamNumberList(input);
-  if (!numbers.length) {
-    return NextResponse.json({ error: "No team numbers found." }, { status: 400 });
-  }
-
-  // Refuse the whole list rather than record part of it: a stray space in
-  // "9882 K" would otherwise conflict team 9882 and leave 9882K judgeable.
-  const adrift = danglingSuffixes(input);
-  if (adrift.length) {
-    return NextResponse.json(
-      {
-        error:
-          `"${adrift.join('", "')}" ${adrift.length === 1 ? "is" : "are"} not a team number. ` +
-          `If you meant a letter suffix, write it with no space — 9882K, not 9882 K. ` +
-          `Nothing was recorded.`,
-      },
-      { status: 400 },
-    );
-  }
-  if (numbers.length > 200) {
-    return NextResponse.json({ error: "That is too many at once." }, { status: 400 });
-  }
+  const read = readTeamNumbers(input);
+  if ("refusal" in read) return read.refusal;
 
   const byNumber = new Map(teams.map((t) => [t.number, t]));
-  const already = new Set(
-    existing.filter((c) => c.panel_id === panelId).map((c) => c.team_id),
-  );
+  const blocks = panelBlocks(existing, judges);
 
   const recorded: string[] = [];
   const unchanged: string[] = [];
   const notFound: string[] = [];
   const unassigned: string[] = [];
 
-  for (const number of numbers) {
+  for (const number of read.numbers) {
     const team = byNumber.get(number);
     if (!team) {
       notFound.push(number);
       continue;
     }
-    if (already.has(team.id)) {
+    if (isPanelBlocked(blocks, panelId, team.id)) {
       unchanged.push(number);
       continue;
     }
@@ -211,4 +254,103 @@ async function declareMany(
   }
 
   return NextResponse.json({ recorded, unchanged, notFound, unassigned, panel: panel.name });
+}
+
+/**
+ * Record one roster judge's conflicts: `{ judgeId, teamNumbers, note? }`.
+ *
+ * `teamNumbers` is a pasted list (or an array of numbers). The note is the
+ * connection to the team, so it applies only when exactly one team is given.
+ * Every number comes back under exactly one of `recorded`, `unchanged` (this
+ * judge already has it) and `notFound`; `takenOff` is the recorded teams that
+ * came off the judge's current panel -- held by it, assigned or with a live
+ * request or booking -- and now need a panel. A judge with no panel blocks
+ * nobody yet, so nothing comes off.
+ *
+ * A judge session may record only for a judge on their own panel.
+ */
+async function declareForJudge(session: Session | null, body: Record<string, unknown>) {
+  const db = store();
+  const [judges, teams] = await Promise.all([db.listJudges(), db.listTeams()]);
+
+  const judge = judges.find((j) => j.id === String(body.judgeId ?? ""));
+  if (!judge) {
+    return NextResponse.json({ error: "That judge is not on the roster." }, { status: 404 });
+  }
+  if (session?.role === "judge" && judge.panel_id !== session.panelId) {
+    return NextResponse.json(
+      { error: "You can only record conflicts for judges on your own panel." },
+      { status: 403 },
+    );
+  }
+
+  const list = Array.isArray(body.teamNumbers) ? body.teamNumbers.join("\n") : body.teamNumbers;
+  const read = readTeamNumbers(String(list ?? ""));
+  if ("refusal" in read) return read.refusal;
+
+  const existing = await db.listConflicts();
+  const have = new Set(existing.filter((c) => c.judge_id === judge.id).map((c) => c.team_id));
+  const note = read.numbers.length === 1 ? String(body.note ?? "").trim().slice(0, 280) || null : null;
+  const byNumber = new Map(teams.map((t) => [t.number, t]));
+
+  const recorded: string[] = [];
+  const unchanged: string[] = [];
+  const notFound: string[] = [];
+  const recordedIds = new Set<string>();
+
+  try {
+    for (const number of read.numbers) {
+      const team = byNumber.get(number);
+      if (!team) {
+        notFound.push(number);
+      } else if (have.has(team.id)) {
+        unchanged.push(number);
+      } else {
+        await db.addConflict({
+          judgeId: judge.id,
+          teamId: team.id,
+          note,
+          declaredBy: actorLabel(session),
+        });
+        recorded.push(number);
+        recordedIds.add(team.id);
+      }
+    }
+  } catch (e) {
+    if (e instanceof StoreError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
+  // The recorded teams the judge's panel is holding come off it. Worked out
+  // from the roster as it is now, before any team is touched.
+  let takeOff: typeof teams = [];
+  if (judge.panel_id && recorded.length) {
+    const [conflicts, requests] = await Promise.all([db.listConflicts(), db.listRequests()]);
+    takeOff = blockedAndHeld(judge.panel_id, panelBlocks(conflicts, judges), teams, requests).filter(
+      (t) => recordedIds.has(t.id),
+    );
+  }
+  const takenOff = takeOff.map((t) => t.number);
+  if (judge.panel_id) await takeOffPanel(judge.panel_id, takeOff);
+
+  if (recorded.length) {
+    const panelName = (await db.listPanels()).find((p) => p.id === judge.panel_id)?.name;
+    await db.logActivity({
+      teamId: recorded.length === 1 ? [...recordedIds][0] : null,
+      actor: actorLabel(session),
+      action: "declared conflicts of interest",
+      detail:
+        `${judge.name} (${panelName ?? "no panel"}) · ${recorded.join(", ")}` +
+        (takenOff.length ? ` · taken off the panel: ${takenOff.join(", ")}` : ""),
+    });
+  }
+
+  // The roster note is the Judge Advisor's; a judge recording for a colleague does not get it back.
+  return NextResponse.json({
+    judge: session?.role === "judge" ? { ...judge, note: null } : judge,
+    recorded,
+    unchanged,
+    notFound,
+    takenOff,
+  });
 }

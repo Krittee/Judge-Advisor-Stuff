@@ -4,7 +4,8 @@ import { liveRequestFor } from "@/lib/data";
 import { divisionsCompatible } from "@/lib/presets";
 import type { Status } from "@/lib/status";
 import { compareTeamNumbers } from "@/lib/teamNumber";
-import type { AppState, ConflictRow, PublicPanel, RequestRow, Team } from "@/lib/types";
+import { isPanelBlocked, panelBlocks } from "@/lib/roster";
+import type { AppState, ConflictRow, JudgeRow, PublicPanel, RequestRow, Team } from "@/lib/types";
 
 /* The Judge Advisor Floor's decisions, kept out of the markup so they run as
    plain functions in tests/adminFloor.logic.test.mjs. */
@@ -103,20 +104,22 @@ export function uncoveredLanguages(panel: Pick<PublicPanel, "languages"> | null,
 
 /**
  * Where this interview may be moved: panels in the team's division (or a
- * blended one) that are not declared conflicted with it -- the API refuses
- * the rest -- plus the panel it is on now.
+ * blended one) that are not blocked from it -- by a whole-panel conflict, or
+ * by a conflict of any judge sitting on the panel; the API refuses the rest
+ * -- plus the panel it is on now.
  */
 export function allowedPanels(
   team: Pick<Team, "id" | "division">,
   currentPanelId: string | null,
   panels: PublicPanel[],
-  conflicts: Pick<ConflictRow, "panel_id" | "team_id">[],
+  conflicts: Pick<ConflictRow, "id" | "panel_id" | "judge_id" | "team_id">[],
+  judges: Pick<JudgeRow, "id" | "panel_id">[] = [],
 ): PublicPanel[] {
+  const blocks = panelBlocks(conflicts, judges);
   return panels.filter(
     (p) =>
       p.id === currentPanelId ||
-      (divisionsCompatible(team.division, p.division) &&
-        !conflicts.some((c) => c.panel_id === p.id && c.team_id === team.id)),
+      (divisionsCompatible(team.division, p.division) && !isPanelBlocked(blocks, p.id, team.id)),
   );
 }
 

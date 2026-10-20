@@ -3,7 +3,7 @@ import { actorLabel, canAdvance, canCancel, getSession, mayActOnPanel } from "@/
 import { store, StoreError, STALE_STATUS_MESSAGE } from "@/lib/db";
 import { isRealSlot } from "@/lib/data";
 import { canTransition, NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
-import { CONFLICT_MESSAGE, isConflicted } from "@/lib/conflicts";
+import { CONFLICT_MESSAGE, isConflicted, isPanelBlocked, loadBlocks } from "@/lib/conflicts";
 import { divisionsCompatible, resolveLanguage } from "@/lib/presets";
 import type { RequestRow } from "@/lib/types";
 
@@ -137,8 +137,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!target) {
       return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
     }
-    const conflicts = await db.listConflicts();
-    if (conflicts.some((c) => c.panel_id === panelId && c.team_id === current.team_id)) {
+    if (isPanelBlocked(await loadBlocks(), panelId, current.team_id)) {
       return NextResponse.json(
         { error: `${target.name} has a declared conflict of interest with this team.` },
         { status: 409 },

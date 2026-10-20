@@ -177,6 +177,10 @@ class FakePool {
     calls.push({ sql: sql.replace(/\s+/g, " ").trim(), params });
     return { rows: answer(sql.replace(/\s+/g, " ").trim(), params) };
   }
+  /* withClient runs a transaction on one connection; here that is the same recorder. */
+  async connect() {
+    return { query: (sql, params) => this.query(sql, params), release() {} };
+  }
 }
 
 const nodeRequire = createRequire(import.meta.url);
@@ -401,4 +405,324 @@ test("a full wipe truncates the referee setup with the event; a day reset leaves
   const [day] = sent(/^truncate/);
   assert.ok(day && !/referee_setup/.test(day.sql), "the setup is the event's, not the day's");
   assert.ok(!/\bflags\b/.test(day.sql));
+});
+
+
+/* ---- the judge roster and judge conflicts ----------------------------------
+
+   The database itself is not available here, so what is checked is what the
+   code sends it: the migration's shape and order (by reading migrate()), and
+   every statement the roster methods send, with its parameters, run against
+   the recording stand-in for the driver. */
+
+const schemaSql = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
+const migrateBody = src.slice(
+  src.indexOf("async function migrate()"),
+  src.indexOf("/** Turn a unique-violation"),
+);
+const after = (text, needle, from = 0) => {
+  const at = text.indexOf(needle, from);
+  assert.ok(at >= 0, `missing: ${needle}`);
+  return at;
+};
+
+test("migrate() creates the judge roster once, copying the old judge lists with names deduped ignoring case", () => {
+  const guard = after(migrateBody, "if to_regclass('public.judges') is null then");
+  const create = after(migrateBody, "create table judges (", guard);
+  const copy = after(migrateBody, "insert into judges (name, panel_id)", create);
+  const end = after(migrateBody, "end if;", copy);
+  assert.ok(guard < create && create < copy && copy < end, "the copy runs only inside the first-time guard, after the table exists");
+
+  assert.match(
+    migrateBody,
+    /create table judges \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*seq\s+bigint generated always as identity,\s*name\s+text not null,\s*note\s+text,\s*panel_id\s+uuid references panels\(id\) on delete set null,\s*created_at timestamptz not null default now\(\)\s*\);/,
+  );
+  const copySql = migrateBody.slice(copy, end);
+  assert.match(copySql, /unnest\(p\.judges\) with ordinality/, "reads the old lists, keeping their order");
+  assert.match(copySql, /select distinct on \(lower\(l\.name\)\)/, "one judge per name ignoring case");
+  assert.match(copySql, /order by lower\(l\.name\), l\.sort_order, l\.panel_name, l\.ord/, "the first panel in event order keeps the judge");
+  assert.match(copySql, /where l\.name <> ''/, "blank entries are skipped");
+  assert.match(copySql, /order by d\.sort_order, d\.panel_name, d\.ord;/, "and roster order follows the event's panel order");
+  assert.ok(!/update panels|delete from panels|drop column/i.test(migrateBody.slice(guard, end)), "the old lists are left untouched, never emptied");
+
+  assert.ok(migrateBody.includes("create unique index if not exists judges_name_unique on judges (lower(name));"));
+  assert.ok(migrateBody.includes("create index if not exists judges_panel_idx on judges (panel_id);"));
+  assert.ok(
+    after(migrateBody, "create table judges (") < after(migrateBody, "create table if not exists conflicts ("),
+    "conflicts references judges, so the roster comes first",
+  );
+});
+
+test("migrate() locks the judges table down like every other table", () => {
+  assert.match(migrateBody, /alter table judges\s+enable row level security;/);
+  assert.match(schemaSql, /alter table judges\s+enable row level security;/);
+});
+
+test("conflicts: a judge's or a panel's, exactly one; old rows keep their panel; both unique", () => {
+  assert.match(
+    migrateBody,
+    /create table if not exists conflicts \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*panel_id\s+uuid references panels\(id\) on delete cascade,\s*judge_id\s+uuid references judges\(id\) on delete cascade,\s*team_id\s+uuid not null references teams\(id\) on delete cascade,/,
+    "panel_id is nullable now, and a panel's removal still takes only its own whole-panel rows",
+  );
+  assert.match(migrateBody, /unique \(panel_id, team_id\),\s*constraint conflicts_one_owner check \(\(panel_id is null\) <> \(judge_id is null\)\)/);
+
+  // An already-deployed database is brought up by guarded ALTERs, in an order that can succeed.
+  const column = after(migrateBody, "alter table conflicts add column if not exists judge_id uuid references judges(id) on delete cascade;");
+  const nullable = after(migrateBody, "alter table conflicts alter column panel_id drop not null;", column);
+  const unique = after(migrateBody, "create unique index if not exists conflicts_judge_team_unique on conflicts (judge_id, team_id);", nullable);
+  const check = after(migrateBody, "if not exists (select 1 from pg_constraint where conname = 'conflicts_one_owner') then", unique);
+  assert.ok(column < nullable && nullable < unique && unique < check);
+  assert.match(
+    migrateBody.slice(check),
+    /^if not exists \(select 1 from pg_constraint where conname = 'conflicts_one_owner'\) then\s*alter table conflicts add constraint conflicts_one_owner\s+check \(\(panel_id is null\) <> \(judge_id is null\)\);\s*end if;/,
+  );
+  assert.ok(!/delete from conflicts|update conflicts|truncate conflicts/i.test(migrateBody), "no conflict row is touched by the migration");
+});
+
+test("supabase/schema.sql agrees with migrate() on the roster and the conflict shape", () => {
+  assert.ok(schemaSql.includes("drop table if exists judges    cascade;"));
+  assert.match(
+    schemaSql,
+    /create table judges \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*seq\s+bigint generated always as identity,\s*name\s+text not null,\s*note\s+text,\s*panel_id\s+uuid references panels\(id\) on delete set null,\s*created_at timestamptz not null default now\(\)\s*\);/,
+  );
+  assert.ok(schemaSql.includes("create unique index judges_name_unique on judges (lower(name));"));
+  assert.match(
+    schemaSql,
+    /create table conflicts \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*panel_id\s+uuid references panels\(id\) on delete cascade,\s*judge_id\s+uuid references judges\(id\) on delete cascade,/,
+  );
+  assert.match(schemaSql, /constraint conflicts_one_owner check \(\(panel_id is null\) <> \(judge_id is null\)\)/);
+  assert.ok(schemaSql.includes("create unique index conflicts_judge_team_unique on conflicts (judge_id, team_id);"));
+  assert.ok(after(schemaSql, "create table judges (") < after(schemaSql, "create table conflicts ("));
+});
+
+const JUDGE_COLUMNS = "id, name, note, panel_id, created_at";
+const judgeRow = (over = {}) => ({ id: "j1", name: "Dana Ruiz", note: null, panel_id: null, created_at: new Date("2026-10-20T08:00:00.000Z"), ...over });
+const pgError = (code, constraint) => Object.assign(new Error(`pg ${code}`), { code, constraint });
+
+test("the roster reads by named columns in the order judges were added; the ordering key is not part of a judge", async () => {
+  calls.length = 0;
+  answer = () => [judgeRow()];
+  const list = await postgresStore.listJudges();
+  assert.equal(sent(/from judges order by seq/)[0].sql, `select ${JUDGE_COLUMNS} from judges order by seq`);
+  assert.deepEqual(list, [{ ...judgeRow(), created_at: "2026-10-20T08:00:00.000Z" }]);
+});
+
+test("addJudge trims the name, and a taken one is a 409 that names it", async () => {
+  calls.length = 0;
+  answer = () => [judgeRow()];
+  await postgresStore.addJudge({ name: "  Dana Ruiz ", note: "coach" });
+  const [insert] = sent(/^insert into judges/);
+  assert.equal(insert.sql, `insert into judges (name, note) values ($1, $2) returning ${JUDGE_COLUMNS}`);
+  assert.deepEqual(insert.params, ["Dana Ruiz", "coach"]);
+
+  answer = (sql) => {
+    if (sql.startsWith("insert into judges")) throw pgError("23505", "judges_name_unique");
+    return [];
+  };
+  await assert.rejects(
+    () => postgresStore.addJudge({ name: " dana ruiz " }),
+    (e) => e.status === 409 && e.message === "dana ruiz is already on the roster.",
+  );
+
+  calls.length = 0;
+  await assert.rejects(() => postgresStore.addJudge({ name: "   " }), (e) => e.status === 400);
+  assert.equal(sent(/judges/).length, 0, "a blank name never reaches the database");
+});
+
+test("updateJudge numbers its parameters after the id, sends a null panel as null, and maps the refusals", async () => {
+  calls.length = 0;
+  answer = (sql) => (sql.startsWith("update judges") ? [judgeRow({ name: "Dana R." })] : []);
+  await postgresStore.updateJudge("j1", { name: " Dana R. ", note: "n", panel_id: null });
+  const [update] = sent(/^update judges set/);
+  assert.equal(update.sql, `update judges set name = $2, note = $3, panel_id = $4 where id = $1 returning ${JUDGE_COLUMNS}`);
+  assert.deepEqual(update.params, ["j1", "Dana R.", "n", null]);
+
+  calls.length = 0;
+  answer = (sql) => (sql.startsWith("select") ? [judgeRow()] : []);
+  await postgresStore.updateJudge("j1", {});
+  assert.equal(sent(/^update/).length, 0, "an empty patch only reads");
+
+  answer = () => [];
+  await assert.rejects(() => postgresStore.updateJudge("j1", { note: "x" }), (e) => e.status === 404);
+
+  answer = (sql) => {
+    if (sql.startsWith("update judges")) throw pgError("23505", "judges_name_unique");
+    return [];
+  };
+  await assert.rejects(() => postgresStore.updateJudge("j1", { name: "Sam" }), (e) => e.status === 409 && /Sam is already on the roster/.test(e.message));
+
+  answer = (sql) => {
+    if (sql.startsWith("update judges")) throw pgError("23503", "judges_panel_id_fkey");
+    return [];
+  };
+  await assert.rejects(() => postgresStore.updateJudge("j1", { panel_id: "gone" }), (e) => e.status === 404 && /panel no longer exists/.test(e.message));
+});
+
+test("removeJudge deletes by id and reports whether there was one; their conflicts go by the foreign key", async () => {
+  calls.length = 0;
+  answer = () => [{ id: "j1" }];
+  assert.equal(await postgresStore.removeJudge("j1"), true);
+  const [del] = sent(/^delete from judges/);
+  assert.equal(del.sql, "delete from judges where id = $1 returning id");
+  assert.deepEqual(del.params, ["j1"]);
+  answer = () => [];
+  assert.equal(await postgresStore.removeJudge("j1"), false);
+  const method = src.slice(src.indexOf("async removeJudge(id) {"));
+  assert.ok(!/conflicts/.test(method.slice(0, method.indexOf("\n  },"))), "removeJudge deletes no conflict by hand: on delete cascade does");
+});
+
+test("a conflict is inserted for a judge or for a panel, never both, and the judge's writes no label", async () => {
+  calls.length = 0;
+  answer = (sql) => (sql.startsWith("insert into conflicts") ? [{ id: "c1" }] : []);
+  await postgresStore.addConflict({ judgeId: "j1", teamId: "t1", note: "n", declaredBy: "admin:JA", judgeName: "ignored" });
+  const [byJudge] = sent(/^insert into conflicts/);
+  assert.equal(
+    byJudge.sql,
+    "insert into conflicts (judge_id, team_id, note, declared_by) values ($1, $2, $3, $4) on conflict (judge_id, team_id) do update set note = conflicts.note returning *",
+  );
+  assert.deepEqual(byJudge.params, ["j1", "t1", "n", "admin:JA"]);
+
+  calls.length = 0;
+  await postgresStore.addConflict({ panelId: "p1", teamId: "t1", judgeName: "Old", note: null, declaredBy: "admin:JA" });
+  const [byPanel] = sent(/^insert into conflicts/);
+  assert.match(byPanel.sql, /^insert into conflicts \(panel_id, team_id, judge_name, note, declared_by\) values \(\$1, \$2, \$3, \$4, \$5\) on conflict \(panel_id, team_id\) do update set/);
+  assert.deepEqual(byPanel.params, ["p1", "t1", "Old", null, "admin:JA"]);
+
+  calls.length = 0;
+  const base = { teamId: "t1", note: null, declaredBy: "admin:JA" };
+  await assert.rejects(() => postgresStore.addConflict({ ...base }), (e) => e.status === 400);
+  await assert.rejects(() => postgresStore.addConflict({ ...base, panelId: "p1", judgeId: "j1" }), (e) => e.status === 400);
+  assert.equal(sent(/conflicts/).length, 0, "the database is never asked");
+
+  answer = () => {
+    throw pgError("23503", "conflicts_judge_id_fkey");
+  };
+  await assert.rejects(() => postgresStore.addConflict({ ...base, judgeId: "gone" }), (e) => e.status === 404);
+});
+
+test("every panel read takes its judges from the roster; the legacy column is never read", async () => {
+  assert.doesNotMatch(src, /select \* from panels|returning \*[^`"]*panels/, "no panel is read whole, legacy column and all");
+  calls.length = 0;
+  answer = () => [];
+  await postgresStore.listPanels();
+  await postgresStore.findPanelByCode("abc");
+  const reads = sent(/from panels p/);
+  assert.equal(reads.length, 2);
+  for (const read of reads) {
+    assert.match(read.sql, /array\(select j\.name from judges j where j\.panel_id = p\.id order by j\.seq\) as judges/);
+    assert.doesNotMatch(read.sql, /p\.judges|\*/);
+  }
+});
+
+const newPanel = { name: "Panel B", code: "BRAVO2", division: "Division 1", judges: ["Dana Ruiz", " dana ruiz ", "Sam Okafor", ""], languages: [], sort_order: 2, slot_start_at: null, slot_minutes: 20, slot_count: 0 };
+const syncOf = (id, names) => [
+  [/^update judges set panel_id = \$1::uuid where lower\(name\) in/, [id, names]],
+  [/^insert into judges \(name, panel_id\) select t\.n, \$1::uuid from unnest\(\$2::text\[\]\) with ordinality as t\(n, ord\) where not exists/, [id, names]],
+  [/^update judges set panel_id = null where panel_id = \$1::uuid and lower\(name\) not in/, [id, names]],
+];
+
+test("createPanel writes no judges column, then makes the roster say who is on the panel, all in one transaction", async () => {
+  calls.length = 0;
+  answer = (sql) => (sql.startsWith("insert into panels") ? [{ id: "p9" }] : sql.includes("from panels p") ? [{ id: "p9", judges: ["Dana Ruiz", "Sam Okafor"] }] : []);
+  const made = await postgresStore.createPanel(newPanel);
+
+  const [insert] = sent(/^insert into panels/);
+  assert.doesNotMatch(insert.sql, /judges/);
+  assert.equal(insert.params.length, 8);
+
+  const sql = calls.map((c) => c.sql);
+  const at = [/^begin$/, /^insert into panels/, ...syncOf("p9", []).map(([re]) => re), /^commit$/].map((re) => sql.findIndex((q) => re.test(q)));
+  assert.ok(at.every((i) => i >= 0) && at.every((i, k) => k === 0 || i > at[k - 1]), `statements out of order: ${at}`);
+  for (const [re, params] of syncOf("p9", ["Dana Ruiz", "Sam Okafor"])) {
+    assert.deepEqual(calls.find((c) => re.test(c.sql)).params, params, "names trimmed, blanks dropped, repeats ignoring case dropped");
+  }
+  assert.deepEqual(made.judges, ["Dana Ruiz", "Sam Okafor"]);
+});
+
+test("a panel code taken twice rolls the whole creation back and says so", async () => {
+  calls.length = 0;
+  answer = (sql) => {
+    if (sql.startsWith("insert into panels")) throw pgError("23505", "panels_code_key");
+    return [];
+  };
+  await assert.rejects(() => postgresStore.createPanel(newPanel), (e) => e.status === 409 && /code is already in use/.test(e.message));
+  const sql = calls.map((c) => c.sql);
+  assert.ok(sql.includes("rollback") && !sql.includes("commit"));
+  assert.ok(!sql.some((q) => /judges/.test(q) && !q.startsWith("insert into panels")), "no judge was touched");
+});
+
+test("a judge name taken a moment ago while a panel is saved is not reported as a panel code clash", async () => {
+  calls.length = 0;
+  answer = (sql) => {
+    if (sql.startsWith("insert into panels")) return [{ id: "p9" }];
+    if (sql.startsWith("insert into judges")) throw pgError("23505", "judges_name_unique");
+    return [];
+  };
+  await assert.rejects(() => postgresStore.createPanel(newPanel), (e) => e.status === 409 && /judge with that name/.test(e.message));
+  assert.ok(calls.some((c) => c.sql === "rollback"), "and the panel is not left half-made");
+});
+
+test("updatePanel treats judges as the roster's: no column is updated for them, and a judges-only save sends no UPDATE panels", async () => {
+  calls.length = 0;
+  answer = (sql) => (sql.includes("from panels p") ? [{ id: "p2", judges: ["Priya Nair"] }] : []);
+  const only = await postgresStore.updatePanel("p2", { judges: ["Priya Nair", "priya nair"] });
+  assert.equal(sent(/^update panels/).length, 0);
+  for (const [re, params] of syncOf("p2", ["Priya Nair"])) assert.deepEqual(calls.find((c) => re.test(c.sql)).params, params);
+  assert.deepEqual(only.judges, ["Priya Nair"]);
+
+  calls.length = 0;
+  answer = (sql) =>
+    sql.startsWith("select division") ? [{ division: "Division 1" }] : sql.startsWith("update panels") ? [{ id: "p2" }] : sql.includes("from panels p") ? [{ id: "p2", judges: [] }] : [];
+  await postgresStore.updatePanel("p2", { name: "Panel Two", judges: [] });
+  const [update] = sent(/^update panels/);
+  assert.equal(update.sql, "update panels set name = $2 where id = $1 returning id");
+  assert.deepEqual(update.params, ["p2", "Panel Two"]);
+  assert.equal(sent(/^update judges set panel_id = null/).length, 1, "an empty list still clears the panel's judges");
+
+  calls.length = 0;
+  await postgresStore.updatePanel("p2", { name: "Panel Three" });
+  assert.equal(sent(/judges set/).length, 0, "a save that does not mention judges leaves the roster alone");
+});
+
+test("seeding preset panels inserts no judges column, and puts each new panel's preset judges on the roster", async () => {
+  const { presetPanels } = await import("../src/lib/presets");
+  calls.length = 0;
+  answer = (sql) => (sql.startsWith("insert into panels") ? [{ id: "px" }] : []);
+  await postgresStore.seedPresetPanels();
+  const inserts = sent(/^insert into panels/);
+  assert.equal(inserts.length, presetPanels().length);
+  assert.ok(inserts.every((i) => !/judges/.test(i.sql) && i.params.length === 8));
+  assert.equal(sent(/^insert into judges/).length, presetPanels().length, "one roster sync per new panel");
+});
+
+test("auto-assign does not choose the panel a conflicted judge sits on, and does once the judge is off it", async () => {
+  const panel = (id) => ({ id, name: id, division: "Division 1", sort_order: 1, languages: [], judges: [], created_at: new Date() });
+  const rowsFor = (judgePanel) => (sql) => {
+    if (sql.includes("from panels p")) return [panel("pA"), panel("pB")];
+    if (sql === "select * from teams") return [{ id: "t1", number: "1001", name: "Hawks", panel_id: null, division: "Division 1", category: "developing", pit: null, created_at: new Date() }];
+    if (sql === "select * from conflicts") return [{ id: "c1", panel_id: null, judge_id: "j1", team_id: "t1" }];
+    if (sql.startsWith(`select ${JUDGE_COLUMNS} from judges`)) return [judgeRow({ panel_id: judgePanel })];
+    return [];
+  };
+  const assignedTo = () => sent(/^update teams set panel_id = data\.panel_id::uuid/)[0]?.params;
+
+  calls.length = 0;
+  answer = rowsFor("pA");
+  await postgresStore.autoAssignTeams(10);
+  assert.deepEqual(assignedTo(), [["t1"], ["pB"]], "Dana is on Panel A, so the team goes to B");
+
+  calls.length = 0;
+  answer = rowsFor(null);
+  await postgresStore.autoAssignTeams(10);
+  assert.deepEqual(assignedTo(), [["t1"], ["pA"]], "with no panel she blocks nobody");
+});
+
+test("a full wipe truncates the roster with the event; a day reset keeps it", async () => {
+  answer = () => [];
+  calls.length = 0;
+  await postgresStore.resetAll();
+  assert.match(sent(/^truncate/)[0].sql, /\bjudges\b/);
+  calls.length = 0;
+  await postgresStore.resetDay();
+  assert.ok(!/\bjudges\b|\bconflicts\b/.test(sent(/^truncate/)[0].sql), "the roster and its conflicts are the event's, not the day's");
 });

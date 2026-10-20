@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { canReadNotes, getSession, mayActOnPanel, type Session } from "@/lib/auth";
 import { store } from "@/lib/db";
-import { CONFLICT_MESSAGE, isConflicted } from "@/lib/conflicts";
+import { blockedTeams, CONFLICT_MESSAGE, isConflicted, loadBlocks } from "@/lib/conflicts";
 import type { Team } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -34,11 +34,7 @@ export async function GET(request: Request) {
 
   // A judge asking for everything gets their own panel's teams only.
   const judge = session as Extract<Session, { role: "judge" }>;
-  const barred = new Set(
-    (await db.listConflicts())
-      .filter((c) => c.panel_id === judge.panelId)
-      .map((c) => c.team_id),
-  );
+  const barred = blockedTeams(await loadBlocks(), judge.panelId);
   const mine = new Set(
     (await db.listTeams())
       .filter((t) => t.panel_id === judge.panelId && !barred.has(t.id))

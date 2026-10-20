@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { liveRequestFor } from "@/lib/data";
 import { divisionsCompatible } from "@/lib/presets";
+import { isPanelBlocked, panelBlocks } from "@/lib/roster";
 import { AdminFrame, type AdminTab as Tab } from "@/components/admin/AdminFrame";
 import { FloorTab } from "@/components/admin/FloorTab";
 import { canTransition, STATUS_META, type Status } from "@/lib/status";
@@ -206,8 +207,11 @@ function TeamsTab({ state, refresh, onError }: TabProps) {
   /* Panel/team pairs that must never be put together. The API refuses them
      anyway, but an option you cannot choose does not belong in the list. */
   const conflicted = useMemo(
-    () => new Set(state.conflicts.map((c) => `${c.panel_id}:${c.team_id}`)),
-    [state.conflicts],
+    () =>
+      new Set(
+        panelBlocks(state.conflicts, state.judges).map((b) => `${b.panel_id}:${b.team_id}`),
+      ),
+    [state.conflicts, state.judges],
   );
 
   async function update(teamId: string, patch: Record<string, unknown>) {
@@ -745,6 +749,13 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
   const { ask, dialog } = useConfirm();
 
   const teamById = useMemo(() => new Map(state.teams.map((t) => [t.id, t])), [state.teams]);
+  const judgeById = useMemo(() => new Map(state.judges.map((j) => [j.id, j])), [state.judges]);
+  /* Which panel each conflict blocks right now: a judge's conflict follows
+     the judge, a whole-panel one is its own panel. */
+  const blocks = useMemo(
+    () => panelBlocks(state.conflicts, state.judges),
+    [state.conflicts, state.judges],
+  );
 
   async function withdraw(id: string) {
     if (
@@ -789,19 +800,21 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
   /* Panels in their configured order, each with the conflicts declared
      against it; a panel with none is left out rather than listed empty. */
   const byPanel = useMemo(() => {
+    const panelOf = new Map(blocks.map((b) => [b.conflict_id, b.panel_id]));
     const groups = state.panels
       .map((panel) => ({
         panel,
-        rows: state.conflicts.filter((c) => c.panel_id === panel.id),
+        rows: state.conflicts.filter((c) => panelOf.get(c.id) === panel.id),
       }))
       .filter((g) => g.rows.length);
 
-    // A conflict whose panel has since been deleted still has to be visible,
-    // or it becomes an invisible rule nobody can withdraw.
-    const known = new Set(state.panels.map((p) => p.id));
-    const orphans = state.conflicts.filter((c) => !known.has(c.panel_id));
+    // A conflict with no panel to show it under -- a judge not on a panel
+    // yet -- still has to be visible, or it becomes an invisible rule
+    // nobody can withdraw.
+    const shown = new Set(groups.flatMap((g) => g.rows.map((r) => r.id)));
+    const orphans = state.conflicts.filter((c) => !shown.has(c.id));
     return orphans.length ? [...groups, { panel: null, rows: orphans }] : groups;
-  }, [state.panels, state.conflicts]);
+  }, [state.panels, state.conflicts, blocks]);
 
   const chosen = state.teams.find((t) => t.number === pick.trim().toUpperCase());
 
@@ -814,9 +827,7 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
       divisionsCompatible(team.division, p.division),
     );
     if (!inDivision.length) return false;
-    return inDivision.every((p) =>
-      state.conflicts.some((c) => c.panel_id === p.id && c.team_id === team.id),
-    );
+    return inDivision.every((p) => isPanelBlocked(blocks, p.id, team.id));
   });
 
   return (
@@ -975,7 +986,7 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
             <div key={panel?.id ?? "gone"} className="rounded-xl ring-1 ring-inset ring-line">
               <div className="flex flex-wrap items-baseline gap-x-3 border-b border-line px-4 py-2.5">
                 <h3 className="text-sm font-semibold text-ink">
-                  {panel?.name ?? "Panel removed"}
+                  {panel?.name ?? "Not on a panel"}
                 </h3>
                 {panel ? <span className="text-xs text-ink-faint">{panel.division}</span> : null}
                 <span className="ml-auto text-xs text-ink-faint">
@@ -994,8 +1005,10 @@ function ConflictsTab({ state, refresh, onError }: TabProps) {
                       <span className="min-w-[8rem] flex-1 truncate text-ink-subtle">
                         {team?.name ?? "team removed"}
                       </span>
-                      {c.judge_name ? (
-                        <span className="text-ink-faint">{c.judge_name}</span>
+                      {c.judge_name || (c.judge_id && judgeById.get(c.judge_id)) ? (
+                        <span className="text-ink-faint">
+                          {c.judge_name ?? judgeById.get(c.judge_id ?? "")?.name}
+                        </span>
                       ) : null}
                       {c.note ? <span className="text-ink-faint">{c.note}</span> : null}
                       {team && !team.panel_id ? (

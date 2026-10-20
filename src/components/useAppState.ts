@@ -12,6 +12,7 @@ const EMPTY: AppState = {
   categories: [],
   languages: [],
   conflicts: [],
+  judges: [],
   pitFloor: { columns: "right-to-left", rows: "bottom-to-top" },
   matchTypes: [],
   refereeSetup: null,

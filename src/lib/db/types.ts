@@ -2,6 +2,7 @@ import type {
   ActivityRow,
   ConflictRow,
   FlagRow,
+  JudgeRow,
   Note,
   Panel,
   RefereeSetup,
@@ -56,12 +57,20 @@ export type SaveScore = {
 };
 
 export type NewConflict = {
-  panelId: string;
+  /** Exactly one of panelId (a whole-panel, legacy conflict) and judgeId. */
+  panelId?: string | null;
+  judgeId?: string | null;
   teamId: string;
-  judgeName: string | null;
+  /** Only read on a whole-panel conflict; a judge's conflict names the judge by id. */
+  judgeName?: string | null;
   note: string | null;
   declaredBy: string;
 };
+
+export type NewJudge = { name: string; note?: string | null };
+
+/** What may change on a roster judge. `panel_id: null` takes them off their panel. */
+export type JudgePatch = Partial<Pick<JudgeRow, "name" | "note" | "panel_id">>;
 
 export type NewFlag = {
   teamId: string;
@@ -192,6 +201,19 @@ export type Store = {
   getRefereeSetup(): Promise<RefereeSetup | null>;
   /** Replaces the one record. resetDay keeps it, resetAll clears it. */
   saveRefereeSetup(input: NewRefereeSetup): Promise<RefereeSetup>;
+
+  /**
+   * The judge roster, in the order judges were added. A panel's `judges`
+   * list is derived from this; createPanel / updatePanel / seedPresetPanels
+   * find-or-create each name in `judges` and set the roster's panel_id to match.
+   */
+  listJudges(): Promise<JudgeRow[]>;
+  /** Names are trimmed and unique case-insensitively: a duplicate is a 409. */
+  addJudge(input: NewJudge): Promise<JudgeRow>;
+  /** 404 if the judge is gone, 409 for a name already on the roster. */
+  updateJudge(id: string, patch: JudgePatch): Promise<JudgeRow>;
+  /** Also removes that judge's conflicts. Returns whether they existed. */
+  removeJudge(id: string): Promise<boolean>;
 
   listConflicts(): Promise<ConflictRow[]>;
   /** Idempotent: declaring the same pair twice returns the existing one. */

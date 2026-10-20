@@ -79,9 +79,28 @@ export type TeamCategoryView = {
   excludesRubrics: string[];
 };
 
+/**
+ * A person on the Judge Advisor's roster. A judge sits on at most one
+ * panel; the panel's `judges` list is derived from this, never stored on
+ * the panel. Conflicts point at a judge's id, not at a typed name.
+ */
+export type JudgeRow = {
+  id: string;
+  name: string;
+  note: string | null;
+  panel_id: string | null;
+  created_at: string;
+};
+
+/**
+ * Exactly one of `judge_id` and `panel_id` is set: a judge's conflict (the
+ * panel they are on is blocked from the team), or a whole-panel conflict
+ * from before there was a roster. `judge_name` is only ever read on the latter.
+ */
 export type ConflictRow = {
   id: string;
-  panel_id: string;
+  panel_id: string | null;
+  judge_id: string | null;
   team_id: string;
   judge_name: string | null;
   note: string | null;
@@ -183,6 +202,8 @@ export type AppState = {
   languages: { id: string; label: string; short: string }[];
   /** Panel/team pairs that must stay apart. */
   conflicts: ConflictRow[];
+  /** The judge roster. Admin only: judges and the desk are sent none. */
+  judges: JudgeRow[];
   /** Which way round the pit floor is drawn, so the plan matches the room. */
   pitFloor: { columns: "left-to-right" | "right-to-left"; rows: "top-to-bottom" | "bottom-to-top" };
   /** The match types a new flag can be pinned to under the event's program

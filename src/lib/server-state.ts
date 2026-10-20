@@ -1,5 +1,6 @@
 import { store } from "./db";
 import { stripCode } from "./data";
+import { blockedTeams, conflictsFor, panelBlocks } from "./roster";
 import {
   divisionsCompatible,
   languages,
@@ -44,11 +45,12 @@ import type { AppState, ViewerCapabilities } from "./types";
  */
 export async function loadState(session: Session | null): Promise<AppState> {
   const db = store();
-  const [panels, teams, rows, allConflicts, allFlags, refereeSetup] = await Promise.all([
+  const [panels, teams, rows, allConflicts, judges, allFlags, refereeSetup] = await Promise.all([
     db.listPanels(),
     db.listTeams(),
     db.listRequests(),
     db.listConflicts(),
+    db.listJudges(),
     db.listFlags(),
     db.getRefereeSetup(),
   ]);
@@ -70,11 +72,8 @@ export async function loadState(session: Session | null): Promise<AppState> {
   // A judge sees their own division and nothing else — and nothing at all
   // of a team their panel has a declared conflict with. "Cannot interview"
   // has to mean cannot see, or the team is still there to be worked on.
-  const barred = new Set(
-    isJudge && judgeSessionValid
-      ? allConflicts.filter((c) => c.panel_id === session.panelId).map((c) => c.team_id)
-      : [],
-  );
+  const blocks = panelBlocks(allConflicts, judges);
+  const barred = isJudge && judgeSessionValid ? blockedTeams(blocks, session.panelId) : new Set<string>();
 
   // divisionsCompatible rather than `===`: a blended team competes across
   // age groups, so it is judged by whichever panel holds it. Comparing
@@ -163,8 +162,12 @@ export async function loadState(session: Session | null): Promise<AppState> {
     conflicts: !canReadNotes(session) || (isJudge && !judgeSessionValid)
       ? []
       : session?.role === "judge"
-        ? allConflicts.filter((c) => c.panel_id === session.panelId)
+        ? conflictsFor(session.panelId, allConflicts, blocks)
         : allConflicts,
+    /* The roster is the Judge Advisor's to run. A judge already sees the
+       names on their own panel; nobody else needs the list, and a judge
+       must not learn which of their colleagues has a conflict with whom. */
+    judges: canAdminister(session) ? judges : [],
     pitFloor: pitFloor(),
     /* The program and field count are the same for every viewer, so they
        go to everyone. Who set them is a staff name, nulled like the rest. */
