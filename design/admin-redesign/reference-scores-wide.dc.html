@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Judge Advisor scores · ranked and compare · wide · dark</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Fira+Sans:wght@400;500&amp;display=swap">
+<style>
+.jq{--canvas:oklch(0.165 0.012 265);--surface:oklch(0.205 0.014 265);--ink:oklch(0.955 0.005 265);--muted:oklch(0.670 0.013 265);--line:oklch(0.320 0.016 265);--accent:oklch(0.680 0.140 258);--on-accent:oklch(0.165 0.012 265);--ring:oklch(0.680 0.140 258 / 0.35);--field:oklch(0.180 0.013 265);--field-line:oklch(0.520 0.014 265);--waiting:oklch(0.735 0.185 58);--waiting-ink:oklch(0.240 0.060 58);--enroute:oklch(0.720 0.140 232);--enroute-ink:oklch(0.220 0.050 232);--active:oklch(0.680 0.170 300);--active-ink:oklch(0.220 0.060 300);--done:oklch(0.745 0.140 158);--done-ink:oklch(0.225 0.055 158);--booked:oklch(0.330 0.020 265);--booked-ink:oklch(0.860 0.012 265);--booked-line:oklch(0.440 0.020 265);--waiting-t:oklch(0.735 0.185 58 / 0.12);--waiting-r:oklch(0.735 0.185 58 / 0.45);--active-t:oklch(0.680 0.170 300 / 0.12);--active-r:oklch(0.680 0.170 300 / 0.45);--caution-bg:oklch(0.790 0.150 82 / 0.12);--caution-line:oklch(0.790 0.150 82 / 0.35);--caution-ink:oklch(0.840 0.100 82);--warn:oklch(0.790 0.150 82);--top-t:oklch(0.760 0.130 175 / 0.14);--top-l:oklch(0.760 0.130 175 / 0.40);--top-i:oklch(0.850 0.110 175);--strong-t:oklch(0.780 0.100 210 / 0.14);--strong-l:oklch(0.780 0.100 210 / 0.40);--strong-i:oklch(0.850 0.080 210);--middle-t:oklch(0.800 0.130 88 / 0.14);--middle-l:oklch(0.800 0.130 88 / 0.40);--middle-i:oklch(0.860 0.100 88);--emerging-t:oklch(0.700 0.010 265 / 0.16);--emerging-l:oklch(0.700 0.010 265 / 0.40);--emerging-i:oklch(0.820 0.008 265);--accent-t:oklch(0.680 0.140 258 / 0.14);--good:oklch(0.745 0.140 158);--minor:oklch(0.735 0.185 58);--major:oklch(0.640 0.200 18);--dq:oklch(0.300 0.010 265);--dq-line:oklch(0.440 0.020 265);--sev-ink:oklch(0.165 0.012 265);position:relative;box-sizing:border-box;width:1280px;height:990px;overflow:hidden;display:flex;flex-direction:column;background:var(--canvas);color:var(--ink);font-family:'Fira Sans',system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+.jq *,.jq *::before,.jq *::after{box-sizing:border-box}
+:where(.jq) :is(h1,h2,h3,p,ul,ol,li,table,blockquote){margin:0;padding:0}
+:where(.jq) :is(ul,ol){list-style:none}
+.jq :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rule{flex:none;height:1px;background:var(--line)}
+.av{flex:none;width:28px;height:28px;display:block}
+.av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:22%;box-shadow:0 0 0 2px var(--accent)}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.who-t{display:flex;flex-direction:column;line-height:1.15}
+.who-t b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.who-t span{font-size:12px;color:var(--muted)}
+.top-r{display:flex;align-items:center;gap:2px}
+.live{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--done)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--done)}
+.signout{padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:14px;text-decoration:underline;cursor:pointer}
+.jq{--hover:oklch(0.245 0.016 265);--lo:oklch(0.800 0.008 265)}
+.s-good{--c:var(--good);--ci:var(--sev-ink)}
+.s-warn{--c:var(--warn);--ci:var(--sev-ink)}
+.s-minor{--c:var(--minor);--ci:var(--sev-ink)}
+.s-major{--c:var(--major);--ci:var(--sev-ink)}
+.s-dq{--c:var(--dq);--ci:oklch(0.955 0.005 265);--cb:var(--dq-line)}
+.sp{display:inline-flex;align-items:center;flex:none;height:24px;padding:0 10px;border-radius:999px;background:var(--c);border:1px solid var(--cb,var(--c));color:var(--ci);font-size:12px;font-weight:500;white-space:nowrap;font-variant-numeric:tabular-nums}
+.band{flex:none;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;border:1px solid var(--bl);background:var(--bt);color:var(--bi);font-size:12px;font-weight:500;white-space:nowrap}
+.b-top{--bt:var(--top-t);--bl:var(--top-l);--bi:var(--top-i)}
+.b-strong{--bt:var(--strong-t);--bl:var(--strong-l);--bi:var(--strong-i)}
+.b-middle{--bt:var(--middle-t);--bl:var(--middle-l);--bi:var(--middle-i)}
+.b-emerging{--bt:var(--emerging-t);--bl:var(--emerging-l);--bi:var(--emerging-i)}
+.leg{display:flex;flex-wrap:wrap;gap:6px}
+.meta{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.meta b{font-weight:500;color:var(--ink)}
+.nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.of{font-size:12px;font-weight:400;color:var(--muted)}
+.pc{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cbtn{display:inline-flex;align-items:center;gap:5px;flex:none;border:1px solid transparent;border-radius:999px;background:transparent;color:var(--muted);cursor:pointer}
+.cbtn:hover{border-color:var(--accent)}
+.none{color:var(--muted)}
+.bnote{font-size:12px;color:var(--muted)}
+.rb{flex:none;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--waiting);color:var(--waiting-ink);font-size:12px;font-weight:500;line-height:22px;text-align:center;font-variant-numeric:tabular-nums}
+.top{flex:none;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 12px 0 20px}
+.signout{min-height:36px}
+.shell{flex:1;min-height:0;display:flex}
+.rail{flex:none;width:224px;display:flex;flex-direction:column;gap:14px;padding:16px 0;background:var(--surface);border-right:1px solid var(--line)}
+.rl{padding:0 20px;margin-bottom:4px;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.ri{position:relative;display:flex;align-items:center;gap:12px;height:44px;margin-right:12px;padding:0 12px 0 20px;border-radius:0 10px 10px 0;color:var(--muted);text-decoration:none;font-size:15px;font-weight:500}
+.ri svg{flex:none}
+.ri[aria-current]{background:var(--accent-t);color:var(--ink)}
+.ri[aria-current]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.ri[aria-current] svg{color:var(--accent)}
+.rc{margin-left:auto;font-size:13px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
+.ri .rb{margin-left:auto}
+.main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:14px;padding:20px 24px 24px}
+.main>*{flex:none}
+.fchips{display:flex;flex-wrap:wrap;gap:6px}
+.fchip{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--field-line);background:var(--field);color:var(--ink);font-family:Archivo,sans-serif;font-weight:600;font-size:14px;white-space:nowrap;cursor:pointer}
+.fchip .fn{font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
+.fchip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.fchip[aria-pressed="true"] .fn{color:var(--on-accent)}
+.cin{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.cin:disabled{cursor:default}
+.box{flex:none;display:grid;place-items:center;width:22px;height:22px;border-radius:6px;border:2px solid var(--field-line);background:var(--field);color:var(--on-accent)}
+.box svg{display:none}
+.cin:checked + .box{background:var(--accent);border-color:var(--accent)}
+.cin:checked + .box svg{display:block}
+.cin:disabled + .box{border-color:var(--line);background:transparent}
+.cin:focus-visible + .box{outline:2px solid var(--accent);outline-offset:2px}
+.cr{position:relative;color:var(--ink)}
+.cr.on{background:var(--accent-t)}
+.rn{text-align:center;font-family:Archivo,sans-serif;font-weight:600;font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
+.lt{display:flex;min-width:0}
+.lt b{flex:none;font-family:Archivo,sans-serif;font-weight:700;font-variant-numeric:tabular-nums}
+.ls b{font-family:Archivo,sans-serif;font-weight:700;font-variant-numeric:tabular-nums}
+.ns{font-size:12px;color:var(--muted)}
+.cr.un,.cr.un .lt b,.cr.un .rn{color:var(--muted)}
+
+.main{gap:14px}
+.tit{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;min-height:40px}
+.tit h1{font-family:Archivo,sans-serif;font-weight:700;font-size:26px;line-height:1.15;letter-spacing:-.01em}
+.tit .leg{margin-left:auto}
+.fbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 32px}
+.fg{display:flex;align-items:center;gap:10px}
+.fg .cl{font-size:11.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.fchip{height:36px;padding:0 14px;border-radius:10px}
+.cols{display:flex;align-items:flex-start;gap:20px}
+.ll{flex:none;width:440px;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.lh{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:6px 8px 6px 16px;border-bottom:1px solid var(--line)}
+.lh p{font-family:Archivo,sans-serif;font-weight:600;font-size:15px}
+.lh p span{font-weight:500;color:var(--muted)}
+.lnk{min-height:32px;min-width:52px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--accent);font-size:14px;font-weight:500;text-decoration:underline;cursor:pointer}
+.ll li+li{border-top:1px solid var(--line)}
+.cr{display:grid;grid-template-columns:22px 20px minmax(0,1fr) 62px 74px;align-items:center;column-gap:10px;min-height:48px;padding:0 14px 0 16px;box-shadow:none}
+.cr.on{box-shadow:inset 3px 0 0 var(--accent)}
+.lt{align-items:baseline;gap:8px}
+.lt b{font-size:17px}
+.lt .nm{font-size:14px}
+.ls{text-align:right;color:var(--muted)}
+.ls b{font-size:17px;color:var(--ink)}
+.ls .of{margin-left:1px}
+.cr.un .ls{color:var(--muted)}
+.lb{display:flex}
+.llf{padding:12px 16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+.cmp{flex:1;min-width:0;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.cmp table{width:100%;border-collapse:collapse;table-layout:fixed}
+.cmp th,.cmp td{text-align:left;vertical-align:middle;font-weight:400}
+.cmp thead th{padding:14px 16px 12px;vertical-align:bottom;border-bottom:1px solid var(--line)}
+.tn{display:block;font-family:Archivo,sans-serif;font-weight:700;font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
+.tnm{display:block;margin-top:2px;font-size:15px;color:var(--ink)}
+.tmt{display:block;margin-top:2px;font-size:12.5px;color:var(--muted)}
+.cmp tbody tr{border-top:1px solid var(--line)}
+.cmp tbody th{padding:10px 12px 10px 16px;font-size:13.5px;line-height:1.35;color:var(--ink)}
+.cmp tbody td{padding:10px 16px}
+.cmp tr.grp{background:var(--field)}
+.cmp tr.grp th{font-size:11.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.cmp tr.grp td .v{font-size:15px}
+.v{font-family:Archivo,sans-serif;font-variant-numeric:tabular-nums;font-size:16px;font-weight:500;color:var(--lo)}
+.v.hi{font-weight:700;color:var(--ink)}
+.v.eq{color:var(--ink)}
+.v .of{margin-left:2px;font-family:'Fira Sans',system-ui,sans-serif;font-weight:400}
+.cmp tr.tt td{padding:14px 16px}
+.cmp tr.tt th{font-weight:500}
+.tt .v{display:block;font-size:26px;line-height:1.1}
+.tt .v .of{font-size:14px}
+.tt .bl1{display:flex;align-items:center;gap:8px;margin-top:6px}
+.nct{display:block;font-size:14px}
+.nct b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.olink{display:inline-flex;align-items:center;min-height:32px;margin-left:-8px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:var(--accent);font-size:14px;font-weight:500;cursor:pointer}
+.cmp .cbtn{display:inline-grid;grid-template-columns:auto auto;justify-items:start;align-items:center;gap:4px 6px;min-height:32px;padding:3px 8px 3px 2px;margin-left:-2px;border-radius:14px}
+.cmp .cbtn .sp{grid-column:1}
+.cmp .cbtn svg{grid-column:2;grid-row:1}
+.cmp tr.cd td,.cmp tr.cd th{padding-top:8px;padding-bottom:8px}
+
+</style>
+</helmet>
+<div class="jq" data-theme="dark">
+<header class="top">
+<div class="who"><span class="av"><img src="/avatars/judge-advisor.jpg" alt="" width="28" height="28"></span><span class="who-t"><b>Judge Advisor</b><span>Alex Morgan</span></span></div>
+<div class="top-r"><span class="live"><i aria-hidden="true"></i>Live</span><button type="button" class="signout">Sign out</button></div>
+</header>
+<div class="rule" aria-hidden="true"></div>
+<div class="shell">
+<nav class="rail" aria-label="Judge Advisor sections">
+<div class="rg"><h2 class="rl">Live</h2><ul>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"></path></svg><span>Floor</span><b class="rb">3</b><span class="sr"> teams requesting</span></a></li>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M5.6 5.6l12.8 12.8"></path></svg><span>Conflicts</span><span class="rc">5</span></a></li>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4L17 12H5"></path></svg><span>Referee</span><span class="rc">9</span></a></li>
+</ul></div>
+<div class="rg"><h2 class="rl">Setup</h2><ul>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 5.2a3 3 0 0 1 0 5.6M18.5 14.8c1.7.8 2.7 2.4 2.7 4.2"></path></svg><span>Teams</span><span class="rc">48</span></a></li>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M9 4v16M15 4v16"></path></svg><span>Panels</span><span class="rc">4</span></a></li>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M4 19h16"></path></svg><span>Import</span></a></li>
+</ul></div>
+<div class="rg"><h2 class="rl">Results</h2><ul>
+<li><a class="ri" href="#" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20v-7M12 20V5M19 20V10"></path></svg><span>Scores</span></a></li>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg><span>Activity</span></a></li>
+</ul></div>
+</nav>
+<main class="main">
+<div class="tit"><h1>Scores</h1><p class="meta">Showing 48 teams · <b>9 of 48</b> scored</p><div class="leg" role="group" aria-label="Score bands"><span class="band b-top">Top ≥85%</span><span class="band b-strong">Strong ≥70%</span><span class="band b-middle">Middle ≥50%</span><span class="band b-emerging">Emerging</span></div></div>
+<div class="fbar"><div class="fg" role="group" aria-labelledby="fg-nb"><span id="fg-nb" class="cl">Notebook</span><div class="fchips"><button type="button" class="fchip" aria-pressed="true">All</button><button type="button" class="fchip" aria-pressed="false">Developing</button><button type="button" class="fchip" aria-pressed="false">Fully Developed</button><button type="button" class="fchip" aria-pressed="false">Ungraded</button></div></div><div class="fg" role="group" aria-labelledby="fg-dv"><span id="fg-dv" class="cl">Division</span><div class="fchips"><button type="button" class="fchip" aria-pressed="true">All</button><button type="button" class="fchip" aria-pressed="false">HS</button><button type="button" class="fchip" aria-pressed="false">MS</button><button type="button" class="fchip" aria-pressed="false">ES</button></div></div></div>
+<div class="cols">
+<section class="ll" aria-label="Ranked teams">
+<div class="lh"><p>2 selected<span> · Compare</span></p><button type="button" class="lnk">Clear</button></div>
+<ul>
+<li><label class="cr"><input class="cin" type="checkbox"><span class="box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span><span class="rn">1</span><span class="lt"><b>5150Z</b><span class="nm">Sparky</span></span><span class="ls"><b>69</b><span class="of">/76</span></span><span class="lb"><span class="band b-top">Top</span></span></label></li>
+<li><label class="cr on"><input class="cin" type="checkbox" checked="checked"><span class="box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span><span class="rn">2</span><span class="lt"><b>8080V</b><span class="nm">Velocity</span></span><span class="ls"><b>62</b><span class="of">/76</span></span><span class="lb"><span class="band b-strong">Strong</span></span></label></li>
+<li><label class="cr on"><input class="cin" type="checkbox" checked="checked"><span class="box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span><span class="rn">3</span><span class="lt"><b>1108</b><span class="nm">Circuit Breakers</span></span><span class="ls"><b>58</b><span class="of">/76</span></span><span class="lb"><span class="band b-strong">Strong</span></span></label></li>
+<li><label class="cr"><input class="cin" type="checkbox"><span class="box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span><span class="rn">4</span><span class="lt"><b>2011A</b><span class="nm">Gear Gremlins</span></span><span class="ls"><b>53</b><span class="of">/76</span></span><span class="lb"><span class="band b-middle">Middle</span></span></label></li>
+<li><label class="cr"><input class="cin" type="checkbox"><span class="box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span><span class="rn">5</span><span class="lt"><b>6036D</b><span class="nm">Nuts &amp; Bolts</span></span><span class="ls"><b>48</b><span class="of">/76</span></span><span class="lb"><span class="band b-middle">Middle</span></span></label></li>
+<li><label class="cr"><input class="cin" type="checkbox"><span class="box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span><span class="rn">6</span><span class="lt"><b>1101R</b><span class="nm">Rookies</span></span><span class="ls"><b>45</b><span class="of">/76</span></span><span class="lb"><span class="band b-middle">Middle</span></span></label></li>
+<li><label class="cr"><input class="cin" type="checkbox"><span class="box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span><span class="rn">7</span><span class="lt"><b>7700B</b><span class="nm">Byte Me</span></span><span class="ls"><b>24</b><span class="of">/76</span></span><span class="lb"><span class="band b-emerging">Emerging</span></span></label></li>
+<li><label class="cr"><input class="cin" type="checkbox"><span class="box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span><span class="rn">8</span><span class="lt"><b>9882K</b><span class="nm">Torque Titans</span></span><span class="ls"><b>22</b><span class="of">/76</span></span><span class="lb"><span class="band b-emerging">Emerging</span></span></label></li>
+<li><label class="cr"><input class="cin" type="checkbox"><span class="box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span><span class="rn">9</span><span class="lt"><b>4410C</b><span class="nm">Robo Rangers</span></span><span class="ls"><b>10</b><span class="of">/12</span></span><span class="lb"><span class="band b-strong">Strong</span></span></label></li>
+<li><label class="cr un"><input class="cin" type="checkbox" disabled="disabled"><span class="box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span><span class="rn">—</span><span class="lt"><b>3141P</b><span class="nm">Pi Squad</span></span><span class="ls">—</span><span class="lb"><span class="ns">not scored</span></span></label></li>
+</ul>
+<p class="llf">38 more teams not scored yet</p>
+</section>
+<section class="cmp" aria-labelledby="cmp-h">
+<h2 id="cmp-h" class="sr">Compare 8080V and 1108</h2>
+<table>
+<caption class="sr">8080V Velocity compared with 1108 Circuit Breakers</caption>
+<colgroup><col style="width:36%"><col style="width:32%"><col style="width:32%"></colgroup>
+<thead><tr><th scope="col"><span class="sr">Measure</span></th><th scope="col"><span class="tn">8080V</span><span class="tnm">Velocity</span><span class="tmt">Rank 2 · Panel 2</span></th><th scope="col"><span class="tn">1108</span><span class="tnm">Circuit Breakers</span><span class="tmt">Rank 3 · Panel 4</span></th></tr></thead>
+<tbody>
+<tr class="tt"><th scope="row">Total</th><td><span class="v hi">62<span class="of">/76</span></span><span class="bl1"><span class="band b-strong">Strong</span><span class="pc">81.6%</span></span></td><td><span class="v">58<span class="of">/76</span></span><span class="bl1"><span class="band b-strong">Strong</span><span class="pc">76.3%</span></span></td></tr>
+<tr class="grp"><th scope="row">Engineering Notebook</th><td><span class="v hi">52<span class="of">/64</span></span></td><td><span class="v">49<span class="of">/64</span></span></td></tr>
+<tr><th scope="row">Notebook Organization</th><td><span class="v">13<span class="of">/16</span></span></td><td><span class="v hi">14<span class="of">/16</span></span></td></tr>
+<tr><th scope="row">Design Process — Define</th><td><span class="v hi">10<span class="of">/12</span></span></td><td><span class="v">9<span class="of">/12</span></span></td></tr>
+<tr><th scope="row">Design Process — Develop Solutions</th><td><span class="v hi">13<span class="of">/16</span></span></td><td><span class="v">12<span class="of">/16</span></span></td></tr>
+<tr><th scope="row">Design Process — Optimize</th><td><span class="v hi">10<span class="of">/12</span></span></td><td><span class="v">8<span class="of">/12</span></span></td></tr>
+<tr><th scope="row">Design Process — Reflection and Iteration</th><td><span class="v eq">6<span class="of">/8</span></span></td><td><span class="v eq">6<span class="of">/8</span></span></td></tr>
+<tr class="grp"><th scope="row">Team Interview</th><td><span class="v hi">10<span class="of">/12</span></span></td><td><span class="v">9<span class="of">/12</span></span></td></tr>
+<tr><th scope="row">Explain Your Learning</th><td><span class="v hi">6<span class="of">/6</span></span></td><td><span class="v">4<span class="of">/6</span></span></td></tr>
+<tr><th scope="row">How You Worked with Others</th><td><span class="v">4<span class="of">/6</span></span></td><td><span class="v hi">5<span class="of">/6</span></span></td></tr>
+<tr><th scope="row">Notes</th><td><span class="nct"><b>3</b> notes</span><button type="button" class="olink" aria-label="Open team sheet for 8080V Velocity">Open team sheet</button></td><td><span class="nct"><b>5</b> notes</span><button type="button" class="olink" aria-label="Open team sheet for 1108 Circuit Breakers">Open team sheet</button></td></tr>
+<tr class="cd"><th scope="row">Conduct</th><td><span class="none">None</span></td><td><button type="button" class="cbtn" aria-label="Open referee flags for 1108 Circuit Breakers: Warning ×2, Good ×1"><span class="sp s-warn">Warning ×2</span><span class="sp s-good">Good ×1</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"></path></svg></button></td></tr>
+</tbody>
+</table>
+</section>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":990}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

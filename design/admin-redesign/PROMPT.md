@@ -20,13 +20,17 @@ The console is being designed **tab by tab**. This file covers:
    judge roster** from the Conflicts data phase.
 7. **Import** (direction A, "One box"). UI, plus a small change to the
    import response (per-line skip reasons, new/updated counts).
+8. **Scores** (direction C, "Ranked + compare"). UI only. Also: every
+   "Notes" / row click on this console opens the **judge console's team
+   sheet** instead of the old NotesDrawer (user decision).
 
 More tabs will be added below as they are designed. Tabs that have no
 section here yet keep their current content, just rendered inside the new
 shell.
 
 **Commits, in order:** (1) shell + Floor; (2) Conflicts data; (3) Conflicts
-UI; (4) Referee; (5) Teams; (6) Panels; (7) Import. Each is one local
+UI; (4) Referee; (5) Teams; (6) Panels; (7) Import; (8) Scores + team
+sheet. Each is one local
 commit with every check green. If you are only asked to do part of this
 file, do the parts in that order.
 
@@ -63,6 +67,10 @@ file, do the parts in that order.
   - `reference-import-wide.dc.html` — 1280 wide: Import, filled box +
     result
   - `reference-import-phone.dc.html` — 375 wide: Import
+  - `reference-scores-wide.dc.html` — 1280 wide: ranked list + compare
+    panel (8080V vs 1108)
+  - `reference-scores-phone.dc.html` — 375 wide: ranked list with two
+    picked and the pinned Compare bar
   These are self-contained HTML mocks (custom `{{hole}}` template, not
   React). Read their `<style>` blocks for sizes, spacing and colours and
   their markup for structure and copy. Team data in them is sample data.
@@ -70,7 +78,8 @@ file, do the parts in that order.
   "Judge Advisor · Floor" (A chosen) and "Judge Advisor · Conflicts (by
   judge)" (C chosen), "Judge Advisor · Referee" (C chosen) and "Judge
   Advisor · Teams" (B chosen), "Judge Advisor · Panels" (B chosen),
-  "Judge Advisor · Import" (A chosen). Boards marked "Not chosen" are
+  "Judge Advisor · Import" (A chosen), "Judge Advisor · Scores" (C
+  chosen). Boards marked "Not chosen" are
   exploration only.
 - **Patterns to reuse, not copy:** the judge console
   (`src/components/judge/`, `.judge` / `.jg-*` in `globals.css`): status
@@ -90,8 +99,9 @@ file, do the parts in that order.
   Import, Scores, Activity. `useScores` only runs while Scores is open.
 - Scores → "conduct" link → Referee tab focusing that team
   (`focusFlagTeam`), cleared when you leave via another section.
-- NotesDrawer for the admin (until the Scores/Teams redesign replaces it),
-  opened from Floor's "Notes".
+- A notes/scores view for the admin, opened from Floor's "Notes". Until
+  the Scores phase lands it is the old NotesDrawer; the Scores phase
+  switches it to the judge console's team sheet (see Scores).
 - Floor actions, all with `from: request.status` on the PATCH:
   - **reassign** — only panels in a compatible division
     (`divisionsCompatible`) and not conflicted with the team, plus its
@@ -606,6 +616,68 @@ stacked, Import full width.
 `parseTeams` reports each skip reason with its line number and doesn't
 report a header row; the route returns `created` / `updated`; the UI shows
 both boxes; Import stays disabled on an empty box.
+
+## Scores (direction C, "Ranked + compare") — UI only
+
+Today's behaviour: `Rankings.tsx`, `rankTeams` in `src/lib/ranking.ts`,
+`bandFor` / `rubricsFor` / `totalFor` in `src/lib/rubrics.ts`,
+`useScores` (only while Scores is open).
+
+### Keep
+- Ranking order from `rankTeams`: scored first, then points (not percent),
+  then team number; unscored teams last with rank "—" and "not scored".
+- Each team totalled and banded against the rubrics its category is
+  judged on (Ungraded: notebook "excluded", total /12).
+- Conduct → Referee with that team selected (`focusFlagTeam`).
+- "N of M scored" and the band legend (Top ≥85%, Strong ≥70%, Middle
+  ≥50%, Emerging).
+
+### Layout (≥1024px), per `reference-scores-wide.dc.html`
+- Title row: "Scores", "Showing N teams · S of M scored", band legend.
+- **Filter chips** (new, client-side): Notebook (All / each category) and
+  Division (All / each division). Filters narrow the list; rank numbers
+  stay the event-wide rank (so "4" means 4th overall even when filtered).
+- **Left (~440px): ranked list.** Row: checkbox, rank, team number +
+  name, total "/max", band pill, and the team's **worst conduct pill** (if
+  any; DQ must be visible without opening anything). Unscored rows are
+  muted and their checkbox is disabled. Clicking the row (not the
+  checkbox) opens the team sheet. Header: "N selected · Compare" and
+  "Clear".
+- **Compare is two teams.** Once two are ticked, the other checkboxes are
+  disabled (with a title "Compare two at a time"); un-ticking one frees
+  them. With fewer than two ticked (including on first load), the right
+  side shows a quiet hint: "Tick two teams to compare them".
+- **Right: compare panel** for the two teams: header per team (number,
+  name, "Rank 2 · Panel 2"); Total + band + percent (one decimal); then
+  for each rubric the rubric total and **one row per rubric section**
+  (section subtotals computed client-side from `ScoreRow.values` and the
+  rubric's `sections`), higher value bold, ties not bold, "excluded" for an
+  out-of-scope rubric; Notes: "3 notes" + "Open team sheet" (fetch the two
+  teams' notes with the existing `/api/notes?teamId=`); Conduct: severity
+  pills linking to Referee, or "None".
+
+### Phone (<1024px), per `reference-scores-phone.dc.html`
+Filters behind a "Filters" button (badge only when a filter is on); the
+ranked list with checkboxes; when two are picked a pinned bar "2 selected ·
+**Compare**" opens the compare panel as a full-screen view with a back
+button (same content, two narrow columns).
+
+### Team sheet for the whole console
+Replace `NotesDrawer` on this console with the judge console's
+`TeamSheet` (`src/components/judge/TeamSheet.tsx`) — Notes · rubric
+segments, flags — opened from Scores rows, the compare panel, Floor's
+"Notes" and the Teams drawer's flags area. The Judge Advisor can read and
+score exactly as with the drawer today (same APIs). If `TeamSheet` needs
+the judge console's chrome or judge-only props, extract what both need
+rather than copying it. When nothing uses `NotesDrawer` any more, delete
+it.
+
+### Tests (must fail if reverted)
+Filters narrow the list but keep overall rank numbers; a third checkbox
+is disabled while two are ticked; section subtotals match the stored
+values; the higher value per row is bold and ties aren't; the worst
+conduct pill shows on the row; rows open the team sheet (not the old
+drawer).
 
 ## Rules
 
