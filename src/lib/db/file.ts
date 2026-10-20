@@ -101,8 +101,32 @@ const LIVE: Status[] = ["requested", "acknowledged", "interviewing", "scheduled"
  * Loading and saving
  * ------------------------------------------------------------------ */
 
-let loaded: Data | null = null;
-let pendingWrite: ReturnType<typeof setTimeout> | null = null;
+/**
+ * Everything one process knows about the data file: the in-memory copy, its
+ * pending save, the lock's heartbeat, and whether the shutdown hooks are on.
+ *
+ * It lives on `globalThis`, not in this module, because `next dev` evaluates
+ * the server modules again whenever it compiles a route for the first time.
+ * Module-level state would then start a NEW copy that reloads the file while
+ * the old copy's save timer is still pending: the new copy misses what the
+ * old one had not written yet, and its next write erases it. Every evaluation
+ * of this module shares the one entry for its file, so there is one copy, one
+ * save timer, one heartbeat and one set of hooks. (A test that wants a cold
+ * start drops `globalThis.__judgeQueueFileStore`.)
+ */
+type Shared = {
+  loaded: Data | null;
+  pendingWrite: ReturnType<typeof setTimeout> | null;
+  heartbeat: ReturnType<typeof setInterval> | null;
+  hooksInstalled: boolean;
+};
+
+const globals = globalThis as { __judgeQueueFileStore?: Map<string, Shared> };
+const registry = (globals.__judgeQueueFileStore ??= new Map<string, Shared>());
+if (!registry.has(FILE)) {
+  registry.set(FILE, { loaded: null, pendingWrite: null, heartbeat: null, hooksInstalled: false });
+}
+const shared = registry.get(FILE)!;
 
 /**
  * The in-memory copy, loaded on first use rather than at import.
@@ -113,15 +137,15 @@ let pendingWrite: ReturnType<typeof setTimeout> | null = null;
  * actually in use.
  */
 function state(): Data {
-  if (!loaded) {
+  if (!shared.loaded) {
     // Claim before reading. A second copy must be refused before it can
     // touch the file; if it is refused, `loaded` stays null, so the next
     // call asks again rather than quietly running without the lock.
     claimLock();
-    loaded = load();
+    shared.loaded = load();
     installShutdownFlush();
   }
-  return loaded;
+  return shared.loaded;
 }
 
 function empty(): Data {
@@ -291,20 +315,22 @@ function persist(snapshot: Data = state()): void {
  * once should not mean fifty separate file writes.
  */
 function save(): void {
-  if (pendingWrite) return;
-  pendingWrite = setTimeout(() => {
-    pendingWrite = null;
+  if (shared.pendingWrite) return;
+  shared.pendingWrite = setTimeout(() => {
+    shared.pendingWrite = null;
     try {
       persist();
     } catch (e) {
       console.error("[store] could not write state file:", e);
     }
   }, 200);
-  pendingWrite.unref?.();
+  shared.pendingWrite.unref?.();
 }
 
 /** Flush before the process dies so the last few seconds are not lost. */
 function installShutdownFlush(): void {
+  if (shared.hooksInstalled) return;
+  shared.hooksInstalled = true;
   // SIGHUP is what closing a terminal window sends, and SIGBREAK is its
   // Windows equivalent. Without them, shutting down by closing the window
   // rather than pressing Ctrl+C would skip the flush below and leave the
@@ -403,13 +429,15 @@ function claimLock(): void {
     }
   }
 
-  setInterval(() => {
+  if (shared.heartbeat) return;
+  shared.heartbeat = setInterval(() => {
     try {
       writeLock(false);
     } catch {
       /* read-only disk: carry on without a heartbeat */
     }
-  }, 5_000).unref?.();
+  }, 5_000);
+  shared.heartbeat.unref?.();
 }
 
 function releaseLock(): void {
@@ -1151,7 +1179,7 @@ function resetDay(): void {
 function resetAll(): void {
   // Going through state() first claims the file, so a second copy cannot wipe it.
   state();
-  loaded = empty();
+  shared.loaded = empty();
   save();
 }
 

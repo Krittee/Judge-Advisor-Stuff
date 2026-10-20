@@ -45,8 +45,23 @@ import {
  * is exactly the situation serverless hosting creates.
  */
 
-let pool: Pool | null = null;
-let connecting: Promise<Pool> | null = null;
+/**
+ * The pool and the migration, kept on `globalThis` rather than in this module:
+ * `next dev` evaluates the server modules again each time it compiles a route
+ * for the first time, and module-level state would open a new pool (and run
+ * the migration again) on every one of those.
+ */
+const shared = ((globalThis as { __judgeQueuePostgres?: PostgresShared }).__judgeQueuePostgres ??= {
+  pool: null,
+  connecting: null,
+  migration: null,
+});
+
+type PostgresShared = {
+  pool: Pool | null;
+  connecting: Promise<Pool> | null;
+  migration: Promise<void> | null;
+};
 
 /**
  * Connect, loading the driver on demand.
@@ -58,12 +73,12 @@ let connecting: Promise<Pool> | null = null;
  * next.config.ts keeps the bundler from trying to resolve it too.
  */
 async function db(): Promise<Pool> {
-  if (pool) return pool;
-  connecting ??= connect().catch((e) => {
-    connecting = null; // let the next request try again
+  if (shared.pool) return shared.pool;
+  shared.connecting ??= connect().catch((e) => {
+    shared.connecting = null; // let the next request try again
     throw e;
   });
-  return connecting;
+  return shared.connecting;
 }
 
 async function connect(): Promise<Pool> {
@@ -80,7 +95,7 @@ async function connect(): Promise<Pool> {
     );
   }
 
-  pool = new Pool({
+  const pool = (shared.pool = new Pool({
     connectionString,
     // Serverless spins up many short-lived instances; a big pool per
     // instance would exhaust the server's connection limit.
@@ -88,7 +103,7 @@ async function connect(): Promise<Pool> {
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
     ssl: sslFor(connectionString),
-  });
+  }));
 
   pool.on("error", (e) => console.error("[postgres] idle client error:", e.message));
   return pool;
@@ -124,15 +139,13 @@ function sslFor(connectionString: string): { rejectUnauthorized: boolean } | und
  * Schema, created on demand
  * ------------------------------------------------------------------ */
 
-let migration: Promise<void> | null = null;
-
 /** Runs once per server instance; concurrent callers share the promise. */
 function ready(): Promise<void> {
-  migration ??= migrate().catch((e) => {
-    migration = null; // let the next request retry rather than wedging
+  shared.migration ??= migrate().catch((e) => {
+    shared.migration = null; // let the next request retry rather than wedging
     throw e;
   });
-  return migration;
+  return shared.migration;
 }
 
 async function migrate(): Promise<void> {

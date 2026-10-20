@@ -30,12 +30,15 @@ const legacy = {
 writeFileSync(FILE, JSON.stringify(legacy));
 
 /**
- * A brand-new copy of the store, as a second compiled route or a restart would
- * have. `require`, not `import()`: deleting the cache entry makes the next
- * require evaluate the module afresh, whereas a dynamic import hands back the
- * same instance and the "second copy" would just be the first.
+ * A cold start: a process that has not read the file yet, as after a restart.
+ * (Two copies of the module in ONE process share one in-memory copy -- see
+ * fileStoreShared.runtime.test.ts -- so a copy that reads the file afresh
+ * needs the process's entry dropped as well.) `require`, not `import()`:
+ * deleting the cache entry makes the next require evaluate the module afresh,
+ * whereas a dynamic import hands back the same instance.
  */
 function freshStore() {
+  delete (globalThis as { __judgeQueueFileStore?: unknown }).__judgeQueueFileStore;
   const path = require.resolve("../src/lib/db/file");
   delete require.cache[path];
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -52,10 +55,11 @@ test("the migrated roster is on disk as soon as the file is read, before any wri
   assert.ok(onDisk.panels.every((p: object) => !("judges" in p)), "and the old lists are gone from the file");
 });
 
-test("a second copy of the store reads the same judge ids, so an id handed out by one is known to the other", async () => {
+test("a restart before anything is written reads the same judge ids, so an id the browser holds is still known", async () => {
   const before = await freshStore().listJudges();
   const second = freshStore();
   assert.notEqual(second, freshStore(), "each call is a different copy of the module");
+  // (That third copy was only there to prove the point; `second` still has its own.)
   const after = await second.listJudges();
   assert.deepEqual(after.map((j) => j.id), before.map((j) => j.id));
   assert.ok(after.length === 2, "and nobody was added by the second read");
