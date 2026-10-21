@@ -294,65 +294,342 @@ h3,
 }
 
 /* ------------------------------------------------------------------ *
- * The board
+ * The board ("Panel columns, refined", design/board-redesign/)
  *
  * Read from the far end of a hall, off a projector, by someone walking
- * past. It gets its own scale rather than the product one stepped up:
- * type that is sized by viewport, because the only thing that matters is
- * how large it lands on the wall, and the wall is the viewport.
+ * past, and opened on a phone from the landing page. Scoped to .board
+ * with a bd- prefix, the way .landing and .teampage are. The mock values
+ * are the 1920-wide targets: --bd-u scales them up on a bigger screen and
+ * never down, so a tile's number stays at 44px and the panels wrap to
+ * more rows on a laptop instead. --bd-h does the same for the header
+ * strip but may shrink to 0.7 so one row of it still fits at 1366.
+ *
+ * Colour is signal: status colours only for status (--c is the fill, --ci
+ * the ink that clears AA on it), division colours only for the marker and
+ * the pit ring, accent only for interactive chrome. No animation: hover
+ * and focus colour changes only, and none of those under reduced motion.
+ * The app's theme toggle is rendered inside the header (the floating one
+ * is hidden), so it is never docked over a number.
  * ------------------------------------------------------------------ */
 
+body:has(.board) > .theme-toggle { display: none; }
+body:has(.board) {
+  --bd-u: max(1px, calc(100vw / 1920));
+  --bd-h: max(0.7px, calc(100vw / 1920));
+}
+
 .board {
-  --board-number: clamp(1.75rem, 3.4vw, 4.5rem);
-  --board-name: clamp(0.75rem, 0.95vw, 1.375rem);
-  --board-meta: clamp(0.6875rem, 0.8vw, 1.125rem);
-  --board-heading: clamp(1rem, 1.5vw, 2.25rem);
+  /* Ink on the booked fill (--booked-quiet): the app has no token for it. */
+  --bd-booked-ink: oklch(0.200 0.014 265);
+  /* In srgb, not oklch: oklch takes the short hue arc to the blue-grey surface and the tint turns blue. */
+  --bd-done-tint: color-mix(in srgb, var(--done) 22%, var(--surface));
+  --bd-done-line: color-mix(in oklch, var(--done) 55%, transparent);
+
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  gap: calc(16 * var(--bd-u));
+  padding: calc(24 * var(--bd-h)) calc(32 * var(--bd-u));
+  background: var(--canvas);
+  color: var(--ink);
+}
+:root[data-theme="light"] .board { --bd-booked-ink: oklch(0.975 0.004 265); }
+
+.board h1, .board h2, .board h3, .board p, .board ul { margin: 0; padding: 0; }
+.board ul { list-style: none; }
+
+.bd-title, .bd-wait b, .bd-wait span, .bd-tal b, .bd-n, .bd-tt, .bd-r, .bd-panel h2, .bd-fh b, .bd-pnum, .bd-key h2, .bd-chipn {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
 
-.board-number {
-  font-family: var(--font-display);
-  font-size: var(--board-number);
-  font-weight: 700;
-  font-stretch: 112%;
-  line-height: 0.95;
-  letter-spacing: -0.02em;
+/* ---- status colours: the fill and the ink that clears AA on it, in both themes ---- */
+.board .bd-s-req { --c: var(--waiting); --ci: var(--waiting-ink); }
+.board .bd-s-en { --c: var(--enroute); --ci: var(--enroute-ink); }
+.board .bd-s-int { --c: var(--active); --ci: var(--active-ink); }
+.board .bd-s-bk { --c: var(--booked-quiet); --ci: var(--bd-booked-ink); }
+.board .bd-s-req, .board .bd-s-en, .board .bd-s-int, .board .bd-s-bk { border-color: transparent; background: var(--c); color: var(--ci); }
+.board .bd-s-done { border-color: var(--bd-done-line); background: var(--bd-done-tint); color: var(--ink); }
+.board .bd-s-done .bd-nm { color: var(--ink-muted); }
+.board .bd-s-none { border-color: var(--line); background: var(--canvas); color: var(--ink); }
+.board .bd-s-none .bd-nm { color: var(--ink-subtle); }
+
+/* Division: the nth division wears the nth --cat-* token (unchanged). */
+.bd-dv-1 { --bd-dv: var(--cat-1); }
+.bd-dv-2 { --bd-dv: var(--cat-2); }
+.bd-dv-3 { --bd-dv: var(--cat-3); }
+.bd-dv-4 { --bd-dv: var(--cat-4); }
+
+/* ---- header: one slim strip on a TV, stacked below 1200px ---- */
+.bd-hd { display: flex; flex: none; align-items: stretch; gap: calc(32 * var(--bd-h)); min-height: calc(112 * var(--bd-h)); }
+.bd-hl { display: flex; flex-direction: column; justify-content: center; gap: calc(4 * var(--bd-h)); }
+.bd-title { font-weight: 700; font-size: calc(40 * var(--bd-h)); line-height: 1.1; letter-spacing: -0.02em; }
+
+.bd-wait {
+  display: flex; align-items: center; gap: calc(20 * var(--bd-h));
+  padding: 0 calc(36 * var(--bd-h)) 0 calc(32 * var(--bd-h));
+  border-radius: calc(20 * var(--bd-h)); background: var(--waiting); color: var(--waiting-ink);
+}
+.bd-wait b { font-weight: 700; font-size: calc(96 * var(--bd-h)); line-height: 1; letter-spacing: -0.03em; }
+.bd-wait span { max-width: calc(190 * var(--bd-h)); font-weight: 700; font-size: calc(28 * var(--bd-h)); line-height: 1.1; letter-spacing: 0.02em; text-transform: uppercase; }
+.bd-wait--none {
+  align-self: center; padding: calc(16 * var(--bd-h)) calc(28 * var(--bd-h));
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-subtle);
+  font-weight: 500; font-size: calc(26 * var(--bd-h)); line-height: 1.2; letter-spacing: 0; text-transform: none;
 }
 
-/* A tile-scoped container, so the number on it can shrink to its own box
-   instead of only the viewport. --board-number alone reads fine for a
-   short number, but a longer one (team numbers are not all the same
-   length) can be wider than the tile at that same viewport-scaled size --
-   min() below picks whichever is smaller. */
-.board-tile {
-  container-type: inline-size;
+.bd-tal { display: flex; align-items: center; gap: calc(32 * var(--bd-h)); }
+.bd-tal li { display: flex; flex-direction: column; }
+.bd-tal b { font-weight: 700; font-size: calc(52 * var(--bd-h)); line-height: 1; }
+.bd-tal span { color: var(--ink-subtle); font-size: max(13px, calc(20 * var(--bd-h))); line-height: 1.3; }
+.bd-t-int b { color: var(--active-quiet); }
+.bd-t-done b { color: var(--done-quiet); }
+
+.bd-chrome {
+  display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: calc(8 * var(--bd-h));
+  margin-left: auto; color: var(--ink-subtle); font-size: max(13px, calc(15 * var(--bd-h))); line-height: 1.3;
+}
+.bd-crow { display: flex; align-items: center; gap: calc(16 * var(--bd-h)); }
+.bd-crow .theme-toggle {
+  position: static; flex: none; width: max(32px, calc(34 * var(--bd-h))); height: max(32px, calc(34 * var(--bd-h)));
+  border: 0; border-radius: 10px; background: transparent; box-shadow: none; color: var(--ink-subtle);
+}
+.bd-crow .theme-toggle:hover { transform: none; color: var(--ink); background: color-mix(in oklch, var(--accent) 12%, transparent); }
+
+.bd-seg { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.bd-seg button {
+  height: max(26px, calc(28 * var(--bd-h))); padding: 0 max(10px, calc(14 * var(--bd-h))); border: 0; border-radius: 8px;
+  background: transparent; color: var(--ink-subtle); font-weight: 500; font-size: inherit; cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.bd-seg button:hover { color: var(--ink); }
+.bd-seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+.bd-chk { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; cursor: pointer; }
+.bd-chk input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.bd-live { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.bd-ld { width: 10px; height: 10px; border-radius: 50%; background: var(--done); }
+.bd-live--off { color: var(--caution-quiet); }
+.bd-live--off .bd-ld { background: var(--caution); }
+.bd-links nav { gap: 12px; }
+.bd-links a { padding: 2px 4px; border-radius: 4px; background: none; color: var(--ink-subtle); font-size: inherit; text-decoration: underline; transition: color 0.15s; }
+.bd-links a:hover { background: none; color: var(--ink); }
+.bd-links a[aria-current] { background: none; color: var(--ink); font-weight: 500; }
+.bd-fs {
+  display: inline-flex; align-items: center; gap: 8px; height: max(28px, calc(32 * var(--bd-h))); padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink-subtle);
+  font-size: inherit; white-space: nowrap; cursor: pointer; transition: color 0.15s;
+}
+.bd-fs:hover { color: var(--ink); }
+
+/* ---- By panel: a column per panel, a narrow column for the rest ---- */
+.bd-main { display: flex; flex: 1; flex-direction: column; gap: calc(16 * var(--bd-u)); }
+.bd-body { display: flex; flex: 1; align-items: flex-start; gap: calc(20 * var(--bd-u)); }
+.bd-panels {
+  display: grid; flex: 1; min-width: 0; align-items: start; gap: calc(20 * var(--bd-u));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(480 * var(--bd-u))), 1fr));
+}
+.bd-side { display: flex; flex: none; width: calc(260 * var(--bd-u)); min-width: 0; flex-direction: column; gap: calc(16 * var(--bd-u)); }
+.bd-pkey { display: none; }
+
+.bd-panel {
+  display: flex; min-width: 0; flex-direction: column; gap: calc(10 * var(--bd-u));
+  padding: calc(14 * var(--bd-u)) calc(16 * var(--bd-u)); border: 1px solid var(--line); border-radius: calc(16 * var(--bd-u)); background: var(--surface);
+}
+.bd-pr { display: flex; align-items: center; gap: calc(12 * var(--bd-u)); }
+.bd-panel h2 { font-weight: 700; font-size: calc(28 * var(--bd-u)); line-height: calc(32 * var(--bd-u)); letter-spacing: -0.01em; }
+.bd-pd { display: inline-flex; align-items: center; gap: calc(8 * var(--bd-u)); color: var(--ink-muted); font-size: calc(17 * var(--bd-u)); }
+.bd-pcount { margin-left: auto; color: var(--ink-subtle); font-size: calc(17 * var(--bd-u)); white-space: nowrap; }
+.bd-pj { margin-top: calc(2 * var(--bd-u)); color: var(--ink-subtle); font-size: calc(18 * var(--bd-u)); line-height: calc(24 * var(--bd-u)); }
+.bd-na { font-style: italic; }
+.bd-dvs { display: inline-block; flex: none; width: 14px; height: 14px; border: 3px solid var(--bd-dv); border-radius: 4px; }
+
+.bd-g2 { display: grid; grid-template-columns: 1fr 1fr; align-content: start; gap: calc(8 * var(--bd-u)); }
+.bd-g2--one { grid-template-columns: 1fr; }
+
+.bd-tile {
+  --bd-nom: calc(44 * var(--bd-u));
+  --bd-tf: calc(21 * var(--bd-u));
+  position: relative; container-type: inline-size; display: flex; min-width: 0; flex-direction: column; justify-content: space-between;
+  height: calc(100 * var(--bd-u)); padding: calc(6 * var(--bd-u)) calc(12 * var(--bd-u));
+  border: 1px solid transparent; border-radius: calc(12 * var(--bd-u));
+}
+.bd-tr { display: flex; align-items: baseline; justify-content: space-between; gap: calc(4 * var(--bd-u)); }
+/* A tile-scoped container, so the number shrinks to its own box and not only
+   to the viewport. 0.62em is a character's average width in Archivo 700 with
+   the -0.02em tracking. --bd-rc is how many characters of --bd-tf (the font
+   size of the time, or of the wait, beside the number) that neighbour takes,
+   so the reserve scales with the same size as the text and a long number
+   gives way instead of clipping or hitting it. */
+.bd-n {
+  font-weight: 700; line-height: 1; letter-spacing: -0.02em; white-space: nowrap;
+  font-size: min(var(--bd-nom), calc((100cqw - var(--bd-rc, 0) * 0.55 * var(--bd-tf)) / (var(--num-len, 5) * 0.62)));
+}
+.bd-tt { font-weight: 700; font-size: calc(21 * var(--bd-u)); line-height: calc(28 * var(--bd-u)); white-space: nowrap; }
+.bd-st { font-weight: 500; font-size: calc(18 * var(--bd-u)); line-height: calc(22 * var(--bd-u)); }
+.bd-nm { display: flex; min-width: 0; align-items: center; gap: calc(7 * var(--bd-u)); font-size: calc(15 * var(--bd-u)); line-height: calc(18 * var(--bd-u)); }
+.bd-nt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Requesting: both columns, taller, the wait at the size of the thing. */
+.bd-tile--big {
+  --bd-nom: calc(64 * var(--bd-u));
+  --bd-tf: calc(84 * var(--bd-u));
+  grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; gap: calc(12 * var(--bd-u));
+  height: calc(120 * var(--bd-u)); padding: calc(8 * var(--bd-u)) calc(20 * var(--bd-u)); border-radius: calc(14 * var(--bd-u));
+}
+.board .bd-tile--big { border: 2px solid var(--waiting-quiet); }
+.bd-l { display: flex; min-width: 0; flex-direction: column; gap: calc(2 * var(--bd-u)); }
+.bd-tile--big .bd-st { font-weight: 700; font-size: calc(18 * var(--bd-u)); letter-spacing: 0.06em; text-transform: uppercase; }
+.bd-r { display: flex; flex: none; align-items: baseline; gap: calc(8 * var(--bd-u)); font-weight: 700; }
+.bd-r b { font-size: calc(84 * var(--bd-u)); line-height: 1; letter-spacing: -0.03em; }
+.bd-r b.bd-long { font-size: calc(48 * var(--bd-u)); }
+.bd-r span { font-size: calc(28 * var(--bd-u)); }
+
+/* Notebook marker: ink colour, no hue. Filled, half, hollow. */
+.bd-nb { display: inline-block; flex: none; width: 13px; height: 13px; border: 2px solid currentColor; border-radius: 50%; vertical-align: middle; }
+.bd-nb--f { background: currentColor; }
+.bd-nb--d { background: linear-gradient(90deg, currentColor 50% , transparent 50%); }
+.bd-nb--u { background: transparent; }
+
+/* ---- the colour key ---- */
+.bd-key { padding: calc(14 * var(--bd-u)) calc(16 * var(--bd-u)); border: 1px solid var(--line); border-radius: calc(16 * var(--bd-u)); background: var(--surface); }
+.bd-key h2 { margin-bottom: calc(8 * var(--bd-u)); color: var(--ink-subtle); font-weight: 700; font-size: calc(15 * var(--bd-u)); line-height: calc(20 * var(--bd-u)); letter-spacing: 0.14em; text-transform: uppercase; }
+.bd-key li { display: flex; align-items: center; gap: calc(10 * var(--bd-u)); color: var(--ink); font-size: calc(16 * var(--bd-u)); line-height: calc(26 * var(--bd-u)); }
+.bd-key .bd-gap { margin-top: calc(8 * var(--bd-u)); }
+.bd-sw { display: inline-block; flex: none; width: 16px; height: 16px; border: 1px solid transparent; border-radius: 5px; }
+.board .bd-sw.bd-s-none { border-color: var(--line-strong); }
+.bd-rg { display: inline-block; flex: none; width: 16px; height: 16px; border: 3px solid var(--bd-dv); border-radius: 5px; }
+
+/* ---- Pit floor ---- */
+.bd-pits { display: flex; flex: 1; flex-direction: column; gap: calc(16 * var(--bd-u)); }
+.bd-floor {
+  display: grid; flex: 1; align-items: start; gap: calc(16 * var(--bd-u)); padding: calc(16 * var(--bd-u));
+  border: 1px solid var(--line); border-radius: calc(16 * var(--bd-u)); background: var(--surface);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(340 * var(--bd-u))), 1fr));
+}
+.bd-fc { display: flex; min-width: 0; flex-direction: column; gap: calc(6 * var(--bd-u)); }
+.bd-fh { display: flex; align-items: baseline; gap: calc(10 * var(--bd-u)); min-height: calc(32 * var(--bd-u)); padding: 0 4px; }
+.bd-fh b { font-weight: 700; font-size: calc(26 * var(--bd-u)); line-height: calc(32 * var(--bd-u)); }
+.bd-fh span { color: var(--ink-subtle); font-size: calc(16 * var(--bd-u)); }
+.bd-fg { display: grid; grid-auto-rows: calc(58 * var(--bd-u)); gap: calc(6 * var(--bd-u)); }
+.bd-pit {
+  display: flex; min-height: 0; align-items: center; gap: calc(12 * var(--bd-u)); padding: 0 calc(12 * var(--bd-u)); border-radius: calc(10 * var(--bd-u));
+}
+/* The division is the ring, over whatever border the status class gives. */
+.board .bd-pit { border: 3px solid var(--bd-dv); }
+.bd-pcode { flex: none; width: calc(38 * var(--bd-u)); font-weight: 500; font-size: calc(15 * var(--bd-u)); line-height: 1; }
+.bd-pnum { font-weight: 700; font-size: calc(44 * var(--bd-u)); line-height: 1; letter-spacing: -0.02em; white-space: nowrap; }
+.bd-ps { margin-left: auto; font-weight: 500; font-size: calc(18 * var(--bd-u)); line-height: 1.1; white-space: nowrap; }
+.bd-pit.bd-s-done .bd-pcode, .bd-pit.bd-s-none .bd-pcode { color: var(--ink-muted); }
+.board .bd-pit.bd-pit--empty { border: 1px dashed var(--line); background: transparent; color: var(--ink-subtle); }
+.board .bd-pit.bd-pit--gone { border-color: transparent; }
+.bd-pit--shared {
+  flex-direction: column; align-items: flex-start; justify-content: center; gap: 0;
+  background: var(--surface); color: var(--ink-muted);
+}
+.board .bd-pit.bd-pit--shared { border-color: var(--caution); }
+.bd-shared-h { color: var(--caution-quiet); font-weight: 500; font-size: calc(15 * var(--bd-u)); }
+.bd-shared-n { max-width: 100%; overflow: hidden; font-weight: 700; font-size: calc(22 * var(--bd-u)); line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+.bd-extra { padding: calc(16 * var(--bd-u)); border: 1px solid var(--line); border-radius: calc(16 * var(--bd-u)); background: var(--surface); }
+.bd-extra h3 { margin-bottom: 8px; color: var(--ink-subtle); font-weight: 600; font-size: calc(16 * var(--bd-u)); }
+.bd-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.bd-chipn { padding: 4px 10px; border-radius: 10px; font-weight: 700; font-size: calc(18 * var(--bd-u)); }
+.board .bd-chipn { border: 3px solid var(--bd-dv); }
+.bd-none { padding: 32px 16px; color: var(--ink-subtle); text-align: center; }
+.bd-none code { color: var(--ink); }
+
+.bd-keyrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 22px; color: var(--ink); font-size: calc(16 * var(--bd-u)); }
+.bd-keyrow--pits { flex: none; min-height: calc(52 * var(--bd-u)); padding: 0 calc(20 * var(--bd-u)); border: 1px solid var(--line); border-radius: calc(14 * var(--bd-u)); background: var(--surface); }
+.bd-ki { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.bd-ki .bd-sw { width: 18px; height: 18px; }
+.bd-ki .bd-rg { width: 18px; height: 18px; }
+.bd-mu { color: var(--ink-subtle); }
+.bd-vr { width: 1px; height: 24px; background: var(--line); }
+
+/* ---- below 1200px: the header stacks (waiting block full width) and the side column drops under the panels ---- */
+@media (max-width: 1199px) {
+  .board { gap: 12px; padding: 8px 16px 24px; }
+  .bd-hd { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px 8px; min-height: 0; }
+  .bd-hl { grid-column: 1; grid-row: 1; min-height: 48px; gap: 0; }
+  /* .lp-brand (the landing's, later in this file) sets display:flex, so out-rank it. */
+  .board .bd-brand { display: none; }
+  .bd-title { font-size: 22px; letter-spacing: -0.01em; }
+  .bd-chrome, .bd-crow { display: contents; font-size: 15px; }
+  .bd-live { grid-column: 2; grid-row: 1; color: var(--ink-subtle); font-size: 14px; }
+  .bd-crow .theme-toggle { grid-column: 3; grid-row: 1; width: 44px; height: 44px; margin-right: -12px; border-radius: 12px; }
+  .bd-wait { grid-column: 1 / -1; grid-row: 2; height: 84px; gap: 16px; padding: 0 20px; border-radius: 18px; }
+  .bd-wait b { font-size: 64px; }
+  .bd-wait span { max-width: none; font-size: 22px; }
+  .bd-wait--none { height: auto; min-height: 56px; justify-content: center; font-size: 20px; }
+  .bd-tal { grid-column: 1 / -1; grid-row: 3; gap: 20px; font-size: 15px; }
+  .bd-tal li { flex-direction: row; align-items: baseline; gap: 5px; }
+  .bd-tal b { font-size: 20px; }
+  .bd-tal span { font-size: 15px; }
+  .bd-seg { grid-column: 1; grid-row: 4; justify-self: start; }
+  .bd-seg button { height: 36px; padding: 0 12px; font-size: 15px; }
+  .bd-chk { grid-column: 2 / 4; grid-row: 4; min-height: 44px; font-size: 15px; }
+  .bd-chk input { width: 22px; height: 22px; }
+  .bd-links { grid-column: 1; grid-row: 5; }
+  .bd-fs { grid-column: 2 / 4; grid-row: 5; }
+
+  .bd-body { flex-direction: column; align-items: stretch; gap: 12px; }
+  .bd-panels { width: 100%; flex: none; }
+  .bd-side { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); align-items: start; gap: 12px; }
 }
 
-.board-tile .board-number {
-  /* Measured against this font at font-stretch 112%/weight 700/-0.02em
-     tracking: a character averages ~0.68em wide. 128cqw / len keeps the
-     rendered width at roughly 87% of the tile's content box (1 / 0.68 *
-     0.87 ≈ 128), leaving a margin instead of an exact-fit line that a
-     sub-pixel rounding difference could tip into clipping again. */
-  font-size: min(var(--board-number), calc(128cqw / var(--num-len, 5)));
+/* ---- phone (< 768px): sections instead of cards, chips for the quiet teams ---- */
+@media (max-width: 767px) {
+  body:has(.board) { --bd-u: 1px; --bd-h: 1px; }
+  .board { gap: 10px; padding: 0 16px 24px; }
+  .bd-title { font-size: 18px; }
+  .bd-links, .bd-fs { display: none; }
+  .bd-main { gap: 10px; }
+  .bd-body, .bd-panels, .bd-side { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+  .bd-side .bd-key { display: none; }
+
+  .bd-panel { gap: 6px; padding: 0; border: 0; border-radius: 0; background: none; }
+  .bd-panel > header { display: flex; height: 48px; flex-direction: column; justify-content: center; }
+  .bd-pr { gap: 10px; }
+  .bd-panel h2 { font-size: 20px; line-height: 24px; }
+  .bd-pd, .bd-pcount { font-size: 14px; }
+  .bd-pj { margin-top: 0; font-size: 14px; line-height: 18px; }
+
+  .bd-g2, .bd-g2--one { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .bd-tile { --bd-nom: 22px; --bd-tf: 15px; grid-column: span 2; height: 66px; padding: 5px 10px; border-radius: 12px; }
+  .bd-tt { font-size: 15px; line-height: 20px; }
+  .bd-st { font-size: 14px; line-height: 16px; }
+  .bd-nm { gap: 6px; font-size: 13px; line-height: 16px; }
+  .bd-tile--big { --bd-nom: 32px; --bd-tf: 40px; grid-column: 1 / -1; height: 68px; gap: 8px; padding: 6px 14px; border-radius: 12px; }
+  .bd-l { gap: 0; }
+  .bd-tile--big .bd-st { font-size: 13px; letter-spacing: 0.05em; line-height: 16px; }
+  .bd-r { gap: 4px; }
+  .bd-r b { font-size: 40px; }
+  .bd-r b.bd-long { font-size: 28px; }
+  .bd-r span { font-size: 18px; }
+
+  /* Not yet and complete: a number in a chip, four to a row. The status and
+     name stay in the markup for a screen reader. */
+  .bd-tile--q { --bd-nom: 16px; grid-column: span 1; height: 40px; align-items: center; justify-content: center; padding: 0; border-radius: 10px; }
+  .bd-tile--q1 { grid-column-start: 1; }
+  .bd-tile--q .bd-n { letter-spacing: -0.01em; }
+  .bd-tile--q .bd-tr { justify-content: center; }
+  .bd-tile--q .bd-st, .bd-tile--q .bd-nm {
+    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+
+  .bd-pkey { display: flex; flex-wrap: wrap; align-content: center; gap: 4px 14px; min-height: 56px; color: var(--ink-subtle); font-size: 13px; }
+  .bd-pkey .bd-ki { gap: 6px; }
+  .bd-pkey .bd-sw { width: 12px; height: 12px; border-radius: 4px; }
+
+  .bd-floor { padding: 12px; }
+  .bd-pit { gap: 8px; padding: 0 10px; }
+  .bd-pcode { width: 30px; font-size: 13px; }
+  .bd-pnum { font-size: 28px; }
+  .bd-ps { font-size: 14px; white-space: normal; text-align: right; }
+  .bd-keyrow--pits { padding: 10px 14px; font-size: 13px; gap: 6px 14px; }
 }
 
-.board-name {
-  font-size: var(--board-name);
-  line-height: 1.2;
-}
-
-.board-meta {
-  font-size: var(--board-meta);
-  line-height: 1.1;
-  font-weight: 600;
-}
-
-.board-heading {
-  font-family: var(--font-display);
-  font-size: var(--board-heading);
-  font-weight: 650;
-  font-stretch: 108%;
-  letter-spacing: -0.01em;
+@media (prefers-reduced-motion: reduce) {
+  .board *, .board *::before, .board *::after { transition: none !important; }
 }
 
 /* ------------------------------------------------------------------ *
