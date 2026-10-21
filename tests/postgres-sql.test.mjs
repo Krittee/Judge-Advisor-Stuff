@@ -728,7 +728,7 @@ test("a full wipe truncates the roster with the event; a day reset keeps it", as
 });
 
 test("a blank name, pit, division or notebook type on a re-import keeps the stored one; a new row still gets the defaults", async () => {
-  const { defaultCategory, presetDivisions } = await import("../src/lib/presets");
+  const { blendedDivisions, defaultCategory, presetDivisions } = await import("../src/lib/presets");
   calls.length = 0;
   answer = () => [];
   await postgresStore.upsertTeams([
@@ -750,7 +750,9 @@ test("a blank name, pit, division or notebook type on a re-import keeps the stor
     [null, "ungraded"],
     presetDivisions()[0],
     defaultCategory(),
+    blendedDivisions(),
   ]);
-  // A division that really changes still takes the panel off.
-  assert.match(upsert.sql, /when teams\.division is distinct from excluded\.division then null/);
+  // A division that really changes takes the panel off only when the panel can't judge the new one (divisionsCompatible).
+  assert.match(upsert.sql, /when teams\.division is not distinct from excluded\.division then teams\.panel_id/);
+  assert.match(upsert.sql, /select 1 from panels p\s+where p\.id = teams\.panel_id\s+and \(p\.division = excluded\.division\s+or excluded\.division = any\(\$8::text\[\]\)\s+or p\.division = any\(\$8::text\[\]\)\)\s+\) then teams\.panel_id\s+else null/);
 });

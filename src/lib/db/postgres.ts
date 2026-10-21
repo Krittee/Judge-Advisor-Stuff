@@ -13,7 +13,7 @@ import type {
 } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { randomPanelCode } from "../panelCode";
-import { defaultCategory, divisionsCompatible, presetDivisions, presetPanels } from "../presets";
+import { blendedDivisions, defaultCategory, divisionsCompatible, presetDivisions, presetPanels } from "../presets";
 import { hasNearbyBooking } from "../data";
 import { isPanelBlocked, judgeKey, panelBlocks } from "../roster";
 import {
@@ -805,11 +805,19 @@ export const postgresStore: Store = {
          pit = coalesce(excluded.pit, teams.pit),
          division = excluded.division,
          category = excluded.category,
-         -- A team that changes division loses its panel: the old one is
-         -- on the far side of the wall.
+         -- A team that changes division loses its panel only when that
+         -- panel can't judge the new one: divisionsCompatible, with $8 the
+         -- blended divisions.
          panel_id = case
-           when teams.division is distinct from excluded.division then null
-           else teams.panel_id
+           when teams.division is not distinct from excluded.division then teams.panel_id
+           when exists (
+             select 1 from panels p
+             where p.id = teams.panel_id
+               and (p.division = excluded.division
+                    or excluded.division = any($8::text[])
+                    or p.division = any($8::text[]))
+           ) then teams.panel_id
+           else null
          end`,
       [
         list.map((t) => t.number),
@@ -819,6 +827,7 @@ export const postgresStore: Store = {
         list.map((t) => t.category ?? null),
         presetDivisions()[0],
         defaultCategory(),
+        blendedDivisions(),
       ],
     );
     return list.length;

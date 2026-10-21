@@ -633,11 +633,12 @@ function upsertTeams(rows: ImportedTeam[]): number {
       if (row.name) existing.name = row.name;
       if (row.pit) existing.pit = row.pit;
       if (row.category) existing.category = row.category;
-      // A team that changes division loses its panel: the old one is on
-      // the far side of the wall.
+      // A team that changes division loses its panel only when that panel
+      // can't judge the new one (as PATCH /api/admin/teams does).
       if (row.division && row.division !== existing.division) {
         existing.division = row.division;
-        existing.panel_id = null;
+        const held = state().panels.find((p) => p.id === existing.panel_id);
+        if (!held || !divisionsCompatible(row.division, held.division)) existing.panel_id = null;
       }
     } else {
       state().teams.push({

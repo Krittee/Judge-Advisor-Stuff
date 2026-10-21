@@ -562,6 +562,23 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     assert.equal(moved?.panel_id, null, "and the panel on the far side of the wall comes off");
   });
 
+  it("re-importing a team into a division its panel can still judge keeps the panel; one it can't judge clears it", async (store) => {
+    const panel = await store.createPanel(panelInput({ division: MS }));
+    await store.upsertTeams([teamInput("1001", { division: MS }), teamInput("1002", { division: MS })]);
+    for (const t of await store.listTeams()) await store.updateTeam(t.id, { panel_id: panel.id });
+
+    // Blended may be judged by anyone, so the panel stays; the stored division still moves.
+    await store.upsertTeams([teamInput("1001", { division: BLEND })]);
+    const blended = await store.findTeamByNumber("1001");
+    assert.equal(blended?.division, BLEND);
+    assert.equal(blended?.panel_id, panel.id, "the MS panel can still judge a Blended team");
+
+    await store.upsertTeams([teamInput("1002", { division: ES })]);
+    const moved = await store.findTeamByNumber("1002");
+    assert.equal(moved?.division, ES);
+    assert.equal(moved?.panel_id, null, "the MS panel can't judge an ES team");
+  });
+
   it("re-importing without a pit keeps each team's pit, a new team has none, and a given pit still changes it", async (store) => {
     await store.upsertTeams([teamInput("1001", { pit: "A1" })]);
 
