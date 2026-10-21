@@ -673,13 +673,14 @@ test("the page wraps every tab in the frame, keeps its session gate, polling, fo
   // A marked team belongs to the trip you took to see it.
   assert.match(page, /if \(id !== tab\) setFocusFlagTeam\(null\);\s*setTab\(id\);/);
   assert.match(page, /setFocusFlagTeam\(team\.id\);\s*setTab\("flags"\);/);
-  for (const tab of ["Rankings", "TeamsTab", "PanelsTab", "ConflictsTab", "RefereeTab", "ImportTab", "ActivityTab"]) {
+  for (const tab of ["ScoresTab", "TeamsTab", "PanelsTab", "ConflictsTab", "RefereeTab", "ImportTab", "ActivityTab"]) {
     assert.ok(page.includes(`<${tab}`), `${tab} is still rendered inside the frame`);
   }
   assert.ok(page.includes("<FloorTab "), "the new Floor");
   assert.ok(!page.includes("function FloorTab(") && !page.includes("<TabBar") && !page.includes("<TopBar"), "the old Floor, tab bar and top bar are gone from the page");
   assert.ok(!page.includes("StatusLegend"));
-  assert.match(page, /<NotesDrawer\s/, "Notes is still the drawer in this step");
+  assert.match(page, /<TeamSheet\s/, "Notes is the judge console's team sheet");
+  assert.ok(!page.includes("NotesDrawer") && !page.includes("Rankings"), "the old drawer and table are gone from the page");
   assert.ok(floor.includes("onNotes(team)"));
 });
 

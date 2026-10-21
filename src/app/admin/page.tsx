@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { liveRequestFor } from "@/lib/data";
 import { AdminFrame, railCounts, type AdminTab as Tab } from "@/components/admin/AdminFrame";
@@ -9,13 +9,16 @@ import { FloorTab } from "@/components/admin/FloorTab";
 import { ImportTab } from "@/components/admin/ImportTab";
 import { PanelsTab } from "@/components/admin/PanelsTab";
 import { RefereeTab } from "@/components/admin/RefereeTab";
+import { ScoresTab } from "@/components/admin/ScoresTab";
+import { scoredText } from "@/components/admin/scoresLogic";
 import { TeamsTab } from "@/components/admin/TeamsTab";
+import { useConfirm } from "@/components/ConfirmDialog";
+import { TeamSheet } from "@/components/judge/TeamSheet";
 import { call, useAppState, useScores } from "@/components/useAppState";
 import { Banner, formatClock } from "@/components/ui";
-import { NotesDrawer } from "@/components/judging";
-import { Rankings } from "@/components/Rankings";
 import type { Session } from "@/lib/auth";
-import type { ActivityRow, Team } from "@/lib/types";
+import { rankTeams } from "@/lib/ranking";
+import type { ActivityRow } from "@/lib/types";
 
 /** The Judge Advisor's console: every panel at once, and the tools to unstick it. */
 export default function AdminPage() {
@@ -24,7 +27,10 @@ export default function AdminPage() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [tab, setTab] = useState<Tab>("floor");
   const [error, setError] = useState<string | null>(null);
-  const [notesFor, setNotesFor] = useState<Team | null>(null);
+  /* The team whose sheet (notes, scores, flags) is open: the judge console's
+     TeamSheet, opened from Scores, Floor's Notes and the Teams drawer. */
+  const [sheetId, setSheetId] = useState<string | null>(null);
+  const { ask, dialog } = useConfirm();
   /* Set when the Conduct column on Scores sends you to a team's flags, so
      the Referee tab knows which one to scroll to and mark. */
   const [focusFlagTeam, setFocusFlagTeam] = useState<string | null>(null);
@@ -35,6 +41,12 @@ export default function AdminPage() {
      rubric totals, so polling for them behind the other five tabs would
      be a request every 15 seconds that nothing renders. */
   const scoreData = useScores({ enabled: tab === "scores" });
+  /* Ranked once, by the same rankTeams the judge console uses, and only while
+     Scores is open: no other tab reads it. */
+  const ranked = useMemo(
+    () => (tab === "scores" ? rankTeams(state.teams, scoreData.scores, scoreData.rubrics, state.categories) : []),
+    [tab, state.teams, scoreData.scores, scoreData.rubrics, state.categories],
+  );
 
   useEffect(() => {
     call<{ session: Session | null }>("/api/session", { method: "GET" })
@@ -60,6 +72,7 @@ export default function AdminPage() {
      waiting, Conflicts' only the judges' (older whole-panel entries are not
      counted); a total that is merely large is not a reason to look. */
   const counts = railCounts(state);
+  const sheetTeam = state.teams.find((t) => t.id === sheetId) ?? null;
 
   return (
     <>
@@ -68,6 +81,7 @@ export default function AdminPage() {
         online={online}
         tab={tab}
         counts={counts}
+        scoredNote={tab === "scores" && scoreData.loaded && !scoreData.error ? scoredText(ranked) : undefined}
         onTab={(id) => {
           // A marked judge or team belongs to the trip you took to see it.
           if (id !== tab) setFocusJudge(null);
@@ -76,7 +90,7 @@ export default function AdminPage() {
         }}
       >
         {/* The redesigned tabs fill the width the rail leaves; the older ones keep the width and padding they had. */}
-        <div className={tab === "floor" || tab === "conflicts" || tab === "panels" || tab === "flags" || tab === "teams" || tab === "import" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
+        <div className={tab === "floor" || tab === "conflicts" || tab === "panels" || tab === "flags" || tab === "teams" || tab === "import" || tab === "scores" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
           {error ? (
             <div className="mb-4">
               <Banner kind="error" onDismiss={() => setError(null)}>
@@ -86,20 +100,17 @@ export default function AdminPage() {
           ) : null}
 
           {tab === "floor" ? (
-            <FloorTab state={state} refresh={refresh} onError={setError} onNotes={setNotesFor} />
+            <FloorTab state={state} refresh={refresh} onError={setError} onNotes={(team) => setSheetId(team.id)} />
           ) : null}
           {tab === "scores" ? (
-            <Rankings
-              teams={state.teams}
-              categories={state.categories}
-              scores={scoreData.scores}
+            <ScoresTab
+              ranked={ranked}
+              state={state}
               rubricList={scoreData.rubrics}
               loaded={scoreData.loaded}
               error={scoreData.error}
-              panelName={Object.fromEntries(state.panels.map((p) => [p.id, p.name]))}
-              onOpenTeam={setNotesFor}
-              flags={state.flags}
-              flagKinds={state.flagKinds}
+              sheetId={sheetId}
+              onOpenTeam={(team) => setSheetId(team.id)}
               onOpenFlags={(team) => {
                 setFocusFlagTeam(team.id);
                 setTab("flags");
@@ -115,6 +126,7 @@ export default function AdminPage() {
                 setFocusFlagTeam(teamId);
                 setTab("flags");
               }}
+              onOpenSheet={setSheetId}
             />
           ) : null}
           {tab === "panels" ? (
@@ -145,16 +157,20 @@ export default function AdminPage() {
           ) : null}
           {tab === "log" ? <ActivityTab /> : null}
         </div>
-      </AdminFrame>
 
-      {notesFor ? (
-        <NotesDrawer
-          team={notesFor}
-          requestId={liveRequestFor(notesFor.id, state.requests)?.id ?? null}
+        {/* Inside the frame, so the sheet gets the .admin tokens its styles read (--jg-field and the rest). */}
+        <TeamSheet
+          team={sheetTeam}
+          request={sheetTeam ? liveRequestFor(sheetTeam.id, state.requests) : null}
           categories={state.categories}
-          onClose={() => setNotesFor(null)}
+          languages={state.languages}
+          flags={state.flags}
+          flagKinds={state.flagKinds}
+          ask={ask}
+          onClose={() => setSheetId(null)}
         />
-      ) : null}
+        {dialog}
+      </AdminFrame>
     </>
   );
 }

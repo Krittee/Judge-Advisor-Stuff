@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 
-import { settleSave } from "../src/components/ScoreSheet";
+import { settleSave } from "../src/components/useRubricScoring";
 import { fetchState } from "../src/components/useAppState";
 
 /* Client-state fixes from the audit: BUG-017 (rapid score taps), BUG-025
@@ -65,13 +65,13 @@ test("a lone failure also asks the server instead of trusting the stale prop", (
   assert.equal(r.apply, false);
 });
 
-test("ScoreSheet routes every save through settleSave and no longer rolls back to the prop", () => {
-  // The save logic lives in the hook the sheet calls; the markup stays in the sheet.
-  const src = code(read("src/components/ScoreSheet.tsx") + read("src/components/useRubricScoring.ts"));
+test("useRubricScoring routes every save through settleSave and no longer rolls back to the prop", () => {
+  // The save logic lives in the hook the team sheet calls; the markup stays in the sheet.
+  const src = code(read("src/components/useRubricScoring.ts"));
   assert.match(src, /settleSave\(\{/);
   assert.ok(!/setValues\(score\?\.values/.test(src.replace(/useEffect\([\s\S]*?\[score\]\);/, "")));
   assert.ok(!/setSaving\b/.test(src), "a single saving key is back");
-  assert.match(src, /pending\.has\(criterion\.id\)/);
+  assert.match(src, /useState<ReadonlySet<string>>/, "pending is a set of criteria, not one flag");
 });
 
 /* ---- BUG-025: the first fetch must not look like an empty roster ------ */

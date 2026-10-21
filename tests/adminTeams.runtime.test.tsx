@@ -115,6 +115,7 @@ function board(
       onResetStatus={noop}
       onRemove={noop}
       onOpenFlags={noop}
+      onOpenSheet={noop}
     />,
   );
 }
@@ -380,7 +381,7 @@ test("on a phone the editor is a native dialog sheet, shut until a team is picke
 });
 
 test("TeamsTab on a phone starts with the list, Filters, Event data closed and no editor", () => {
-  const m = renderToStaticMarkup(<TeamsTab state={slice} refresh={async () => {}} onError={noop} onOpenFlags={noop} />);
+  const m = renderToStaticMarkup(<TeamsTab state={slice} refresh={async () => {}} onError={noop} onOpenFlags={noop} onOpenSheet={noop} />);
   assert.match(m, /<ul class="ja-tm-ll"/);
   assert.match(m, /Auto-assign 2 unassigned/);
   assert.match(m, /<button type="button" class="ja-ev-b" aria-expanded="false"/);

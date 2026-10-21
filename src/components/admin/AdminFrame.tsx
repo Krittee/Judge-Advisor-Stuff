@@ -194,6 +194,7 @@ export function AdminFrame({
   tab,
   onTab,
   counts,
+  scoredNote,
   children,
 }: {
   name?: string;
@@ -202,6 +203,8 @@ export function AdminFrame({
   onTab: (tab: AdminTab) => void;
   /** Per-section counts; Floor's is the teams requesting. Omit or 0 for none. */
   counts: Partial<Record<AdminTab, number>>;
+  /** "9 of 48 scored": the phone bar's note on Scores, which the rail does not count. */
+  scoredNote?: string;
   children: React.ReactNode;
 }) {
   const [sheet, setSheet] = useState(false);
@@ -297,6 +300,8 @@ export function AdminFrame({
           ) : (
             <span className="ja-rc">{counts[tab]}</span>
           )
+        ) : tab === "scores" && scoredNote ? (
+          <span className="ja-rc">{scoredNote}</span>
         ) : null}
       </div>
 

@@ -88,7 +88,7 @@ function Body({
   // one is under way, on the notes otherwise.
   const [picked, setPicked] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
-  // The notes, scores and totals are loaded and saved by the hook NotesDrawer shares.
+  // The notes, scores and totals are loaded and saved by useTeamRecord.
   const {
     notes,
     draft,
@@ -246,7 +246,7 @@ function Body({
 /**
  * One rubric: the criteria in their sections, a row of big scale buttons for
  * each, and the footer that says each tap saves. The saving itself is
- * useRubricScoring, shared with the Judge Advisor's ScoreSheet.
+ * useRubricScoring.
  */
 export function RubricSegment({
   rubric,

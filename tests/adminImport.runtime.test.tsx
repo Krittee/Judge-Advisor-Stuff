@@ -142,8 +142,11 @@ test("a typed edit clears 'Loaded…', a new file clears the last answer, a succ
 test("the Import block of globals.css: its own prefix, an accent dashed drag border, done-green and caution answers, no motion", () => {
   const start = css.indexOf("/* @ja-block import */");
   assert.ok(start > css.indexOf("/* @ja-block panels */"), "appended after the existing blocks");
-  const block = css.slice(start);
-  assert.ok(!/@ja-block (?!import)/.test(block), "the last block of the file");
+  // Scores (step 8) is appended after it.
+  const end = css.indexOf("/* @ja-block scores */");
+  assert.ok(end > start, "Scores follows it");
+  const block = css.slice(start, end);
+  assert.ok(!/@ja-block (?!import)/.test(block), "the import block runs up to the next one");
   assert.match(block, /\.ja-im-drop \{[^}]*border: 1\.5px dashed/);
   assert.match(block, /\.ja-im-drop\[data-drag\] \{[^}]*border-color: var\(--accent\)/);
   assert.match(block, /\.ja-im-ok \{[^}]*var\(--done\) 45%[^}]*var\(--done\) 12%/);

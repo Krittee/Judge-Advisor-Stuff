@@ -736,15 +736,13 @@ test("the page keeps its session gate, polling and error banner, and no longer u
   assert.ok(page.includes("rankTeams("), "the ranking order is the shared one");
 });
 
-test("the notes, scores and totals are loaded and saved by one hook, shared with the Judge Advisor's drawer", () => {
+test("the notes, scores and totals are loaded and saved by one hook, read by the team sheet on both consoles", () => {
   const hook = read("src/components/useTeamRecord.ts");
   assert.ok(hook.includes("/api/notes?teamId=") && hook.includes('"/api/notes"') && hook.includes("/api/scores?teamId="));
   assert.ok(hook.includes("rubricsFor(") && hook.includes("totalFor("));
-  for (const file of ["src/components/judging.tsx", "src/components/judge/TeamSheet.tsx"]) {
-    const src = read(file);
-    assert.ok(src.includes('useTeamRecord } from "@/components/useTeamRecord"') || src.includes('useTeamRecord } from "./useTeamRecord"'), `${file} does not use the hook`);
-    assert.ok(!src.includes("/api/notes") && !src.includes("totalFor("), `${file} carries its own copy of the loading`);
-  }
+  const sheet = read("src/components/judge/TeamSheet.tsx");
+  assert.ok(sheet.includes('useTeamRecord } from "@/components/useTeamRecord"'), "the team sheet does not use the hook");
+  assert.ok(!sheet.includes("/api/notes") && !sheet.includes("totalFor("), "the team sheet carries its own copy of the loading");
 });
 
 test("the wait is rounded in one place: judgeQueue's minutesSince, used by the alert row and the cards", () => {

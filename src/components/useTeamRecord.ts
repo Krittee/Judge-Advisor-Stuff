@@ -9,8 +9,8 @@ import type { Note, ScoreRow, Team } from "@/lib/types";
 /**
  * Everything a judge records about one team, with no markup of its own:
  * the private notes, the team's score rows, the draft of the next note and
- * the total those scores add up to. Shared by the Judge Advisor's NotesDrawer
- * and the judge console's team sheet.
+ * the total those scores add up to. The team sheet (src/components/judge/TeamSheet.tsx)
+ * reads it on both the judge console and the Judge Advisor's.
  *
  * The endpoints behind it refuse anyone who is not a judge or the Judge
  * Advisor, and refuse a judge looking at a team outside their own panel.
@@ -84,7 +84,7 @@ export function useTeamRecord(
     error,
     rubrics,
     scores,
-    /** For ScoreSheet / RubricSegment: `onSaved` and `onCleared` update these. */
+    /** For RubricSegment: `onSaved` and `onCleared` update these. */
     setScores,
     saveNote,
     /** The rubrics that count for this team. */

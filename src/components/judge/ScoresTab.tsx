@@ -11,7 +11,7 @@ import { rubricShort } from "./logic";
 
 /**
  * The Scores tab: the panel ranked on points, in the order rankTeams gives
- * (src/lib/ranking.ts), the same one the Judge Advisor's Rankings table uses.
+ * (src/lib/ranking.ts), the same one the Judge Advisor's Scores tab uses.
  * Tapping a row opens the team sheet.
  */
 export function ScoresTab({

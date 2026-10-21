@@ -138,9 +138,11 @@ test("the referee page awaits the shared ask() for the setup change before savin
 
 test("each of the admin console's confirmations goes through ask()", () => {
   const src = read("src/app/admin/page.tsx");
-  // Every question moved into a tab (checked below); the page itself asks none.
+  // Every question moved into a tab (checked below); the page itself asks none. Its one hook is for the
+  // team sheet (the judge console's), whose "Clear scores" confirm comes through the same ask().
   assert.equal(src.match(/await ask\(/g)?.length ?? 0, 0);
-  assert.ok(!src.includes("useConfirm()"), "the page has no hook of its own to render");
+  assert.equal(src.match(/useConfirm\(\)/g)?.length, 1, "one hook, for the team sheet");
+  assert.ok(src.includes("ask={ask}") && src.match(/\{dialog\}/g)?.length === 1, "handed to the sheet, and its dialog rendered once");
   // The Panels tab: the division change, Delete panel and Remove from roster, all through ask(); the add-judge one is its own dialog.
   const panelsLogic = read("src/components/admin/panelsLogic.ts");
   const sites: [string, RegExp][] = [

@@ -1199,6 +1199,13 @@ body:has(.referee) > .theme-toggle:hover {
  * TO), caution is for referee flags, bands keep the config's colours, and
  * --accent is interactive chrome -- the active tab, the selected segment and
  * scale value, the Save button.
+ *
+ * Shared with the Judge Advisor console: the team sheet (.jg-sheet down to
+ * .jg-sf, and the pieces it uses: .jg-band, .jg-sc, .jg-quiet, .jg-prim) is
+ * styled by bare .jg-* rules, none under .judge, so it looks the same wherever
+ * it is mounted. Its colours come from three custom properties, --jg-field,
+ * --jg-field-line and --jg-ring, taken from the nearest .judge or .admin
+ * ancestor (both define them): mount the sheet inside one of the two.
  * ------------------------------------------------------------------ */
 
 .judge {
@@ -1557,7 +1564,7 @@ body:has(.judge) > .theme-toggle:hover {
  * One stylesheet serves every tab, so a class one tab styles is a class the
  * others' markup can pick up. Each feature's CSS opens with an @ja-block
  * marker comment, and a class is styled bare by one block only: another tab
- * takes its own prefix (.ja-cf-, .ja-tm-, .ja-pn-, .ja-rf-, .ja-im-) or anchors a rule on
+ * takes its own prefix (.ja-cf-, .ja-tm-, .ja-pn-, .ja-rf-, .ja-im-, .ja-sc-) or anchors a rule on
  * a class of its own. tests/adminCssScope.test.mjs fails on a second definition.
  * ------------------------------------------------------------------ */
 
@@ -2234,6 +2241,7 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-tm-flr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ja-tm-od { display: inline-flex; min-height: 44px; align-items: center; gap: 5px; margin-left: auto; background: transparent; color: var(--accent); font-weight: 500; font-size: 15px; }
 .ja-tm-od:hover { text-decoration: underline; }
+.ja-tm-ts { align-self: flex-start; margin-left: 0; }
 .ja-tm-rm { gap: 2px; }
 .ja-tm-rmb {
   display: inline-flex; height: 44px; align-items: center; align-self: flex-start; gap: 8px; padding: 0 10px 0 6px; border-radius: 10px;
@@ -2601,4 +2609,211 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-im-chk { min-height: 44px; font-size: 15px; }
   .ja-im-max { min-height: 0; font-size: 15px; }
   .ja-im-num { width: 64px; height: 36px; font-size: 15px; }
+}
+
+/* @ja-block scores */
+/* Scores (design/admin-redesign/reference-scores-*.dc.html): the teams ranked, two ticked to set side by side. From 1024px the list is ~440px with the
+   compare panel beside it; on a phone the panel is a screen of its own behind the pinned Compare bar.
+   Colour is signal: bands keep the config's colours, the conduct pill wears its severity's (the Referee tab's pill), accent is chrome (ticks, selected chips, links). */
+.ja-sc-h, .ja-sc-rn, .ja-sc-t1 b, .ja-sc-tot, .ja-sc-lh p, .ja-sc-chip, .ja-sc-tn, .ja-sc-v, .ja-sc-sel b, .ja-sc-cmpb {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+/* The page column fills .ja-main and .ja-sc fills the page column, so the pinned bar's margin-top: auto puts it at the bottom of the screen however few rows
+   there are; with more rows than fit, sticky holds it there. */
+.ja-pad:has(> .ja-sc) { display: flex; min-height: 100%; flex-direction: column; padding-bottom: 0; }
+.ja-sc { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 10px; }
+
+/* The title row: on a phone the Filters button and the count, then the legend */
+.ja-sc-top { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; }
+.ja-sc-h { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; font-weight: 700; font-size: 26px; line-height: 1.15; letter-spacing: -0.01em; }
+.ja-sc-meta { margin: 0; color: var(--ink-subtle); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.ja-sc-meta b { color: var(--ink); font-weight: 500; }
+.ja-sc-sc { display: none; }
+.ja-sc-leg { display: flex; grid-column: 1 / -1; flex-wrap: wrap; gap: 4px; }
+.ja-sc-leg .jg-band { padding: 0 7px; font-size: 11.5px; }
+.ja-sc-fb {
+  position: relative; display: inline-flex; flex: none; height: 44px; align-items: center; gap: 8px; padding: 0 14px;
+  border: 1.5px solid var(--jg-field-line); border-radius: 12px; background: transparent; color: var(--ink); font-weight: 500; font-size: 15px;
+}
+.ja-sc-fb svg { color: var(--ink-subtle); }
+.ja-sc-fb[data-on="true"] { border-color: var(--accent); background: var(--ja-accent-t); }
+.ja-sc-fb[data-on="true"] svg { color: var(--accent); }
+.ja-sc-fc {
+  position: absolute; top: -8px; right: -6px; display: grid; min-width: 22px; height: 22px; place-items: center; padding: 0 6px;
+  border-radius: 11px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 12px; box-shadow: 0 0 0 2px var(--canvas);
+}
+
+/* The two filters: chips. Inline from 1024px; in the phone's Filters sheet below it. */
+.ja-sc-fbar { display: none; }
+.ja-sc-fg { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.ja-sc-cl { flex: none; color: var(--ink-subtle); font-weight: 500; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ja-sc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ja-sc-chip {
+  display: inline-flex; height: 36px; align-items: center; padding: 0 14px; border: 1.5px solid var(--jg-field-line); border-radius: 10px;
+  background: var(--jg-field); color: var(--ink); font-weight: 600; font-size: 14px; white-space: nowrap;
+}
+.ja-sc-chip:hover:not([aria-pressed="true"]) { background: var(--surface-2); }
+.ja-sc-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.ja-sc-fsheet .ja-sc-fg { flex-direction: column; align-items: flex-start; gap: 8px; }
+.ja-sc-fsheet .ja-sc-chip { height: 44px; }
+.ja-sc-ff { display: flex; flex-direction: column; gap: 8px; }
+.ja-sc-ff .jg-quiet { align-self: center; }
+
+.ja-sc-cols { display: flex; min-width: 0; flex-direction: column; gap: 10px; padding-bottom: 12px; }
+.ja-sc-hint { margin: 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.4; }
+.ja-sc-none { margin: 0; color: var(--ink-subtle); font-size: 14px; }
+.ja-sc-lnk {
+  display: inline-flex; min-width: 52px; min-height: 44px; align-items: center; justify-content: center; padding: 0 10px; border-radius: 8px;
+  background: transparent; color: var(--accent); font-weight: 500; font-size: 14px; text-decoration: underline;
+}
+.ja-sc-lnk:disabled { opacity: 0.4; }
+
+/* The ranked list: on a phone one card per team */
+.ja-sc-lh { display: none; }
+.ja-sc-list ul { display: flex; flex-direction: column; gap: 8px; }
+.ja-sc-list > .ja-sc-none { padding: 24px 16px; border: 1px dashed var(--line-strong); border-radius: 14px; text-align: center; }
+.ja-sc-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: stretch; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); }
+.ja-sc-row.ja-sc-on { border-color: var(--accent); background: var(--ja-accent-t); }
+.ja-sc-un, .ja-sc-un .ja-sc-t1 b, .ja-sc-un .ja-sc-rn, .ja-sc-un .ja-sc-nm { color: var(--ink-subtle); }
+.ja-sc-ck { position: relative; display: grid; min-height: 60px; place-items: center; }
+.ja-sc-cin { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.ja-sc-cin:disabled { cursor: not-allowed; }
+.ja-sc-cin:focus-visible { outline: none; }
+.ja-sc-box {
+  display: grid; flex: none; width: 22px; height: 22px; place-items: center; border: 2px solid var(--jg-field-line); border-radius: 6px;
+  background: var(--jg-field); color: var(--accent-ink);
+}
+.ja-sc-box svg { display: none; width: 14px; height: 14px; }
+.ja-sc-cin:checked + .ja-sc-box { border-color: var(--accent); background: var(--accent); }
+.ja-sc-cin:checked + .ja-sc-box svg { display: block; }
+.ja-sc-cin:disabled + .ja-sc-box { border-color: var(--line); background: transparent; }
+.ja-sc-cin:focus-visible + .ja-sc-box { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ja-sc-main {
+  display: grid; width: 100%; min-height: 60px; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; column-gap: 10px;
+  padding: 6px 12px 6px 0; border-radius: 0 13px 13px 0; background: transparent; color: inherit; text-align: left;
+}
+.ja-sc-main:hover { background: var(--surface-2); }
+.ja-sc-main:focus-visible { outline-offset: -2px; }
+.ja-sc-rn { color: var(--ink-subtle); text-align: center; font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; }
+.ja-sc-t { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 3px; }
+.ja-sc-t1 { display: flex; min-width: 0; max-width: 100%; flex-direction: column; line-height: 1.25; }
+.ja-sc-t1 b { flex: none; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
+.ja-sc-nm { min-width: 0; overflow: hidden; color: var(--ink-subtle); text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.ja-sc-t .ja-sp { height: 20px; padding: 0 8px; font-size: 11.5px; }
+.ja-sc-s { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.ja-sc-tot { font-weight: 700; font-size: 20px; line-height: 1; font-variant-numeric: tabular-nums; }
+.ja-sc-tot small { color: var(--ink-subtle); font-weight: 500; font-size: 12px; }
+.ja-sc-ns { color: var(--ink-subtle); font-size: 13px; }
+
+/* The pinned "2 selected · Compare" bar (phone) */
+.ja-sc-pbar {
+  position: sticky; bottom: 0; z-index: 4; display: flex; align-items: center; gap: 6px; margin: auto -16px 0; padding: 10px 16px max(16px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--jg-field-line); background: var(--surface);
+}
+.ja-sc-sel { display: flex; min-width: 0; flex: 1; flex-direction: column; margin: 0; line-height: 1.2; }
+.ja-sc-sel b { font-weight: 700; font-size: 16px; }
+.ja-sc-sel span { overflow: hidden; color: var(--ink-subtle); text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.ja-sc-quiet { flex: none; min-width: 56px; min-height: 44px; padding: 0 10px; background: transparent; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
+.ja-sc-quiet:hover { color: var(--ink); }
+.ja-sc-cmpb { display: inline-flex; flex: none; height: 48px; align-items: center; justify-content: center; padding: 0 22px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 16px; }
+.ja-sc-cmpb:hover { background: color-mix(in oklch, var(--accent) 88%, var(--ink)); }
+
+/* The compare panel: a table of rows, one column per team */
+.ja-sc-cmp { overflow: clip; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.ja-sc-back { display: inline-flex; min-height: 44px; align-items: center; gap: 6px; margin: 2px 0 0 4px; padding: 0 10px 0 4px; border-radius: 10px; background: transparent; color: var(--accent); font-weight: 500; font-size: 15px; }
+.ja-sc-back:hover { text-decoration: underline; }
+.ja-sc-cmp table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.ja-sc-c0 { width: 34%; }
+.ja-sc-cmp th, .ja-sc-cmp td { vertical-align: middle; text-align: left; font-weight: 400; }
+.ja-sc-cmp thead th { padding: 10px 12px 12px; vertical-align: bottom; border-bottom: 1px solid var(--line); }
+.ja-sc-tn { display: block; font-weight: 700; font-size: 20px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ja-sc-tnm { display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.ja-sc-tmt { display: block; margin-top: 2px; color: var(--ink-subtle); font-size: 12px; }
+.ja-sc-cmp tbody tr { border-top: 1px solid var(--line); }
+.ja-sc-cmp tbody th { padding: 10px 8px 10px 12px; color: var(--ink); font-size: 13px; line-height: 1.35; }
+.ja-sc-cmp tbody td { padding: 10px 12px; }
+.ja-sc-grp { background: var(--ja-col); }
+.ja-sc-grp th { color: var(--ink-subtle); font-weight: 500; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ja-sc-v { color: var(--ink); font-weight: 500; font-size: 16px; font-variant-numeric: tabular-nums; }
+.ja-sc-hi { font-weight: 700; }
+.ja-sc-grp .ja-sc-v { font-size: 15px; }
+.ja-sc-of { margin-left: 2px; color: var(--ink-subtle); font-family: var(--font-fira), ui-sans-serif, system-ui, sans-serif; font-weight: 400; font-size: 12px; }
+.ja-sc-x { color: var(--ink-subtle); font-size: 14px; }
+.ja-sc-tt td { padding-top: 14px; padding-bottom: 14px; }
+.ja-sc-tt th { font-weight: 500; }
+.ja-sc-tt .ja-sc-v { display: block; font-size: 24px; line-height: 1.1; }
+.ja-sc-tt .ja-sc-of { font-size: 13px; }
+.ja-sc-bl { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 6px; }
+.ja-sc-pc { color: var(--ink-subtle); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ja-sc-nct { display: block; font-size: 14px; }
+.ja-sc-olink { display: inline-flex; min-height: 44px; align-items: center; margin-left: -8px; padding: 0 8px; border-radius: 8px; background: transparent; color: var(--accent); font-weight: 500; font-size: 14px; }
+.ja-sc-olink:hover { text-decoration: underline; }
+.ja-sc-cbtn {
+  display: inline-grid; min-height: 44px; grid-template-columns: auto auto; justify-items: start; align-items: center; gap: 4px 6px; margin-left: -2px; padding: 3px 8px 3px 2px;
+  border: 1px solid transparent; border-radius: 14px; background: transparent; color: var(--ink-subtle);
+}
+.ja-sc-cbtn:hover { border-color: var(--accent); }
+.ja-sc-cbtn .ja-sp { grid-column: 1; }
+.ja-sc-cbtn svg { grid-column: 2; grid-row: 1; }
+.ja-sc-cd td, .ja-sc-cd th { padding-top: 8px; padding-bottom: 8px; }
+
+/* A phone shows the list or the compare screen, never both */
+@media (max-width: 1023.98px) {
+  .ja-sc[data-view="list"] .ja-sc-cmp { display: none; }
+  .ja-sc[data-view="compare"] :is(.ja-sc-top, .ja-sc-hint, .ja-sc-list, .ja-sc-pbar) { display: none; }
+}
+
+@media (min-width: 1024px) {
+  .ja-pad:has(> .ja-sc) { padding-bottom: 16px; }
+  .ja-sc { gap: 14px; }
+
+  .ja-sc-top { display: flex; min-height: 40px; flex-wrap: wrap; gap: 6px 16px; }
+  .ja-sc-h { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; white-space: normal; }
+  .ja-sc-fb { display: none; }
+  .ja-sc-meta { font-size: 14px; text-align: left; }
+  .ja-sc-sc { display: inline; }
+  .ja-sc-leg { margin-left: auto; gap: 6px; }
+  .ja-sc-leg .jg-band { padding: 0 8px; font-size: 12px; }
+
+  .ja-sc-fbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 32px; }
+
+  .ja-sc-cols { display: grid; grid-template-columns: 440px minmax(0, 1fr); align-items: start; gap: 20px; padding-bottom: 0; }
+  .ja-sc-list { grid-column: 1; grid-row: 1; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+  .ja-sc-hint { grid-column: 2; grid-row: 1; padding: 40px 16px; border: 1px dashed var(--line-strong); border-radius: 14px; text-align: center; font-size: 14px; }
+  .ja-sc-lh { display: flex; min-height: 48px; align-items: center; justify-content: space-between; padding: 6px 8px 6px 16px; border-bottom: 1px solid var(--line); }
+  .ja-sc-lh p { margin: 0; font-weight: 600; font-size: 15px; }
+  .ja-sc-lh span { color: var(--ink-subtle); font-weight: 500; }
+  .ja-sc-lnk { min-height: 32px; }
+  .ja-sc-list > .ja-sc-none { padding: 24px 16px; border: 0; border-radius: 0; }
+
+  .ja-sc-list ul { gap: 0; }
+  .ja-sc-list li + li { border-top: 1px solid var(--line); }
+  .ja-sc-row { border: 0; border-radius: 0; background: transparent; }
+  .ja-sc-row.ja-sc-on { background: var(--ja-accent-t); box-shadow: inset 3px 0 0 var(--accent); }
+  .ja-sc-ck, .ja-sc-main { min-height: 48px; }
+  .ja-sc-main { padding: 4px 14px 4px 0; border-radius: 0; }
+  .ja-sc-t1 { flex-direction: row; align-items: baseline; gap: 8px; }
+  .ja-sc-t1 b { font-size: 17px; }
+  .ja-sc-nm { color: var(--ink); font-size: 14px; }
+  .ja-sc-s { display: grid; grid-template-columns: 56px 78px; align-items: center; column-gap: 10px; }
+  .ja-sc-tot { font-size: 17px; text-align: right; }
+  .ja-sc-tot small { margin-left: 1px; font-weight: 400; }
+  .ja-sc-s .jg-band { justify-self: start; }
+  .ja-sc-ns { grid-column: 1 / -1; text-align: right; font-size: 12px; }
+
+  .ja-sc-pbar, .ja-sc-back { display: none; }
+  .ja-sc[data-view] .ja-sc-cmp { display: block; }
+  .ja-sc-cmp { position: sticky; top: 12px; grid-column: 2; grid-row: 1; max-height: calc(100dvh - 80px); overflow-y: auto; }
+  .ja-sc-c0 { width: 36%; }
+  .ja-sc-cmp thead th { padding: 14px 16px 12px; }
+  .ja-sc-tn { font-size: 24px; }
+  .ja-sc-tnm { font-size: 15px; }
+  .ja-sc-tmt { font-size: 12.5px; }
+  .ja-sc-cmp tbody th { padding: 10px 12px 10px 16px; font-size: 13.5px; }
+  .ja-sc-cmp tbody td { padding: 10px 16px; }
+  .ja-sc-tt td { padding-top: 14px; padding-bottom: 14px; }
+  .ja-sc-tt .ja-sc-v { font-size: 26px; }
+  .ja-sc-tt .ja-sc-of { font-size: 14px; }
+  .ja-sc-olink { min-height: 32px; }
+  .ja-sc-cbtn { min-height: 32px; }
 }

@@ -87,12 +87,15 @@ export function TeamsTab({
   refresh,
   onError,
   onOpenFlags,
+  onOpenSheet,
 }: {
   state: AppState;
   refresh: () => Promise<void>;
   onError: (message: string | null) => void;
   /** Switch to the Referee section with this team selected, as Scores' conduct link does. */
   onOpenFlags: (teamId: string) => void;
+  /** Open this team's sheet (notes, scores, flags) over the console. */
+  onOpenSheet: (teamId: string) => void;
 }) {
   const wide = useWide();
   const { ask, dialog } = useConfirm();
@@ -243,6 +246,7 @@ export function TeamsTab({
         onResetStatus={resetStatus}
         onRemove={remove}
         onOpenFlags={openFlags}
+        onOpenSheet={() => team && onOpenSheet(team.id)}
         eventData={<EventData refresh={refresh} />}
       />
     </div>
@@ -279,6 +283,7 @@ export function TeamsBoard({
   onResetStatus,
   onRemove,
   onOpenFlags,
+  onOpenSheet,
   eventData = null,
 }: {
   state: Slice;
@@ -305,6 +310,7 @@ export function TeamsBoard({
   onResetStatus: (request: RequestRow, status: Status) => void;
   onRemove: () => void;
   onOpenFlags: () => void;
+  onOpenSheet: () => void;
   eventData?: React.ReactNode;
 }) {
   const uid = useId();
@@ -328,6 +334,7 @@ export function TeamsBoard({
     onResetStatus,
     onRemove,
     onOpenFlags,
+    onOpenSheet,
   });
 
   const selects = (
@@ -772,6 +779,7 @@ type EditorProps = {
   onResetStatus: (request: RequestRow, status: Status) => void;
   onRemove: () => void;
   onOpenFlags: () => void;
+  onOpenSheet: () => void;
 };
 
 /** The pinned bottom of the editor: what the server refused, and "Save changes", disabled until something changed. */
@@ -857,7 +865,7 @@ function SheetBody(p: EditorProps & { titleId: string }) {
   );
 }
 
-function Fields({ uid, team, draft, onDraft, state, onResetStatus, onRemove, onOpenFlags }: EditorProps) {
+function Fields({ uid, team, draft, onDraft, state, onResetStatus, onRemove, onOpenFlags, onOpenSheet }: EditorProps) {
   const set = (patch: Partial<TeamDraft>) => onDraft({ ...draft, ...patch });
   const { request, bookedAt } = interviewOf(team.id, state.requests);
   const pills = flagPills(team.id, state.flags, state.flagKinds);
@@ -1006,6 +1014,10 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, onRemove, onO
         ) : (
           <p className="ja-hint">No flags recorded.</p>
         )}
+        {/* The judge console's team sheet: the flags in full, the notes, and the scores. */}
+        <button type="button" className="ja-tm-od ja-tm-ts" onClick={onOpenSheet}>
+          Open team sheet
+        </button>
       </div>
 
       <div className="ja-fl ja-tm-rm">
