@@ -901,6 +901,267 @@ body:has(.landing) > .theme-toggle { top: 0; }
 }
 
 /* ------------------------------------------------------------------ *
+ * Team page ("Status board", design/team-redesign/)
+ *
+ * Scoped to .teampage with a tp- prefix. The top bar is the landing's
+ * (.lp-top, .lp-brand and friends, which are not scoped to .landing), and
+ * the app's theme toggle docks into it the same way. The --tp-* tokens are
+ * the sign-in/landing --si-* ones, which only .signin and .landing define.
+ *
+ * Colour is signal: status colours only on the panel, the track and the
+ * history chips (--c is the fill, --ci the ink on it); accent only on
+ * buttons, chips, links and focus; danger only on the error banner.
+ * No animation: hover and focus colour changes only, and none of those
+ * under prefers-reduced-motion.
+ * ------------------------------------------------------------------ */
+
+.teampage {
+  --tp-accent-hover: oklch(0.730 0.125 258);
+  --tp-tint: oklch(0.680 0.140 258 / 0.14);
+  --tp-ring: oklch(0.680 0.140 258 / 0.35);
+  --tp-field: oklch(0.180 0.013 265);
+  --tp-field-line: oklch(0.520 0.014 265);
+  --tp-disabled: oklch(0.280 0.014 265);
+  --tp-shadow: none;
+  /* Ink on the scheduled panel, whose fill is --booked-quiet: the app has no token for it. */
+  --tp-booked-ink: oklch(0.200 0.014 265);
+  --tp-danger-text: oklch(0.800 0.110 18);
+  --tp-danger-tint: oklch(0.555 0.200 18 / 0.16);
+  --tp-danger-line: oklch(0.555 0.200 18 / 0.55);
+
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  background: var(--canvas);
+  color: var(--ink);
+}
+:root[data-theme="light"] .teampage {
+  --tp-accent-hover: oklch(0.455 0.160 258);
+  --tp-tint: oklch(0.510 0.160 258 / 0.09);
+  --tp-ring: oklch(0.510 0.160 258 / 0.25);
+  --tp-field: oklch(0.995 0.002 265);
+  --tp-field-line: oklch(0.640 0.012 265);
+  --tp-disabled: oklch(0.915 0.008 265);
+  --tp-shadow: 0 1px 2px oklch(0.225 0.016 265 / 0.05), 0 18px 40px -24px oklch(0.225 0.016 265 / 0.25);
+  --tp-booked-ink: oklch(0.975 0.004 265);
+  --tp-danger-text: oklch(0.470 0.180 18);
+  --tp-danger-tint: oklch(0.560 0.200 18 / 0.08);
+  --tp-danger-line: oklch(0.560 0.200 18 / 0.35);
+}
+
+/* A status wears its fill and the ink that clears AA on it, in both themes. */
+.teampage .tp-s-booked { --c: var(--booked-quiet); --ci: var(--tp-booked-ink); }
+.teampage .tp-s-waiting { --c: var(--waiting); --ci: var(--waiting-ink); }
+.teampage .tp-s-enroute { --c: var(--enroute); --ci: var(--enroute-ink); }
+.teampage .tp-s-active { --c: var(--active); --ci: var(--active-ink); }
+.teampage .tp-s-done { --c: var(--done); --ci: var(--done-ink); }
+.teampage .tp-s-off { --c: var(--off); --ci: var(--off-ink); }
+
+.tp-pan-team, .tp-pan-lab, .tp-pan-sent, .tp-pan-time b, .tp-btn, .tp-seg button, .tp-chip, .tp-slot b,
+.tp-st--current .tp-st-l, .tp-dsc-h, .tp-h-q, .tp-h-caps {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* The app's one floating theme toggle, docked into the top bar's corner as on the landing page. */
+body:has(.teampage) > .theme-toggle {
+  position: absolute; top: 0; right: 8px; bottom: auto;
+  width: 44px; height: 44px; border: 0; border-radius: 12px;
+  background: transparent; box-shadow: none; color: var(--ink-subtle);
+}
+body:has(.teampage) > .theme-toggle:hover {
+  transform: none; color: var(--ink);
+  background: color-mix(in oklch, var(--accent) 12%, transparent);
+}
+
+.tp-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* One column on a phone and up to 560px; two columns from 1024px (below). */
+.tp-stage { display: flex; flex: 1; }
+.tp-grid { display: flex; width: 100%; max-width: 560px; margin: 0 auto; padding: 4px 16px 24px; flex-direction: column; gap: 12px; }
+.tp-left, .tp-right { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
+
+/* Errors, and a poll that failed after the first answer */
+.tp-alert {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px;
+  border: 1px solid var(--tp-danger-line); border-radius: 12px;
+  background: var(--tp-danger-tint); color: var(--tp-danger-text);
+  font-weight: 500; font-size: 15px; line-height: 1.4;
+}
+.tp-alert svg { flex: none; margin-top: 1px; }
+.tp-alert span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tp-alert-x {
+  display: grid; flex: none; width: 44px; height: 44px; margin: -12px -8px -12px 0; place-items: center;
+  border: 0; border-radius: 10px; background: transparent; color: inherit; transition: background 0.15s;
+}
+.tp-alert-x:hover { background: var(--tp-danger-tint); }
+.tp-offline {
+  margin: 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface); color: var(--caution-quiet); font-size: 14px; line-height: 1.4;
+}
+
+/* 1 · The status panel */
+.tp-pan { padding: 18px 20px; border-radius: 24px; background: var(--c); color: var(--ci); }
+.tp-pan--idle { --c: var(--surface); --ci: var(--ink); border: 1px solid var(--line); box-shadow: var(--tp-shadow); }
+.tp-pan-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tp-pan-team { margin: 0; font-weight: 600; font-size: 15px; line-height: 1.3; }
+.tp-ptag {
+  display: inline-flex; align-items: center; height: 28px; padding: 0 10px;
+  border: 1px solid currentColor; border-radius: 8px; font-size: 13px; font-weight: 500; white-space: nowrap;
+}
+.tp-pan-lab { margin: 12px 0 0; font-weight: 700; font-size: 12px; line-height: 1.4; letter-spacing: 0.2em; text-transform: uppercase; }
+.tp-pan-sent { margin: 4px 0 0; font-weight: 700; font-size: 28px; line-height: 1.15; letter-spacing: -0.01em; }
+.tp-pan--idle .tp-pan-sent { margin-top: 12px; }
+.tp-pan-time { margin: 10px 0 0; }
+.tp-pan-time span { display: block; font-size: 14px; font-weight: 500; line-height: 1.4; }
+.tp-pan-time b { display: block; font-weight: 700; font-size: 72px; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tp-pan-time small { margin-left: 8px; font-size: 28px; font-weight: 600; letter-spacing: 0; }
+/* "just now" is eight characters: at full size it would be wider than a phone. */
+.tp-pan-time .tp-word { font-size: 52px; }
+.tp-pan-cap { margin: 8px 0 0; font-size: 15px; line-height: 1.4; }
+.tp-pan-foot { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid color-mix(in oklch, currentColor 35%, transparent); font-size: 15px; line-height: 1.4; }
+.tp-pan-foot b { font-weight: 600; }
+.tp-pan-foot span { display: block; }
+.tp-pan--idle .tp-pan-foot--none { color: var(--caution-quiet); }
+
+/* 2 · The track */
+.tp-track { padding: 14px 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
+.tp-track ol { display: flex; flex-direction: column; }
+.tp-st {
+  position: relative; display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 12px;
+  min-height: 34px; padding: 5px 0; font-size: 15px; line-height: 1.3; color: var(--ink-subtle);
+}
+.tp-st:not(:last-child)::after { content: ""; position: absolute; left: 11px; top: 29px; bottom: -5px; width: 2px; background: var(--line); }
+.tp-mk {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 24px; height: 24px;
+  border: 2px solid var(--tp-field-line); border-radius: 50%; background: var(--surface); color: var(--ink-subtle);
+}
+.tp-st--done { color: var(--ink); }
+.tp-st--done .tp-mk { border-color: var(--ink-subtle); }
+.tp-st--skipped .tp-mk { border-style: dashed; border-color: var(--line); }
+.tp-st--current { color: var(--ink); font-weight: 600; font-size: 17px; }
+.tp-st--current .tp-mk { border: 0; background: var(--c); }
+.tp-st--current .tp-mk::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ci); }
+.tp-st-m { font-weight: 500; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--ink-subtle); }
+.tp-st--current .tp-st-m { color: var(--ink); }
+.tp-trk-cap { margin: 8px 0 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.4; color: var(--ink-subtle); }
+
+/* 3 · The actions */
+.tp-acts { display: flex; flex-direction: column; gap: 12px; }
+.tp-h-q { margin: 0; font-weight: 600; font-size: 20px; line-height: 1.25; }
+.tp-lbl { display: block; margin: 0 0 8px; font-weight: 500; font-size: 15px; line-height: 1.35; }
+.tp-fine, .tp-load { margin: 0; font-size: 14px; line-height: 1.4; color: var(--ink-subtle); }
+.tp-fine--c { text-align: center; }
+.tp-rule { height: 1px; margin: 4px 0; background: var(--line); }
+.tp-field {
+  display: block; width: 100%; height: 48px; margin: 0; padding: 0 14px;
+  border: 1.5px solid var(--tp-field-line); border-radius: 12px; background: var(--tp-field); color: var(--ink);
+  font-size: 16px; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.tp-field::placeholder { color: var(--ink-subtle); opacity: 1; }
+.tp-field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--tp-ring); }
+.tp-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 52px; margin: 0; padding: 0 12px;
+  border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink);
+  font-weight: 600; font-size: 17px; transition: background 0.15s;
+}
+.tp-btn:hover:not(:disabled) { background: var(--tp-accent-hover); }
+.tp-btn:disabled { background: var(--tp-disabled); color: var(--ink-subtle); cursor: not-allowed; }
+.tp-btn--out { height: 44px; border: 1.5px solid var(--tp-field-line); background: transparent; color: var(--ink); font-size: 15px; }
+.tp-btn--out:hover:not(:disabled) { background: var(--tp-tint); }
+.tp-btn--out:disabled { background: transparent; opacity: 0.5; }
+.tp-btn--fit { width: auto; align-self: flex-start; padding: 0 18px; }
+.tp-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.tp-pair--one { grid-template-columns: minmax(0, 1fr); }
+.tp-seg { display: flex; gap: 4px; padding: 4px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--tp-field); }
+.tp-seg button {
+  flex: 1; min-width: 0; height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--ink);
+  font-weight: 600; font-size: 16px; transition: background 0.15s, color 0.15s;
+}
+.tp-seg button:hover { background: var(--tp-tint); }
+.tp-seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+/* Book a time instead: a collapsible card */
+.tp-dsc { overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
+.tp-dsc-h {
+  display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 56px; padding: 0 16px;
+  border: 0; background: transparent; color: var(--ink); font-weight: 600; font-size: 17px; text-align: left; transition: background 0.15s;
+}
+.tp-dsc-h:hover { background: var(--tp-tint); }
+.tp-dsc-h:focus-visible { outline-offset: -3px; }
+.tp-dsc-h svg { color: var(--ink-subtle); }
+.tp-dsc-b { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-top: 1px solid var(--line); }
+.tp-dsc-b[hidden] { display: none; }
+.tp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.tp-chip {
+  height: 44px; padding: 0 16px; border: 1.5px solid var(--tp-field-line); border-radius: 12px; background: var(--surface); color: var(--ink);
+  font-weight: 600; font-size: 15px; transition: border-color 0.15s, background 0.15s;
+}
+.tp-chip:hover { border-color: var(--accent); }
+.tp-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+
+/* The slot grid (SlotPicker's "team" variant) */
+.tp-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tp-slot {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; height: 56px; min-width: 0; padding: 0;
+  border: 1.5px solid var(--tp-field-line); border-radius: 12px; background: var(--tp-field); color: var(--ink);
+  line-height: 1.15; transition: border-color 0.15s, background 0.15s;
+}
+.tp-slot:hover:not(:disabled) { border-color: var(--accent); background: var(--tp-tint); }
+.tp-slot b { font-weight: 600; font-size: 18px; font-variant-numeric: tabular-nums; }
+.tp-slot small { font-size: 12px; color: var(--ink-subtle); }
+.tp-slot:disabled:not(.tp-slot--off) { opacity: 0.5; }
+.tp-slot--off { border: 1.5px dashed var(--line); background: transparent; }
+.tp-slot--off b { font-weight: 500; color: var(--ink-subtle); text-decoration: line-through; text-decoration-thickness: 1px; }
+.tp-slot--mine { border-style: solid; border-color: var(--done); background: color-mix(in oklch, var(--done) 16%, transparent); }
+.tp-slot--mine b { color: var(--done-quiet); text-decoration: none; }
+.tp-slot--mine small { color: var(--done-quiet); }
+.tp-slots-note { margin: 0 0 8px; font-size: 14px; line-height: 1.4; color: var(--ink-subtle); }
+.tp-slots-none { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; color: var(--caution-quiet); font-size: 15px; line-height: 1.4; }
+.tp-slots-none p { margin: 4px 0 0; color: var(--ink-subtle); }
+
+/* Earlier today, and the way out */
+.tp-hist-s { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.tp-hist-s ul { display: flex; flex-direction: column; gap: 6px; }
+.tp-h-caps { margin: 0 0 4px; font-weight: 700; font-size: 12px; line-height: 1.4; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-subtle); }
+.tp-hist {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 8px 14px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--surface); font-size: 15px;
+}
+.tp-hist-t { color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
+.tp-sc {
+  display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 999px;
+  background: var(--c); color: var(--ci); font-size: 13px; font-weight: 500; white-space: nowrap;
+}
+.tp-sc.tp-s-off { box-shadow: inset 0 0 0 1px var(--line); }
+.tp-more { display: flex; align-items: center; justify-content: center; min-height: 44px; color: var(--accent); font-size: 15px; text-decoration: underline; }
+.tp-more:hover { color: var(--tp-accent-hover); }
+
+/* From 1024px: the panel and the track beside the actions */
+@media (min-width: 1024px) {
+  .tp-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 32px; max-width: 1280px; padding: 8px 40px 32px; }
+  .tp-alert, .tp-offline { grid-column: 1 / -1; }
+  .tp-left, .tp-right { gap: 16px; }
+  .tp-pan { padding: 28px 32px; }
+  .tp-pan-sent { font-size: 40px; }
+  .tp-pan-time b { font-size: 96px; }
+  .tp-pan-time .tp-word { font-size: 64px; }
+  .tp-track { padding: 22px 24px; }
+  .tp-track ol { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .tp-st { flex-direction: column; display: flex; align-items: center; gap: 8px; min-height: 0; padding: 0; text-align: center; }
+  .tp-st:not(:last-child)::after { left: calc(50% + 18px); right: calc(-50% + 18px); top: 11px; bottom: auto; width: auto; height: 2px; }
+  .tp-st--current { font-size: 16px; }
+  .tp-slots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (min-width: 768px) {
+  body:has(.teampage) > .theme-toggle { top: 11px; right: 28px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .teampage *, .teampage *::before, .teampage *::after { transition: none !important; }
+}
+
+/* ------------------------------------------------------------------ *
  * Referee console ("Match first", design/referee-redesign/)
  *
  * A phone app shell: the page never scrolls, so the current-match bar, the
