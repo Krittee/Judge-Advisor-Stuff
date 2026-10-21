@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 
+import { NO_POLL, polled } from "../src/components/admin/activityLogic";
 import { settleSave } from "../src/components/useRubricScoring";
 import { fetchState } from "../src/components/useAppState";
 
@@ -120,8 +121,11 @@ test("the hook marks loaded only when state arrived, and the team page says so w
 });
 
 test("the Activity tab clears its error once a poll succeeds", () => {
-  const admin = code(read("src/app/admin/page.tsx"));
-  assert.match(admin, /setRows\(activity\);\s*setError\(null\);/);
+  const tab = code(read("src/components/admin/ActivityTab.tsx"));
+  assert.match(tab, /setPoll\(\(p\) => polled\(p, \{ rows: activity \}/, "a success goes through polled");
+  const failed = polled(NO_POLL, { error: "down" }, new Date());
+  assert.equal(failed.error, "down");
+  assert.equal(polled(failed, { rows: [] }, new Date()).error, null, "the next success is the recovery");
 });
 
 /* ---- BUG-032: the flags memo must not close over all of `state` -------- */

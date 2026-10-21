@@ -498,7 +498,7 @@ test("the page opens one TeamSheet, inside the frame, from Scores, Floor's Notes
   assert.ok(page.includes("state.teams.find((t) => t.id === sheetId)"));
   assert.match(page, /request=\{sheetTeam \? liveRequestFor\(sheetTeam\.id, state\.requests\) : null\}/);
   assert.ok(page.includes("ask={ask}"), "its Clear scores confirm is the console's own ask()");
-  assert.ok(page.includes("onClose={() => setSheetId(null)}"));
+  assert.match(page, /onClose=\{\(\) => \{\s*setSheetId\(null\);/);
   for (const tab of tabs) assert.ok(page.includes(`<${tab}`), tab);
 });
 
@@ -656,8 +656,11 @@ test("the phone bar says how many are scored on Scores, and nowhere else", () =>
 test("the Scores block: its own prefix, after the import block, tokens only, no motion, 44px taps on a phone", () => {
   const start = css.indexOf("/* @ja-block scores */");
   assert.ok(start > css.indexOf("/* @ja-block import */"), "appended after the existing blocks");
-  const block = css.slice(start);
-  assert.ok(!/@ja-block (?!scores)/.test(block), "the last block of the file");
+  // Activity (step 10) is appended after it.
+  const end = css.indexOf("/* @ja-block activity */");
+  assert.ok(end > start, "Activity follows it");
+  const block = css.slice(start, end);
+  assert.ok(!/@ja-block (?!scores)/.test(block), "the scores block runs up to the next one");
   assert.doesNotMatch(block, /transition|animation|@keyframes/, "no motion");
   assert.doesNotMatch(block, /#[0-9a-f]{3,8}\b|oklch\(|rgb\(|hsl\(/i, "tokens only, so the light theme follows");
   assert.doesNotMatch(block, /overflow-x/, "no sideways-scrolling row");

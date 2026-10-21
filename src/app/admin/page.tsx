@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { liveRequestFor } from "@/lib/data";
+import { ActivityTab } from "@/components/admin/ActivityTab";
 import { AdminFrame, railCounts, type AdminTab as Tab } from "@/components/admin/AdminFrame";
 import { ConflictsTab } from "@/components/admin/ConflictsTab";
 import { FloorTab } from "@/components/admin/FloorTab";
@@ -15,10 +16,9 @@ import { TeamsTab } from "@/components/admin/TeamsTab";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { TeamSheet } from "@/components/judge/TeamSheet";
 import { call, useAppState, useScores } from "@/components/useAppState";
-import { Banner, formatClock } from "@/components/ui";
+import { Banner } from "@/components/ui";
 import type { Session } from "@/lib/auth";
 import { rankTeams } from "@/lib/ranking";
-import type { ActivityRow } from "@/lib/types";
 
 /** The Judge Advisor's console: every panel at once, and the tools to unstick it. */
 export default function AdminPage() {
@@ -90,7 +90,7 @@ export default function AdminPage() {
         }}
       >
         {/* The redesigned tabs fill the width the rail leaves; the older ones keep the width and padding they had. */}
-        <div className={tab === "floor" || tab === "conflicts" || tab === "panels" || tab === "flags" || tab === "teams" || tab === "import" || tab === "scores" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
+        <div className={tab === "floor" || tab === "conflicts" || tab === "panels" || tab === "flags" || tab === "teams" || tab === "import" || tab === "scores" || tab === "log" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
           {error ? (
             <div className="mb-4">
               <Banner kind="error" onDismiss={() => setError(null)}>
@@ -155,7 +155,7 @@ export default function AdminPage() {
           {tab === "import" ? (
             <ImportTab refresh={refresh} onError={setError} divisions={state.divisions} />
           ) : null}
-          {tab === "log" ? <ActivityTab /> : null}
+          {tab === "log" ? <ActivityTab state={state} onOpenSheet={setSheetId} /> : null}
         </div>
 
         {/* Inside the frame, so the sheet gets the .admin tokens its styles read (--jg-field and the rest). */}
@@ -167,54 +167,14 @@ export default function AdminPage() {
           flags={state.flags}
           flagKinds={state.flagKinds}
           ask={ask}
-          onClose={() => setSheetId(null)}
+          onClose={() => {
+            setSheetId(null);
+            // Scores shows the totals the sheet just wrote; its own poll is up to 15 s away.
+            if (tab === "scores") scoreData.reload();
+          }}
         />
         {dialog}
       </AdminFrame>
     </>
-  );
-}
-
-/* ==================================================================== */
-/* Activity — who did what, for when the floor gets confusing            */
-/* ==================================================================== */
-
-function ActivityTab() {
-  const [rows, setRows] = useState<ActivityRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const load = () =>
-      call<{ activity: ActivityRow[] }>("/api/admin/activity", { method: "GET" })
-        .then(({ activity }) => {
-          setRows(activity);
-          // A later success is the recovery; without this the banner from
-          // one dropped poll stayed up, hiding the log, for good.
-          setError(null);
-        })
-        .catch((e) => setError((e as Error).message));
-    load();
-    const t = setInterval(load, 10_000);
-    return () => clearInterval(t);
-  }, []);
-
-  if (error) return <Banner kind="error">{error}</Banner>;
-
-  return (
-    <ul className="divide-y divide-line rounded-xl ring-1 ring-inset ring-line">
-      {rows.map((r) => (
-        <li key={r.id} className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-2.5 text-sm">
-          <span className="w-20 shrink-0 text-ink-faint">{formatClock(r.created_at)}</span>
-          <span className="w-48 shrink-0 truncate text-ink-subtle">
-            {r.actor_role && r.actor_role.toLowerCase() !== r.actor.toLowerCase() ? `${r.actor} · ${r.actor_role}` : r.actor}
-          </span>
-          <span className="text-ink">{r.action}</span>
-          {r.detail ? <span className="text-ink-faint">{r.detail}</span> : null}
-        </li>
-      ))}
-      {!rows.length ? (
-        <li className="px-4 py-8 text-center text-sm text-ink-faint">Nothing logged yet.</li>
-      ) : null}
-    </ul>
   );
 }
