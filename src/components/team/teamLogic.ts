@@ -1,6 +1,6 @@
 import type { Ask } from "@/components/judge/logic";
 import { formatClock, formatMinutes } from "@/components/ui";
-import type { Status } from "@/lib/status";
+import { STATUS_META, type Status } from "@/lib/status";
 import type { RequestRow } from "@/lib/types";
 
 /* The team page's decisions, kept apart from how they are drawn
@@ -126,11 +126,20 @@ export function clockParts(iso: string): { time: string; period: string } {
   };
 }
 
-/** "4 min" + "ago"; under a minute it is just "just now" with nothing after it. */
-export function agoParts(iso: string, now: number): { text: string; suffix: string } {
+/**
+ * "4 min" + "ago"; under a minute it is just "just now" with nothing after it.
+ * `long` is an hour or more ("54h 39m"), too wide for the big digits.
+ */
+export function agoParts(iso: string, now: number): { text: string; suffix: string; long: boolean } {
   const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
   const text = formatMinutes(mins);
-  return { text, suffix: mins < 1 ? "" : "ago" };
+  return { text, suffix: mins < 1 ? "" : "ago", long: mins >= 60 };
+}
+
+/** The caps label over the status sentence: the short name when the long one would just repeat it. */
+export function statusCaps(s: Status): string {
+  const { label, short, teamLabel } = STATUS_META[s];
+  return label.toLowerCase() === teamLabel.toLowerCase() ? short : label;
 }
 
 /** A step's time as one line: "10:40 AM", "4 min ago", "just now". */
@@ -163,7 +172,7 @@ export async function cancelAfterAsking(
   send: () => Promise<void>,
 ): Promise<boolean> {
   const { question, confirmLabel } = cancelPrompt(request);
-  if (!(await ask(question, { confirmLabel, danger: true }))) return false;
+  if (!(await ask(question, { confirmLabel, cancelLabel: "Keep it", danger: true }))) return false;
   await send();
   return true;
 }

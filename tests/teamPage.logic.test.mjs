@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 import {
   agoParts,
+  statusCaps,
   bigTimeOf,
   canCancel,
   cancelAfterAsking,
@@ -16,6 +17,7 @@ import {
   trackSteps,
 } from "../src/components/team/teamLogic";
 import { formatClock } from "../src/components/ui";
+import { STATUS_META } from "../src/lib/status";
 
 /* The team page's decisions, run for real against
    src/components/team/teamLogic.ts. How they are drawn is in
@@ -110,13 +112,25 @@ test("no time is invented: an interview with no start, or a finished request, ha
 });
 
 test("times read as a person would: '4 min ago', 'just now', '1h 5m ago'", () => {
-  assert.deepEqual(agoParts(ago(4), NOW), { text: "4 min", suffix: "ago" });
-  assert.deepEqual(agoParts(ago(0), NOW), { text: "just now", suffix: "" });
-  assert.deepEqual(agoParts(ago(65), NOW), { text: "1h 5m", suffix: "ago" });
-  assert.deepEqual(agoParts(new Date(NOW + 60_000).toISOString(), NOW), { text: "just now", suffix: "" }, "a clock a little ahead never reads as negative");
+  assert.deepEqual(agoParts(ago(4), NOW), { text: "4 min", suffix: "ago", long: false });
+  assert.deepEqual(agoParts(ago(0), NOW), { text: "just now", suffix: "", long: false });
+  assert.deepEqual(agoParts(ago(65), NOW), { text: "1h 5m", suffix: "ago", long: true });
+  assert.deepEqual(agoParts(new Date(NOW + 60_000).toISOString(), NOW), { text: "just now", suffix: "", long: false }, "a clock a little ahead never reads as negative");
   assert.equal(stepTime({ kind: "ago", iso: ago(4) }, NOW), "4 min ago");
   assert.equal(stepTime({ kind: "ago", iso: ago(0) }, NOW), "just now");
   assert.equal(stepTime({ kind: "clock", iso: SLOT }, NOW), formatClock(SLOT));
+});
+
+test("an hour or more is 'long', so the big digits are set smaller", () => {
+  assert.equal(agoParts(ago(59), NOW).long, false);
+  assert.equal(agoParts(ago(60), NOW).long, true);
+  assert.deepEqual(agoParts(ago(54 * 60 + 39), NOW), { text: "54h 39m", suffix: "ago", long: true });
+});
+
+test("the caps label over the sentence is the short name only when the two would repeat", () => {
+  assert.equal(statusCaps("interviewing"), "Interviewing");
+  assert.equal(statusCaps("acknowledged"), "Judges on their way");
+  assert.equal(statusCaps("requested"), STATUS_META.requested.label);
 });
 
 test("a clock time splits into big digits and a small AM/PM, and puts back the same time", () => {
@@ -148,7 +162,7 @@ test("cancel asks first, as a danger action; on a no nothing is sent", async () 
   });
   assert.equal(did, false);
   assert.equal(sent, 0, "a declined cancel must send nothing");
-  assert.deepEqual(asked, [["Cancel your request for a judge?", { confirmLabel: "Cancel request", danger: true }]]);
+  assert.deepEqual(asked, [["Cancel your request for a judge?", { confirmLabel: "Cancel request", cancelLabel: "Keep it", danger: true }]]);
 });
 
 test("on a yes the cancel is sent, once, after the question", async () => {

@@ -6,6 +6,8 @@ import { Button } from "./ui";
 export type ConfirmOptions = {
   /** The confirming button's words. "Confirm" when left out. */
   confirmLabel?: string;
+  /** The declining button's words. "Cancel" when left out. */
+  cancelLabel?: string;
   /** Styles the confirming button as the destructive act it is. */
   danger?: boolean;
 };
@@ -102,7 +104,7 @@ export function ConfirmDialog({
           <div className="mt-5 flex gap-3">
             {/* Cancel comes first so showModal() puts focus on it: the safe answer. */}
             <Button variant="ghost" className="min-h-11 flex-1" onClick={() => onSettle(false)}>
-              Cancel
+              {pending.cancelLabel ?? "Cancel"}
             </Button>
             <Button
               variant={pending.danger ? "danger" : "primary"}

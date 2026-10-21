@@ -231,12 +231,22 @@ test("a requested team is in the orange state and may still cancel; nobody else 
   const mi = view({ current: interviewing, requests: [...crowd, interviewing] });
   assert.match(panelOf(mi), /^<section class="tp-pan tp-s-active"/);
   assert.match(panelOf(mi), /<span>Started<\/span><b>12 min<small>ago<\/small><\/b>/);
+  // The caps label is the short name, so the sentence is not said twice.
+  assert.match(panelOf(mi), /<p class="tp-pan-lab">Interviewing<\/p><h1[^>]*>Interview in progress<\/h1>/);
+  assert.equal(text(panelOf(mi)).match(/Interview in progress/g)?.length, 1);
   assert.doesNotMatch(mi, /Cancel this/);
 });
 
 test("a request made a moment ago reads 'just now', set smaller so it still fits a phone", () => {
   const fresh = req({ status: "requested", requested_at: new Date(NOW - 10_000).toISOString() });
   assert.match(panelOf(view({ current: fresh, requests: [fresh] })), /<span>Requested<\/span><b class="tp-word">just now<\/b>/);
+});
+
+test("an hour or more is set smaller so it still fits; under an hour is not", () => {
+  const long = req({ status: "interviewing", started_at: ago(54 * 60 + 39) });
+  assert.match(panelOf(view({ current: long, requests: [long] })), /<span>Started<\/span><b class="tp-word">54h 39m<small>ago<\/small><\/b>/);
+  const short = req({ status: "interviewing", started_at: ago(59) });
+  assert.match(panelOf(view({ current: short, requests: [short] })), /<b>59 min<small>ago<\/small><\/b>/);
 });
 
 /* ---- no panel, errors, offline ------------------------------------------------------ */
@@ -248,7 +258,7 @@ test("no panel: the caution line, the request button disabled, and no booking se
   assert.doesNotMatch(m, /Book a time with|tp-slots|1 in interview|Panel is free/);
 });
 
-test("a panel with no slots set up keeps its message, in the team variant", () => {
+test("a panel with no slots set up says so plainly, in the team variant", () => {
   const m = view({ requests: [] });
   assert.doesNotMatch(m, /tp-slots-none/);
   const empty = renderToStaticMarkup(
@@ -258,7 +268,8 @@ test("a panel with no slots set up keeps its message, in the team variant", () =
       onMessage={noop} onReady={noop} onBook={noop} onCancel={noop}
     />,
   );
-  assert.match(empty, /<div class="tp-slots-none"><strong>Panel 2 has no bookable times set up yet\.<\/strong><p>Use <strong>Interview now<\/strong> instead, or ask the Judge Advisor to add times: Admin → Panels → Panel 2 → Booking slots\.<\/p><\/div>/);
+  assert.match(empty, /<p class="tp-slots-none">No times to book with Panel 2\. Ask for a judge now instead\.<\/p>/);
+  assert.doesNotMatch(empty, /Judge Advisor|Admin/);
 });
 
 test("an error shows in a dismissible alert and leaves the page usable", () => {

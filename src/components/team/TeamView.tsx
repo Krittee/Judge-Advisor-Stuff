@@ -12,6 +12,7 @@ import {
   canCancel,
   clockParts,
   historyTime,
+  statusCaps,
   stepTime,
   toneOf,
   trackSteps,
@@ -185,7 +186,7 @@ function StatusPanel({
         <p className="tp-pan-team">{`Team ${team.number} · ${team.name}`}</p>
         {language ? <span className="tp-ptag">{language.label}</span> : null}
       </div>
-      {current ? <p className="tp-pan-lab">{STATUS_META[current.status].label}</p> : null}
+      {current ? <p className="tp-pan-lab">{statusCaps(current.status)}</p> : null}
       <h1 className="tp-pan-sent" id="tp-st">
         {current ? STATUS_META[current.status].teamLabel : "Ask for a judge"}
       </h1>
@@ -219,9 +220,9 @@ function PanelTime({ big, now }: { big: BigTime; now: number }) {
       </b>
     );
   } else {
-    const { text, suffix } = agoParts(big.at.iso, now);
+    const { text, suffix, long } = agoParts(big.at.iso, now);
     figure = suffix ? (
-      <b>
+      <b className={long ? "tp-word" : undefined}>
         {text}
         <small>{suffix}</small>
       </b>

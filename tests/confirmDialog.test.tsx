@@ -103,6 +103,15 @@ test("a destructive question styles the confirm in the danger tokens; others use
   );
 });
 
+test("the declining button says Cancel unless the question gives it other words", () => {
+  const dialog = (pending: Parameters<typeof ConfirmDialog>[0]["pending"]) =>
+    renderToStaticMarkup(<ConfirmDialog pending={pending} onSettle={noop} />);
+  assert.match(dialog({ question: "Sure?" }), />Cancel</);
+  const kept = dialog({ question: "Cancel it?", confirmLabel: "Cancel request", cancelLabel: "Keep it" });
+  assert.match(kept, />Keep it</);
+  assert.doesNotMatch(kept, />Cancel</);
+});
+
 test("with nothing pending the dialog is an empty shell", () => {
   const markup = renderToStaticMarkup(<ConfirmDialog pending={null} onSettle={noop} />);
   assert.match(markup, /<dialog/);
@@ -115,7 +124,7 @@ test("the dialog is a native modal: showModal, Escape and the backdrop say no, o
   assert.ok(src.includes("dialog.close()"));
   assert.match(src, /onClose=\{\(\) => \{\s*if \(pending\) onSettle\(false\);\s*\}\}/, "Escape");
   assert.match(src, /e\.target === e\.currentTarget\) onSettle\(false\)/, "the backdrop");
-  assert.match(src, /<Button variant="ghost"[^>]*onClick=\{\(\) => onSettle\(false\)\}>\s*Cancel/);
+  assert.match(src, /<Button variant="ghost"[^>]*onClick=\{\(\) => onSettle\(false\)\}>\s*\{pending\.cancelLabel \?\? "Cancel"\}/);
   assert.match(src, /onClick=\{\(\) => onSettle\(true\)\}/, "only the confirming button says yes");
   assert.equal(src.match(/onSettle\(true\)/g)?.length, 1);
 });

@@ -1013,7 +1013,7 @@ body:has(.teampage) > .theme-toggle:hover {
 .tp-pan--idle .tp-pan-sent { margin-top: 12px; }
 .tp-pan-time { margin: 10px 0 0; }
 .tp-pan-time span { display: block; font-size: 14px; font-weight: 500; line-height: 1.4; }
-.tp-pan-time b { display: block; font-weight: 700; font-size: 72px; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tp-pan-time b { display: block; font-weight: 700; font-size: 72px; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tp-pan-time small { margin-left: 8px; font-size: 28px; font-weight: 600; letter-spacing: 0; }
 /* "just now" is eight characters: at full size it would be wider than a phone. */
 .tp-pan-time .tp-word { font-size: 52px; }

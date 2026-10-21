@@ -132,9 +132,9 @@ test("team variant: when nothing is left it says why, in SlotPicker's own words"
   assert.deepEqual(tiles(m).map((t) => t.label), ["Taken", "Taken"]);
 });
 
-test("team variant: no slots set up keeps the 'Interview now' message", () => {
+test("team variant: no slots set up says so plainly, with no staff wording", () => {
   const m = renderToStaticMarkup(<SlotPicker variant="team" panel={{ ...panel, slot_start_at: null, slot_count: 0 }} requests={[]} teams={teams} teamId={null} onPick={noop} />);
-  assert.equal(m, '<div class="tp-slots-none"><strong>Panel 1 has no bookable times set up yet.</strong><p>Use <strong>Interview now</strong> instead, or ask the Judge Advisor to add times: Admin → Panels → Panel 1 → Booking slots.</p></div>');
+  assert.equal(m, '<p class="tp-slots-none">No times to book with Panel 1. Ask for a judge now instead.</p>');
 });
 
 test("the team page asks for the variant and the picker's own rules still decide the tiles", () => {

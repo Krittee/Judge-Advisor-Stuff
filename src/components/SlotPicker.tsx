@@ -106,16 +106,14 @@ export function SlotPicker({
   );
 
   if (!slots.length) {
+    // Teams get a plain sentence; the Admin path is for staff.
+    if (variant === "team") {
+      return <p className="tp-slots-none">{`No times to book with ${panel.name}. Ask for a judge now instead.`}</p>;
+    }
     return (
-      <div
-        className={
-          variant === "team"
-            ? "tp-slots-none"
-            : "rounded-xl bg-caution/12 px-4 py-3 text-sm text-caution-quiet ring-1 ring-inset ring-caution/35"
-        }
-      >
+      <div className="rounded-xl bg-caution/12 px-4 py-3 text-sm text-caution-quiet ring-1 ring-inset ring-caution/35">
         <strong>{panel.name} has no bookable times set up yet.</strong>
-        <p className={variant === "team" ? undefined : "mt-1 text-caution-quiet/80"}>
+        <p className="mt-1 text-caution-quiet/80">
           Use <strong>Interview now</strong> instead, or ask the Judge Advisor to add times:
           Admin → Panels → {panel.name} → Booking slots.
         </p>

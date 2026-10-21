@@ -14,7 +14,7 @@ export type JudgeTab = "queue" | "scores" | "today";
 /** The shared in-page confirm (useConfirm's `ask`). */
 export type Ask = (
   question: string,
-  options?: { confirmLabel?: string; danger?: boolean },
+  options?: { confirmLabel?: string; cancelLabel?: string; danger?: boolean },
 ) => Promise<boolean>;
 
 /** How soon a booked slot starts "in N min" on its row. */
