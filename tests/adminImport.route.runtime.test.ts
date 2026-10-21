@@ -183,6 +183,70 @@ test("a number pasted twice is one team: the later row wins, and created + updat
   assert.equal(names["5678"], "Bolts Third");
 });
 
+/* ===== a blank column on a re-import leaves what is stored ============= */
+
+const MS = "Middle School";
+const byNumber = async (db: Awaited<ReturnType<typeof store>>) => Object.fromEntries((await db.listTeams()).map((t) => [t.number, t]));
+
+test("re-importing with no notebook, division or pit column keeps each stored team's, and a new team gets the defaults", async () => {
+  const db = await world();
+  await db.upsertTeams([{ number: "1234", name: "Old", pit: "A1", division: MS, category: "ungraded" }]);
+
+  const { status, body } = await importTeams(ADMIN, { text: "1234, Iron Hawks\n5678, Bolts" });
+  assert.equal(status, 200);
+  assert.deepEqual([body.created, body.updated], [1, 1]);
+
+  const teams = await byNumber(db);
+  assert.equal(teams["1234"].name, "Iron Hawks", "the name still updates");
+  assert.equal(teams["1234"].category, "ungraded", "no fifth column: the notebook type stays");
+  assert.equal(teams["1234"].division, MS, "no fourth column: the division stays");
+  assert.equal(teams["1234"].pit, "A1", "no third column: the pit stays");
+  assert.equal(teams["5678"].category, "developing", "a new team gets the default notebook type");
+  assert.equal(teams["5678"].division, ES, "the first configured division");
+  assert.equal(teams["5678"].pit, null);
+});
+
+test("re-importing a bare team number keeps the stored name, a new bare number is 'Team <number>', and a name still renames", async () => {
+  const db = await world();
+  await db.upsertTeams([{ number: "1234", name: "Iron Hawks", pit: null, division: ES, category: "developing" }]);
+
+  await importTeams(ADMIN, { text: "1234\n5678\n9999, , C3" });
+  let teams = await byNumber(db);
+  assert.equal(teams["1234"].name, "Iron Hawks", "no name cell: the stored name stays");
+  assert.equal(teams["5678"].name, "Team 5678", "a new team gets the fallback name");
+  assert.equal(teams["9999"].name, "Team 9999", "a blank name cell between filled ones is blank too");
+  assert.equal(teams["9999"].pit, "C3");
+
+  await importTeams(ADMIN, { text: "1234, Kilo Kestrels" });
+  teams = await byNumber(db);
+  assert.equal(teams["1234"].name, "Kilo Kestrels", "a name that is given wins");
+});
+
+test("a blank cell between filled ones is blank too, and a filled cell still updates (tab-separated, as pasted from a sheet)", async () => {
+  const db = await world();
+  await db.upsertTeams([{ number: "1234", name: "Old", pit: "A1", division: MS, category: "ungraded" }]);
+
+  await importTeams(ADMIN, { text: "1234\tIron Hawks\t\t\tdeveloping" });
+  let team = (await byNumber(db))["1234"];
+  assert.deepEqual([team.pit, team.division, team.category], ["A1", MS, "developing"], "only the notebook column was filled");
+
+  await importTeams(ADMIN, { text: "1234\tIron Hawks\tb 7\tHigh School" });
+  team = (await byNumber(db))["1234"];
+  assert.deepEqual([team.pit, team.division, team.category], ["B7", "High School", "developing"]);
+});
+
+test("a division or notebook type named in the request applies to every line without its own, stored teams included", async () => {
+  const db = await world();
+  await db.upsertTeams([{ number: "1234", name: "Old", pit: null, division: MS, category: "ungraded" }]);
+
+  await importTeams(ADMIN, { text: "1234, Iron Hawks\n5678, Bolts", division: "High School", category: "fully-developed" });
+  const teams = await byNumber(db);
+  for (const number of ["1234", "5678"]) {
+    assert.equal(teams[number].division, "High School");
+    assert.equal(teams[number].category, "fully-developed");
+  }
+});
+
 /* ===== what stays ======================================================= */
 
 test("auto-assign still spreads the teams and the reply still carries imported, skipped and assigned", async () => {

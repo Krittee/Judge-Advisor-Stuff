@@ -13,7 +13,7 @@ import type {
 } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { randomPanelCode } from "../panelCode";
-import { divisionsCompatible, presetPanels } from "../presets";
+import { defaultCategory, divisionsCompatible, presetDivisions, presetPanels } from "../presets";
 import { hasNearbyBooking } from "../data";
 import { isPanelBlocked, judgeKey, panelBlocks } from "../roster";
 import {
@@ -789,12 +789,20 @@ export const postgresStore: Store = {
 
   async upsertTeams(list: ImportedTeam[]) {
     if (!list.length) return 0;
+    // A blank cell leaves what is stored (see ImportedTeam), so nulls come in as nulls. The proposed row is
+    // checked against not null before the conflict is looked at, so it has to carry a name, division and type:
+    // the stored one for a team that exists, else the default. Pit has no default and coalesces on update.
     await query(
       `insert into teams (number, name, pit, division, category)
-       select * from unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[])
+       select t.number,
+              coalesce(t.name, (select k.name from teams k where k.number = t.number), 'Team ' || t.number),
+              t.pit,
+              coalesce(t.division, (select k.division from teams k where k.number = t.number), $6::text),
+              coalesce(t.category, (select k.category from teams k where k.number = t.number), $7::text)
+       from unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[]) as t(number, name, pit, division, category)
        on conflict (number) do update set
          name = excluded.name,
-         pit = excluded.pit,
+         pit = coalesce(excluded.pit, teams.pit),
          division = excluded.division,
          category = excluded.category,
          -- A team that changes division loses its panel: the old one is
@@ -805,10 +813,12 @@ export const postgresStore: Store = {
          end`,
       [
         list.map((t) => t.number),
-        list.map((t) => t.name),
+        list.map((t) => t.name ?? null),
         list.map((t) => t.pit),
-        list.map((t) => t.division),
-        list.map((t) => t.category),
+        list.map((t) => t.division ?? null),
+        list.map((t) => t.category ?? null),
+        presetDivisions()[0],
+        defaultCategory(),
       ],
     );
     return list.length;

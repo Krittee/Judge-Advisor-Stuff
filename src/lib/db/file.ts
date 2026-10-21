@@ -629,8 +629,9 @@ function upsertTeams(rows: ImportedTeam[]): number {
   for (const row of rows) {
     const existing = state().teams.find((t) => t.number === row.number);
     if (existing) {
-      existing.name = row.name;
-      existing.pit = row.pit;
+      // A blank cell leaves what is stored (see ImportedTeam).
+      if (row.name) existing.name = row.name;
+      if (row.pit) existing.pit = row.pit;
       if (row.category) existing.category = row.category;
       // A team that changes division loses its panel: the old one is on
       // the far side of the wall.
@@ -642,10 +643,10 @@ function upsertTeams(rows: ImportedTeam[]): number {
       state().teams.push({
         id: randomUUID(),
         number: row.number,
-        name: row.name,
+        name: row.name || `Team ${row.number}`,
         panel_id: null,
-        division: row.division,
-        category: row.category,
+        division: row.division || presetDivisions()[0],
+        category: row.category || defaultCategory(),
         pit: row.pit,
         created_at: now,
       });

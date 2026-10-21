@@ -726,3 +726,31 @@ test("a full wipe truncates the roster with the event; a day reset keeps it", as
   await postgresStore.resetDay();
   assert.ok(!/\bjudges\b|\bconflicts\b/.test(sent(/^truncate/)[0].sql), "the roster and its conflicts are the event's, not the day's");
 });
+
+test("a blank name, pit, division or notebook type on a re-import keeps the stored one; a new row still gets the defaults", async () => {
+  const { defaultCategory, presetDivisions } = await import("../src/lib/presets");
+  calls.length = 0;
+  answer = () => [];
+  await postgresStore.upsertTeams([
+    { number: "1001", name: null, pit: null },
+    { number: "1002", name: "Given", pit: "B2", division: "High School", category: "ungraded" },
+  ]);
+  const [upsert] = sent(/insert into teams/);
+  assert.match(upsert.sql, /pit = coalesce\(excluded\.pit, teams\.pit\)/, "a null pit leaves the stored one");
+  assert.match(upsert.sql, /coalesce\(t\.name, \(select k\.name from teams k where k\.number = t\.number\), 'Team ' \|\| t\.number\)/, "a blank name keeps the stored one; a new team is 'Team <number>'");
+  // The proposed row is checked against not null before the conflict, so it carries the stored value, else the default.
+  assert.match(upsert.sql, /coalesce\(t\.division, \(select k\.division from teams k where k\.number = t\.number\), \$6::text\)/);
+  assert.match(upsert.sql, /coalesce\(t\.category, \(select k\.category from teams k where k\.number = t\.number\), \$7::text\)/);
+  assert.match(upsert.sql, /division = excluded\.division,\s*category = excluded\.category/, "so the update writes what the insert carried");
+  assert.deepEqual(upsert.params, [
+    ["1001", "1002"],
+    [null, "Given"],
+    [null, "B2"],
+    [null, "High School"],
+    [null, "ungraded"],
+    presetDivisions()[0],
+    defaultCategory(),
+  ]);
+  // A division that really changes still takes the panel off.
+  assert.match(upsert.sql, /when teams\.division is distinct from excluded\.division then null/);
+});

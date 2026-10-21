@@ -3,6 +3,7 @@ import test from "node:test";
 
 import type { Store } from "../src/lib/db/types";
 import { StoreError } from "../src/lib/db/types";
+import { defaultCategory, presetDivisions } from "../src/lib/presets";
 
 /**
  * One set of rules, run against every backend.
@@ -511,6 +512,65 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     const teams = await store.listTeams();
     assert.equal(teams.length, 1, "the same number must not appear twice");
     assert.equal(teams[0].name, "New Name");
+  });
+
+  /* A blank cell on a re-import is "not said", not "clear it": a stored team keeps its notebook type,
+     division and pit, a new one gets the defaults, and a value still changes the field. */
+
+  it("re-importing without a name keeps each team's name, calls a new team 'Team <number>', and a given name still renames it", async (store) => {
+    await store.upsertTeams([teamInput("1001", { name: "Iron Hawks" })]);
+
+    await store.upsertTeams([{ number: "1001", name: null, pit: "A1" }, { number: "1002", pit: null }]);
+    const [kept, created] = await store.listTeams();
+    assert.equal(kept.name, "Iron Hawks", "no name cell: the stored name stays");
+    assert.equal(kept.pit, "A1", "the rest of the line still updates");
+    assert.equal(created.name, "Team 1002", "a new team gets the fallback name");
+
+    await store.upsertTeams([{ number: "1001", name: "Kilo Kestrels", pit: null }]);
+    assert.equal((await store.findTeamByNumber("1001"))?.name, "Kilo Kestrels", "a name that is given wins");
+  });
+
+  it("re-importing without a notebook type keeps each team's, gives a new team the default, and a given type still changes it", async (store) => {
+    await store.upsertTeams([teamInput("1001", { category: "ungraded" })]);
+
+    await store.upsertTeams([{ number: "1001", name: "Re-imported", pit: null }, { number: "1002", name: "Brand new", pit: null }]);
+    const [kept, created] = await store.listTeams();
+    assert.equal(kept.name, "Re-imported", "the rest of the line still updates");
+    assert.equal(kept.category, "ungraded", "no fifth column: the stored type stays");
+    assert.equal(created.category, defaultCategory(), "a new team gets the default type");
+
+    await store.upsertTeams([{ number: "1001", name: "Re-imported", pit: null, category: "fully-developed" }]);
+    assert.equal((await store.findTeamByNumber("1001"))?.category, "fully-developed", "a type that is given wins");
+  });
+
+  it("re-importing without a division keeps each team's division and panel, gives a new team the first division, and a given division still moves it", async (store) => {
+    const panel = await store.createPanel(panelInput({ division: MS }));
+    await store.upsertTeams([teamInput("1001", { division: MS })]);
+    const held = await store.findTeamByNumber("1001");
+    assert.ok(held);
+    await store.updateTeam(held.id, { panel_id: panel.id });
+
+    await store.upsertTeams([{ number: "1001", name: "Re-imported", pit: null }, { number: "1002", name: "Brand new", pit: null }]);
+    const kept = await store.findTeamByNumber("1001");
+    assert.equal(kept?.division, MS, "no fourth column: the stored division stays");
+    assert.equal(kept?.panel_id, panel.id, "so the panel it holds is not taken away");
+    assert.equal((await store.findTeamByNumber("1002"))?.division, presetDivisions()[0], "a new team gets the first division");
+
+    await store.upsertTeams([{ number: "1001", name: "Re-imported", pit: null, division: ES }]);
+    const moved = await store.findTeamByNumber("1001");
+    assert.equal(moved?.division, ES, "a division that is given wins");
+    assert.equal(moved?.panel_id, null, "and the panel on the far side of the wall comes off");
+  });
+
+  it("re-importing without a pit keeps each team's pit, a new team has none, and a given pit still changes it", async (store) => {
+    await store.upsertTeams([teamInput("1001", { pit: "A1" })]);
+
+    await store.upsertTeams([{ number: "1001", name: "Re-imported", pit: null }, { number: "1002", name: "Brand new", pit: null }]);
+    assert.equal((await store.findTeamByNumber("1001"))?.pit, "A1", "no pit column: the stored pit stays");
+    assert.equal((await store.findTeamByNumber("1002"))?.pit, null, "a new team has no pit");
+
+    await store.upsertTeams([{ number: "1001", name: "Re-imported", pit: "B2" }]);
+    assert.equal((await store.findTeamByNumber("1001"))?.pit, "B2", "a pit that is given wins");
   });
 
   it("a team is found whatever case its number is typed in", async (store) => {

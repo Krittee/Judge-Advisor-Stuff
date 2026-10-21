@@ -129,12 +129,17 @@ export type NewActivity = {
   detail?: string | null;
 };
 
+/**
+ * One line of an import. A blank cell is "not said", not "clear it": null (or left out) for `name`,
+ * `pit`, `division` or `category` means a team already stored keeps its own, and a new team gets
+ * "Team <number>", no pit, the first division and the default notebook type. A value is written either way.
+ */
 export type ImportedTeam = {
   number: string;
-  name: string;
+  name?: string | null;
   pit: string | null;
-  division: string;
-  category: string;
+  division?: string | null;
+  category?: string | null;
 };
 
 /**

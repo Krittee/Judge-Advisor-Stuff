@@ -8,12 +8,13 @@ import { isPanelBlocked, loadBlocks } from "@/lib/conflicts";
 
 export const dynamic = "force-dynamic";
 
+/** Null where the line (and the request) said nothing: a stored team keeps its own, see `ImportedTeam`. */
 type ParsedTeam = {
   number: string;
-  name: string;
+  name: string | null;
   pit: string | null;
-  division: string;
-  category: string;
+  division: string | null;
+  category: string | null;
 };
 
 /** A line the import could not read: 1-based, as it is numbered in the box. */
@@ -27,7 +28,10 @@ const BAD_CHARS = "team number has characters other than A–Z, 0–9 and -";
  * Bulk import. Accepts pasted CSV or TSV, with or without a header row:
  *   1234, Iron Hawks, Pit 12
  *   9882K<TAB>Iron Hawks
- * Existing team numbers are updated rather than duplicated.
+ * Existing team numbers are updated rather than duplicated. A blank name,
+ * pit, division or notebook column leaves an existing team's value alone (a
+ * new team is called "Team <number>" and gets the first division and the
+ * default notebook type).
  *
  * Replies with `imported` (teams written, one per distinct number),
  * `created` and `updated` (which add up to it; a number already stored
@@ -48,8 +52,8 @@ export async function POST(request: Request) {
 
   const { teams, skipped, skippedLines } = parseTeams(
     text,
-    resolveDivision(body.division),
-    resolveCategory(body.category),
+    named(body.division, resolveDivision),
+    named(body.category, resolveCategory),
   );
   if (!teams.length) {
     return NextResponse.json(
@@ -238,6 +242,11 @@ function clampPerPanel(value: unknown): number {
   return Math.max(1, Math.min(40, Number(value) || 10));
 }
 
+/** A value the request names for the whole paste, resolved; null when it names none. */
+function named(input: unknown, resolve: (input: unknown) => string): string | null {
+  return String(input ?? "").trim() ? resolve(input) : null;
+}
+
 function resolveDivision(input: unknown): string {
   const wanted = String(input ?? "").trim();
   const divisions = presetDivisions();
@@ -246,13 +255,14 @@ function resolveDivision(input: unknown): string {
 
 /**
  * @param fallbackDivision used for any row that does not name one in a
- *        fourth column, so a whole paste can go into one division.
+ *        fourth column, so a whole paste can go into one division. Null
+ *        when the request names none.
  * @param fallbackCategory likewise for a fifth column.
  */
 function parseTeams(
   text: string,
-  fallbackDivision: string,
-  fallbackCategory: string,
+  fallbackDivision: string | null,
+  fallbackCategory: string | null,
 ): { teams: ParsedTeam[]; skipped: number; skippedLines: SkippedLine[] } {
   const seen = new Map<string, ParsedTeam>();
   const skippedLines: SkippedLine[] = [];
@@ -283,7 +293,7 @@ function parseTeams(
 
     seen.set(number, {
       number,
-      name: cells[1] || `Team ${number}`,
+      name: cells[1] || null,
       pit: normalizePit(cells[2]),
       division: cells[3] ? resolveDivision(cells[3]) : fallbackDivision,
       category: cells[4] ? resolveCategory(cells[4]) : fallbackCategory,
