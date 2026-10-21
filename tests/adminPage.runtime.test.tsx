@@ -181,8 +181,8 @@ test("the rail is a labelled nav with LIVE, SETUP and RESULTS in order, and the 
   assert.match(r, /^<nav class="ja-rail" aria-label="Judge Advisor sections">/);
   assert.deepEqual([...r.matchAll(/<h2 class="ja-rl">(.*?)<\/h2>/g)].map((m) => m[1]), ["Live", "Setup", "Results", "Other consoles"]);
   const groups = r.split('<h2 class="ja-rl">').slice(1, 4).map((g) => [...g.matchAll(/<span>(\w+)<\/span>/g)].map((m) => m[1]));
-  assert.deepEqual(groups, [["Floor", "Conflicts", "Referee"], ["Teams", "Panels", "Import"], ["Scores", "Activity"]]);
-  assert.deepEqual(SECTION_GROUPS.flatMap((g) => g.items.map((i) => i.id)), ["floor", "conflicts", "flags", "teams", "panels", "import", "scores", "log"]);
+  assert.deepEqual(groups, [["Floor", "Referee"], ["Teams", "Panels", "Conflicts", "Import"], ["Scores", "Activity"]]);
+  assert.deepEqual(SECTION_GROUPS.flatMap((g) => g.items.map((i) => i.id)), ["floor", "flags", "teams", "panels", "conflicts", "import", "scores", "log"]);
   // Real buttons, not links: the section is page state.
   assert.equal(r.match(/<button type="button" class="ja-ri"/g)?.length, 8);
   // The only links are the other consoles, in a group of their own after the sections.

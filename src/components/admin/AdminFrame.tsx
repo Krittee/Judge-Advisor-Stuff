@@ -34,16 +34,6 @@ export const SECTION_GROUPS: { label: string; items: Section[] }[] = [
     label: "Live",
     items: [
       { id: "floor", label: "Floor", icon: <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /> },
-      {
-        id: "conflicts",
-        label: "Conflicts",
-        icon: (
-          <>
-            <circle cx="12" cy="12" r="9" />
-            <path d="M5.6 5.6l12.8 12.8" />
-          </>
-        ),
-      },
       { id: "flags", label: "Referee", icon: <path d="M5 21V4M5 4h12l-2.5 4L17 12H5" /> },
     ],
   },
@@ -67,6 +57,16 @@ export const SECTION_GROUPS: { label: string; items: Section[] }[] = [
           <>
             <rect x="3" y="4" width="18" height="16" rx="2" />
             <path d="M9 4v16M15 4v16" />
+          </>
+        ),
+      },
+      {
+        id: "conflicts",
+        label: "Conflicts",
+        icon: (
+          <>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M5.6 5.6l12.8 12.8" />
           </>
         ),
       },

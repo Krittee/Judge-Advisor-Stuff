@@ -130,8 +130,8 @@ theme toggle where the other consoles put it.
 A fixed ~224px left column under the top bar, three groups with small-caps
 labels:
 
-- **LIVE** — Floor, Conflicts, Referee
-- **SETUP** — Teams, Panels, Import
+- **LIVE** — Floor, Referee
+- **SETUP** — Teams, Panels, Conflicts, Import
 - **RESULTS** — Scores, Activity
 
 Each item: a 22px stroke icon (from the mock), the label, and the count on
