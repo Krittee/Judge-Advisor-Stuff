@@ -132,6 +132,12 @@ export const moveQuestion = (team: Pick<Team, "number">, division: string, left:
  * panel was changed in the same edit (then the Judge Advisor has already chosen); a no sends nothing.
  */
 export async function saveTeamAfterAsking(ask: Ask, call: Call, team: Team, draft: TeamDraft, panels: PublicPanel[]): Promise<boolean> {
+  // A panel picked before the division moved can fall out of the select ("— none —") while the draft still holds it.
+  // The Judge Advisor can't see it, so it counts as not picked: the held panel is asked about, and the server's rule applies.
+  const picked = panels.find((p) => p.id === draft.panelId);
+  if (draft.panelId && draft.panelId !== (team.panel_id ?? "") && picked && !divisionsCompatible(draft.division, picked.division)) {
+    draft = { ...draft, panelId: team.panel_id ?? "" };
+  }
   const patch = teamPatch(team, draft);
   if (!patch) return false;
   const left = draft.panelId === (team.panel_id ?? "") ? panelLeft(team, draft.division, panels) : null;

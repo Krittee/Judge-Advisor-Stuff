@@ -171,6 +171,38 @@ test("changing division AND the panel in the same edit does not ask; the new pan
   assert.deepEqual(calls[1].body, { teamId: titans.id, division: "High School", panelId: null });
 });
 
+test("a panel picked for the old division, then a division it can't judge: counts as not picked, asks about the held panel, sends division only", async () => {
+  // Titans (MS, Panel 2): pick Panel 4 (Elementary), then move to High School. Panel 4 can't judge High School and drops from the select.
+  const yes = asker(true);
+  const { calls, call } = caller();
+  assert.equal(await saveTeamAfterAsking(yes.ask, call, titans, { ...toHigh, panelId: "p4" }, panels), true);
+  assert.deepEqual(yes.asked.map((a) => a.question), ["Move 9882K to High School? It comes off Panel 2 (Middle School) and will need a panel."]);
+  assert.deepEqual(calls[0].body, { teamId: titans.id, division: "High School" });
+  // Declining still sends nothing.
+  const no = asker(false);
+  assert.equal(await saveTeamAfterAsking(no.ask, call, titans, { ...toHigh, panelId: "p4" }, panels), false);
+  assert.equal(calls.length, 1);
+});
+
+test("a panel picked that suits the new division is still sent, with no ask", async () => {
+  const yes = asker(true);
+  const { calls, call } = caller();
+  assert.equal(await saveTeamAfterAsking(yes.ask, call, titans, { ...toHigh, panelId: "p1" }, panels), true);
+  assert.equal(yes.asked.length, 0);
+  assert.deepEqual(calls[0].body, { teamId: titans.id, division: "High School", panelId: "p1" });
+});
+
+test("an incompatible panel picked while the held panel suits the new division: no ask, division only", async () => {
+  const withBlend = [...panels, panel(5, "Blended")];
+  const onBlend = team("1101", "Blend Team", { panel_id: "p5" });
+  const yes = asker(true);
+  const { calls, call } = caller();
+  // The held Blended panel judges anyone, so nothing comes off; Panel 4 (Elementary) can't judge High School, so it is dropped.
+  assert.equal(await saveTeamAfterAsking(yes.ask, call, onBlend, { ...startDraft(onBlend), division: "High School", panelId: "p4" }, withBlend), true);
+  assert.equal(yes.asked.length, 0);
+  assert.deepEqual(calls[0].body, { teamId: onBlend.id, division: "High School" });
+});
+
 test("panelLeft names the held panel only when the division changes to one it cannot judge", () => {
   assert.equal(panelLeft(titans, "High School", panels)?.id, "p2");
   assert.equal(panelLeft(titans, "Middle School", panels), null, "same division");
