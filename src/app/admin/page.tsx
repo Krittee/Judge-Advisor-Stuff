@@ -6,14 +6,14 @@ import { liveRequestFor } from "@/lib/data";
 import { AdminFrame, railCounts, type AdminTab as Tab } from "@/components/admin/AdminFrame";
 import { ConflictsTab } from "@/components/admin/ConflictsTab";
 import { FloorTab } from "@/components/admin/FloorTab";
+import { ImportTab } from "@/components/admin/ImportTab";
 import { PanelsTab } from "@/components/admin/PanelsTab";
 import { RefereeTab } from "@/components/admin/RefereeTab";
 import { TeamsTab } from "@/components/admin/TeamsTab";
 import { call, useAppState, useScores } from "@/components/useAppState";
-import { Banner, Button, formatClock, inputClass } from "@/components/ui";
+import { Banner, formatClock } from "@/components/ui";
 import { NotesDrawer } from "@/components/judging";
 import { Rankings } from "@/components/Rankings";
-import { readSpreadsheet } from "@/lib/spreadsheet";
 import type { Session } from "@/lib/auth";
 import type { ActivityRow, Team } from "@/lib/types";
 
@@ -76,7 +76,7 @@ export default function AdminPage() {
         }}
       >
         {/* The redesigned tabs fill the width the rail leaves; the older ones keep the width and padding they had. */}
-        <div className={tab === "floor" || tab === "conflicts" || tab === "panels" || tab === "flags" || tab === "teams" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
+        <div className={tab === "floor" || tab === "conflicts" || tab === "panels" || tab === "flags" || tab === "teams" || tab === "import" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
           {error ? (
             <div className="mb-4">
               <Banner kind="error" onDismiss={() => setError(null)}>
@@ -156,179 +156,6 @@ export default function AdminPage() {
         />
       ) : null}
     </>
-  );
-}
-
-/* ==================================================================== */
-/* Import — paste the roster                                             */
-/* ==================================================================== */
-
-function ImportTab({
-  refresh,
-  onError,
-  divisions,
-}: {
-  refresh: () => Promise<void>;
-  onError: (m: string | null) => void;
-  divisions: string[];
-}) {
-  const [text, setText] = useState("");
-  const [autoAssign, setAutoAssign] = useState(true);
-  const [perPanel, setPerPanel] = useState(10);
-  const [loaded, setLoaded] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
-
-  /** Read a dropped or chosen file straight into the box. */
-  async function takeFile(file: File | undefined | null) {
-    if (!file) return;
-    onError(null);
-    setResult(null);
-    setLoaded(null);
-    try {
-      const sheet = await readSpreadsheet(file);
-      setText(sheet.text);
-      setLoaded(
-        `Loaded ${sheet.rows} row${sheet.rows === 1 ? "" : "s"} from ${file.name}.` +
-          (sheet.warning ? ` ${sheet.warning}` : "") +
-          " Check it below, then Import.",
-      );
-    } catch (e) {
-      onError((e as Error).message);
-    }
-  }
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
-
-  async function submit() {
-    setBusy(true);
-    onError(null);
-    setResult(null);
-    try {
-      const res = await call<{ imported: number; skipped: number; assigned: number }>(
-        "/api/admin/teams",
-        { body: { text, autoAssign, perPanel } },
-      );
-      setResult(
-        `Imported ${res.imported} team${res.imported === 1 ? "" : "s"}` +
-          (res.assigned ? `, assigned ${res.assigned} to panels` : "") +
-          (res.skipped ? `. Skipped ${res.skipped} unreadable line(s).` : "."),
-      );
-      setText("");
-      await refresh();
-    } catch (e) {
-      onError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="max-w-2xl space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Import your team list</h2>
-        <p className="mt-1 text-sm text-ink-subtle">
-          One team per line: <code className="text-ink-muted">number, name, pit, division</code>.
-          Division is each team&apos;s own — <code className="text-ink-muted">Elementary School</code>,{" "}
-          <code className="text-ink-muted">Middle School</code>, and so on — so one paste can bring
-          in every division at once; a row with nothing in that column falls back to{" "}
-          {divisions[0] ? <code className="text-ink-muted">{divisions[0]}</code> : "the first configured division"}.
-          Pit is optional, and reads best as a letter and a number like{" "}
-          <code className="text-ink-muted">A1</code>, which is what puts the team on the
-          board&apos;s pit floor plan. Team numbers may include letters —{" "}
-          <code className="text-ink-muted">9882K</code>{" "}
-          works as well as <code className="text-ink-muted">1234</code>. Notebook type isn&apos;t
-          set here — every imported team starts as the event&apos;s default classification, and
-          the Judge Advisor sorts Developing from Fully Developed during review. Paste straight
-          from a spreadsheet — tabs work too, and a header row is skipped automatically.
-          Re-importing updates existing teams instead of duplicating them.
-        </p>
-      </div>
-
-      {/* Drop a spreadsheet, or paste — both end up in the same box. */}
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          takeFile(e.dataTransfer.files?.[0]);
-        }}
-        className={`rounded-xl border-2 border-dashed p-4 transition ${
-          dragging ? "border-accent bg-accent/10" : "border-line"
-        }`}
-      >
-        <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
-          <label className="cursor-pointer rounded-lg bg-surface px-3 py-2 text-ink ring-1 ring-inset ring-line hover:bg-surface-2">
-            Choose a file
-            <input
-              type="file"
-              accept=".csv,.tsv,.txt,.xlsx"
-              className="hidden"
-              onChange={(e) => {
-                takeFile(e.target.files?.[0]);
-                e.target.value = "";
-              }}
-            />
-          </label>
-          <span className="text-ink-faint">
-            or drag one here — <code className="text-ink-subtle">.xlsx</code>,{" "}
-            <code className="text-ink-subtle">.csv</code>,{" "}
-            <code className="text-ink-subtle">.tsv</code>. Or just paste below.
-          </span>
-        </div>
-
-        <textarea
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            setLoaded(null);
-          }}
-          rows={12}
-          spellCheck={false}
-          placeholder={
-            "1234, Iron Hawks, A1, Elementary School\n" +
-            "9882K, Kilo Kestrels, A2, Middle School\n" +
-            "9882A, Alpha Antelopes, B1, Elementary School"
-          }
-          className={`${inputClass} font-mono text-sm`}
-        />
-      </div>
-
-      {loaded ? <Banner kind="info">{loaded}</Banner> : null}
-
-      <div className="flex flex-wrap items-center gap-4">
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-muted">
-          <input
-            type="checkbox"
-            checked={autoAssign}
-            onChange={(e) => setAutoAssign(e.target.checked)}
-            className="h-4 w-4 accent-[var(--accent)]"
-          />
-          Spread across panels evenly
-        </label>
-        <label className="flex items-center gap-2 text-sm text-ink-subtle">
-          max
-          <input
-            type="number"
-            min={1}
-            max={40}
-            value={perPanel}
-            onChange={(e) => setPerPanel(Number(e.target.value))}
-            disabled={!autoAssign}
-            className={`${inputClass} w-20 py-2 disabled:opacity-40`}
-          />
-          per panel
-        </label>
-        <Button onClick={submit} disabled={busy || !text.trim()}>
-          {busy ? "Importing…" : "Import"}
-        </Button>
-      </div>
-
-      {result ? <Banner kind="success">{result}</Banner> : null}
-    </div>
   );
 }
 

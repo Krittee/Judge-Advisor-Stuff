@@ -16,11 +16,24 @@ type ParsedTeam = {
   category: string;
 };
 
+/** A line the import could not read: 1-based, as it is numbered in the box. */
+type SkippedLine = { line: number; text: string; reason: string };
+
+const NO_NUMBER = "no team number";
+const NO_DIGIT = "no digit in the team number";
+const BAD_CHARS = "team number has characters other than A–Z, 0–9 and -";
+
 /**
  * Bulk import. Accepts pasted CSV or TSV, with or without a header row:
  *   1234, Iron Hawks, Pit 12
  *   9882K<TAB>Iron Hawks
  * Existing team numbers are updated rather than duplicated.
+ *
+ * Replies with `imported` (teams written, one per distinct number),
+ * `created` and `updated` (which add up to it; a number already stored
+ * before this paste is an update), `assigned`, `skipped` (every line not
+ * read, header included, as it always was) and `skippedLines`: the ones
+ * worth telling the Judge Advisor about, each with its line and why.
  */
 export async function POST(request: Request) {
   const session = await getSession();
@@ -33,7 +46,7 @@ export async function POST(request: Request) {
   const autoAssign = Boolean(body.autoAssign);
   const perPanel = clampPerPanel(body.perPanel);
 
-  const { teams, skipped } = parseTeams(
+  const { teams, skipped, skippedLines } = parseTeams(
     text,
     resolveDivision(body.division),
     resolveCategory(body.category),
@@ -53,9 +66,20 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Counted against what is stored now, before the write. `teams` holds
+    // one row per number, so a number pasted twice is one team, not two.
+    const known = new Set((await store().listTeams()).map((t) => t.number));
     await store().upsertTeams(teams);
     const assigned = autoAssign ? await store().autoAssignTeams(perPanel) : 0;
-    return NextResponse.json({ imported: teams.length, skipped, assigned });
+    const updated = teams.filter((t) => known.has(t.number)).length;
+    return NextResponse.json({
+      imported: teams.length,
+      created: teams.length - updated,
+      updated,
+      skipped,
+      skippedLines,
+      assigned,
+    });
   } catch (e) {
     if (e instanceof StoreError) {
       return NextResponse.json({ error: e.message }, { status: e.status });
@@ -229,22 +253,31 @@ function parseTeams(
   text: string,
   fallbackDivision: string,
   fallbackCategory: string,
-): { teams: ParsedTeam[]; skipped: number } {
+): { teams: ParsedTeam[]; skipped: number; skippedLines: SkippedLine[] } {
   const seen = new Map<string, ParsedTeam>();
+  const skippedLines: SkippedLine[] = [];
   let skipped = 0;
+  let first = true;
 
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trim();
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
     if (!line) continue;
+    const isFirst = first;
+    first = false;
 
     const cells = splitRow(line);
     const number = normalizeTeamNumber(cells[0]);
 
     // Team numbers are text, so a header row cannot be spotted by failing
     // to parse as a number. It is caught by requiring at least one digit:
-    // "Team Number" has none, "9882K" does.
-    if (!isValidTeamNumber(number) || !/\d/.test(number)) {
+    // "Team Number" has none, "9882K" does. The first line without one is
+    // that header, and is skipped without a word; anywhere else it is a
+    // line the Judge Advisor should hear about.
+    const reason = !number ? NO_NUMBER : !/\d/.test(number) ? NO_DIGIT : !isValidTeamNumber(number) ? BAD_CHARS : null;
+    if (reason) {
       skipped++;
+      if (!(isFirst && reason === NO_DIGIT)) skippedLines.push({ line: i + 1, text: line.slice(0, 200), reason });
       continue;
     }
 
@@ -257,7 +290,7 @@ function parseTeams(
     });
   }
 
-  return { teams: [...seen.values()], skipped };
+  return { teams: [...seen.values()], skipped, skippedLines };
 }
 
 /**

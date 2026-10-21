@@ -399,7 +399,7 @@ const page = read("src/app/admin/page.tsx");
 test("the page renders the Teams tab from its own file, in the wide layout, and Open in Referee sends the team the way Scores does", () => {
   assert.ok(page.includes('import { TeamsTab } from "@/components/admin/TeamsTab"'));
   assert.match(page, /<TeamsTab\s+state=\{state\}\s+refresh=\{refresh\}\s+onError=\{setError\}\s+onOpenFlags=\{\(teamId\) => \{\s*setFocusFlagTeam\(teamId\);\s*setTab\("flags"\);/);
-  assert.match(page, /tab === "flags" \|\| tab === "teams" \? "ja-pad"/);
+  assert.match(page, /tab === "teams"( \|\| tab === "\w+")* \? "ja-pad"/, "Teams is among the tabs in the wide padding");
   for (const gone of ["function TeamsTab", "function EditableCell", "function StorageHealth", "function DangerZone", "resetRequestStatus", "RESETTABLE_STATUSES"]) {
     assert.ok(!page.includes(gone), `${gone} left page.tsx`);
   }

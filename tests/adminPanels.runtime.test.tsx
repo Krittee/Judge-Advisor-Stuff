@@ -444,7 +444,10 @@ test("the tab decides no conflict: it asks the server (dryRun) and reads the ros
 /* ---- styles ------------------------------------------------------------------ */
 
 const css = read("src/app/globals.css");
-const block = css.slice(css.indexOf("/* Panels (design/admin-redesign"));
+// Up to the next feature's block: later steps append theirs after Panels'.
+const blockStart = css.indexOf("/* Panels (design/admin-redesign");
+const blockEnd = css.indexOf("/* @ja-block", blockStart);
+const block = css.slice(blockStart, blockEnd < 0 ? undefined : blockEnd);
 
 test("the Panels styles are page-scoped, use tokens for both themes, and have no animation", () => {
   assert.ok(block.length > 1000);

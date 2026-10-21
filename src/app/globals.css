@@ -1557,7 +1557,7 @@ body:has(.judge) > .theme-toggle:hover {
  * One stylesheet serves every tab, so a class one tab styles is a class the
  * others' markup can pick up. Each feature's CSS opens with an @ja-block
  * marker comment, and a class is styled bare by one block only: another tab
- * takes its own prefix (.ja-cf-, .ja-tm-, .ja-pn-, .ja-rf-) or anchors a rule on
+ * takes its own prefix (.ja-cf-, .ja-tm-, .ja-pn-, .ja-rf-, .ja-im-) or anchors a rule on
  * a class of its own. tests/adminCssScope.test.mjs fails on a second definition.
  * ------------------------------------------------------------------ */
 
@@ -2505,4 +2505,100 @@ body:has(.admin) > .theme-toggle:hover {
   /* The sheets are centred dialogs here. */
   .ja-pn-dlg { max-width: 26rem; max-height: min(40rem, calc(100dvh - 4rem)); margin: auto; border: 1px solid var(--jg-field-line); border-radius: 20px; }
   .ja-pn-dlg .jg-grab { display: none; }
+}
+
+/* @ja-block import */
+/* Import (design/admin-redesign/reference-import-*.dc.html): one box that takes a file, a drop or a paste, and the two answers under it.
+   Colour is signal: done-green is "Imported", caution is "lines skipped"; accent is chrome (Choose a file, the dashed border while dragging, Import). */
+.ja-im { --ja-im-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; display: flex; max-width: 64rem; flex-direction: column; gap: 16px; }
+
+/* The format card: the line in mono, then the three things to know (beside it from 1024px) */
+.ja-im-fmt { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.ja-im-fmt-l { display: contents; }
+.ja-im-k { margin: 0; color: var(--ink-subtle); font-weight: 500; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ja-im-line { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--jg-field); font-family: var(--ja-im-mono); font-size: 14.5px; line-height: 1.3; }
+.ja-im-hint { order: 1; margin: 0; color: var(--ink-subtle); font-size: 12.5px; line-height: 1.4; }
+.ja-im-bul { display: flex; flex-direction: column; gap: 8px; }
+.ja-im-bul li { position: relative; padding-left: 18px; color: var(--ink-subtle); font-size: 13.5px; line-height: 1.45; }
+.ja-im-bul li::before { content: ""; position: absolute; top: 0.62em; left: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--jg-field-line); }
+.ja-im-bul b { color: var(--ink); font-weight: 500; }
+.ja-im-fmt code { color: var(--ink); font-family: var(--ja-im-mono); font-size: 12.5px; }
+
+/* The drop card: dashed all round, accent while a file is over it */
+.ja-im-drop { display: flex; flex-direction: column; gap: 12px; padding: 12px; border: 1.5px dashed var(--jg-field-line); border-radius: 16px; background: var(--surface); }
+.ja-im-drop[data-drag] { border-color: var(--accent); }
+.ja-im-pickrow { display: flex; flex-direction: column; gap: 10px; }
+.ja-im-pickrow p { margin: 0; color: var(--ink-subtle); font-size: 13px; text-align: center; }
+/* The file input inside is visually hidden but still takes focus: the label shows it. */
+.ja-im-pick {
+  position: relative; display: inline-flex; width: 100%; height: 48px; flex: none; align-items: center; justify-content: center; gap: 8px;
+  border: 1.5px solid var(--jg-field-line); border-radius: 12px; background: transparent; color: var(--ink); font-weight: 500; font-size: 16px; white-space: nowrap; cursor: pointer;
+}
+.ja-im-pick:hover { background: var(--surface-2); }
+.ja-im-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ja-im-pick svg { flex: none; color: var(--accent); }
+.ja-im-ta {
+  display: block; width: 100%; height: 182px; margin: 0; padding: 10px; overflow: auto; border: 1.5px solid var(--jg-field-line); border-radius: 10px;
+  background: var(--jg-field); color: var(--ink); font-family: var(--ja-im-mono); font-size: 11.5px; line-height: 20px; white-space: pre; resize: none;
+}
+.ja-im-ta::placeholder { color: var(--ink-subtle); opacity: 1; }
+.ja-im-ta:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--jg-ring); }
+
+/* "Loaded teams.xlsx · 48 rows" */
+.ja-im-info {
+  display: flex; min-height: 44px; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin: 0; padding: 6px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 14px; font-variant-numeric: tabular-nums;
+}
+.ja-im-info svg { flex: none; color: var(--ink-subtle); }
+.ja-im-warn { color: var(--caution-quiet); font-size: 13.5px; }
+
+/* Spread, max, Import: Import is full width under the options on a phone */
+.ja-im-opts { display: flex; flex-direction: column; gap: 4px; }
+.ja-im-opts .ja-prim { margin-top: 8px; }
+.ja-im-chk { display: inline-flex; min-height: 48px; align-items: center; gap: 4px; font-size: 16px; }
+.ja-im-cb { appearance: none; -webkit-appearance: none; position: relative; flex: none; width: 32px; height: 32px; margin: 0 0 0 -5px; border: 0; background: transparent; }
+.ja-im-cb::after {
+  content: ""; position: absolute; top: 5px; left: 5px; width: 22px; height: 22px;
+  border: 1.5px solid var(--jg-field-line); border-radius: 6px; background: var(--jg-field);
+}
+.ja-im-cb:checked::after { border-color: var(--accent); background: var(--accent); }
+.ja-im-cb:checked::before {
+  content: ""; position: absolute; z-index: 1; top: 8px; left: 13px; width: 6px; height: 12px;
+  border: solid var(--accent-ink); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg);
+}
+.ja-im-max { display: inline-flex; min-height: 52px; align-items: center; gap: 8px; color: var(--ink-subtle); font-size: 16px; }
+.ja-im-num {
+  width: 76px; height: 44px; margin: 0; padding: 0 8px; border: 1.5px solid var(--jg-field-line); border-radius: 10px; background: var(--jg-field);
+  color: var(--ink); font: inherit; font-weight: 500; font-size: 17px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.ja-im-num:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--jg-ring); }
+.ja-im-num:disabled { opacity: 0.4; }
+
+/* The answers: Imported in done-green, the skipped lines in caution */
+.ja-im-out { display: flex; flex-direction: column; gap: 8px; }
+.ja-im-ok {
+  display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid color-mix(in oklch, var(--done) 45%, transparent); border-radius: 12px;
+  background: color-mix(in oklch, var(--done) 12%, transparent); font-size: 15px; line-height: 1.45;
+}
+.ja-im-ok svg { flex: none; width: 20px; height: 20px; margin-top: 1px; color: var(--done-quiet); }
+.ja-im-ok p { margin: 0; }
+.ja-im-ok b { font-weight: 500; }
+.ja-im-skip ul { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+.ja-im-skip li { font-size: 13.5px; }
+
+@media (min-width: 1024px) {
+  .ja-im-fmt { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; gap: 8px 32px; padding: 16px 20px; }
+  .ja-im-fmt-l { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
+  .ja-im-line { font-size: 17px; }
+  .ja-im-drop { padding: 16px; }
+  .ja-im-pickrow { flex-direction: row; align-items: center; gap: 14px; }
+  .ja-im-pickrow p { font-size: 14px; text-align: left; }
+  .ja-im-pick { width: auto; height: 40px; padding: 0 16px; border-radius: 10px; font-size: 15px; }
+  .ja-im-ta { height: 206px; padding: 12px 14px; font-size: 13.5px; line-height: 22px; }
+  .ja-im-info { min-width: 260px; min-height: 36px; align-self: flex-start; }
+  .ja-im-opts { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 28px; }
+  .ja-im-opts .ja-prim { width: auto; min-width: 160px; margin: 0 0 0 auto; padding: 0 24px; }
+  .ja-im-chk { min-height: 44px; font-size: 15px; }
+  .ja-im-max { min-height: 0; font-size: 15px; }
+  .ja-im-num { width: 64px; height: 36px; font-size: 15px; }
 }
