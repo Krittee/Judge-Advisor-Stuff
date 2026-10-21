@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Judge Queue · live board A · by panel · TV</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Fira+Sans:wght@400;500&amp;display=swap">
+<style>
+.jq{--canvas:oklch(0.968 0.005 265);--surface:oklch(0.995 0.002 265);--ink:oklch(0.225 0.016 265);--muted:oklch(0.520 0.014 265);--line:oklch(0.885 0.010 265);--accent:oklch(0.510 0.160 258);--accent-hover:oklch(0.455 0.160 258);--on-accent:oklch(0.995 0.002 265);--danger:oklch(0.560 0.200 18);--danger-ink:oklch(0.470 0.180 18);--danger-tint:oklch(0.560 0.200 18 / 0.08);--danger-line:oklch(0.560 0.200 18 / 0.35);--tint:oklch(0.510 0.160 258 / 0.09);--ring:oklch(0.510 0.160 258 / 0.25);--field:oklch(0.995 0.002 265);--field-line:oklch(0.640 0.012 265);--disabled:oklch(0.915 0.008 265);--booked-quiet:oklch(0.430 0.016 265);--jb:oklch(0.510 0.160 258 / 0.07);--jl:oklch(0.510 0.160 258 / 0.35);--waiting:oklch(0.700 0.180 52);--enroute:oklch(0.745 0.120 232);--active:oklch(0.680 0.170 300);--done:oklch(0.735 0.135 158);--shadow:0 1px 2px oklch(0.225 0.016 265 / 0.05),0 18px 40px -24px oklch(0.225 0.016 265 / 0.25);--booked-ink:oklch(0.975 0.004 265);--waiting-ink:oklch(0.200 0.050 52);--enroute-ink:oklch(0.200 0.040 232);--active-ink:oklch(0.170 0.050 300);--done-ink:oklch(0.200 0.050 158);position:relative;box-sizing:border-box;width:1920px;height:1080px;overflow:hidden;display:flex;flex-direction:column;background:var(--canvas);color:var(--ink);font-family:'Fira Sans',system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.jq[data-theme="dark"]{--canvas:oklch(0.165 0.012 265);--surface:oklch(0.205 0.014 265);--ink:oklch(0.955 0.005 265);--muted:oklch(0.670 0.013 265);--line:oklch(0.320 0.016 265);--accent:oklch(0.680 0.140 258);--accent-hover:oklch(0.730 0.125 258);--on-accent:oklch(0.165 0.012 265);--danger:oklch(0.555 0.200 18);--danger-ink:oklch(0.800 0.110 18);--danger-tint:oklch(0.555 0.200 18 / 0.16);--danger-line:oklch(0.555 0.200 18 / 0.55);--tint:oklch(0.680 0.140 258 / 0.14);--ring:oklch(0.680 0.140 258 / 0.35);--field:oklch(0.180 0.013 265);--field-line:oklch(0.520 0.014 265);--disabled:oklch(0.280 0.014 265);--booked-quiet:oklch(0.780 0.014 265);--jb:oklch(0.680 0.140 258 / 0.12);--jl:oklch(0.680 0.140 258 / 0.45);--waiting:oklch(0.735 0.185 58);--enroute:oklch(0.720 0.140 232);--active:oklch(0.680 0.170 300);--done:oklch(0.745 0.140 158);--shadow:none;--booked-ink:oklch(0.200 0.014 265);--waiting-ink:oklch(0.200 0.050 52);--enroute-ink:oklch(0.200 0.040 232);--active-ink:oklch(0.170 0.050 300);--done-ink:oklch(0.200 0.050 158)}
+.jq{--waiting-quiet:oklch(0.440 0.130 52);--enroute-quiet:oklch(0.430 0.120 232);--active-quiet:oklch(0.430 0.150 300);--done-quiet:oklch(0.430 0.105 158);--ink-2:oklch(0.400 0.015 265);--cat-1:oklch(0.540 0.130 205);--cat-2:oklch(0.520 0.155 315);--cat-3:oklch(0.520 0.120 150);--cat-4:oklch(0.510 0.150 265)}
+.jq[data-theme="dark"]{--waiting-quiet:oklch(0.800 0.110 58);--enroute-quiet:oklch(0.790 0.090 232);--active-quiet:oklch(0.775 0.105 300);--done-quiet:oklch(0.775 0.100 158);--ink-2:oklch(0.800 0.010 265);--cat-1:oklch(0.720 0.130 205);--cat-2:oklch(0.700 0.150 315);--cat-3:oklch(0.720 0.120 150);--cat-4:oklch(0.690 0.140 265)}
+body{margin:0}
+button,input{font:inherit;color:inherit}
+.jq *,.jq *::before,.jq *::after{box-sizing:border-box}
+:where(.jq) :is(h1,h2,h3,p,ul,ol){margin:0;padding:0}
+:where(.jq) :is(ul,ol){list-style:none}
+.jq :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.brand{display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap}
+.mark{flex:none;width:26px;height:26px;border-radius:8px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center}
+.brand-n{font-family:Archivo,sans-serif;font-weight:700;font-size:16px;letter-spacing:-0.01em}
+.brand-s{font-size:14px;color:var(--muted)}
+.icon-btn{flex:none;width:44px;height:44px;border-radius:12px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.icon-btn:hover{background:var(--tint);color:var(--ink)}
+.nb{flex:none;display:inline-block;width:13px;height:13px;border-radius:50%;border:2px solid currentColor;vertical-align:middle}
+.nb--f{background:currentColor}
+.nb--d{background:linear-gradient(90deg,currentColor 50%,transparent 50%)}
+.nb--u{background:transparent}
+.tl{border:1px solid transparent}
+.c-req,.s-req{--c:var(--waiting);--ci:var(--waiting-ink)}
+.c-en,.s-en{--c:var(--enroute);--ci:var(--enroute-ink)}
+.c-int,.s-int{--c:var(--active);--ci:var(--active-ink)}
+.c-bk,.s-bk{--c:var(--booked-quiet);--ci:var(--booked-ink)}
+.s-req,.s-en,.s-int,.s-bk{background:var(--c);color:var(--ci);border-color:transparent}
+.s-done{background:color-mix(in oklch,var(--done) 22%,var(--surface));color:var(--ink);border-color:color-mix(in oklch,var(--done) 55%,transparent)}
+.s-none{background:var(--canvas);color:var(--ink);border-color:var(--line)}
+.s-done .sub{color:var(--ink-2)}
+.s-none .sub{color:var(--muted)}
+.dv-e{--dv:var(--cat-1)}
+.dv-m{--dv:var(--cat-2)}
+.dvs{display:inline-block;flex:none;width:14px;height:14px;border-radius:4px;border:3px solid var(--dv)}
+.sw{display:inline-block;flex:none;width:16px;height:16px;border-radius:5px;border-width:1px;border-style:solid}
+.sw.s-none{border-color:var(--field-line)}
+.chrome{display:flex;flex-direction:column;align-items:flex-end;gap:8px;font-size:15px;line-height:1.3;color:var(--muted)}
+.crow{display:flex;align-items:center;gap:16px}
+.chrome .icon-btn{width:34px;height:34px;border-radius:10px}
+.seg{display:flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.seg button{height:28px;padding:0 14px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-weight:500;font-size:15px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.chk{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.chk input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+.live{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.ld{width:10px;height:10px;border-radius:50%;background:var(--done)}
+.lnk{color:var(--muted);text-decoration:underline;white-space:nowrap}
+.fsb{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--muted);font-size:15px;cursor:pointer;white-space:nowrap}
+.fsb:hover{color:var(--ink)}
+
+.jq{padding:24px 32px;gap:16px}
+.hd{flex:none;height:112px;display:flex;align-items:stretch;gap:32px}
+.hd-l{display:flex;flex-direction:column;justify-content:center;gap:4px}
+.hd-t{font-family:Archivo,sans-serif;font-weight:700;font-size:40px;line-height:1.1;letter-spacing:-0.02em}
+.wait{display:flex;align-items:center;gap:20px;padding:0 36px 0 32px;border-radius:20px;background:var(--waiting);color:var(--waiting-ink)}
+.wait b{font-family:Archivo,sans-serif;font-weight:700;font-size:96px;line-height:1;letter-spacing:-0.03em}
+.wait span{font-family:Archivo,sans-serif;font-weight:700;font-size:28px;line-height:1.1;text-transform:uppercase;letter-spacing:0.02em;max-width:190px}
+.tal{display:flex;align-items:center;gap:32px}
+.tal li{display:flex;flex-direction:column}
+.tal b{font-family:Archivo,sans-serif;font-weight:700;font-size:52px;line-height:1}
+.tal span{font-size:20px;line-height:1.3;color:var(--muted)}
+.tal .t-int b{color:var(--active-quiet)}
+.tal .t-done b{color:var(--done-quiet)}
+.hd .chrome{margin-left:auto;justify-content:center}
+
+.bd{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) 260px;gap:20px}
+.pn{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.ph-r{display:flex;align-items:center;gap:12px}
+.ph-r h2{font-family:Archivo,sans-serif;font-weight:700;font-size:28px;line-height:32px;letter-spacing:-0.01em}
+.ph-d{display:inline-flex;align-items:center;gap:8px;font-size:17px;color:var(--ink-2)}
+.ph-c{margin-left:auto;font-size:17px;color:var(--muted)}
+.ph-j{margin-top:2px;font-size:18px;line-height:24px;color:var(--muted)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
+.tl{display:flex;flex-direction:column;justify-content:space-between;height:100px;padding:6px 12px;border-radius:12px;min-width:0}
+.tl-r{display:flex;align-items:baseline;justify-content:space-between;gap:4px}
+.tl-n{font-family:Archivo,sans-serif;font-weight:700;font-size:44px;line-height:44px;letter-spacing:-0.02em;white-space:nowrap}
+.tl-t{font-family:Archivo,sans-serif;font-weight:700;font-size:21px;line-height:28px;white-space:nowrap}
+.tl-st{font-size:18px;line-height:22px;font-weight:500}
+.tl-nm{display:flex;align-items:center;gap:7px;font-size:15px;line-height:18px;min-width:0}
+.tl-nm span:last-child{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tl--big{grid-column:1 / -1;height:120px;flex-direction:row;align-items:center;justify-content:space-between;padding:8px 20px;border-radius:14px;border-width:2px;border-color:var(--waiting-quiet)}
+.tl--big .l{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tl--big .tl-n{font-size:64px;line-height:64px}
+.tl--big .tl-st{font-weight:700;text-transform:uppercase;letter-spacing:0.06em;font-size:18px}
+.tl--big .r{display:flex;align-items:baseline;gap:8px;font-family:Archivo,sans-serif;font-weight:700}
+.tl--big .r b{font-size:84px;line-height:1;letter-spacing:-0.03em}
+.tl--big .r span{font-size:28px}
+.side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.lg{padding:14px 16px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.lg h2{font-family:Archivo,sans-serif;font-weight:700;font-size:15px;line-height:20px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.lg li{display:flex;align-items:center;gap:10px;font-size:16px;line-height:26px;color:var(--ink)}
+.lg .gap{margin-top:8px}
+.lg .nb{color:var(--ink)}
+.lg .rg{display:inline-block;flex:none;width:16px;height:16px;border-radius:5px;border:3px solid var(--dv)}
+</style>
+</helmet>
+<div class="jq" data-theme="{{theme}}">
+<header class="hd">
+<div class="hd-l"><div class="brand"><span class="mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 7h14M5 12h10M5 17h6"></path></svg></span><span class="brand-n">Judge Queue</span><span class="brand-s">VEX IQ · V5RC</span></div><h1 class="hd-t">Judging Board</h1></div>
+<p class="wait"><b>4</b><span>waiting for a judge</span></p>
+<ul class="tal"><li class="t-int"><b>3</b><span>in interview</span></li><li class="t-done"><b>8</b><span>complete</span></li></ul>
+<div class="chrome"><div class="crow"><div class="seg" role="group" aria-label="Board view"><button type="button" aria-pressed="true">By panel</button><button type="button" aria-pressed="false">Pit floor</button></div><button type="button" class="icon-btn" onClick="{{onTheme}}" aria-label="{{themeLabel}}">
+<sc-if value="{{light}}" hint-placeholder-val="{{ true }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path></svg></sc-if>
+<sc-if value="{{dark}}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"></path></svg></sc-if>
+</button></div><div class="crow"><span class="chk"><input id="hc-a1" type="checkbox"><label for="hc-a1">Hide completed</label></span><span class="live"><span class="ld" aria-hidden="true"></span>Live</span><a class="lnk" href="#">Consoles</a><button type="button" class="fsb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg>Fullscreen</button></div></div>
+</header>
+<main class="bd">
+<section class="pn dv-e" aria-labelledby="pn1">
+<header><div class="ph-r"><h2 id="pn1">Panel 1</h2><span class="ph-d"><i class="dvs" aria-hidden="true"></i>Elementary School</span><span class="ph-c">12 teams</span></div><p class="ph-j">Dana Ruiz · Chris Lin</p></header>
+<div class="g2"><div class="tl tl--big s-req"><div class="l"><span class="tl-n">1108</span><span class="tl-st">Requesting a judge</span><span class="tl-nm"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Bolt Runners</span></span></div><div class="r"><b>6</b><span>min</span></div></div><div class="tl s-en"><div class="tl-r"><span class="tl-n">4417A</span><span class="tl-t">5 min</span></div><div class="tl-st">On the way</div><div class="tl-nm sub"><span class="nb nb--f" role="img" aria-label="Fully Developed"></span><span>Neon Newtons</span></div></div><div class="tl s-int"><div class="tl-r"><span class="tl-n">8210S</span><span class="tl-t">14 min</span></div><div class="tl-st">Interviewing</div><div class="tl-nm sub"><span class="nb nb--u" role="img" aria-label="Ungraded"></span><span>Pixel Pandas</span></div></div><div class="tl s-bk"><div class="tl-r"><span class="tl-n">2011A</span><span class="tl-t">11:50</span></div><div class="tl-st">Booked</div><div class="tl-nm sub"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Gear Gremlins</span></div></div><div class="tl s-bk"><div class="tl-r"><span class="tl-n">3350B</span><span class="tl-t">12:20</span></div><div class="tl-st">Booked</div><div class="tl-nm sub"><span class="nb nb--f" role="img" aria-label="Fully Developed"></span><span>Sparkplugs</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">1999</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Lunar Lynx</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">2205</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--f" role="img" aria-label="Fully Developed"></span><span>Wired Wolves</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">5521D</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--u" role="img" aria-label="Ungraded"></span><span>Byte Bees</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">8841E</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Flux Foxes</span></div></div><div class="tl s-done"><div class="tl-r"><span class="tl-n">1520</span></div><div class="tl-st">Complete</div><div class="tl-nm sub"><span class="nb nb--f" role="img" aria-label="Fully Developed"></span><span>Rocket Rovers</span></div></div><div class="tl s-done"><div class="tl-r"><span class="tl-n">6106X</span></div><div class="tl-st">Complete</div><div class="tl-nm sub"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Cog Squad</span></div></div><div class="tl s-done"><div class="tl-r"><span class="tl-n">7734C</span></div><div class="tl-st">Complete</div><div class="tl-nm sub"><span class="nb nb--u" role="img" aria-label="Ungraded"></span><span>Tin Tigers</span></div></div></div>
+</section>
+<section class="pn dv-m" aria-labelledby="pn2">
+<header><div class="ph-r"><h2 id="pn2">Panel 2</h2><span class="ph-d"><i class="dvs" aria-hidden="true"></i>Middle School</span><span class="ph-c">12 teams</span></div><p class="ph-j">Priya Nair · Alex Chen</p></header>
+<div class="g2"><div class="tl tl--big s-req"><div class="l"><span class="tl-n">1101</span><span class="tl-st">Requesting a judge</span><span class="tl-nm"><span class="nb nb--f" role="img" aria-label="Fully Developed"></span><span>Circuit Breakers</span></span></div><div class="r"><b>11</b><span>min</span></div></div><div class="tl tl--big s-req"><div class="l"><span class="tl-n">9882K</span><span class="tl-st">Requesting a judge</span><span class="tl-nm"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Torque Titans</span></span></div><div class="r"><b>1</b><span>min</span></div></div><div class="tl s-int"><div class="tl-r"><span class="tl-n">5090Z</span><span class="tl-t">9 min</span></div><div class="tl-st">Interviewing</div><div class="tl-nm sub"><span class="nb nb--f" role="img" aria-label="Fully Developed"></span><span>Iron Hawks</span></div></div><div class="tl s-bk"><div class="tl-r"><span class="tl-n">2742P</span><span class="tl-t">12:40</span></div><div class="tl-st">Booked</div><div class="tl-nm sub"><span class="nb nb--u" role="img" aria-label="Ungraded"></span><span>Volt Vipers</span></div></div><div class="tl s-bk"><div class="tl-r"><span class="tl-n">3188M</span><span class="tl-t">12:00</span></div><div class="tl-st">Booked</div><div class="tl-nm sub"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Hydro Hounds</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">3821</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--f" role="img" aria-label="Fully Developed"></span><span>Gyro Geckos</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">5555K</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--u" role="img" aria-label="Ungraded"></span><span>Welded Wasps</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">6620H</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--u" role="img" aria-label="Ungraded"></span><span>Quantum Quokkas</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">7075W</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Ratchet Rams</span></div></div><div class="tl s-done"><div class="tl-r"><span class="tl-n">1307</span></div><div class="tl-st">Complete</div><div class="tl-nm sub"><span class="nb nb--f" role="img" aria-label="Fully Developed"></span><span>Drift Drones</span></div></div><div class="tl s-done"><div class="tl-r"><span class="tl-n">4466R</span></div><div class="tl-st">Complete</div><div class="tl-nm sub"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Axle Ants</span></div></div><div class="tl s-done"><div class="tl-r"><span class="tl-n">9014T</span></div><div class="tl-st">Complete</div><div class="tl-nm sub"><span class="nb nb--f" role="img" aria-label="Fully Developed"></span><span>Spin Sharks</span></div></div></div>
+</section>
+<section class="pn dv-m" aria-labelledby="pn3">
+<header><div class="ph-r"><h2 id="pn3">Panel 3</h2><span class="ph-d"><i class="dvs" aria-hidden="true"></i>Middle School</span><span class="ph-c">12 teams</span></div><p class="ph-j">Sam Ortiz · Lee Park</p></header>
+<div class="g2"><div class="tl tl--big s-req"><div class="l"><span class="tl-n">2468</span><span class="tl-st">Requesting a judge</span><span class="tl-nm"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Gizmo Guardians</span></span></div><div class="r"><b>3</b><span>min</span></div></div><div class="tl s-en"><div class="tl-r"><span class="tl-n">8002F</span><span class="tl-t">2 min</span></div><div class="tl-st">On the way</div><div class="tl-nm sub"><span class="nb nb--f" role="img" aria-label="Fully Developed"></span><span>Laser Llamas</span></div></div><div class="tl s-int"><div class="tl-r"><span class="tl-n">6619J</span><span class="tl-t">4 min</span></div><div class="tl-st">Interviewing</div><div class="tl-nm sub"><span class="nb nb--u" role="img" aria-label="Ungraded"></span><span>Mach Mice</span></div></div><div class="tl s-bk"><div class="tl-r"><span class="tl-n">4004G</span><span class="tl-t">12:10</span></div><div class="tl-st">Booked</div><div class="tl-nm sub"><span class="nb nb--f" role="img" aria-label="Fully Developed"></span><span>Rivet Raptors</span></div></div><div class="tl s-bk"><div class="tl-r"><span class="tl-n">33445B</span><span class="tl-t">13:00</span></div><div class="tl-st">Booked</div><div class="tl-nm sub"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Plasma Pumas</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">2650V</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--u" role="img" aria-label="Ungraded"></span><span>Kinetic Kiwis</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">4290Q</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Lever Lemurs</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">5871Y</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Dynamo Dingos</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">7716H</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--u" role="img" aria-label="Ungraded"></span><span>Hex Herons</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">8339L</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--f" role="img" aria-label="Fully Developed"></span><span>Anchor Owls</span></div></div><div class="tl s-done"><div class="tl-r"><span class="tl-n">7301</span></div><div class="tl-st">Complete</div><div class="tl-nm sub"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Servo Sloths</span></div></div><div class="tl s-done"><div class="tl-r"><span class="tl-n">9150N</span></div><div class="tl-st">Complete</div><div class="tl-nm sub"><span class="nb nb--f" role="img" aria-label="Fully Developed"></span><span>Beam Bears</span></div></div></div>
+</section>
+<div class="side">
+<section class="pn" aria-labelledby="pn0">
+<header><div class="ph-r"><h2 id="pn0">Unassigned</h2><span class="ph-c">2 teams</span></div><p class="ph-j">No panel yet</p></header>
+<div class="g2" style="grid-template-columns:1fr"><div class="tl s-none"><div class="tl-r"><span class="tl-n">3007</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--u" role="img" aria-label="Ungraded"></span><span>Static Sparks</span></div></div><div class="tl s-none"><div class="tl-r"><span class="tl-n">6180G</span></div><div class="tl-st">Not yet</div><div class="tl-nm sub"><span class="nb nb--d" role="img" aria-label="Developing"></span><span>Magnet Moles</span></div></div></div>
+</section>
+<section class="lg" aria-labelledby="lgt"><h2 id="lgt">What the colours mean</h2><ul>
+<li><span class="sw s-req" aria-hidden="true"></span>Requesting a judge</li>
+<li><span class="sw s-en" aria-hidden="true"></span>Judges on the way</li>
+<li><span class="sw s-int" aria-hidden="true"></span>Interviewing</li>
+<li><span class="sw s-bk" aria-hidden="true"></span>Booked slot</li>
+<li><span class="sw s-done" aria-hidden="true"></span>Complete</li>
+<li><span class="sw s-none" aria-hidden="true"></span>Not yet in the queue</li>
+<li class="gap"><span class="nb nb--f" aria-hidden="true"></span>Fully Developed</li>
+<li><span class="nb nb--d" aria-hidden="true"></span>Developing</li>
+<li><span class="nb nb--u" aria-hidden="true"></span>Ungraded</li>
+<li class="gap dv-e"><i class="rg" aria-hidden="true"></i>Elementary School</li>
+<li class="dv-m"><i class="rg" aria-hidden="true"></i>Middle School</li>
+</ul></section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"dark"},"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    const s = this.state || {};
+    const theme = s.theme ?? p.theme ?? 'dark';
+    return {
+      theme,
+      light: theme !== 'dark',
+      dark: theme === 'dark',
+      themeLabel: theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
+      onTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' })
+    };
+  }
+}
+</script>
+</body>
+</html>
