@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { actorParts } from "@/lib/activity";
 import { actorLabel, canAdvance, canCancel, getSession, mayActOnPanel } from "@/lib/auth";
 import { store, StoreError, STALE_STATUS_MESSAGE } from "@/lib/db";
 import { isRealSlot } from "@/lib/data";
@@ -327,7 +328,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     await store().logActivity({
       requestId: id,
       teamId: current.team_id,
-      actor,
+      kind: "request",
+      ...actorParts(session),
       action: logLine,
       detail: body.detail ? String(body.detail).slice(0, 200) : null,
     });

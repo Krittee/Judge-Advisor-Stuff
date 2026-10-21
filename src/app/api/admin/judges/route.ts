@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { actorLabel, canAdminister, getSession } from "@/lib/auth";
+import { actorParts } from "@/lib/activity";
+import { canAdminister, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { takeOffPanel, teamsToTakeOff } from "@/lib/conflicts";
 import type { JudgePatch } from "@/lib/db/types";
@@ -34,7 +35,8 @@ export async function POST(request: Request) {
       note: cleanNote(body.note),
     });
     await store().logActivity({
-      actor: actorLabel(session),
+      kind: "setup",
+      ...actorParts(session),
       action: "added a judge",
       detail: judge.name,
     });
@@ -85,10 +87,10 @@ export async function PATCH(request: Request) {
     const updated = await db.updateJudge(id, patch);
     if (joining) await takeOffPanel(takeOff);
 
-    const actor = actorLabel(session);
+    const who = { kind: "setup" as const, ...actorParts(session) };
     if (updated.name !== judge.name) {
       await db.logActivity({
-        actor,
+        ...who,
         action: "renamed a judge",
         detail: `${judge.name} → ${updated.name}`,
       });
@@ -96,7 +98,7 @@ export async function PATCH(request: Request) {
     if (updated.panel_id !== judge.panel_id) {
       const nameOf = (panelId: string | null) => panels.find((p) => p.id === panelId)?.name;
       await db.logActivity({
-        actor,
+        ...who,
         action: "moved a judge",
         detail:
           (updated.panel_id
@@ -128,7 +130,8 @@ export async function DELETE(request: Request) {
   const removed = await db.removeJudge(id);
   if (removed && judge) {
     await db.logActivity({
-      actor: actorLabel(session),
+      kind: "setup",
+      ...actorParts(session),
       action: "removed a judge",
       detail: conflictsRemoved
         ? `${judge.name} · ${conflictsRemoved} ${conflictsRemoved === 1 ? "conflict" : "conflicts"} withdrawn with them`

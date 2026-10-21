@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { actorParts } from "@/lib/activity";
 import { actorLabel, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
@@ -96,7 +97,8 @@ export async function POST(request: Request) {
     await store().logActivity({
       requestId: created.id,
       teamId: team.id,
-      actor: session ? actorLabel(session) : "team",
+      kind: "request",
+      ...actorParts(session),
       action: kind === "slot" ? "booked slot" : "joined queue",
       detail: `Team ${team.number}`,
     });

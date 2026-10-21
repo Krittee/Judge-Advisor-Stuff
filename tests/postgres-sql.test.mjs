@@ -756,3 +756,44 @@ test("a blank name, pit, division or notebook type on a re-import keeps the stor
   assert.match(upsert.sql, /when teams\.division is not distinct from excluded\.division then teams\.panel_id/);
   assert.match(upsert.sql, /select 1 from panels p\s+where p\.id = teams\.panel_id\s+and \(p\.division = excluded\.division\s+or excluded\.division = any\(\$8::text\[\]\)\s+or p\.division = any\(\$8::text\[\]\)\)\s+\) then teams\.panel_id\s+else null/);
 });
+
+/* ---- Activity: kind, the actor's role, and the team number (no database here either) ---- */
+
+test("migrate() adds the activity kind and role as idempotent nullable columns, and schema.sql creates them", () => {
+  assert.ok(migrateBody.includes("alter table activity add column if not exists kind text;"));
+  assert.ok(migrateBody.includes("alter table activity add column if not exists actor_role text;"));
+  assert.ok(!/alter table activity add column if not exists (kind|actor_role) text not null/.test(migrateBody), "an older row has neither, so both stay nullable");
+  assert.match(schemaSql, /create table activity \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*request_id\s+uuid references requests\(id\) on delete cascade,\s*team_id\s+uuid references teams\(id\) on delete set null,\s*kind\s+text,[^\n]*\n\s*actor\s+text not null,[^\n]*\n\s*actor_role\s+text,/);
+});
+
+test("logActivity stores the kind and the actor's role in their own columns", async () => {
+  calls.length = 0;
+  answer = () => [];
+  await postgresStore.logActivity({ teamId: "t1", kind: "referee", actor: "Jordan", actorRole: "Referee", action: "flagged minor", detail: "Team 9882K" });
+  const [insert] = sent(/^insert into activity/);
+  assert.match(insert.sql, /^insert into activity \(request_id, team_id, kind, actor, actor_role, action, detail\) values \(\$1, \$2, \$3, \$4, \$5, \$6, \$7\)$/);
+  assert.deepEqual(insert.params, [null, "t1", "referee", "Jordan", "Referee", "flagged minor", "Team 9882K"]);
+});
+
+test("listActivity joins the team's number in one query, and reads an old row (no kind) from its action and actor", async () => {
+  const at = new Date("2026-10-20T09:00:00.000Z");
+  const row = { id: "a1", request_id: null, team_id: "t1", detail: null, created_at: at, team_number: "9882K" };
+  calls.length = 0;
+  answer = () => [
+    { ...row, kind: "setup", actor: "Alex", actor_role: "Judge Advisor", action: "added a judge" },
+    { ...row, id: "a2", team_number: null, team_id: null, kind: null, actor_role: null, actor: "referee:Jordan", action: "flagged minor" },
+  ];
+  const read = await postgresStore.listActivity(5);
+
+  const selects = sent(/from activity/);
+  assert.equal(selects.length, 1, "one query, not one per row");
+  assert.match(selects[0].sql, /left join teams t on t\.id = a\.team_id/);
+  assert.match(selects[0].sql, /t\.number as team_number/);
+  assert.match(selects[0].sql, /order by a\.created_at desc limit \$1$/);
+  assert.deepEqual(selects[0].params, [5]);
+
+  assert.deepEqual(read.map((a) => [a.kind, a.actor, a.actor_role, a.team_number, a.created_at]), [
+    ["setup", "Alex", "Judge Advisor", "9882K", "2026-10-20T09:00:00.000Z"],
+    ["referee", "Jordan", "Referee", null, "2026-10-20T09:00:00.000Z"],
+  ]);
+});

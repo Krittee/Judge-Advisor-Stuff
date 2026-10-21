@@ -68,19 +68,23 @@ test("deleting a team clears its flags and request-linked activity, and nulls th
     matchAffecting: false,
   });
   // Team-only activity survives the delete with its team nulled.
-  await fileStore.logActivity({ teamId: team.id, actor: "queuer:Desk", action: "note" });
+  await fileStore.logActivity({ teamId: team.id, kind: "setup", actor: "Desk", actorRole: "Front desk", action: "note" });
   // Activity tied to the deleted team's request is dropped with the request.
   await fileStore.logActivity({
     requestId: request.id,
     teamId: team.id,
-    actor: "queuer:Desk",
+    kind: "request",
+    actor: "Desk",
+    actorRole: "Front desk",
     action: "requested",
   });
   // Another team's request-linked activity is not touched.
   await fileStore.logActivity({
     requestId: otherRequest.id,
     teamId: other.id,
-    actor: "queuer:Desk",
+    kind: "request",
+    actor: "Desk",
+    actorRole: "Front desk",
     action: "requested",
   });
 

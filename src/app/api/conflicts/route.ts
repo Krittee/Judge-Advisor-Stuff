@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { actorParts } from "@/lib/activity";
 import { actorLabel, canAdminister, canReadNotes, getSession } from "@/lib/auth";
 import type { Session } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
@@ -95,7 +96,8 @@ export async function POST(request: Request) {
 
   await db.logActivity({
     teamId: team.id,
-    actor: actorLabel(session),
+    kind: "conflict",
+    ...actorParts(session),
     action: "declared a conflict of interest",
     detail: `Team ${team.number} · ${panel.name}`,
   });
@@ -133,7 +135,8 @@ export async function DELETE(request: Request) {
       : panels.find((p) => p.id === conflict.panel_id)?.name;
     await db.logActivity({
       teamId: conflict.team_id,
-      actor: actorLabel(session),
+      kind: "conflict",
+      ...actorParts(session),
       action: "withdrew a conflict of interest",
       detail: `Team ${team?.number ?? "?"} · ${who ?? conflict.judge_name ?? "unknown"}`,
     });
@@ -247,7 +250,8 @@ async function declareMany(
 
   if (recorded.length) {
     await db.logActivity({
-      actor: actorLabel(session),
+      kind: "conflict",
+      ...actorParts(session),
       action: "declared conflicts of interest",
       detail: `${panel.name} · ${recorded.join(", ")}`,
     });
@@ -337,7 +341,8 @@ async function declareForJudge(session: Session | null, body: Record<string, unk
     const panelName = (await db.listPanels()).find((p) => p.id === judge.panel_id)?.name;
     await db.logActivity({
       teamId: recorded.length === 1 ? [...recordedIds][0] : null,
-      actor: actorLabel(session),
+      kind: "conflict",
+      ...actorParts(session),
       action: "declared conflicts of interest",
       detail:
         `${judge.name} (${panelName ?? "no panel"}) · ${recorded.join(", ")}` +

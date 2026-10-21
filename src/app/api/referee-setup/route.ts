@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { actorLabel, canAdminister, canFlag, getSession } from "@/lib/auth";
+import { actorParts } from "@/lib/activity";
+import { canAdminister, canFlag, getSession } from "@/lib/auth";
 import { store } from "@/lib/db";
 import { parseRefereeSetup } from "@/lib/flagValidation";
 import { getRuleset } from "@/lib/rules";
@@ -47,7 +48,8 @@ export async function PUT(request: Request) {
   });
 
   await store().logActivity({
-    actor: actorLabel(session),
+    kind: "setup",
+    ...actorParts(session),
     action: `Referee setup: ${describe(setup)}`,
     detail: previous ? `was ${describe(previous)}` : null,
   });

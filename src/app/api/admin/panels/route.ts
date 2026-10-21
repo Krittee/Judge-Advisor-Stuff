@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { actorLabel, canAdminister, getSession } from "@/lib/auth";
+import { actorParts } from "@/lib/activity";
+import { canAdminister, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { takeOffPanel, teamsToTakeOff } from "@/lib/conflicts";
 import { judgeKey } from "@/lib/roster";
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
       slot_count: clamp(body.slotCount, 0, 60, 0),
       slot_start_at: body.slotStartAt ? new Date(String(body.slotStartAt)).toISOString() : null,
     });
+    await logSetup(session, "added a panel", `${panel.name} · ${panel.division}`);
     return NextResponse.json({ panel });
   } catch (e) {
     if (e instanceof StoreError) {
@@ -77,6 +79,7 @@ export async function PATCH(request: Request) {
 
   try {
     const db = store();
+    const was = (await db.listPanels()).find((p) => p.id === id);
 
     /* The judges field is the roster's now: each name is found or added and
        put on this panel, and anyone else on it is taken off. A judge with a
@@ -85,8 +88,7 @@ export async function PATCH(request: Request) {
     let takeOff: Awaited<ReturnType<typeof teamsToTakeOff>> = [];
     let roster: Awaited<ReturnType<typeof db.listJudges>> = [];
     if (patch.judges || body.dryRun === true) {
-      const panel = (await db.listPanels()).find((p) => p.id === id);
-      if (!panel) {
+      if (!was) {
         return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
       }
       roster = await db.listJudges();
@@ -114,6 +116,13 @@ export async function PATCH(request: Request) {
       await takeOffPanel(takeOff);
       await logJudgeChanges(session, panel, before, patch.judges, takeOff.map((t) => t.number));
     }
+    // The judges field is the roster's and logged above; this is the panel's own settings.
+    const changed = (Object.keys(patch) as (keyof Panel)[]).filter(
+      (k) => k !== "judges" && String(was?.[k]) !== String(panel[k]),
+    );
+    if (changed.length) {
+      await logSetup(session, "edited a panel", `${panel.name} · ${changed.map((k) => k.replace(/_/g, " ")).join(", ")}`);
+    }
     return NextResponse.json({ panel, takenOff: takeOff.map((t) => t.number) });
   } catch (e) {
     if (e instanceof StoreError) {
@@ -133,8 +142,7 @@ async function logJudgeChanges(
 ) {
   const wanted = new Set(names.map(judgeKey));
   const known = new Map(before.map((j) => [judgeKey(j.name), j]));
-  const actor = actorLabel(session);
-  const log = (action: string, detail: string) => store().logActivity({ actor, action, detail });
+  const log = (action: string, detail: string) => logSetup(session, action, detail);
 
   for (const name of names) {
     const was = known.get(judgeKey(name));
@@ -149,6 +157,10 @@ async function logJudgeChanges(
   if (takenOff.length) await log("took teams off a panel", `${panel.name} · ${takenOff.join(", ")}`);
 }
 
+function logSetup(session: Awaited<ReturnType<typeof getSession>>, action: string, detail: string) {
+  return store().logActivity({ kind: "setup", ...actorParts(session), action, detail });
+}
+
 /** Create any preset panel from config/event.json that does not exist yet. */
 export async function PUT() {
   const session = await getSession();
@@ -157,6 +169,7 @@ export async function PUT() {
   }
 
   const created = await store().seedPresetPanels();
+  if (created) await logSetup(session, "added preset panels", `${created} added`);
   return NextResponse.json({ created, panels: await store().listPanels() });
 }
 
@@ -172,13 +185,16 @@ export async function DELETE(request: Request) {
   // whether one panel goes or all of them do.
   if (params.get("all") === "true") {
     const deleted = await store().deleteAllPanels();
+    if (deleted) await logSetup(session, "deleted all panels", `${deleted} ${deleted === 1 ? "panel" : "panels"}`);
     return NextResponse.json({ ok: true, deleted });
   }
 
   const id = params.get("id");
   if (!id) return NextResponse.json({ error: "id required." }, { status: 400 });
 
+  const gone = (await store().listPanels()).find((p) => p.id === id);
   await store().deletePanel(id);
+  if (gone) await logSetup(session, "deleted a panel", gone.name);
   return NextResponse.json({ ok: true, deleted: 1 });
 }
 

@@ -1,4 +1,5 @@
 import type {
+  ActivityKind,
   ActivityRow,
   ConflictRow,
   FlagRow,
@@ -124,7 +125,10 @@ export type NewRefereeSetup = {
 export type NewActivity = {
   requestId?: string | null;
   teamId?: string | null;
+  kind: ActivityKind;
+  /** The plain name; see `actorParts`. */
   actor: string;
+  actorRole: string | null;
   action: string;
   detail?: string | null;
 };

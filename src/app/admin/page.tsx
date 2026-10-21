@@ -205,7 +205,9 @@ function ActivityTab() {
       {rows.map((r) => (
         <li key={r.id} className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-2.5 text-sm">
           <span className="w-20 shrink-0 text-ink-faint">{formatClock(r.created_at)}</span>
-          <span className="w-48 shrink-0 truncate text-ink-subtle">{r.actor}</span>
+          <span className="w-48 shrink-0 truncate text-ink-subtle">
+            {r.actor_role && r.actor_role.toLowerCase() !== r.actor.toLowerCase() ? `${r.actor} · ${r.actor_role}` : r.actor}
+          </span>
           <span className="text-ink">{r.action}</span>
           {r.detail ? <span className="text-ink-faint">{r.detail}</span> : null}
         </li>

@@ -176,14 +176,21 @@ export type ScoreRow = {
   updated_at: string;
 };
 
+export type ActivityKind = "request" | "referee" | "conflict" | "setup";
+
 export type ActivityRow = {
   id: string;
   request_id: string | null;
   team_id: string | null;
+  kind: ActivityKind;
+  /** The plain name; `actor_role` is what they were acting as ("Judge Advisor", "Panel 2", "Referee", "Front desk", "Team"). */
   actor: string;
+  actor_role: string | null;
   action: string;
   detail: string | null;
   created_at: string;
+  /** `teams.number` of `team_id`; null when the entry names no team. */
+  team_number: string | null;
 };
 
 /** Panel with its judge code stripped — safe to send to any browser. */

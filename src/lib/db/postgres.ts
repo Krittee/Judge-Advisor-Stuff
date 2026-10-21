@@ -1,6 +1,5 @@
 import type { Pool, PoolClient } from "pg";
 import type {
-  ActivityRow,
   ConflictRow,
   FlagRow,
   JudgeRow,
@@ -13,6 +12,7 @@ import type {
 } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { randomPanelCode } from "../panelCode";
+import { readActivity, type StoredActivity } from "../activity";
 import { blendedDivisions, defaultCategory, divisionsCompatible, presetDivisions, presetPanels } from "../presets";
 import { hasNearbyBooking } from "../data";
 import { isPanelBlocked, judgeKey, panelBlocks } from "../roster";
@@ -431,6 +431,11 @@ async function migrate(): Promise<void> {
       alter table flags add column if not exists manual_version text;
       alter table flags add column if not exists match_affecting boolean not null default false;
 
+      -- Activity entries gained a kind and the actor's role. An older row has
+      -- neither (null) and is read as what its action and actor imply.
+      alter table activity add column if not exists kind text;
+      alter table activity add column if not exists actor_role text;
+
       -- Conflicts used to belong to a panel alone. Now a judge's (judge_id)
       -- or a whole panel's (panel_id), one of the two; every existing row
       -- keeps its panel and so keeps its meaning.
@@ -629,11 +634,13 @@ export const postgresStore: Store = {
 
   async listActivity(limit = 150) {
     return rows(
-      await query<ActivityRow>(
-        "select * from activity order by created_at desc limit $1",
+      await query<StoredActivity & { team_number: string | null }>(
+        `select a.*, t.number as team_number from activity a
+         left join teams t on t.id = a.team_id
+         order by a.created_at desc limit $1`,
         [limit],
       ),
-    );
+    ).map((a) => readActivity(a, a.team_number));
   },
 
   async findPanelByCode(code) {
@@ -1333,12 +1340,14 @@ export const postgresStore: Store = {
     // failed audit write break the thing the user actually asked for.
     try {
       await query(
-        `insert into activity (request_id, team_id, actor, action, detail)
-         values ($1, $2, $3, $4, $5)`,
+        `insert into activity (request_id, team_id, kind, actor, actor_role, action, detail)
+         values ($1, $2, $3, $4, $5, $6, $7)`,
         [
           entry.requestId ?? null,
           entry.teamId ?? null,
+          entry.kind,
           entry.actor,
+          entry.actorRole,
           entry.action,
           entry.detail ?? null,
         ],

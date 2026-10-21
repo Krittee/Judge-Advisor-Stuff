@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import { actorParts } from "@/lib/activity";
 import {
-  actorLabel,
   canAdminister,
   canFlag,
   canReadFlags,
@@ -104,7 +104,8 @@ export async function POST(request: Request) {
 
   await store().logActivity({
     teamId,
-    actor: actorLabel(session),
+    kind: "referee",
+    ...actorParts(session),
     action: `flagged ${kind}`,
     detail: [
       `Team ${team.number}`,
@@ -256,7 +257,8 @@ export async function PATCH(request: Request) {
 
   await store().logActivity({
     teamId,
-    actor: actorLabel(session),
+    kind: "referee",
+    ...actorParts(session),
     action: changedKind ? `corrected a flag: ${previousKind} → ${kind}` : "corrected a flag",
     detail: [`Team ${team?.number ?? "?"}`, ...(changes.length ? changes : ["nothing changed"])].join(
       " · ",
@@ -284,6 +286,21 @@ export async function DELETE(request: Request) {
   const id = new URL(request.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required." }, { status: 400 });
 
-  const removed = await store().removeFlag(id);
+  // Read before removing: once it is gone nothing says whose flag it was.
+  const db = store();
+  const flag = (await db.listFlags()).find((f) => f.id === id);
+  const removed = await db.removeFlag(id);
+  if (removed && flag) {
+    const team = (await db.listTeams()).find((t) => t.id === flag.team_id);
+    await db.logActivity({
+      teamId: flag.team_id,
+      kind: "referee",
+      ...actorParts(session),
+      action: `removed a flag: ${flag.kind}`,
+      detail: [`Team ${team?.number ?? "?"}`, matchReference(flag.match_type, flag.match_number), fieldLabel(flag.field)]
+        .filter(Boolean)
+        .join(" · "),
+    });
+  }
   return NextResponse.json({ ok: true, removed });
 }

@@ -1089,6 +1089,30 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     assert.equal(await store.findPanelByCode("CONF01"), null, "a deleted panel signs nobody in");
   });
 
+  it("an activity entry keeps its kind, name and role, and reads back with the number of the team it names", async (store) => {
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+
+    await store.logActivity({ teamId: team.id, kind: "referee", actor: "Jordan", actorRole: "Referee", action: "flagged minor", detail: "Team 1001" });
+    await store.logActivity({ kind: "setup", actor: "Alex", actorRole: "Judge Advisor", action: "added a judge" });
+
+    const read = async (action: string) => (await store.listActivity()).find((a) => a.action === action);
+    const flagged = await read("flagged minor");
+    assert.deepEqual(
+      [flagged?.kind, flagged?.actor, flagged?.actor_role, flagged?.team_id, flagged?.team_number, flagged?.detail],
+      ["referee", "Jordan", "Referee", team.id, "1001", "Team 1001"],
+    );
+    const setup = await read("added a judge");
+    assert.deepEqual([setup?.kind, setup?.actor, setup?.actor_role, setup?.team_id, setup?.team_number], ["setup", "Alex", "Judge Advisor", null, null]);
+
+    await store.deleteTeam(team.id);
+    assert.equal((await read("flagged minor"))?.team_number, null, "a removed team leaves the entry with no number");
+
+    await store.resetDay();
+    assert.deepEqual(await store.listActivity(), [], "a day reset clears the log");
+  });
+
   it("the same panel code cannot be issued twice", async (store) => {
     await store.createPanel(panelInput({ code: "CONF01" }));
     await assert.rejects(

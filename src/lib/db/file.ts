@@ -21,6 +21,7 @@ import type {
   Team,
 } from "../types";
 import type { Status } from "../status";
+import { readActivity, type StoredActivity } from "../activity";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
 import { divisionsCompatible } from "../presets";
@@ -85,7 +86,7 @@ type Data = {
   flags: FlagRow[];
   /** The event's program and field count; null until one is saved. */
   refereeSetup: RefereeSetup | null;
-  activity: ActivityRow[];
+  activity: StoredActivity[];
 };
 
 const FILE = resolve(process.env.DATA_FILE ?? ".data/state.json");
@@ -241,6 +242,12 @@ function migrate(data: Data): Data {
   data.judges ??= [];
   data.flags ??= [];
   data.refereeSetup ??= null;
+  // Activity entries gained a kind and the actor's role; an older one has
+  // neither and is read as what it implies (see readActivity).
+  for (const a of data.activity) {
+    a.kind ??= null;
+    a.actor_role ??= null;
+  }
   // Match and field arrived after the first flags did; rule after that,
   // then the ruleset it belongs to. A flag with no ruleset is a VEX IQ one.
   for (const f of data.flags) {
@@ -484,9 +491,11 @@ function listNotes(teamId?: string): Note[] {
 }
 
 function listActivity(limit = 150): ActivityRow[] {
+  const numbers = new Map(state().teams.map((t) => [t.id, t.number]));
   return [...state().activity]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .slice(0, limit);
+    .slice(0, limit)
+    .map((a) => readActivity(a, (a.team_id && numbers.get(a.team_id)) || null));
 }
 
 function findPanelByCode(code: string): Panel | null {
@@ -1152,7 +1161,9 @@ function logActivity(entry: NewActivity): void {
     id: randomUUID(),
     request_id: entry.requestId ?? null,
     team_id: entry.teamId ?? null,
+    kind: entry.kind,
     actor: entry.actor,
+    actor_role: entry.actorRole,
     action: entry.action,
     detail: entry.detail ?? null,
     created_at: new Date().toISOString(),

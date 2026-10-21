@@ -148,9 +148,9 @@ test("every save is logged to Activity, saying what it replaced", async () => {
   const first = log.find((a) => a.action === "Referee setup: V5RC, 3 fields");
   const latest = log.find((a) => a.action === "Referee setup: VIQRC, 1 field");
   assert.ok(first && latest);
-  assert.equal(first.actor, "referee:Dana");
+  assert.deepEqual([first.kind, first.actor, first.actor_role], ["setup", "Dana", "Referee"]);
   assert.equal(first.detail, null, "the first save replaced nothing");
-  assert.equal(latest.actor, "admin:Judge Advisor");
+  assert.deepEqual([latest.kind, latest.actor, latest.actor_role], ["setup", "Judge Advisor", "Judge Advisor"]);
   assert.equal(latest.detail, "was V5RC, 3 fields");
 });
 

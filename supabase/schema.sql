@@ -236,7 +236,9 @@ create table activity (
   id         uuid primary key default gen_random_uuid(),
   request_id uuid references requests(id) on delete cascade,
   team_id    uuid references teams(id) on delete set null,
-  actor      text not null,
+  kind       text,                            -- request / referee / conflict / setup; null = an older row, read from its action
+  actor      text not null,                   -- the plain name
+  actor_role text,                            -- 'Judge Advisor', 'Panel 2', 'Referee', 'Front desk', 'Team'
   action     text not null,
   detail     text,
   created_at timestamptz not null default now()

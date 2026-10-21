@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { actorParts } from "@/lib/activity";
 import { canAdminister, getSession } from "@/lib/auth";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
 import { divisionsCompatible, presetDivisions, resolveCategory } from "@/lib/presets";
 import { normalizePit } from "@/lib/pit";
 import { store, StoreError } from "@/lib/db";
 import { isPanelBlocked, loadBlocks } from "@/lib/conflicts";
+import type { Team } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +78,11 @@ export async function POST(request: Request) {
     await store().upsertTeams(teams);
     const assigned = autoAssign ? await store().autoAssignTeams(perPanel) : 0;
     const updated = teams.filter((t) => known.has(t.number)).length;
+    await logSetup(
+      session,
+      "imported teams",
+      `${teams.length} ${teams.length === 1 ? "team" : "teams"} · ${teams.length - updated} new`,
+    );
     return NextResponse.json({
       imported: teams.length,
       created: teams.length - updated,
@@ -112,14 +119,17 @@ export async function PATCH(request: Request) {
     }
 
     // Clears the day's requests, notes and log but keeps teams and panels.
+    // Both resets clear the log too, so the entry is written after: the first of what follows.
     if (body.action === "resetDay") {
       await store().resetDay();
+      await logSetup(session, "reset the day", "Requests, notes, scores and activity cleared");
       return NextResponse.json({ ok: true });
     }
 
     // Wipes everything, including the roster. Used to clear the demo data.
     if (body.action === "resetAll") {
       await store().resetAll();
+      await logSetup(session, "wiped everything", "Teams, panels, judges, conflicts, referee flags and setup cleared");
       return NextResponse.json({ ok: true });
     }
 
@@ -216,7 +226,14 @@ export async function PATCH(request: Request) {
       patch.number = number;
     }
 
-    return NextResponse.json({ team: await store().updateTeam(teamId, patch) });
+    const before = { ...(await store().listTeams()).find((t) => t.id === teamId) }; // updateTeam edits the stored row in place
+    const team = await store().updateTeam(teamId, patch);
+    const changed = (Object.keys(patch) as (keyof Team)[]).filter((k) => String(before[k]) !== String(team[k]));
+    if (changed.length) {
+      const named = changed.map((k) => (k === "panel_id" ? "panel" : k)).join(", ");
+      await logSetup(session, "edited a team", `Team ${team.number} · ${named}`, team.id);
+    }
+    return NextResponse.json({ team });
   } catch (e) {
     if (e instanceof StoreError) {
       return NextResponse.json({ error: e.message }, { status: e.status });
@@ -234,8 +251,14 @@ export async function DELETE(request: Request) {
   const teamId = new URL(request.url).searchParams.get("teamId");
   if (!teamId) return NextResponse.json({ error: "teamId required." }, { status: 400 });
 
+  const team = (await store().listTeams()).find((t) => t.id === teamId);
   await store().deleteTeam(teamId);
+  if (team) await logSetup(session, "removed a team", `Team ${team.number} · ${team.name}`);
   return NextResponse.json({ ok: true });
+}
+
+function logSetup(session: Awaited<ReturnType<typeof getSession>>, action: string, detail: string, teamId: string | null = null) {
+  return store().logActivity({ teamId, kind: "setup", ...actorParts(session), action, detail });
 }
 
 function clampPerPanel(value: unknown): number {

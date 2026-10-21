@@ -565,7 +565,15 @@ test("roster and conflict changes are logged with who, which judge, and which te
   assert.match(entry("declared conflicts of interest")?.detail ?? "", /^Dana R\. \(Panel 1\) · 9882K, 7700B · taken off the panel: 9882K$/);
   assert.match(entry("withdrew a conflict of interest")?.detail ?? "", /^Team 9882K · Dana R\.$/);
   assert.match(entry("removed a judge")?.detail ?? "", /^Dana R\. · 1 conflict withdrawn with them$/);
-  assert.ok(log.every((a) => a.actor === "admin:Judge Advisor"), "who is recorded");
+  assert.ok(log.every((a) => a.actor === "Judge Advisor" && a.actor_role === "Judge Advisor"), "who is recorded: the name and the role");
+  assert.deepEqual(log.map((a) => [a.action, a.kind]).sort(), [
+    ["added a judge", "setup"],
+    ["declared conflicts of interest", "conflict"],
+    ["moved a judge", "setup"],
+    ["removed a judge", "setup"],
+    ["renamed a judge", "setup"],
+    ["withdrew a conflict of interest", "conflict"],
+  ]);
 });
 
 test("removing a judge removes their conflicts and says how many", async () => {
