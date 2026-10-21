@@ -2,6 +2,7 @@ import { kindCounts, type FlagKind } from "@/components/Flags";
 import type { Ask } from "@/components/judge/logic";
 import { liveRequestFor } from "@/lib/data";
 import { normalizePit } from "@/lib/pit";
+import { divisionsCompatible } from "@/lib/presets";
 import { isPanelBlocked, panelBlocks } from "@/lib/roster";
 import { canTransition, STATUS_META, type Status } from "@/lib/status";
 import { normalizeTeamNumber } from "@/lib/teamNumber";
@@ -78,19 +79,20 @@ export function flagPills(teamId: string, flags: FlagRow[], kinds: FlagKind[]): 
 /* ---- the editor ------------------------------------------------------------ */
 
 /** What the drawer (or the phone's sheet) edits. Starts as the team is; only "Save changes" sends it. */
-export type TeamDraft = { number: string; name: string; pit: string; category: string; panelId: string };
+export type TeamDraft = { number: string; name: string; pit: string; division: string; category: string; panelId: string };
 
 export const startDraft = (team: Team): TeamDraft => ({
   number: team.number,
   name: team.name,
   pit: team.pit ?? "",
+  division: team.division,
   category: team.category,
   panelId: team.panel_id ?? "",
 });
 
 /**
  * The one PATCH body for "Save changes": the team, and each of number, name,
- * pit, notebook and panel that the draft changes, tidied the way the server
+ * pit, division, notebook and panel that the draft changes, tidied the way the server
  * tidies them. Null when nothing changed, which is what keeps Save disabled.
  *
  * Only the changed fields go, so saving a pit is never refused because the
@@ -104,6 +106,7 @@ export function teamPatch(team: Team, draft: TeamDraft): Record<string, unknown>
   if (name !== team.name.trim()) patch.name = name;
   const pit = normalizePit(draft.pit);
   if (pit !== normalizePit(team.pit)) patch.pit = pit;
+  if (draft.division !== team.division) patch.division = draft.division;
   if (draft.category !== team.category) patch.category = draft.category;
   if (draft.panelId !== (team.panel_id ?? "")) patch.panelId = draft.panelId || null;
   return Object.keys(patch).length ? patch : null;
@@ -111,10 +114,28 @@ export function teamPatch(team: Team, draft: TeamDraft): Record<string, unknown>
 
 export const isDirty = (team: Team, draft: TeamDraft): boolean => teamPatch(team, draft) !== null;
 
-/** "Save changes": the whole edit in one PATCH, or nothing when nothing changed. Returns whether it sent; the server's refusal is thrown. */
-export async function saveTeam(call: Call, team: Team, draft: TeamDraft): Promise<boolean> {
+/**
+ * The panel a move to `division` takes the team off: the one it holds, when it can't judge that
+ * division. The server clears it (PATCH with a division and no panelId); this only says so, to ask first.
+ */
+export function panelLeft(team: Team, division: string, panels: PublicPanel[]): PublicPanel | null {
+  const held = panels.find((p) => p.id === team.panel_id);
+  return held && division !== team.division && !divisionsCompatible(division, held.division) ? held : null;
+}
+
+export const moveQuestion = (team: Pick<Team, "number">, division: string, left: Pick<PublicPanel, "name" | "division">): string =>
+  `Move ${team.number} to ${division}? It comes off ${left.name} (${left.division}) and will need a panel.`;
+
+/**
+ * "Save changes": the whole edit in one PATCH, or nothing when nothing changed. Returns whether it sent; the
+ * server's refusal is thrown. A division move that takes the team off the panel it holds asks first, unless the
+ * panel was changed in the same edit (then the Judge Advisor has already chosen); a no sends nothing.
+ */
+export async function saveTeamAfterAsking(ask: Ask, call: Call, team: Team, draft: TeamDraft, panels: PublicPanel[]): Promise<boolean> {
   const patch = teamPatch(team, draft);
   if (!patch) return false;
+  const left = draft.panelId === (team.panel_id ?? "") ? panelLeft(team, draft.division, panels) : null;
+  if (left && !(await ask(moveQuestion(team, draft.division, left), { confirmLabel: "Move team" }))) return false;
   await call("/api/admin/teams", { method: "PATCH", body: { teamId: team.id, ...patch } });
   return true;
 }
@@ -123,17 +144,20 @@ export async function saveTeam(call: Call, team: Team, draft: TeamDraft): Promis
  * The panels the select offers: the Floor's allowed list (division and conflicts), plus the team's own.
  * The Floor stops offering a panel that has become blocked as a place to move to; here it must stay
  * so the select shows where the team really is, marked, instead of reading "— none —".
+ * `division` is the one being edited: the list follows it, and the held panel drops out when it can't judge it.
  */
 export function panelOptions(
   team: Team,
   panels: PublicPanel[],
   conflicts: ConflictRow[],
   judges: JudgeRow[],
+  division: string = team.division,
 ): { id: string; name: string; blocked: boolean }[] {
   const blocks = panelBlocks(conflicts, judges);
-  const allowed = new Set(allowedPanels(team, team.panel_id, panels, conflicts, judges).map((p) => p.id));
+  const held = panelLeft(team, division, panels) ? null : team.panel_id;
+  const allowed = new Set(allowedPanels({ ...team, division }, held, panels, conflicts, judges).map((p) => p.id));
   return panels
-    .filter((p) => allowed.has(p.id) || p.id === team.panel_id)
+    .filter((p) => allowed.has(p.id) || p.id === held)
     .map((p) => ({ id: p.id, name: p.name, blocked: isPanelBlocked(blocks, p.id, team.id) }));
 }
 

@@ -226,15 +226,19 @@ test("picking a row opens the drawer, titled 'Edit team · number name', beside 
   assert.match(m, /<table/);
 });
 
-test("the drawer edits number, pit, name, notebook and panel, and shows division and booked time read-only", () => {
+test("the drawer edits number, pit, name, division, notebook and panel, and shows the booked time read-only", () => {
   const d = drawer(board({ picked: rangers }));
   assert.match(d, /<label class="ja-lab" for="[^"]*-num">Team number<\/label><input id="[^"]*-num" class="ja-in" type="text"[^>]* value="4410C"/);
   assert.match(d, /<label class="ja-lab" for="[^"]*-pit">Pit<\/label><input[^>]* value="A9"/);
   assert.match(d, /<label class="ja-lab" for="[^"]*-name">Name<\/label><input[^>]* value="Robo Rangers"/);
   assert.match(d, /Pits read as a letter and a number \(A1\), which places a team on the board&#x27;s floor plan\./);
-  assert.match(d, /<span class="ja-lab">Division<\/span><span class="jg-ptag" title="Middle School">MS<\/span>/);
+  // Division is a select of the configured divisions, on the team's own.
+  assert.match(d, /<label class="ja-lab" for="[^"]*-division">Division<\/label>/);
+  const dv = selectOf(d, "division");
+  assert.deepEqual(optionsOf(dv).map((o) => o[1]), ["High School", "Middle School", "Elementary School"]);
+  assert.match(dv, /<option value="Middle School" selected="">Middle School<\/option>/);
   assert.match(d, /<span class="ja-lab">Booked<\/span><span class="ja-tm-bk">\d{1,2}:\d{2}/);
-  const nb = selectOf(d, "nb");
+  const nb = selectOf(d, "category");
   assert.deepEqual(optionsOf(nb).map((o) => o[1]), ["Developing", "Fully Developed", "Ungraded"]);
   assert.match(nb, /<option value="ungraded" selected="">Ungraded<\/option>/);
 });
@@ -249,6 +253,41 @@ test("the panel select hides blocked panels and other divisions' panels, and off
   // Pi Squad (High School) is offered Panel 1 only.
   assert.deepEqual(optionsOf(selectOf(drawer(board({ picked: pi })), "pn")), [["", "— none —"], ["p1", "Panel 1"]]);
   assert.match(drawer(board({ picked: pi })), /HS panels without a conflict/);
+});
+
+test("changing the division in the draft re-filters the panel select and its hint to the new division", () => {
+  // Torque Titans (Middle School, Panel 2) being moved to High School: Panel 2 no longer fits, Panel 1 does.
+  const d = drawer(board({ picked: titans, draft: { division: "High School" } }));
+  assert.match(selectOf(d, "division"), /<option value="High School" selected="">High School<\/option>/);
+  assert.deepEqual(optionsOf(selectOf(d, "pn")), [["", "— none —"], ["p1", "Panel 1"]]);
+  assert.match(selectOf(d, "pn"), /<option value="" selected="">— none —<\/option>/, "the held panel is no longer shown as the choice");
+  assert.match(d, /HS panels without a conflict/);
+  assert.doesNotMatch(d, /MS panels without a conflict/);
+  // Save is enabled by the division alone.
+  assert.match(d, /<button type="submit" class="ja-prim">Save changes<\/button>/);
+  // Moved back, it is as it was.
+  assert.deepEqual(optionsOf(selectOf(drawer(board({ picked: titans, draft: { division: "Middle School" } })), "pn")).map((o) => o[0]), ["", "p2", "p3"]);
+});
+
+test("every id in the rendered markup is unique, and each label points at exactly one control (toolbar and drawer share a page)", () => {
+  const views: [string, string][] = [
+    ["wide, drawer open", board({ picked: titans })],
+    ["wide, nothing picked", board()],
+    ["phone, editor sheet open", board({ wide: false, picked: titans })],
+    ["phone, filters sheet open", board({ wide: false, filtersOpen: true })],
+  ];
+  for (const [view, markup] of views) {
+    const ids = [...markup.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+    const dupes = ids.filter((id, i) => ids.indexOf(id) !== i);
+    assert.deepEqual(dupes, [], `${view}: duplicate ids`);
+    for (const [, target] of markup.matchAll(/\sfor="([^"]+)"/g)) {
+      assert.equal(ids.filter((id) => id === target).length, 1, `${view}: a label points at ${target}`);
+    }
+  }
+  // The two Notebook selects in the wide layout are different controls with their own labels.
+  const wide = board({ picked: titans });
+  assert.match(selectOf(wide, "nb"), /All notebooks/);
+  assert.match(selectOf(wide, "category"), /Fully Developed/);
 });
 
 test("the panel the team holds is selected, and says so if it is now conflicted", () => {
@@ -406,7 +445,7 @@ test("the page renders the Teams tab from its own file, in the wide layout, and 
 });
 
 test("every write goes through a logic function that asks first; nothing is sent from the markup", () => {
-  assert.ok(tab.includes("await saveTeam(call, team, draft)"), "Save is one saveTeam");
+  assert.ok(tab.includes("await saveTeamAfterAsking(ask, call, team, draft, state.panels)"), "Save is one saveTeamAfterAsking, which asks before a division move takes the panel off");
   assert.ok(tab.includes("resetStatusAfterAsking(ask, call, team, request, status)"));
   assert.ok(tab.includes("removeTeamAfterAsking(ask, call, team)"));
   assert.ok(tab.includes("openInRefereeAfterAsking(ask, team, draft, onOpenFlags)"));
@@ -430,7 +469,8 @@ test("closing the drawer, picking another row and Escape all go through the unsa
 
 test("the panel choice is the Floor's rule, not a new conflict check", () => {
   const logic = read("src/components/admin/teamsLogic.ts");
-  assert.ok(logic.includes("allowedPanels(team, team.panel_id, panels, conflicts, judges)"));
+  assert.ok(logic.includes("allowedPanels({ ...team, division }, held, panels, conflicts, judges)"));
+  assert.ok(logic.includes("divisionsCompatible(division, held.division)"), "the client only asks; the same compatibility the server uses");
   assert.ok(logic.includes("strandedTeams(teams, panels, panelBlocks(conflicts, judges))"));
   assert.ok(!/panel_id ===|\.panel_id\s*===/.test(logic.replace(/team\.panel_id \?\? ""/g, "")), "no panel_id comparison of its own");
   assert.ok(!/c\.panel_id|conflicts?\.(?:some|find)/.test(tab + logic), "no read of a conflict's panel_id");

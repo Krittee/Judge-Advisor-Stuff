@@ -9,9 +9,11 @@ import {
   interviewOf,
   isDirty,
   leaveAfterAsking,
+  moveQuestion,
   notebookCounts,
   openInRefereeAfterAsking,
   panelCell,
+  panelLeft,
   panelLoad,
   panelOptions,
   removeQuestion,
@@ -20,7 +22,7 @@ import {
   resetAfterAsking,
   resetQuestion,
   resetStatusAfterAsking,
-  saveTeam,
+  saveTeamAfterAsking,
   startDraft,
   strandedIds,
   teamPatch,
@@ -74,42 +76,117 @@ test("nothing changed means no patch, and the editor is not dirty (Save stays di
   assert.equal(isDirty(legacy, startDraft(legacy)), false);
 });
 
-test("Save sends number, name, pit, notebook and panel together in ONE PATCH", async () => {
+test("Save sends number, name, pit, division, notebook and panel together in ONE PATCH", async () => {
   const { calls, call } = caller();
-  const draft = { number: "9882l", name: "Torque Titans II", pit: "c 7", category: "fully-developed", panelId: "p3" };
-  assert.equal(await saveTeam(call, titans, draft), true);
+  const draft = { number: "9882l", name: "Torque Titans II", pit: "c 7", division: "High School", category: "fully-developed", panelId: "p1" };
+  const { ask, asked } = asker(true);
+  assert.equal(await saveTeamAfterAsking(ask, call, titans, draft, panels), true);
 
-  assert.equal(calls.length, 1, "five fields, one request");
+  assert.equal(asked.length, 0, "the panel was picked in the same edit, so there is nothing to ask");
+  assert.equal(calls.length, 1, "six fields, one request");
   assert.equal(calls[0].url, "/api/admin/teams");
   assert.equal(calls[0].method, "PATCH");
   // Tidied the way the server tidies, so what is sent is what will be stored.
   assert.deepEqual(calls[0].body, {
-    teamId: titans.id, number: "9882L", name: "Torque Titans II", pit: "C7", category: "fully-developed", panelId: "p3",
+    teamId: titans.id, number: "9882L", name: "Torque Titans II", pit: "C7", division: "High School", category: "fully-developed", panelId: "p1",
   });
 });
 
 test("only what changed is sent, so a pit can be saved while the panel it sits on is conflicted", async () => {
   const { calls, call } = caller();
-  assert.equal(await saveTeam(call, titans, { ...startDraft(titans), pit: "D1" }), true);
+  assert.equal(await saveTeamAfterAsking(asker(true).ask, call, titans, { ...startDraft(titans), pit: "D1" }, panels), true);
   assert.deepEqual(calls[0].body, { teamId: titans.id, pit: "D1" });
   assert.ok(!("panelId" in calls[0].body), "an untouched panel is not re-checked by the server");
 });
 
 test("no panel is sent as null, and a cleared pit as null", async () => {
   const { calls, call } = caller();
-  await saveTeam(call, titans, { ...startDraft(titans), panelId: "", pit: "" });
+  await saveTeamAfterAsking(asker(true).ask, call, titans, { ...startDraft(titans), panelId: "", pit: "" }, panels);
   assert.deepEqual(calls[0].body, { teamId: titans.id, pit: null, panelId: null });
 });
 
 test("Save with nothing changed sends nothing", async () => {
   const { calls, call } = caller();
-  assert.equal(await saveTeam(call, titans, startDraft(titans)), false);
+  assert.equal(await saveTeamAfterAsking(asker(true).ask, call, titans, startDraft(titans), panels), false);
   assert.equal(calls.length, 0);
 });
 
 test("the server's refusal is thrown, for the editor to show", async () => {
   const { call } = caller("Team 7700B already exists.");
-  await assert.rejects(saveTeam(call, titans, { ...startDraft(titans), number: "7700B" }), /Team 7700B already exists\./);
+  await assert.rejects(saveTeamAfterAsking(asker(true).ask, call, titans, { ...startDraft(titans), number: "7700B" }, panels), /Team 7700B already exists\./);
+});
+
+/* ---- Division: editable, and asks before it takes a team off its panel ---------------------- */
+
+// Titans (Middle School, on Panel 2) moved to High School: Panel 2 cannot judge High School.
+const toHigh = { ...startDraft(titans), division: "High School" };
+
+test("a division move that takes the team off its panel asks first, in real names, and a no sends nothing", async () => {
+  const no = asker(false);
+  const { calls, call } = caller();
+  assert.equal(await saveTeamAfterAsking(no.ask, call, titans, toHigh, panels), false);
+  assert.deepEqual(no.asked, [{
+    question: "Move 9882K to High School? It comes off Panel 2 (Middle School) and will need a panel.",
+    options: { confirmLabel: "Move team" },
+  }]);
+  assert.equal(moveQuestion(titans, "High School", panels[1]), no.asked[0].question);
+  assert.equal(calls.length, 0, "declined: nothing is sent");
+});
+
+test("a yes sends division in the one PATCH, and no panelId: the server's rule clears the panel", async () => {
+  const yes = asker(true);
+  const { calls, call } = caller();
+  assert.equal(await saveTeamAfterAsking(yes.ask, call, titans, { ...toHigh, pit: "D1" }, panels), true);
+  assert.equal(yes.asked.length, 1);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].body, { teamId: titans.id, division: "High School", pit: "D1" });
+  assert.ok(!("panelId" in calls[0].body), "the client asks and sends; the server decides what comes off");
+});
+
+test("a compatible move saves without asking: to a blended division, or with no panel to lose", async () => {
+  const blended = "Blended";
+  const withBlend = [...panels, panel(5, blended)];
+  const yes = asker(true);
+  const { calls, call } = caller();
+  // The team's Panel 2 is Middle School; a Blended team clears the wall against any panel.
+  assert.equal(await saveTeamAfterAsking(yes.ask, call, titans, { ...startDraft(titans), division: blended }, withBlend), true);
+  assert.equal(yes.asked.length, 0);
+  assert.deepEqual(calls[0].body, { teamId: titans.id, division: blended });
+  // No panel held, nothing to take off.
+  const byte = team("7700B", "Byte Me");
+  assert.equal(await saveTeamAfterAsking(yes.ask, call, byte, { ...startDraft(byte), division: "High School" }, panels), true);
+  assert.equal(yes.asked.length, 0);
+  assert.deepEqual(calls[1].body, { teamId: byte.id, division: "High School" });
+});
+
+test("changing division AND the panel in the same edit does not ask; the new panel goes with it", async () => {
+  const yes = asker(true);
+  const { calls, call } = caller();
+  assert.equal(await saveTeamAfterAsking(yes.ask, call, titans, { ...toHigh, panelId: "p1" }, panels), true);
+  assert.equal(yes.asked.length, 0);
+  assert.deepEqual(calls[0].body, { teamId: titans.id, division: "High School", panelId: "p1" });
+  // Choosing "— none —" in the same edit is a choice too.
+  await saveTeamAfterAsking(yes.ask, call, titans, { ...toHigh, panelId: "" }, panels);
+  assert.equal(yes.asked.length, 0);
+  assert.deepEqual(calls[1].body, { teamId: titans.id, division: "High School", panelId: null });
+});
+
+test("panelLeft names the held panel only when the division changes to one it cannot judge", () => {
+  assert.equal(panelLeft(titans, "High School", panels)?.id, "p2");
+  assert.equal(panelLeft(titans, "Middle School", panels), null, "same division");
+  assert.equal(panelLeft(team("7700B", "Byte Me"), "High School", panels), null, "no panel held");
+  assert.equal(panelLeft(titans, "Blended", panels), null, "a blended division is compatible with any panel");
+});
+
+test("changing division re-filters the panel select to the new division, and the held panel drops out when it no longer fits", () => {
+  const ids = (division) => panelOptions(titans, panels, [], [], division).map((o) => o.id);
+  assert.deepEqual(ids(undefined), ["p2", "p3"], "as the team is");
+  assert.deepEqual(ids("High School"), ["p1"], "Panel 2 is Middle School: gone");
+  assert.deepEqual(ids("Elementary School"), ["p4"]);
+  assert.deepEqual(ids("Middle School"), ["p2", "p3"], "back where it was");
+  // Conflicts still apply to the new division's panels.
+  const t = team("2011A", "Gear Gremlins", { panel_id: "p1", division: "High School" });
+  assert.deepEqual(panelOptions(t, panels, [conflict("c1", "j-p2", t)], [judge("j-p2", "p2")], "Middle School").map((o) => o.id), ["p3"]);
 });
 
 /* ---- closing with unsaved changes ------------------------------------------------------ */

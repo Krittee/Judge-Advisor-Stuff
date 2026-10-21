@@ -25,7 +25,7 @@ import {
   removeTeamAfterAsking,
   RESETTABLE_STATUSES,
   resetStatusAfterAsking,
-  saveTeam,
+  saveTeamAfterAsking,
   startDraft,
   strandedIds,
   type Filters,
@@ -79,7 +79,7 @@ type Slice = Pick<AppState, "teams" | "panels" | "requests" | "categories" | "di
 /**
  * The Teams section: the roster and who judges whom. Select a team to edit it
  * in a drawer (a sheet on a phone); "Save changes" sends number, name, pit,
- * notebook and panel together in one PATCH. The interview status override,
+ * division, notebook and panel together in one PATCH. The interview status override,
  * Remove team and the two resets each ask first, through the in-page confirm.
  */
 export function TeamsTab({
@@ -144,7 +144,7 @@ export function TeamsTab({
     setSaving(true);
     setError(null);
     try {
-      if (await saveTeam(call, team, draft)) {
+      if (await saveTeamAfterAsking(ask, call, team, draft, state.panels)) {
         await refresh();
         setEdit(null);
         // A sheet has done its job; a drawer stays, showing the saved team.
@@ -861,7 +861,10 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, onRemove, onO
   const set = (patch: Partial<TeamDraft>) => onDraft({ ...draft, ...patch });
   const { request, bookedAt } = interviewOf(team.id, state.requests);
   const pills = flagPills(team.id, state.flags, state.flagKinds);
-  const options = panelOptions(team, state.panels, state.conflicts, state.judges);
+  const options = panelOptions(team, state.panels, state.conflicts, state.judges, draft.division);
+  // A panel the new division cannot use is no longer in the list: the select reads "— none —", which is what Save will do (after asking).
+  const panelShown = options.some((o) => o.id === draft.panelId) ? draft.panelId : "";
+  const divisions = state.divisions.includes(draft.division) ? state.divisions : [...state.divisions, draft.division];
 
   return (
     <>
@@ -888,24 +891,33 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, onRemove, onO
       </div>
 
       <div className="ja-tm-ro">
-        <div>
-          <span className="ja-lab">Division</span>
-          <span className="jg-ptag" title={team.division}>
-            {divisionTag(team.division)}
-          </span>
+        <div className="ja-fl">
+          <label className="ja-lab" htmlFor={`${uid}-division`}>
+            Division
+          </label>
+          <div className="ja-selw">
+            <select id={`${uid}-division`} className="ja-in ja-sel" value={draft.division} onChange={(e) => set({ division: e.target.value })}>
+              {divisions.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            <ChevronDown />
+          </div>
         </div>
-        <div>
+        <div className="ja-fl">
           <span className="ja-lab">Booked</span>
           <span className={bookedAt ? "ja-tm-bk" : "ja-tm-bk ja-tm-none"}>{formatClock(bookedAt)}</span>
         </div>
       </div>
 
       <div className="ja-fl">
-        <label className="ja-lab" htmlFor={`${uid}-nb`}>
+        <label className="ja-lab" htmlFor={`${uid}-category`}>
           Notebook
         </label>
         <div className="ja-selw">
-          <select id={`${uid}-nb`} className="ja-in ja-sel" value={draft.category} onChange={(e) => set({ category: e.target.value })}>
+          <select id={`${uid}-category`} className="ja-in ja-sel" value={draft.category} onChange={(e) => set({ category: e.target.value })}>
             {state.categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.label}
@@ -922,7 +934,7 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, onRemove, onO
         </label>
         <div className="ja-selw">
           {/* Only panels that may judge this team: its own side of the division wall and no conflict (the Floor's list), plus the one it holds. */}
-          <select id={`${uid}-pn`} className="ja-in ja-sel" value={draft.panelId} onChange={(e) => set({ panelId: e.target.value })}>
+          <select id={`${uid}-pn`} className="ja-in ja-sel" value={panelShown} onChange={(e) => set({ panelId: e.target.value })}>
             <option value="">— none —</option>
             {options.map((o) => (
               <option key={o.id} value={o.id}>
@@ -933,7 +945,7 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, onRemove, onO
           </select>
           <ChevronDown />
         </div>
-        <p className="ja-hint">{divisionTag(team.division)} panels without a conflict</p>
+        <p className="ja-hint">{divisionTag(draft.division)} panels without a conflict</p>
       </div>
 
       <div className="ja-fl">
