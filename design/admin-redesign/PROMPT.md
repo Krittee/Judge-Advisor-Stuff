@@ -475,7 +475,15 @@ Today's behaviour: `TeamsTab`, `EditableCell`, `StorageHealth`,
 - **Drawer** (~368px, right side, pushes the table narrower rather than
   covering it) for the selected team, titled "Edit team · <number> <name>":
   - Team number + Pit side by side, Name; pit hint under them.
-  - Division (read-only tag) and Booked (read-only).
+  - **Division select** (user decision, after step 5: editable) and Booked
+    (read-only). Changing the division re-filters the Judge panel select to
+    the new division. On Save, if the team's current panel can't judge the
+    new division and the panel wasn't changed in the same edit, **ask
+    first**: "Move 9882K to High School? It comes off Panel 2 (Middle
+    School) and will need a panel." — then send the one PATCH (the server
+    already clears an incompatible panel; keep that the single source of
+    the rule). A compatible move (e.g. to a blended division) saves without
+    asking.
   - Notebook select.
   - Judge panel select + helper "<division> panels without a conflict".
   - Interview: status pill + "Reset to…" select, and a caution box
@@ -485,8 +493,9 @@ Today's behaviour: `TeamsTab`, `EditableCell`, `StorageHealth`,
     section with that team selected, like Scores' conduct link).
   - "Remove team" (danger-quiet) + "Asks first. Removes <n> and all its
     requests."
-  - Pinned **"Save changes"** (accent) saves number, name, pit, notebook
-    and panel together in one PATCH; disabled until something changed.
+  - Pinned **"Save changes"** (accent) saves number, name, pit, division,
+    notebook and panel together in one PATCH; disabled until something
+    changed.
     Closing the drawer with unsaved changes asks first.
 
 ### Phone (<1024px)
