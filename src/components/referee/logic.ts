@@ -1,6 +1,7 @@
 import { isValidMatchNumber } from "@/lib/match";
 import { isValidFieldPick, type FlagReport } from "@/lib/flagValidation";
 import { findMatchType } from "@/lib/rules";
+import type { Session } from "@/lib/auth";
 import type { RefereeSetup } from "@/lib/types";
 
 /**
@@ -26,6 +27,13 @@ export type CurrentMatch = { matchType: string; matchNumber: string; field: stri
 export function localDate(day: Date = new Date()): string {
   const two = (n: number) => String(n).padStart(2, "0");
   return `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}`;
+}
+
+/** Whether this session may set the event up: the head referee or the Judge
+ *  Advisor. The same rule as canSetUpRefereeing in auth.ts, which a page
+ *  cannot import (it reads cookies) -- the API refuses anyone else regardless. */
+export function canSetUp(session: Session | null | undefined): boolean {
+  return session?.role === "admin" || (session?.role === "referee" && session.head === true);
 }
 
 /** The Event setup screen shows until a setup exists for today: none at all, or

@@ -10,7 +10,7 @@ export type Session =
   | { role: "admin"; name: string }
   | { role: "judge"; name: string; panelId: string; panelName: string }
   | { role: "queuer"; name: string }
-  | { role: "referee"; name: string };
+  | { role: "referee"; name: string; head?: true };
 
 const COOKIE = "jq_session";
 const MAX_AGE = 60 * 60 * 16; // one long event day
@@ -106,8 +106,14 @@ export async function getSession(): Promise<Session | null> {
   try {
     const { payload } = await jwtVerify(token, secret());
     const role = payload.role;
-    if (role === "admin" || role === "queuer" || role === "referee") {
+    if (role === "admin" || role === "queuer") {
       return { role, name: String(payload.name ?? role) };
+    }
+    if (role === "referee") {
+      const name = String(payload.name ?? role);
+      // Only a literal `true` in a token we signed is the head referee;
+      // "true", 1 or anything else is a referee like any other.
+      return payload.head === true ? { role, name, head: true } : { role, name };
     }
     if (role === "judge" && typeof payload.panelId === "string") {
       return {
@@ -146,7 +152,7 @@ const warnedAboutCode = new Set<string>();
  * so in production they are not access codes at all — setting one
  * explicitly is refused just as firmly as leaving it unset.
  */
-const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "REF001", "ALPHA1", "BRAVO2", "CHARLIE3"]);
+const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "REF001", "HREF01", "ALPHA1", "BRAVO2", "CHARLIE3"]);
 
 /** Read and validate a code that may be left unset. */
 function configuredRoleCode(envVar: string): string {
@@ -220,6 +226,7 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
   const adminSlot = adminCodeSlots().find((slot) => sameCode(code, slot.code));
   const queuerCode = roleCode("QUEUER_CODE", "DESK01");
   const refereeCode = roleCode("REFEREE_CODE", "REF001");
+  const headRefereeCode = roleCode("HEAD_REFEREE_CODE", "HREF01");
   const cleanName = name.trim().slice(0, 60);
 
   if (adminSlot) {
@@ -230,6 +237,11 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
   }
   if (refereeCode && sameCode(code, refereeCode)) {
     return { role: "referee", name: cleanName || "Referee" };
+  }
+  // After the shared code, so if the two are set equal the code stays a
+  // plain referee's: a collision must never promote everyone.
+  if (headRefereeCode && sameCode(code, headRefereeCode)) {
+    return { role: "referee", name: cleanName || "Head referee", head: true };
   }
 
   // Judge codes live in the store, so a panel can be added mid-event
@@ -405,6 +417,15 @@ export function canReadNotes(s: Session | null): boolean {
 
 export function canAdminister(s: Session | null): boolean {
   return s?.role === "admin";
+}
+
+/**
+ * Who may set the program and field count every referee works from: the
+ * head referee (a referee signed in with HEAD_REFEREE_CODE) and the Judge
+ * Advisor. Any other referee only reads it.
+ */
+export function canSetUpRefereeing(s: Session | null): boolean {
+  return canAdminister(s) || (s?.role === "referee" && s.head === true);
 }
 
 /**

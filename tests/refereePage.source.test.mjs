@@ -30,7 +30,10 @@ function rule(selector) {
 test("the Event setup screen shows once loaded when there is no setup for today, or on request", () => {
   assert.match(pageSrc, /const settingUp = loaded && \(editingSetup \|\| needsEventSetup\(setup, today\)\)/);
   assert.ok(pageSrc.includes("const today = localDate()"), "today is the device's date");
-  assert.ok(pageSrc.includes("<EventSetup"));
+  // The head referee gets the form; every other referee gets the wait screen in its place.
+  assert.ok(pageSrc.includes("<SetupGate") && pageSrc.includes("canSetUp={mayEditSetup}"));
+  assert.ok(pageSrc.includes("const mayEditSetup = canSetUp(session)"));
+  assert.ok(!pageSrc.includes("<EventSetup"), "the page never renders the form outside the gate");
   // Not before the first poll: an empty state has no setup and would flash the screen.
   assert.ok(pageSrc.includes("if (!loaded)"));
   assert.ok(pageSrc.indexOf("if (!loaded)") < pageSrc.indexOf("if (settingUp)"));
@@ -52,6 +55,8 @@ test("the setup is reachable later from the program tag at the top, not from the
   assert.ok(!pageSrc.includes("onChangeProgram") && !sheetSrc.includes("onChangeProgram"));
   assert.ok(!pageSrc.includes("rf-setup-link") && !read("src/app/globals.css").includes("rf-setup-link"), "the foot-of-Report Event setup row is gone");
   assert.equal(pageSrc.match(/setEditingSetup\(true\)/g).length, 1, "the tag is the only way into setup");
+  // ...and only for someone who may set it up: for everyone else the tag is given no handler at all.
+  assert.ok(pageSrc.includes("onEdit={mayEditSetup ? () => setEditingSetup(true) : undefined}"));
 });
 
 test("the setup screen has the specified words, pre-fills from the last setup and defaults to 3 fields", () => {
@@ -99,14 +104,15 @@ test("the current-match bar shows the match, the field and the read-only program
   const bar = pageSrc.slice(pageSrc.indexOf('<section className="rf-mbar"'), pageSrc.indexOf("</section>", pageSrc.indexOf('<section className="rf-mbar"')));
   assert.ok(bar.includes('aria-label="Current match"'));
   assert.ok(bar.includes("matchReference(matchType, matchNumber)") && bar.includes("fieldLabel(field)"));
-  assert.ok(bar.includes("{ruleset.program}"));
+  assert.ok(bar.includes("program={ruleset.program}") && bar.includes("fieldCount={fieldCount}"));
   // The program tag is a button that opens Event setup (reachable from the top, not only the Report footer).
   const css0 = read("src/app/globals.css");
-  const tag = bar.slice(bar.lastIndexOf("<button", bar.indexOf('className="rf-ptag"')), bar.indexOf("</button>", bar.indexOf('className="rf-ptag"')));
-  assert.ok(tag.includes('<button') && tag.includes('type="button"'), "the program tag is a button");
-  assert.ok(tag.includes("aria-label={`Event setup: ${ruleset.program}, ${fieldCount}"));
-  assert.ok(tag.includes("onClick={() => setEditingSetup(true)}"));
-  assert.ok(tag.includes('{ruleset.program} · {fieldCount} {fieldCount === 1 ? "field" : "fields"}') && tag.includes('aria-hidden="true"'), "the tag shows the program and the field count");
+  const tagSrc = read("src/components/referee/HeadReferee.tsx");
+  const tag = tagSrc.slice(tagSrc.indexOf("<button"), tagSrc.indexOf("</button>"));
+  assert.ok(tag.includes('type="button"'), "the program tag is a button");
+  assert.ok(tag.includes('aria-label={`Event setup: ${program}, ${fields}`}'));
+  assert.ok(tag.includes("onClick={onEdit}"));
+  assert.ok(tagSrc.includes('const fields = `${fieldCount} ${fieldCount === 1 ? "field" : "fields"}`') && tag.includes("{text}") && tag.includes('aria-hidden="true"'), "the tag shows the program and the field count");
   assert.match(css0, /\.rf-ptag \{[^}]*white-space:\s*nowrap/, "the tag never wraps its own text");
   const css = read("src/app/globals.css");
   const ptag = css.match(/\.rf-ptag::before \{([^}]*)\}/)?.[1] ?? "";
@@ -114,6 +120,12 @@ test("the current-match bar shows the match, the field and the read-only program
   assert.ok(24 + 2 * -vy >= 44, "the 24px pill keeps a >= 44px tall hit area");
   assert.ok(-vx <= 8, "the hit area stays inside the bar's 8px gap so it never reaches Change");
   assert.ok(bar.includes("setSheetOpen(true)"));
+  // Read-only for a referee who cannot change it: the same pill, with nothing to tap and no hue of its own.
+  const ro = rule(".rf-ptag--ro {");
+  assert.match(ro, /cursor: default/);
+  assert.match(rule(".rf-ptag--ro::before"), /content: none/, "no 44px hit area over the Change button");
+  assert.match(rule(".rf-ptag--ro:hover"), /border-color: var\(--line\); color: var\(--ink-subtle\)/, "no hover state");
+  assert.ok(!/oklch|#[0-9a-f]{3,6}\b|rgb\(/i.test(ro + rule(".rf-ptag--ro::before") + rule(".rf-ptag--ro:hover")), "tokens only");
 });
 
 /* ---- the sheet ------------------------------------------------------------ */

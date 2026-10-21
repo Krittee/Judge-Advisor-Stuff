@@ -18,6 +18,7 @@ const ROLE_NAMES = { admin: "Judge Advisor", queuer: "Front desk", referee: "Ref
 export function actorParts(s: Session | null): { actor: string; actorRole: string } {
   if (!s) return { actor: "team", actorRole: "Team" };
   if (s.role === "judge") return { actor: s.name, actorRole: s.panelName };
+  if (s.role === "referee" && s.head) return { actor: s.name, actorRole: "Head referee" };
   return { actor: s.name, actorRole: ROLE_NAMES[s.role] };
 }
 

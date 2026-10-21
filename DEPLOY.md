@@ -92,6 +92,7 @@ as well:
 | `ADMIN_CODE_4` | Optional fourth Judge Advisor code. |
 | `QUEUER_CODE` | A code for whoever works the queue desk. |
 | `REFEREE_CODE` | A code for the referees, who flag what they see on the field. |
+| `HEAD_REFEREE_CODE` | A code for the head referee, who also sets the program and fields for the event. |
 | `SESSION_SECRET` | A long random string — see below. |
 
 **For `SESSION_SECRET`,** just mash your keyboard for 40+ characters. It does
@@ -166,6 +167,7 @@ A deployed app starts empty — no demo teams to clear.
 | Judges | `your-address.vercel.app/login` + their panel code |
 | Queue desk | `your-address.vercel.app/login` + your `QUEUER_CODE` |
 | Referees | `your-address.vercel.app/login` + your `REFEREE_CODE` |
+| Head referee | `your-address.vercel.app/login` + your `HEAD_REFEREE_CODE` |
 | The TV | `your-address.vercel.app/board`, then press Fullscreen |
 
 Make the team address short and readable — Vercel lets you rename the project

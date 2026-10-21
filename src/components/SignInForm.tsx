@@ -25,6 +25,11 @@ const ROLES: Record<Role, { label: string; avatar: string; tone: string }> = {
 };
 const CREW: Role[] = ["judge", "queuer", "admin"];
 
+/** What the pass calls someone: the head referee is a referee with a flag, and the same avatar. */
+function labelFor(s: Session): string {
+  return s.role === "referee" && s.head ? "Head referee" : ROLES[s.role].label;
+}
+
 /** How long the welcome panel shows before the console opens. */
 const WELCOME_MS = 900;
 
@@ -63,7 +68,7 @@ export function SignInForm({
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [signedIn, setSignedIn] = useState<Role | null>(null);
+  const [signedIn, setSignedIn] = useState<Session | null>(null);
 
   // ponytail: matched on the server's wording; give the 429 its own code if that text changes.
   const rateLimited = error?.startsWith("Too many") ?? false;
@@ -79,7 +84,7 @@ export function SignInForm({
       });
       const home = homeFor(session.role);
       router.prefetch(home);
-      setSignedIn(session.role);
+      setSignedIn(session);
       setTimeout(() => {
         router.push(home);
         router.refresh();
@@ -109,7 +114,7 @@ export function SignInForm({
 
             <div className="si-body">
               {signedIn ? (
-                <Welcome role={signedIn} />
+                <Welcome session={signedIn} />
               ) : (
                 <>
                   <h1 className="si-title" id="si-title">{title}</h1>
@@ -191,7 +196,7 @@ export function SignInForm({
 
       {/* Present from the start so screen readers announce the change. */}
       <p className="sr-only" role="status">
-        {signedIn ? `Signed in as ${ROLES[signedIn].label}. Opening the queue.` : ""}
+        {signedIn ? `Signed in as ${labelFor(signedIn)}. Opening the queue.` : ""}
       </p>
     </div>
   );
@@ -247,8 +252,9 @@ function Band({ door, checking }: { door?: Role; checking: boolean }) {
 }
 
 /** Shown in place of the form for a moment once the code is accepted. */
-function Welcome({ role }: { role: Role }) {
-  const { label, avatar, tone } = ROLES[role];
+export function Welcome({ session }: { session: Session }) {
+  const { avatar, tone } = ROLES[session.role];
+  const label = labelFor(session);
   return (
     <div className={`si-welcome ${tone}`}>
       <div className="si-hero">

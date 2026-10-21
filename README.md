@@ -47,6 +47,7 @@ cp .env.example .env.local     # then edit the codes
 | `ADMIN_CODE_2`–`ADMIN_CODE_4` | unset | Optional codes for up to three more Judge Advisors. |
 | `QUEUER_CODE` | `DESK01` | Queue desk. Can only add teams to the queue. |
 | `REFEREE_CODE` | `REF001` | Referees. Can only flag what they saw on the field. Referees must enter their name to sign in; flags are recorded under it. |
+| `HEAD_REFEREE_CODE` | `HREF01` | The head referee: a referee who can also set the program and number of fields for the event. Keep it different from `REFEREE_CODE`. |
 | `SESSION_SECRET` | insecure key | Signs the login cookie. `openssl rand -base64 32` |
 | `TRUST_PROXY` | unset | Set to `1` only if a reverse proxy **you control** sits in front of the app and sets `X-Forwarded-For` itself. See below. |
 | `DATABASE_URL` | unset | Set it to use Postgres; unset uses the JSON file. |
@@ -148,6 +149,7 @@ same refusal.
 | **Queue desk** (`QUEUER_CODE`) | any team | — | un-seen only | — | — |
 | **Judge** (panel code) | own panel | **own panel** | own panel | **own panel** | — |
 | **Referee** (`REFEREE_CODE`) | — | — | — | — | — |
+| **Head referee** (`HEAD_REFEREE_CODE`) | — | — | — | — | — |
 | **Judge Advisor** (`ADMIN_CODE`–`ADMIN_CODE_4`) | any | any | any | any | ✅ |
 
 A referee sits outside that table: they touch no interview and read no
@@ -353,15 +355,18 @@ months later when someone asks why a panel never saw a particular team.
 Referees work the field, not the judging room, and what they see there is
 often the thing a judge most needs to know. `/referee` is their page:
 
-0. **Once per event, not per device:** the first referee to open `/referee`
-   each day gets **Event setup** — the **program** (V5RC or VIQRC) and the
-   **number of fields** (1–20, default 3). It is saved for everyone, and
-   every referee then works from it, so there is no ruleset to pick on a
-   phone. The screen comes back once a day pre-filled with yesterday's
-   choice (a multi-day event is one tap), and a change to a setup other
-   referees are already using asks first. Any referee can change it later
-   from the *{PROGRAM} · {N} fields* tag at the top of the console (there is no
-   head-referee role); every save is logged in the Activity log.
+0. **Once per event, not per device:** the **head referee** (the referee who
+   signed in with `HEAD_REFEREE_CODE`) opens `/referee` each day to **Event
+   setup** — the **program** (V5RC or VIQRC) and the **number of fields**
+   (1–20, default 3). It is saved for everyone, and every referee then works
+   from it, so there is no ruleset to pick on a phone. Until it is done every
+   other referee sees *Waiting for the head referee*, and the page opens on
+   its own once it is. The screen comes back once a day pre-filled with
+   yesterday's choice (a multi-day event is one tap), and a change to a setup
+   other referees are already using asks first. The head referee, or the
+   Judge Advisor, can change it later from the *{PROGRAM} · {N} fields* tag at
+   the top of the console; other referees see that tag but cannot open it.
+   Every save is logged in the Activity log.
 1. **Set the match** — the pinned *Current match* bar (`QF 2-1 · Field 2`,
    with the program as a read-only tag) opens the *Set the match* sheet:
    **Teamwork** or **Skills**, the match type and number, and the field.
@@ -579,6 +584,10 @@ the staff page.
 
 The code is `REFEREE_CODE` (development default `REF001`, which — being
 printed here — is refused in production like every other published code).
+The head referee signs in the same way, at any door, with
+`HEAD_REFEREE_CODE` (development default `HREF01`): a referee in every
+respect, who also sets up refereeing. If the two codes are set equal, the
+code is a plain referee's.
 
 ---
 

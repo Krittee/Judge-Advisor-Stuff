@@ -183,7 +183,7 @@ export type ActivityRow = {
   request_id: string | null;
   team_id: string | null;
   kind: ActivityKind;
-  /** The plain name; `actor_role` is what they were acting as ("Judge Advisor", "Panel 2", "Referee", "Front desk", "Team"). */
+  /** The plain name; `actor_role` is what they were acting as ("Judge Advisor", "Panel 2", "Referee", "Head referee", "Front desk", "Team"). */
   actor: string;
   actor_role: string | null;
   action: string;

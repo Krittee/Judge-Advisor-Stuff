@@ -12,6 +12,11 @@ test("a new entry stores the plain name and the role it acted in", () => {
   assert.deepEqual(actorParts({ role: "queuer", name: "Sam" }), { actor: "Sam", actorRole: "Front desk" });
   assert.deepEqual(actorParts({ role: "referee", name: "Jordan" }), { actor: "Jordan", actorRole: "Referee" });
   assert.deepEqual(
+    actorParts({ role: "referee", name: "Dana", head: true }),
+    { actor: "Dana", actorRole: "Head referee" },
+    "the head referee is named as such; the same sign-in as a referee otherwise",
+  );
+  assert.deepEqual(
     actorParts({ role: "judge", name: "Priya", panelId: "p2", panelName: "Panel 2" }),
     { actor: "Priya", actorRole: "Panel 2" },
     "a judge's role is their panel's real name",

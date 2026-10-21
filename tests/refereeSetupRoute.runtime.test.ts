@@ -18,7 +18,8 @@ process.env.SESSION_SECRET = "referee-setup-test-secret-0123456789abcdef";
 delete process.env.DATABASE_URL;
 (globalThis as Record<string, unknown>).AsyncLocalStorage = AsyncLocalStorage;
 
-const REFEREE: Session = { role: "referee", name: "Dana" };
+const REFEREE: Session = { role: "referee", name: "Kim" };
+const HEAD: Session = { role: "referee", name: "Dana", head: true };
 const ADMIN: Session = { role: "admin", name: "Judge Advisor" };
 const JUDGE: Session = { role: "judge", name: "Sam", panelId: "p1", panelName: "Panel A" };
 const QUEUER: Session = { role: "queuer", name: "Front Desk" };
@@ -68,31 +69,47 @@ async function fresh() {
   return db;
 }
 
-test("a referee and the Judge Advisor may save the setup; a judge, the desk and an anonymous caller may not", async () => {
+test("the head referee and the Judge Advisor may save the setup; a referee, a judge, the desk and an anonymous caller may not", async () => {
   const db = await fresh();
 
   for (const [who, session] of [
+    ["referee", REFEREE],
     ["judge", JUDGE],
     ["queuer", QUEUER],
     ["anonymous", null],
   ] as const) {
     const { status, body } = await put(session, good);
     assert.equal(status, 403, `${who} must be refused`);
-    assert.ok(body.error);
+    assert.equal(body.error, "Only the head referee or the Judge Advisor can set up refereeing.");
     assert.equal(await db.getRefereeSetup(), null, `${who} must not have saved anything`);
     assert.deepEqual(await db.listActivity(), [], `${who} must not have logged anything`);
   }
 
-  const referee = await put(REFEREE, good);
-  assert.equal(referee.status, 200, referee.body.error);
+  const head = await put(HEAD, good);
+  assert.equal(head.status, 200, head.body.error);
   const admin = await put(ADMIN, { ...good, ruleset: "viqrc" });
   assert.equal(admin.status, 200, admin.body.error);
   assert.equal((await db.getRefereeSetup())?.ruleset, "viqrc");
 });
 
+test("a garbled head flag in a signed token does not make a referee the head, and a judge's is ignored", async () => {
+  const db = await fresh();
+  for (const [what, session] of [
+    ["the string \"true\"", { ...REFEREE, head: "true" }],
+    ["the number 1", { ...REFEREE, head: 1 }],
+    ["false", { ...REFEREE, head: false }],
+    ["a judge carrying it", { ...JUDGE, head: true }],
+    ["the desk carrying it", { ...QUEUER, head: true }],
+  ] as const) {
+    const { status } = await put(session as unknown as Session, good);
+    assert.equal(status, 403, what);
+  }
+  assert.equal(await db.getRefereeSetup(), null);
+});
+
 test("the setup is stored with who set it, the client's own date and a server timestamp", async () => {
   const db = await fresh();
-  const { status, body } = await put(REFEREE, good);
+  const { status, body } = await put(HEAD, good);
   assert.equal(status, 200, body.error);
 
   assert.equal(body.setup?.ruleset, "v5rc");
@@ -124,22 +141,22 @@ test("a bad program, field count or date is a 400 that saves nothing", async () 
     ["no date", { today: undefined }],
   ];
   for (const [what, change] of cases) {
-    const { status, body } = await put(REFEREE, { ...good, ...change });
+    const { status, body } = await put(HEAD, { ...good, ...change });
     assert.equal(status, 400, what);
     assert.ok(body.error, what);
     assert.equal(await db.getRefereeSetup(), null, `${what} must not save`);
   }
-  assert.equal((await put(REFEREE, null)).status, 400, "a body that is not an object is a bad request, not a crash");
+  assert.equal((await put(HEAD, null)).status, 400, "a body that is not an object is a bad request, not a crash");
   assert.deepEqual(await db.listActivity(), []);
 
   // The edges are fine.
-  assert.equal((await put(REFEREE, { ...good, field_count: 1 })).status, 200);
-  assert.equal((await put(REFEREE, { ...good, field_count: 20 })).status, 200);
+  assert.equal((await put(HEAD, { ...good, field_count: 1 })).status, 200);
+  assert.equal((await put(HEAD, { ...good, field_count: 20 })).status, 200);
 });
 
 test("every save is logged to Activity, saying what it replaced", async () => {
   const db = await fresh();
-  await put(REFEREE, good);
+  await put(HEAD, good);
   await put(ADMIN, { ruleset: "viqrc", field_count: 1, today: "2026-09-10" });
 
   // Found by what they say, not by position: two saves in the same millisecond have no fixed order.
@@ -148,7 +165,7 @@ test("every save is logged to Activity, saying what it replaced", async () => {
   const first = log.find((a) => a.action === "Referee setup: V5RC, 3 fields");
   const latest = log.find((a) => a.action === "Referee setup: VIQRC, 1 field");
   assert.ok(first && latest);
-  assert.deepEqual([first.kind, first.actor, first.actor_role], ["setup", "Dana", "Referee"]);
+  assert.deepEqual([first.kind, first.actor, first.actor_role], ["setup", "Dana", "Head referee"]);
   assert.equal(first.detail, null, "the first save replaced nothing");
   assert.deepEqual([latest.kind, latest.actor, latest.actor_role], ["setup", "Judge Advisor", "Judge Advisor"]);
   assert.equal(latest.detail, "was V5RC, 3 fields");
@@ -163,7 +180,7 @@ test("the setup is part of the state everyone polls (minus who set it, for anony
   assert.equal(before.refereeSetup, null);
   assert.deepEqual(ids(before), ["P", "Q", "F", "SKD", "SKA"], "no setup: VEX IQ's, as flags default to");
 
-  await put(REFEREE, good);
+  await put(HEAD, good);
   const setup = await db.getRefereeSetup();
   for (const viewer of [null, REFEREE, ADMIN, JUDGE, QUEUER]) {
     const state = await loadState(viewer);

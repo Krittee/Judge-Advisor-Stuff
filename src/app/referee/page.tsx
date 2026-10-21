@@ -7,11 +7,12 @@ import { Banner } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { FlagList, FlagSummary, flagsOnDay, kindOf } from "@/components/Flags";
 import { AllRulesPicker } from "@/components/AllRulesPicker";
-import { EventSetup } from "@/components/referee/EventSetup";
+import { ProgramTag, SetupGate } from "@/components/referee/HeadReferee";
 import { MatchSheet } from "@/components/referee/MatchSheet";
 import { RefereeFrame } from "@/components/referee/RefereeFrame";
 import { SeverityButtons } from "@/components/referee/SeverityButtons";
 import {
+  canSetUp,
   localDate,
   matchIsSet,
   needsEventSetup,
@@ -100,6 +101,9 @@ function Referee() {
   const fieldCount = setup?.field_count ?? MAX_FIELD_COUNT;
   const today = localDate();
   const settingUp = loaded && (editingSetup || needsEventSetup(setup, today));
+  // Only the head referee (or the Judge Advisor) sets it up; the rest wait for
+  // it and see it read-only.
+  const mayEditSetup = canSetUp(session);
 
   /* Arriving from the all-teams list, which passes the team it picked.
      Only seeds the box: typing over it afterwards is the point of the
@@ -274,7 +278,8 @@ function Referee() {
   if (settingUp) {
     return (
       <RefereeFrame {...frame} tabs={false}>
-        <EventSetup
+        <SetupGate
+          canSetUp={mayEditSetup}
           setup={setup}
           name={session?.name ?? ""}
           busy={setupBusy}
@@ -296,18 +301,11 @@ function Referee() {
           <b>{matchReference(matchType, matchNumber) ?? "Not set"}</b>
         </div>
         {fieldLabel(field) ? <span className="rf-mchip">{fieldLabel(field)}</span> : null}
-        <button
-          type="button"
-          className="rf-ptag"
-          aria-label={`Event setup: ${ruleset.program}, ${fieldCount} ${fieldCount === 1 ? "field" : "fields"}`}
-          title="Event setup"
-          onClick={() => setEditingSetup(true)}
-        >
-          {ruleset.program} · {fieldCount} {fieldCount === 1 ? "field" : "fields"}
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
+        <ProgramTag
+          program={ruleset.program}
+          fieldCount={fieldCount}
+          onEdit={mayEditSetup ? () => setEditingSetup(true) : undefined}
+        />
         <button type="button" className="rf-chg" onClick={() => setSheetOpen(true)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />

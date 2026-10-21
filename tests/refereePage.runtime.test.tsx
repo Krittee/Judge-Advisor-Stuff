@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { Welcome } from "../src/components/SignInForm";
 import { EventSetup } from "../src/components/referee/EventSetup";
+import { ProgramTag, SetupGate } from "../src/components/referee/HeadReferee";
 import { MatchSheet } from "../src/components/referee/MatchSheet";
 import { SeverityButtons } from "../src/components/referee/SeverityButtons";
 import type { FlagKind } from "../src/components/Flags";
@@ -164,4 +166,73 @@ test("severity buttons are filled in their tone, and the escalation ring marks a
   assert.equal(ringed.length, 1, "exactly one kind is ringed");
   assert.match(markup, /class="[^"]*ring-caution[^"]*">Major violation/);
   assert.doesNotMatch(markup, /aria-pressed="true"/, "nothing is selected on the user's behalf");
+});
+
+/* ---- the head referee ------------------------------------------------------ */
+
+const gate = (canSetUp: boolean, over: Partial<RefereeSetup> | null = null) =>
+  renderToStaticMarkup(
+    <SetupGate
+      canSetUp={canSetUp}
+      setup={over ? { ...setup, ...over } : null}
+      name="Jordan Lee"
+      busy={false}
+      error={null}
+      onSave={noop}
+    />,
+  );
+
+test("with no setup for today the head referee gets the setup form", () => {
+  const markup = gate(true);
+  assert.match(markup, /<form[^>]*class="rf-setup"/);
+  assert.match(markup, /Set up refereeing/);
+  assert.match(markup, /Start refereeing/);
+  assert.doesNotMatch(markup, /Waiting for the head referee/);
+});
+
+test("with no setup for today any other referee gets a wait screen, not the form", () => {
+  const markup = gate(false);
+  assert.match(markup, /<h1[^>]*>Waiting for the head referee<\/h1>/);
+  assert.match(
+    markup,
+    /The head referee sets the program and fields for today\. This page updates on its own once it(&#x27;|&#39;|')s done\./,
+  );
+  assert.match(markup, /role="status"/, "announced to a screen reader");
+  assert.doesNotMatch(markup, /<form|<button|<input|Set up refereeing|Start refereeing|aria-pressed/, "nothing to fill in or tap");
+  assert.doesNotMatch(markup, /Set by/, "no Set by line either");
+});
+
+test("a setup left over from another day still gets the wait screen, not a pre-filled form", () => {
+  assert.doesNotMatch(gate(false, { ruleset: "viqrc" }), /VIQRC|<form/);
+});
+
+const tag = (onEdit?: () => void) =>
+  renderToStaticMarkup(<ProgramTag program="VIQRC" fieldCount={4} onEdit={onEdit} />);
+
+test("the program tag opens the setup for the head referee", () => {
+  const markup = tag(noop);
+  assert.match(markup, /<button[^>]*type="button"[^>]*class="rf-ptag"[^>]*>VIQRC · 4 fields<svg/);
+  assert.match(markup, /aria-label="Event setup: VIQRC, 4 fields"/);
+  assert.match(markup, /title="Event setup"/);
+});
+
+test("any other referee sees the same summary as plain text: no button, nothing that opens the editor", () => {
+  const markup = tag();
+  assert.match(markup, /^<span class="rf-ptag rf-ptag--ro">VIQRC · 4 fields<\/span>$/);
+  assert.doesNotMatch(markup, /<button|aria-label|title=|<svg/);
+  assert.match(renderToStaticMarkup(<ProgramTag program="V5RC" fieldCount={1} />), />V5RC · 1 field</);
+});
+
+/* ---- sign-in -------------------------------------------------------------- */
+
+test("the success panel says Head referee for the head code and Referee otherwise, with the same avatar", () => {
+  const head = renderToStaticMarkup(<Welcome session={{ role: "referee", name: "Dana", head: true }} />);
+  const plain = renderToStaticMarkup(<Welcome session={{ role: "referee", name: "Kim" }} />);
+  assert.match(head, /Signed in as Head referee/);
+  assert.match(plain, /Signed in as Referee</);
+  assert.doesNotMatch(plain, /Head referee/);
+  const avatar = (m: string) => /src="([^"]+)"/.exec(m)?.[1];
+  assert.equal(avatar(head), "/avatars/referee.jpg");
+  assert.equal(avatar(head), avatar(plain));
+  assert.match(head, /class="si-welcome r-ref"/, "the referee pass colours");
 });

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { canSetUpRefereeing } from "../src/lib/auth";
 import {
+  canSetUp,
   localDate,
   matchIsSet,
   needsEventSetup,
@@ -32,6 +34,22 @@ test("the setup is asked for when there is none, or it was saved on another day"
   assert.equal(needsEventSetup(setup({ set_on: "2026-10-17" }), "2026-10-18"), true, "yesterday's setup");
   assert.equal(needsEventSetup(setup({ set_on: "2026-10-19" }), "2026-10-18"), true, "a date that is not today");
   assert.equal(needsEventSetup(setup(), "2026-10-18"), false, "today's setup goes straight to the console");
+});
+
+test("the console offers the setup to the head referee and the Judge Advisor, exactly as the API allows it", () => {
+  const sessions = [
+    { role: "referee", name: "Dana", head: true },
+    { role: "admin", name: "Alex" },
+    { role: "referee", name: "Kim" },
+    { role: "referee", name: "Kim", head: "true" },
+    { role: "judge", name: "Sam", panelId: "p1", panelName: "Panel A" },
+    { role: "queuer", name: "Sam" },
+    null,
+  ];
+  assert.deepEqual(sessions.map(canSetUp), [true, true, false, false, false, false, false]);
+  // The page cannot import auth.ts (it reads cookies), so this is what keeps the two rules one rule.
+  assert.deepEqual(sessions.map(canSetUp), sessions.map(canSetUpRefereeing));
+  assert.equal(canSetUp(undefined), false, "while the session is still loading");
 });
 
 test("today is the device's calendar date, zero-padded, not UTC", () => {

@@ -246,6 +246,7 @@ them. Before the real day:
    ADMIN_CODE_4=fourth-admin-code
    QUEUER_CODE=pick-something-for-the-desk
    REFEREE_CODE=pick-something-for-the-referees
+   HEAD_REFEREE_CODE=pick-something-for-the-head-referee
    ```
 3. Stop the app (`Ctrl + C`) and start it again (`npm run dev`)
 

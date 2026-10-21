@@ -153,5 +153,5 @@ rings (2px accent outline, inputs: accent border + 3px ring), all targets
   referee: empty (button disabled), referee without name (disabled), wrong
   code (banner under the code field), checking, success panel → redirect.
   Dev codes: `JA2026` (Judge Advisor), `DESK01` (Queue desk), `REF001`
-  (Referee), `ALPHA1` (a judge panel, if seeded).
+  (Referee), `HREF01` (Head referee), `ALPHA1` (a judge panel, if seeded).
 - Nothing pushed, no PR opened, until the user approves.

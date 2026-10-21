@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { actorParts } from "@/lib/activity";
-import { canAdminister, canFlag, getSession } from "@/lib/auth";
+import { canSetUpRefereeing, getSession } from "@/lib/auth";
 import { store } from "@/lib/db";
 import { parseRefereeSetup } from "@/lib/flagValidation";
 import { getRuleset } from "@/lib/rules";
@@ -19,15 +19,16 @@ function describe(setup: RefereeSetup): string {
  * event. Done once (and again for another event or day), not per match or
  * per device, so a new flag takes its ruleset from here.
  *
- * Any signed-in referee or the Judge Advisor may save it: there is no head
- * referee role. That is wide, so every save is logged to Activity with what
- * it replaced. Reading it needs no route -- it is part of /api/state.
+ * Only the head referee (the referee who signed in with HEAD_REFEREE_CODE)
+ * or the Judge Advisor may save it; every other referee works from it. Each
+ * save is logged to Activity with what it replaced. Reading it needs no
+ * route -- it is part of /api/state.
  */
 export async function PUT(request: Request) {
   const session = await getSession();
-  if (!canFlag(session) && !canAdminister(session)) {
+  if (!canSetUpRefereeing(session)) {
     return NextResponse.json(
-      { error: "Only a referee or the Judge Advisor can set up refereeing." },
+      { error: "Only the head referee or the Judge Advisor can set up refereeing." },
       { status: 403 },
     );
   }
