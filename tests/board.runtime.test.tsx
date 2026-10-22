@@ -165,7 +165,8 @@ test("Fullscreen and the theme toggle are there; console links are staff-only", 
 });
 
 test("the key names the statuses, the three markers and the divisions", () => {
-  const key = board(day);
+  // Elementary School is listed only because a team is on the roster.
+  const key = board({ ...day, teams: [...day.teams, team("7700", { division: "Elementary School" })] });
   for (const label of ["Requesting a judge", "Judges on the way", "Booked slot", "Not yet in the queue", "Fully Developed", "Developing", "Ungraded", "Elementary School"]) {
     assert.ok(key.includes(label), `the key is missing ${label}`);
   }
@@ -199,4 +200,19 @@ test("a booked tile's reserve for its clock leaves the number its full phone siz
   assert.ok(room >= 22, `the number would shrink to ${room.toFixed(1)}px, below the 22px other live tiles keep on a phone`);
   // 5- and 6-character numbers beside the same clock stay legible too.
   assert.ok((content - rc * 0.55 * 15) / (6 * 0.62) >= 18);
+});
+
+test("a division with no teams is not in the By panel key; one with teams is", () => {
+  const state = appState([team("1101")], []); // divisions: Elementary School, Middle School; the team is Middle
+  const key = board(state).slice(board(state).indexOf('id="bd-key-t"'));
+  assert.ok(key.includes("Middle School"));
+  assert.ok(!key.includes("Elementary School"), "an empty division is listed in the key");
+});
+
+test("a division with no teams on the plan is not in the pit floor key; one with teams is", () => {
+  const state = appState([team("1101", { pit: "A1" }), team("2202", { pit: null, division: "Elementary School" })], []);
+  const footer = board(state, { view: "pits" }).split('<footer class="bd-keyrow')[1];
+  assert.ok(footer.includes("Middle School") && footer.includes("1 pit"));
+  assert.ok(!footer.includes("Elementary School"), "a division with nobody on the plan is listed");
+  assert.doesNotMatch(footer, /\b0 pits\b/);
 });

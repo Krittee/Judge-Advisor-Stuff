@@ -9,6 +9,7 @@ import { formatClock } from "@/components/ui";
 import type { AppState, TeamCategoryView } from "@/lib/types";
 import {
   divisionClass,
+  divisionsInUse,
   groupByPanel,
   markerKey,
   notebookMarker,
@@ -144,7 +145,7 @@ export function BoardView({ state, online, view, hideDone, onView, onHideDone }:
               </div>
               <div className="bd-side">
                 {unassigned ? <PanelCard group={unassigned} hideDone={hideDone} state={state} /> : null}
-                <ColourKey categories={state.categories} divisions={state.divisions} />
+                <ColourKey categories={state.categories} divisions={state.divisions} used={divisionsInUse(state.divisions, state.teams)} />
               </div>
             </div>
             <p className="bd-pkey">
@@ -315,7 +316,8 @@ function MarkerDot({ marker, label }: { marker: Marker; label: string }) {
   return <span className={`bd-nb bd-nb--${shape}`} role="img" aria-label={label} />;
 }
 
-function ColourKey({ categories, divisions }: { categories: TeamCategoryView[]; divisions: string[] }) {
+/** `divisions` is the whole config list (a division's colour is its position in it); `used` is what gets listed. */
+function ColourKey({ categories, divisions, used }: { categories: TeamCategoryView[]; divisions: string[]; used: string[] }) {
   const statuses: [string, string][] = [
     ["bd-s-req", "Requesting a judge"],
     ["bd-s-en", "Judges on the way"],
@@ -340,7 +342,7 @@ function ColourKey({ categories, divisions }: { categories: TeamCategoryView[]; 
             {c.label}
           </li>
         ))}
-        {divisions.map((d, i) => (
+        {used.map((d, i) => (
           <li key={d} className={`${divisionClass(d, divisions)}${i === 0 ? " bd-gap" : ""}`}>
             <i className="bd-rg" aria-hidden="true" />
             {d}

@@ -493,7 +493,7 @@ body:has(.board) {
 /* ---- the colour key ---- */
 .bd-key { padding: calc(14 * var(--bd-u)) calc(16 * var(--bd-u)); border: 1px solid var(--line); border-radius: calc(16 * var(--bd-u)); background: var(--surface); }
 .bd-key h2 { margin-bottom: calc(8 * var(--bd-u)); color: var(--ink-subtle); font-weight: 700; font-size: calc(15 * var(--bd-u)); line-height: calc(20 * var(--bd-u)); letter-spacing: 0.14em; text-transform: uppercase; }
-.bd-key li { display: flex; align-items: center; gap: calc(10 * var(--bd-u)); color: var(--ink); font-size: calc(16 * var(--bd-u)); line-height: calc(26 * var(--bd-u)); }
+.bd-key li { display: flex; align-items: center; gap: calc(10 * var(--bd-u)); color: var(--ink); font-size: calc(16 * var(--bd-u)); line-height: calc(24 * var(--bd-u)); }
 .bd-key .bd-gap { margin-top: calc(8 * var(--bd-u)); }
 .bd-sw { display: inline-block; flex: none; width: 16px; height: 16px; border: 1px solid transparent; border-radius: 5px; }
 .board .bd-sw.bd-s-none { border-color: var(--line-strong); }

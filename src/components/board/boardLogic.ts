@@ -161,6 +161,11 @@ export function divisionClass(division: string, divisions: string[]): string {
   return `bd-dv-${(Math.max(0, divisions.indexOf(division)) % 4) + 1}`;
 }
 
+/** The divisions that have at least one of these teams, in config order: the keys list only those. */
+export function divisionsInUse(divisions: string[], teams: { division: string }[]): string[] {
+  return divisions.filter((d) => teams.some((t) => t.division === d));
+}
+
 /** "1 team", "12 teams". */
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;

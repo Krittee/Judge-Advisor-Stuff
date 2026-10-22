@@ -65,12 +65,15 @@ export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean
     .filter((p) => !isMappablePit(p.team.pit))
     .sort((a, b) => a.team.number.localeCompare(b.team.number));
 
-  const perDivision = state.divisions.map((d) => ({
-    division: d,
-    tone: divisionClass(d, state.divisions),
-    total: mapped.filter((p) => p.team.division === d).length,
-    waiting: mapped.filter((p) => p.team.division === d && p.status === "requested").length,
-  }));
+  // Only divisions with a team on the plan: "High School 0 pits" is noise on a TV.
+  const perDivision = state.divisions
+    .map((d) => ({
+      division: d,
+      tone: divisionClass(d, state.divisions),
+      total: mapped.filter((p) => p.team.division === d).length,
+      waiting: mapped.filter((p) => p.team.division === d && p.status === "requested").length,
+    }))
+    .filter((d) => d.total > 0);
 
   return (
     <div className="bd-pits">

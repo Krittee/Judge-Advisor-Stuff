@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import {
   boardOrder,
   divisionClass,
+  divisionsInUse,
   groupByPanel,
   markerKey,
   notebookMarker,
@@ -310,4 +311,13 @@ test("the number's reserve is in characters of the neighbour's own font size, wh
   assert.match(phone, /\.bd-tile \{ --bd-nom: 22px; --bd-tf: 15px;/);
   assert.match(phone, /\.bd-tt \{ font-size: 15px;/, "--bd-tf must match the phone time size");
   assert.match(phone, /\.bd-tile--big \{ --bd-nom: 32px; --bd-tf: 40px;/);
+});
+
+test("the keys list only divisions that have teams, in config order", () => {
+  const divisions = ["Elementary School", "Middle School", "High School", "Blended"];
+  const teams = [{ division: "Middle School" }, { division: "Elementary School" }, { division: "Middle School" }];
+  assert.deepEqual(divisionsInUse(divisions, teams), ["Elementary School", "Middle School"]);
+  assert.deepEqual(divisionsInUse(divisions, []), []);
+  // A division's colour still comes from its place in the whole list.
+  assert.equal(divisionClass("Middle School", divisions), "bd-dv-2");
 });
