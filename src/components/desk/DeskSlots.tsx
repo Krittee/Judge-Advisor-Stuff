@@ -93,9 +93,12 @@ export function DeskSlots({
         <span>
           {panel.name} · {panel.slot_minutes} min slots
         </span>
-        <span className="dk-tag">
-          {grid.open} of {grid.shown} open
-        </span>
+        {/* Every slot past: "0 of 0 open" says nothing the box below doesn't. */}
+        {grid.shown ? (
+          <span className="dk-tag">
+            {grid.open} of {grid.shown} open
+          </span>
+        ) : null}
       </div>
 
       {grid.open === 0 ? (

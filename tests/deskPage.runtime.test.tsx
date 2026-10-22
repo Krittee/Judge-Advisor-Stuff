@@ -362,6 +362,8 @@ test("no slots set up and none left each say so, in place of the grid", () => {
   const past = buildSlots({ ...gridPanel, slot_start_at: "2000-01-01T10:00:00.000Z", slot_count: 2 }, [], gTeams);
   assert.match(grid({ slots: past }), new RegExp(`<p>${noSlotsLeftLine(past, Date.now())}</p>`));
   assert.match(grid({ slots: past }), /No slots left today — the rest have already passed/);
+  assert.match(grid({ slots: past }), /min slots/, "the panel line stays");
+  assert.doesNotMatch(grid({ slots: past }), / open</, "no \"0 of 0 open\" when every slot is past");
 });
 
 /* ---- the wiring, read from source ------------------------------------------------------------------ */
