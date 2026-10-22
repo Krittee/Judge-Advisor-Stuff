@@ -193,7 +193,7 @@ function StatusPanel({
       {big ? <PanelTime big={big} now={now} /> : null}
       {!current && load ? (
         <p className="tp-pan-cap">
-          <PanelBusyLine load={load} plain />
+          <PanelBusyLine load={load} />
         </p>
       ) : null}
       {panel ? (
@@ -381,7 +381,7 @@ function BookedActions({
       <p className="tp-fine tp-fine--c">Either gives up your {formatClock(booking.slot_start)} slot.</p>
       {load ? (
         <p className="tp-load">
-          <PanelBusyLine load={load} plain />
+          <PanelBusyLine load={load} />
         </p>
       ) : null}
       <div className="tp-rule" aria-hidden="true" />
@@ -416,7 +416,6 @@ function SlotSection({ p, panel }: { p: TeamViewProps; panel: PublicPanel }) {
           </div>
         ) : null}
         <SlotPicker
-          variant="team"
           panel={panel}
           requests={p.requests}
           teams={p.teams}

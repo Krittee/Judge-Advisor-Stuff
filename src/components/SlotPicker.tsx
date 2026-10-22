@@ -7,12 +7,13 @@ import { formatClock } from "./ui";
 import type { PublicPanel, RequestRow, Slot, Team } from "@/lib/types";
 
 /**
- * Pick a booking slot, with conflicts shown rather than hidden.
+ * The team page's slot tiles, with conflicts shown rather than hidden.
  *
  * An earlier version listed only the free slots, which meant a full
  * schedule looked identical to a panel that runs no slots at all. Showing
  * the taken ones — and who holds them — is the difference between "no
- * times available" and "here is who you are clashing with".
+ * times available" and "here is who you are clashing with". The queue desk
+ * draws its own grid (components/desk/DeskSlots.tsx) from the same slots.
  */
 
 export type PanelLoad = {
@@ -49,16 +50,9 @@ export function noSlotsLeftLine(slots: Slot[], now: number): string {
   return `No slots left — ${slots.length - passed} taken, ${passed} already passed`;
 }
 
-/**
- * How busy this panel is right now, in one line.
- *
- * `plain` leaves the colour to the surrounding text: the team page shows it
- * on a status panel, where green and orange would read as statuses.
- */
-export function PanelBusyLine({ load, plain = false }: { load: PanelLoad; plain?: boolean }) {
-  if (!load.waiting && !load.interviewing) {
-    return <span className={plain ? undefined : "text-done-quiet"}>Panel is free right now</span>;
-  }
+/** How busy this panel is right now, in one line. Plain text: the team page shows it on a status panel. */
+export function PanelBusyLine({ load }: { load: PanelLoad }) {
+  if (!load.waiting && !load.interviewing) return <span>Panel is free right now</span>;
 
   const parts: string[] = [];
   if (load.interviewing) parts.push(`${load.interviewing} in interview`);
@@ -67,13 +61,13 @@ export function PanelBusyLine({ load, plain = false }: { load: PanelLoad; plain?
       `${load.waiting} already waiting${load.longestWait ? ` (longest ${load.longestWait} min)` : ""}`,
     );
   }
-  return <span className={plain ? undefined : "text-caution-quiet"}>{parts.join(" · ")}</span>;
+  return <span>{parts.join(" · ")}</span>;
 }
 
-const TOO_CLOSE_TITLE =
+export const TOO_CLOSE_TITLE =
   "Too close to another team's booking on this panel — judges need 20 minutes to walk between interviews";
 
-const takenTitle = (taken: NonNullable<Slot["takenBy"]>) =>
+export const takenTitle = (taken: NonNullable<Slot["takenBy"]>) =>
   `Taken by team ${taken.teamNumber} — ${STATUS_META[taken.status].label}`;
 
 export function SlotPicker({
@@ -84,7 +78,6 @@ export function SlotPicker({
   disabled,
   onPick,
   excludeRequestId,
-  variant,
 }: {
   panel: PublicPanel;
   requests: RequestRow[];
@@ -96,29 +89,15 @@ export function SlotPicker({
   /** Set while rescheduling a booking, so its own current time does not
    *  block the slots around it (see buildSlots). */
   excludeRequestId?: string;
-  /** "team" draws the team page's tiles (styled under .teampage). Left out, the
-   *  picker is the one the queue desk has always had. */
-  variant?: "team";
 }) {
   const slots = useMemo(
     () => buildSlots(panel, requests, teams, excludeRequestId),
     [panel, requests, teams, excludeRequestId],
   );
 
+  // Teams get a plain sentence; the Admin path is for staff.
   if (!slots.length) {
-    // Teams get a plain sentence; the Admin path is for staff.
-    if (variant === "team") {
-      return <p className="tp-slots-none">{`No times to book with ${panel.name}. Ask for a judge now instead.`}</p>;
-    }
-    return (
-      <div className="rounded-xl bg-caution/12 px-4 py-3 text-sm text-caution-quiet ring-1 ring-inset ring-caution/35">
-        <strong>{panel.name} has no bookable times set up yet.</strong>
-        <p className="mt-1 text-caution-quiet/80">
-          Use <strong>Interview now</strong> instead, or ask the Judge Advisor to add times:
-          Admin → Panels → {panel.name} → Booking slots.
-        </p>
-      </div>
-    );
+    return <p className="tp-slots-none">{`No times to book with ${panel.name}. Ask for a judge now instead.`}</p>;
   }
 
   const now = Date.now();
@@ -126,46 +105,18 @@ export function SlotPicker({
     (s) => !s.takenBy && !s.blocked && new Date(s.end).getTime() > now,
   ).length;
 
-  if (variant === "team") {
-    // Nothing says "open" about a tile that reads Open, so the count line is
-    // only for when nothing is left -- the reason is the part worth saying.
-    return (
-      <div>
-        {free ? null : <p className="tp-slots-note">{noSlotsLeftLine(slots, now)}</p>}
-        <div
-          className="tp-slots"
-          role="group"
-          aria-label={`Times with ${panel.name}, ${panel.slot_minutes} minutes each`}
-        >
-          {slots.map((slot) => (
-            <TeamSlot
-              key={slot.start}
-              slot={slot}
-              isMine={Boolean(teamId && slot.takenBy?.teamId === teamId)}
-              past={new Date(slot.end).getTime() <= now}
-              disabled={disabled}
-              onPick={onPick}
-            />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
+  // Nothing says "open" about a tile that reads Open, so the count line is
+  // only for when nothing is left -- the reason is the part worth saying.
   return (
     <div>
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-xs">
-        <span className="text-ink-subtle">
-          {free
-            ? `${free} of ${slots.length} slots open`
-            : noSlotsLeftLine(slots, now)}
-        </span>
-        <Legend />
-      </div>
-
-      <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(104px,1fr))]">
+      {free ? null : <p className="tp-slots-note">{noSlotsLeftLine(slots, now)}</p>}
+      <div
+        className="tp-slots"
+        role="group"
+        aria-label={`Times with ${panel.name}, ${panel.slot_minutes} minutes each`}
+      >
         {slots.map((slot) => (
-          <SlotButton
+          <TeamSlot
             key={slot.start}
             slot={slot}
             isMine={Boolean(teamId && slot.takenBy?.teamId === teamId)}
@@ -179,82 +130,9 @@ export function SlotPicker({
   );
 }
 
-function SlotButton({
-  slot,
-  isMine,
-  past,
-  disabled,
-  onPick,
-}: {
-  slot: Slot;
-  isMine: boolean;
-  past: boolean;
-  disabled?: boolean;
-  onPick: (slot: Slot) => void;
-}) {
-  const time = formatClock(slot.start);
-
-  if (isMine) {
-    return (
-      <div className="rounded-xl bg-done/20 px-2 py-2.5 text-center ring-1 ring-inset ring-done/50">
-        <div className="text-sm font-semibold text-done-quiet">{time}</div>
-        <div className="text-[11px] text-done-quiet">yours</div>
-      </div>
-    );
-  }
-
-  if (slot.takenBy) {
-    const meta = STATUS_META[slot.takenBy.status];
-    return (
-      <div
-        className="rounded-xl bg-surface px-2 py-2.5 text-center ring-1 ring-inset ring-line"
-        title={takenTitle(slot.takenBy)}
-      >
-        <div className="text-sm font-medium text-ink-faint line-through">{time}</div>
-        <div className="flex items-center justify-center gap-1 text-[11px] text-ink-subtle">
-          <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
-          {slot.takenBy.teamNumber}
-        </div>
-      </div>
-    );
-  }
-
-  if (past) {
-    return (
-      <div className="rounded-xl bg-surface px-2 py-2.5 text-center ring-1 ring-inset ring-line">
-        <div className="text-sm text-ink-faint line-through">{time}</div>
-        <div className="text-[11px] text-ink-faint">gone</div>
-      </div>
-    );
-  }
-
-  if (slot.blocked) {
-    return (
-      <div
-        className="rounded-xl bg-surface px-2 py-2.5 text-center ring-1 ring-inset ring-line"
-        title={TOO_CLOSE_TITLE}
-      >
-        <div className="text-sm text-ink-faint line-through">{time}</div>
-        <div className="text-[11px] text-ink-faint">too close</div>
-      </div>
-    );
-  }
-
-  return (
-    <button
-      disabled={disabled}
-      onClick={() => onPick(slot)}
-      className="rounded-xl bg-surface px-2 py-2.5 text-center ring-1 ring-inset ring-line transition hover:bg-accent hover:text-white disabled:opacity-40"
-    >
-      <div className="text-sm font-semibold">{time}</div>
-      <div className="text-[11px] opacity-70">free</div>
-    </button>
-  );
-}
-
 /**
- * The team page's tile: the same five cases as SlotButton, in the same order,
- * drawn as buttons (disabled when they can't be booked) styled under .teampage.
+ * The team page's tile: five cases, in this order, drawn as buttons
+ * (disabled when they can't be booked) styled under .teampage.
  */
 function TeamSlot({
   slot,
@@ -294,21 +172,5 @@ function TeamSlot({
       <b>{time}</b>
       <small>Open</small>
     </button>
-  );
-}
-
-function Legend() {
-  return (
-    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ink-faint">
-      <span className="flex items-center gap-1">
-        <span className="h-2 w-2 rounded-sm bg-surface-2" /> free
-      </span>
-      <span className="flex items-center gap-1">
-        <span className="h-2 w-2 rounded-sm bg-line-strong" /> taken
-      </span>
-      <span className="flex items-center gap-1">
-        <span className="h-2 w-2 rounded-sm bg-done/60" /> yours
-      </span>
-    </span>
   );
 }

@@ -2197,6 +2197,229 @@ body:has(.judge) > .theme-toggle:hover {
 }
 
 /* ------------------------------------------------------------------ *
+ * Queue desk ("Now / Book", design/queue-redesign/, direction B)
+ *
+ * A phone page: the top bar and the Now | Book bar stay pinned while the
+ * page scrolls, and the pinned Book / Move bar sticks to the bottom. The
+ * top bar is the judge console's. The desk's own colours are --dk-*, set
+ * here because --si-desk only exists under .signin / .landing.
+ *
+ * Colour is signal: status fills only on status chips (--c is the fill,
+ * --ci the ink on it), caution for the warnings, danger-quiet for "not
+ * found" and "Cancel booking", accent for interactive chrome. Teal only
+ * rings the avatar. Hover and focus colour changes only, nothing moves.
+ * ------------------------------------------------------------------ */
+
+.desk {
+  --dk-gutter: max(16px, calc((100vw - 32rem) / 2));
+  --dk-desk: oklch(0.740 0.110 185);
+  --dk-field: oklch(0.180 0.013 265);
+  --dk-field-line: oklch(0.520 0.014 265);
+  --dk-disabled: oklch(0.280 0.014 265);
+  /* Ink on the booked chip, whose fill is --booked-quiet: the app has no token for it. */
+  --dk-booked-ink: oklch(0.200 0.014 265);
+  --dk-ring: color-mix(in oklch, var(--accent) 35%, transparent);
+  --dk-tint: color-mix(in oklch, var(--accent) 14%, transparent);
+  --dk-tint-line: color-mix(in oklch, var(--accent) 45%, transparent);
+  --dk-danger-ring: color-mix(in oklch, var(--danger-quiet) 25%, transparent);
+
+  display: flex; min-height: 100dvh; flex-direction: column;
+  background: var(--canvas); color: var(--ink);
+}
+:root[data-theme="light"] .desk {
+  --dk-desk: oklch(0.520 0.105 185);
+  --dk-field: oklch(0.995 0.002 265);
+  --dk-field-line: oklch(0.640 0.012 265);
+  --dk-disabled: oklch(0.915 0.008 265);
+  --dk-booked-ink: oklch(0.975 0.004 265);
+}
+
+/* A status wears its fill and the ink that clears AA on it, in both themes. */
+.desk .dk-s-booked { --c: var(--booked-quiet); --ci: var(--dk-booked-ink); }
+.desk .dk-s-waiting { --c: var(--waiting); --ci: var(--waiting-ink); }
+.desk .dk-s-enroute { --c: var(--enroute); --ci: var(--enroute-ink); }
+.desk .dk-s-active { --c: var(--active); --ci: var(--active-ink); }
+.desk .dk-s-done { --c: var(--done); --ci: var(--done-ink); }
+
+.dk-who-t b, .dk-big, .dk-seg button, .dk-prim, .dk-out, .dk-slot b, .dk-q1 b, .dk-mv b {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* The app's one floating theme toggle, docked into the top bar's corner as on the judge console. */
+body:has(.desk) > .theme-toggle {
+  top: 4px; right: 6px; bottom: auto; width: 44px; height: 44px;
+  border: 0; border-radius: 12px; background: transparent; box-shadow: none; color: var(--ink-subtle);
+}
+body:has(.desk) > .theme-toggle:hover {
+  transform: none; color: var(--ink); background: color-mix(in oklch, var(--accent) 12%, transparent);
+}
+
+/* Chrome */
+.dk-top {
+  position: sticky; top: 0; z-index: 20; display: flex; flex: none; height: 52px; align-items: center; justify-content: space-between;
+  padding: 0 calc(var(--dk-gutter) - 10px) 0 calc(var(--dk-gutter) - 2px); border-bottom: 1px solid var(--line); background: var(--canvas);
+}
+.dk-who { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.dk-av { display: block; flex: none; width: 28px; height: 28px; }
+.dk-av img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 22%; box-shadow: 0 0 0 2px var(--dk-desk); }
+.dk-who-t { display: flex; min-width: 0; flex-direction: column; line-height: 1.15; }
+.dk-who-t b { font-weight: 700; font-size: 16px; }
+.dk-who-t span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-subtle); font-size: 12px; }
+.dk-top-r { display: flex; flex: none; align-items: center; gap: 2px; margin-right: 44px; }
+.dk-live { display: flex; align-items: center; gap: 6px; color: var(--done-quiet); font-weight: 500; font-size: 12px; }
+.dk-live i { width: 8px; height: 8px; border-radius: 50%; background: var(--done); }
+.dk-live[data-online="false"] { color: var(--caution-quiet); }
+.dk-live[data-online="false"] i { background: var(--caution); }
+.dk-top-r > button { min-height: 44px; padding: 0 10px; border-radius: 10px; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
+.dk-top-r > button:hover { color: var(--ink); }
+
+.dk-mbar {
+  position: sticky; top: 52px; z-index: 19; display: flex; flex: none; height: 64px; align-items: center;
+  padding: 0 var(--dk-gutter); background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.dk-seg { display: flex; flex: 1; gap: 4px; padding: 4px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--dk-field); }
+.dk-seg button {
+  display: flex; flex: 1; min-width: 0; height: 44px; align-items: center; justify-content: center; padding: 0;
+  border-radius: 10px; background: transparent; color: var(--ink-subtle); font-weight: 600; font-size: 16px;
+}
+.dk-seg button:hover { color: var(--ink); }
+.dk-seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+.dk-body { display: flex; flex: 1; flex-direction: column; gap: 10px; padding: 10px var(--dk-gutter) 12px; }
+.dk-body > * { flex: none; }
+
+/* Fields */
+.dk-lab { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 6px; font-weight: 500; font-size: 15px; line-height: 1.3; }
+.dk-tag { color: var(--ink-subtle); font-weight: 400; font-size: 13px; }
+.dk-input {
+  display: block; width: 100%; height: 48px; margin: 0; padding: 0 14px; border: 1.5px solid var(--dk-field-line); border-radius: 12px;
+  background: var(--dk-field); color: var(--ink); font-size: 16px;
+}
+.dk-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--dk-ring); }
+.dk-input::placeholder { color: var(--ink-subtle); opacity: 1; }
+.dk-big { height: 52px; padding: 0 16px; font-weight: 700; font-size: 32px; letter-spacing: 0.08em; text-transform: uppercase; }
+.dk-big::placeholder { text-transform: none; letter-spacing: 0.08em; }
+.dk-input.dk-err, .dk-input.dk-err:focus { border-color: var(--danger-quiet); }
+.dk-input.dk-err:focus { box-shadow: 0 0 0 3px var(--dk-danger-ring); }
+.dk-errln { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0 0; color: var(--danger-quiet); font-weight: 500; font-size: 14px; line-height: 1.35; }
+.dk-errln svg { flex: none; margin-top: 1px; }
+.dk-selw { position: relative; }
+.dk-sel { appearance: none; -webkit-appearance: none; padding-right: 38px; color-scheme: inherit; }
+.dk-selw svg { position: absolute; top: 15px; right: 12px; color: var(--ink-subtle); pointer-events: none; }
+.dk-two { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 10px; }
+.dk-tline { display: flex; flex-direction: column; gap: 2px; margin: 8px 0 0; color: var(--ink-subtle); font-size: 14px; line-height: 1.35; }
+.dk-tline b { color: var(--ink); font-weight: 500; }
+.dk-cover { margin: 6px 0 0; color: var(--ink-subtle); font-size: 12.5px; }
+.dk-cover p { margin: 0; font-size: 12.5px; }
+.dk-cover p.text-ink-faint { color: var(--ink-subtle); }
+.dk-hint { margin: 0; padding: 12px 14px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-subtle); font-size: 14px; }
+
+/* After an action */
+.dk-msg {
+  margin: 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+  font-size: 14px; line-height: 1.4;
+}
+.dk-msg--err { border-color: color-mix(in oklch, var(--danger-quiet) 45%, transparent); background: color-mix(in oklch, var(--danger-quiet) 10%, transparent); color: var(--danger-quiet); }
+
+/* Buttons */
+.dk-prim {
+  display: block; width: 100%; height: 52px; border-radius: 12px; background: var(--accent); color: var(--accent-ink);
+  font-weight: 700; font-size: 17px;
+}
+.dk-prim:hover:not(:disabled) { background: color-mix(in oklch, var(--accent) 88%, var(--ink)); }
+.dk-prim.dk-lg { height: 56px; font-size: 18px; }
+.dk-prim:disabled { background: var(--dk-disabled); color: var(--ink-subtle); }
+.dk-out {
+  display: block; width: 100%; height: 52px; border: 1.5px solid var(--dk-field-line); border-radius: 12px; background: transparent;
+  color: var(--ink); font-weight: 600; font-size: 17px;
+}
+.dk-out:hover:not(:disabled) { background: var(--surface-2); }
+.dk-out:disabled { opacity: 0.5; }
+.dk-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.dk-pair .dk-prim, .dk-pair .dk-out { height: 56px; padding: 0 4px; font-size: 16px; }
+.dk-pair.dk-rq { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+.dk-quiet { flex: none; min-height: 44px; padding: 0 8px; background: transparent; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
+.dk-quiet:hover:not(:disabled) { color: var(--ink); }
+.dk-quiet:disabled { opacity: 0.5; }
+.dk-quiet.dk-dg, .dk-quiet.dk-dg:hover:not(:disabled) { color: var(--danger-quiet); }
+
+/* What the team already has */
+.dk-ex { display: flex; flex-direction: column; gap: 10px; }
+.dk-stl { display: flex; align-items: center; gap: 8px; }
+.dk-stl .dk-sc { height: 28px; padding: 0 12px; font-size: 13px; }
+.dk-undo { display: flex; flex-direction: column; align-items: center; }
+.dk-undo p, .dk-cap { margin: 0; color: var(--ink-subtle); font-size: 12.5px; line-height: 1.35; }
+.dk-cap { text-align: center; }
+.dk-caution {
+  display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; border: 1px solid color-mix(in oklch, var(--caution) 35%, transparent);
+  border-radius: 12px; background: color-mix(in oklch, var(--caution) 12%, transparent); color: var(--caution-quiet);
+  font-size: 13px; line-height: 1.4; text-wrap: balance;
+}
+.dk-caution svg { flex: none; margin-top: 2px; }
+.dk-caution p { margin: 0; }
+.dk-mv {
+  display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 4px 0 12px; border: 1px solid var(--dk-tint-line);
+  border-radius: 14px; background: var(--dk-tint); font-size: 15px;
+}
+.dk-mv svg { flex: none; color: var(--accent); }
+.dk-mv p { flex: 1; min-width: 0; margin: 0; }
+.dk-mv b { font-weight: 700; }
+
+/* Chips */
+.dk-sc {
+  display: inline-flex; flex: none; height: 24px; align-items: center; justify-content: center; padding: 0 10px;
+  border: 1px solid var(--c); border-radius: 999px; background: var(--c); color: var(--ci);
+  font-weight: 500; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.dk-tm { min-width: 50px; }
+/* LanguageTag's own markup, drawn as the mock's outlined tag */
+.dk-lt > span {
+  display: inline-flex; height: 24px; align-items: center; padding: 0 7px; border: 1px solid var(--line); border-radius: 6px;
+  background: transparent; color: var(--ink-subtle); font-weight: 500; font-size: 12px; letter-spacing: 0.04em;
+}
+
+/* Slots: one row per hour, the hour on the left and the slots in fixed columns */
+.dk-slots { display: flex; flex-direction: column; gap: 8px; }
+.dk-hrow { display: grid; align-items: center; gap: 8px; }
+.dk-hrow > h3 { grid-column: 1; grid-row: 1; margin: 0; color: var(--ink-subtle); font-weight: 500; font-size: 12px; letter-spacing: 0.04em; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.dk-hrow > h3 small { display: block; font-size: 11px; letter-spacing: 0; }
+.dk-slot {
+  display: flex; min-width: 0; height: 48px; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0;
+  border: 1.5px solid var(--dk-field-line); border-radius: 12px; background: var(--dk-field); color: var(--ink); line-height: 1.1;
+}
+.dk-slot b { display: flex; align-items: center; gap: 5px; font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; }
+.dk-slot small { color: var(--ink-subtle); font-size: 12px; }
+.dk-slot:hover:not(:disabled) { border-color: var(--accent); }
+.dk-slot[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.dk-slot:disabled { border-color: var(--line); background: var(--surface); color: var(--ink-subtle); cursor: default; opacity: 1; }
+.dk-slot--taken b, .dk-slot--too-close b { font-weight: 500; text-decoration: line-through; text-decoration-thickness: 1px; }
+.dk-slot--current:disabled { border-color: var(--accent); background: var(--dk-field); color: var(--ink); }
+.dk-slot--current:disabled small { color: var(--accent-quiet); font-weight: 500; }
+
+.dk-pin { position: sticky; bottom: 0; z-index: 10; margin: 0 calc(var(--dk-gutter) * -1); padding: 10px var(--dk-gutter); background: var(--surface); border-top: 1px solid var(--line); }
+.dk-abar {
+  position: sticky; bottom: 0; z-index: 10; display: flex; flex: none; flex-direction: column; gap: 2px;
+  padding: 10px var(--dk-gutter) max(12px, env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--line);
+}
+.dk-sub { display: flex; align-items: center; justify-content: center; gap: 4px; color: var(--ink-subtle); font-size: 12.5px; }
+
+/* The lists */
+.dk-grp { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.dk-sec { display: flex; align-items: center; gap: 8px; min-height: 22px; margin: 0; color: var(--ink-subtle); font-weight: 500; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+.dk-qrow { display: flex; min-height: 52px; align-items: center; padding: 0 4px 0 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.dk-qw { border-color: color-mix(in oklch, var(--waiting) 45%, transparent); }
+.dk-qmain { display: flex; flex: 1; min-width: 0; align-self: stretch; align-items: center; gap: 8px; padding: 5px 6px 5px 10px; }
+.dk-qt { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; line-height: 1.25; }
+.dk-q1 { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
+.dk-q1 b { flex: none; font-weight: 700; font-size: 20px; }
+.dk-q1 span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.dk-q2 { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; color: var(--ink-subtle); font-size: 12.5px; }
+.dk-wt { color: var(--waiting-quiet); font-weight: 500; }
+.dk-el { color: var(--ink); font-weight: 500; }
+.dk-qrow .dk-quiet { padding: 0 6px; }
+.dk-empty { margin: 0; padding: 24px 16px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-faint); text-align: center; font-size: 14px; }
+
+/* ------------------------------------------------------------------ *
  * Judge Advisor console ("Panel board", design/admin-redesign/)
  *
  * The shell -- top bar, grouped side rail, and on a phone the Sections
