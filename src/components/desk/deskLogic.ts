@@ -181,7 +181,11 @@ export const TONE: Partial<Record<Status, "booked" | "waiting" | "enroute" | "ac
 /** Does typed text point at this team: a number it starts, or a name it is part of (any case)? */
 export function teamMatches(t: Pick<Team, "number" | "name">, query: string): boolean {
   const number = normalizeTeamNumber(query);
-  return !number || t.number.startsWith(number) || t.name.toLowerCase().includes(number.toLowerCase());
+  // The box keeps only A-Z, 0-9 and "-" (filterTeamNumberInput), so squash the
+  // name the same way: "orbit otters" arrives as ORBITOTTERS. No length cap here,
+  // so the end of a long name still matches. Non-Latin names can't be typed in.
+  const squashed = t.name.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  return !number || t.number.startsWith(number) || squashed.includes(number);
 }
 
 export type TeamListRow = { team: Team; request: RequestRow | null };

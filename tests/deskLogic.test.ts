@@ -11,8 +11,10 @@ import {
   slotGrid,
   slotKind,
   teamList,
+  teamMatches,
 } from "../src/components/desk/deskLogic";
 import { formatClock } from "../src/components/ui";
+import { filterTeamNumberInput } from "../src/lib/teamNumber";
 import type { PublicPanel, RequestRow, Slot, Team } from "../src/lib/types";
 
 /* The queue desk's decisions, run for real against
@@ -66,6 +68,18 @@ test("not found only for a complete-looking number that no roster number could s
   assert.deepEqual(look("OTTER", { roster: otters }), { kind: "none" }, "a name match is for the list to find, not an error");
   assert.deepEqual(look("9882K", { team: null, roster: otters.slice(0, 1) }), { kind: "not-found" }, "a number that is nobody's still is");
   assert.deepEqual(look("OTTERX", { roster: otters }), { kind: "not-found" });
+  // The box strips spaces and punctuation, so a typed "orbit otters" arrives as ORBITOTTERS.
+  assert.deepEqual(look("ORBITOTTERS", { roster: otters }), { kind: "none" }, "a full name with its space squashed out");
+  assert.deepEqual(look("ORBITO", { roster: otters }), { kind: "none" }, "across the space");
+});
+
+test("teamMatches: names match the way the box squashes what is typed", () => {
+  const otters = { number: "1241", name: "Orbit Otters" };
+  for (const typed of ["orbit otters", "Orbit O", "otter", "1241"]) {
+    assert.ok(teamMatches(otters, filterTeamNumberInput(typed)), typed);
+  }
+  assert.ok(teamMatches({ number: "5", name: "Alpha Beta Gamma Delta Omega" }, "OMEGA"), "no length cap on the name");
+  assert.ok(!teamMatches(otters, filterTeamNumberInput("orbit x")));
 });
 
 test("the busy text is panelLoad's numbers, or 'free now'", () => {
