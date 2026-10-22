@@ -366,6 +366,75 @@ test("no slots set up and none left each say so, in place of the grid", () => {
   assert.doesNotMatch(grid({ slots: past }), / open</, "no \"0 of 0 open\" when every slot is past");
 });
 
+/* ---- all teams ----------------------------------------------------------------------------------- */
+
+const teamRows = (m: string) => buttons(m).filter((b) => b.attrs.includes("dk-trow"));
+
+test("All teams: a section in Now and in Book, a real button per team in number order", () => {
+  for (const mode of ["now", "book"] as const) {
+    const m = view({ mode, number: "" });
+    assert.match(m, /<h2 class="dk-sec" id="dk-t-h">All teams · 5<\/h2>/);
+    const rows = teamRows(m);
+    assert.deepEqual(
+      rows.map((b) => /aria-label="([^"]*)"/.exec(b.attrs)![1]),
+      ["Select team 4410C, Robo Rangers", "Select team 5555H, High Fives", "Select team 7700B, Byte Me", "Select team 8123N, Bolt Brigade", "Select team 9882K, Torque Titans"],
+    );
+    assert.ok(rows.every((b) => b.attrs.includes('type="button"') && !b.disabled));
+  }
+  assert.ok(view({ mode: "book", number: "" }).indexOf("Booked later") < view({ mode: "book", number: "" }).indexOf("All teams"), "after the mode's own list");
+  assert.ok(view({ number: "" }).indexOf("Waiting now") < view({ number: "" }).indexOf("All teams"));
+});
+
+test("All teams: each row says its panel or 'No panel', and a status chip or booked time when it has one", () => {
+  const rows = teamRows(view({ number: "" }));
+  const by = (n: string) => rows.find((b) => b.attrs.includes(`team ${n},`))!;
+  assert.match(by("9882K").text, /Panel 2/);
+  assert.match(by("9882K").text, /Requesting a judge/);
+  assert.match(text(by("4410C").text), new RegExp(`Panel 2${formatClock(slotAt(2))}`));
+  assert.match(view({ number: "" }), new RegExp(`dk-sc dk-s-booked dk-tm">${formatClock(slotAt(2))}`));
+  assert.equal(by("8123N").text, "8123NBolt BrigadeNo panel");
+  assert.match(view({ number: "" }), /<span class="dk-np">No panel<\/span>/);
+  assert.equal(by("7700B").text, "7700BByte MePanel 2", "nothing live, no chip");
+});
+
+test("All teams: the box filters the list and the heading counts it; the team on screen is pressed", () => {
+  const m = view({ number: "77" });
+  assert.match(m, /All teams · 1 of 5/);
+  assert.deepEqual(teamRows(m).map((b) => [/team (\w+),/.exec(b.attrs)![1], /aria-pressed="(\w+)"/.exec(b.attrs)![1]]), [["7700B", "false"]], "77 is not a whole number yet, so no team is selected");
+  const sel = view({ number: "7700B" });
+  assert.deepEqual(teamRows(sel).map((b) => b.attrs.includes('aria-pressed="true"')), [true]);
+  assert.match(view({ number: "BOLT" }), /All teams · 1 of 5/, "by name");
+  assert.match(view({ number: "" }), /All teams · 5</);
+  assert.equal(teamRows(view({ number: "" })).filter((b) => b.attrs.includes('aria-pressed="true"')).length, 0);
+  assert.equal(teamRows(view({ number: "4410C" })).filter((b) => b.attrs.includes('aria-pressed="true"')).length, 1);
+});
+
+test("a name that matches a team gives no danger state; the list does the finding", () => {
+  const m = view({ number: "BYTE" });
+  assert.doesNotMatch(m, /dk-err|aria-invalid|dk-errln|No team BYTE at this event/);
+  assert.match(m, /All teams · 1 of 5/);
+  assert.match(view({ number: "BYTEZ" }), /No team BYTEZ at this event/, "no team has that in its name");
+});
+
+test("All teams: no match gives one muted line", () => {
+  const m = view({ number: "0420Z" });
+  assert.match(m, /All teams · 0 of 5/);
+  assert.equal(teamRows(m).length, 0);
+  assert.match(m, /<li class="dk-empty">No team matches 0420Z\.<\/li>/);
+});
+
+test("All teams: hidden while rescheduling", () => {
+  const m = view({ mode: "book", number: "4410C", reschedule: roboBooking });
+  assert.doesNotMatch(m, /All teams|dk-trow/);
+});
+
+test("All teams: a tap goes through the number setter, then scrolls to the top without smoothing", () => {
+  const src = noComments(read("src/components/desk/DeskView.tsx"));
+  assert.match(src, /onClick=\{\(\) => \{\s*p\.onNumber\(t\.number\);\s*window\.scrollTo\(\{ top: 0 \}\);\s*\}\}/);
+  assert.doesNotMatch(src, /smooth/);
+  assert.match(noComments(read("src/app/queue/page.tsx")), /onNumber=\{\(n\) => \{\s*setNumber\(n\);\s*setPicked\(null\);/, "the same setter typing uses");
+});
+
 /* ---- the wiring, read from source ------------------------------------------------------------------ */
 
 const noComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");

@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 import { CautionIcon, DeskSlots } from "./DeskSlots";
-import { busyText, lookupState, nextFreeStart, slotKind, TONE } from "./deskLogic";
+import { busyText, lookupState, nextFreeStart, slotKind, teamList, TONE } from "./deskLogic";
 import { LanguageCover, LanguageTag, type Language } from "@/components/Language";
 import { SignOutButton } from "@/components/judging";
 import { panelLoad } from "@/components/SlotPicker";
@@ -93,7 +93,7 @@ export function DeskView(p: DeskViewProps) {
     team,
     panel,
     existing,
-    rosterNumbers: p.teams.map((t) => t.number),
+    roster: p.teams,
   });
   const moving = reschedule && state.kind === "booked" ? reschedule : null;
 
@@ -122,6 +122,7 @@ export function DeskView(p: DeskViewProps) {
     [p.requests],
   );
 
+  const allTeams = useMemo(() => teamList(p.teams, p.requests, p.number), [p.teams, p.requests, p.number]);
   const notFound = state.kind === "not-found";
   const canRequest = Boolean(team && panel) && state.kind === "ready";
   const category = team ? (p.categories.find((c) => c.id === team.category)?.label ?? team.category) : "";
@@ -484,6 +485,58 @@ export function DeskView(p: DeskViewProps) {
                   </li>
                 );
               })}
+            </ul>
+          </section>
+        ) : null}
+
+        {/* ---- every team, to scroll and tap ---- */}
+        {!moving ? (
+          <section className="dk-grp" aria-labelledby="dk-t-h">
+            <h2 className="dk-sec" id="dk-t-h">
+              {p.number
+                ? `All teams · ${allTeams.length} of ${p.teams.length}`
+                : `All teams · ${p.teams.length}`}
+            </h2>
+            <ul className="dk-grp">
+              {allTeams.map(({ team: t, request: r }) => {
+                const pn = panelById.get(t.panel_id ?? "")?.name;
+                return (
+                  <li key={t.id}>
+                    <button
+                      type="button"
+                      className="dk-qrow dk-trow"
+                      aria-label={`Select team ${t.number}, ${t.name}`}
+                      aria-pressed={team?.id === t.id}
+                      onClick={() => {
+                        p.onNumber(t.number);
+                        window.scrollTo({ top: 0 });
+                      }}
+                    >
+                      <span className="dk-qmain">
+                        <span className="dk-qt">
+                          <span className="dk-q1">
+                            <b>{t.number}</b>
+                            <span>{t.name}</span>
+                          </span>
+                          <span className="dk-q2">
+                            <span className={pn ? undefined : "dk-np"}>{pn ?? "No panel"}</span>
+                            {r ? (
+                              r.status === "scheduled" ? (
+                                <span className="dk-sc dk-s-booked dk-tm">{formatClock(r.slot_start)}</span>
+                              ) : (
+                                <span className={`dk-sc dk-s-${TONE[r.status]}`}>{STATUS_META[r.status].label}</span>
+                              )
+                            ) : null}
+                          </span>
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+              {!allTeams.length ? (
+                <li className="dk-empty">{p.number ? `No team matches ${normalizeTeamNumber(p.number)}.` : "No teams yet."}</li>
+              ) : null}
             </ul>
           </section>
         ) : null}

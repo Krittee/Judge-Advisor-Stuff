@@ -2417,6 +2417,10 @@ body:has(.desk) > .theme-toggle:hover {
 .dk-wt { color: var(--waiting-quiet); font-weight: 500; }
 .dk-el { color: var(--ink); font-weight: 500; }
 .dk-qrow .dk-quiet { padding: 0 6px; }
+.dk-trow { width: 100%; padding: 0; color: inherit; text-align: left; }
+.dk-trow:hover, .dk-trow[aria-pressed="true"] { border-color: var(--accent); }
+.dk-trow[aria-pressed="true"] { background: var(--dk-tint); }
+.dk-np { color: var(--caution-quiet); }
 .dk-empty { margin: 0; padding: 24px 16px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-faint); text-align: center; font-size: 14px; }
 
 /* ------------------------------------------------------------------ *

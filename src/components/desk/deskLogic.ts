@@ -2,7 +2,9 @@ import type { Ask } from "@/components/judge/logic";
 import type { PanelLoad } from "@/components/SlotPicker";
 import { clockParts } from "@/components/team/teamLogic";
 import { formatClock } from "@/components/ui";
+import { liveRequestFor } from "@/lib/data";
 import type { Status } from "@/lib/status";
+import { compareTeamNumbers, normalizeTeamNumber } from "@/lib/teamNumber";
 import type { PublicPanel, RequestRow, Slot, Team } from "@/lib/types";
 
 /* The queue desk's decisions, kept apart from how they are drawn
@@ -30,7 +32,8 @@ const COMPLETE_LENGTH = 3;
  *
  * "Not found" waits until the number could not still be on its way to a real
  * one: 770 is not an error while 7700B is on the roster, and an empty box
- * says nothing at all.
+ * says nothing at all. Text that matches a team's name is not an error either:
+ * the All teams list finds that team (same matching, teamMatches).
  */
 export function lookupState(input: {
   number: string;
@@ -38,16 +41,16 @@ export function lookupState(input: {
   panel: PublicPanel | null;
   /** The team's live request, or failing that its earliest booking (liveRequestFor). */
   existing: RequestRow | null;
-  /** Every number on the roster, for telling a half-typed number from a wrong one. */
-  rosterNumbers: string[];
+  /** The whole roster, for telling a half-typed number or a name from a wrong number. */
+  roster: Pick<Team, "number" | "name">[];
 }): LookupState {
-  const { number, team, panel, existing, rosterNumbers } = input;
+  const { number, team, panel, existing, roster } = input;
   if (!team) {
     // Until the roster has arrived nothing can be called wrong.
     const complete =
       number.length >= COMPLETE_LENGTH &&
-      rosterNumbers.length > 0 &&
-      !rosterNumbers.some((n) => n.startsWith(number));
+      roster.length > 0 &&
+      !roster.some((t) => teamMatches(t, number));
     return complete ? { kind: "not-found" } : { kind: "none" };
   }
   if (existing) {
@@ -172,6 +175,28 @@ export const TONE: Partial<Record<Status, "booked" | "waiting" | "enroute" | "ac
   interviewing: "active",
   completed: "done",
 };
+
+/* ---- all teams ---------------------------------------------------------------------- */
+
+/** Does typed text point at this team: a number it starts, or a name it is part of (any case)? */
+export function teamMatches(t: Pick<Team, "number" | "name">, query: string): boolean {
+  const number = normalizeTeamNumber(query);
+  return !number || t.number.startsWith(number) || t.name.toLowerCase().includes(number.toLowerCase());
+}
+
+export type TeamListRow = { team: Team; request: RequestRow | null };
+
+/**
+ * Every team in number order, each with its live request or earliest booking.
+ * Typed text narrows it to the teams whose number starts with it or whose name
+ * contains it; an empty box is everyone.
+ */
+export function teamList(teams: Team[], requests: RequestRow[], query: string): TeamListRow[] {
+  return teams
+    .filter((t) => teamMatches(t, query))
+    .sort((a, b) => compareTeamNumbers(a.number, b.number))
+    .map((team) => ({ team, request: liveRequestFor(team.id, requests) }));
+}
 
 /* ---- cancelling a booking --------------------------------------------------------- */
 

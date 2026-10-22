@@ -10,6 +10,7 @@ import {
   nextFreeStart,
   slotGrid,
   slotKind,
+  teamList,
 } from "../src/components/desk/deskLogic";
 import { formatClock } from "../src/components/ui";
 import type { PublicPanel, RequestRow, Slot, Team } from "../src/lib/types";
@@ -30,7 +31,7 @@ const look = (number: string, over: Partial<Parameters<typeof lookupState>[0]> =
     team: roster.includes(number) ? team(number) : null,
     panel,
     existing: null,
-    rosterNumbers: roster,
+    roster: roster.map((number) => ({ number, name: `Team ${number}` })),
     ...over,
   });
 
@@ -60,7 +61,11 @@ test("not found only for a complete-looking number that no roster number could s
   assert.deepEqual(look(""), { kind: "none" }, "an empty box says nothing");
   assert.deepEqual(look("77"), { kind: "none" }, "too short to be complete");
   assert.deepEqual(look("770"), { kind: "none" }, "still on its way to 7700B");
-  assert.deepEqual(look("0420Z", { rosterNumbers: [] }), { kind: "none" }, "before the roster has arrived");
+  assert.deepEqual(look("0420Z", { roster: [] }), { kind: "none" }, "before the roster has arrived");
+  const otters = [{ number: "1241", name: "Orbit Otters" }, { number: "9882K", name: "Torque Titans" }];
+  assert.deepEqual(look("OTTER", { roster: otters }), { kind: "none" }, "a name match is for the list to find, not an error");
+  assert.deepEqual(look("9882K", { team: null, roster: otters.slice(0, 1) }), { kind: "not-found" }, "a number that is nobody's still is");
+  assert.deepEqual(look("OTTERX", { roster: otters }), { kind: "not-found" });
 });
 
 test("the busy text is panelLoad's numbers, or 'free now'", () => {
@@ -229,4 +234,35 @@ test("the desk's CSS sits after the judge console block and has no motion", () =
   const classes = new Set([...bare.matchAll(/\.([a-z][\w-]*)/g)].map((m) => m[1]));
   const stray = [...classes].filter((c) => !/^(dk-|desk$|theme-toggle$|text-ink-faint$)/.test(c));
   assert.deepEqual(stray, [], "every class in the block is the desk's own");
+});
+
+/* ---- all teams --------------------------------------------------------------------- */
+
+const named = (number: string, name: string): Team => ({ ...team(number), name });
+const roll = [named("9882K", "Torque Titans"), named("100A", "Quantum Quokkas"), named("20B", "Byte Me"), named("1122A", "Bolt Brigade")];
+const heldReq = (team_id: string, status: RequestRow["status"], id = `r-${team_id}`) => ({ id, team_id, status, slot_start: null }) as RequestRow;
+
+test("teamList: every team in number order (100 after 20), empty box means all", () => {
+  assert.deepEqual(teamList(roll, [], "").map((r) => r.team.number), ["20B", "100A", "1122A", "9882K"]);
+  assert.deepEqual(teamList(roll, [], "  ").length, 4, "nothing real typed");
+});
+
+test("teamList: narrows by number prefix and by name, either case", () => {
+  assert.deepEqual(teamList(roll, [], "11").map((r) => r.team.number), ["1122A"]);
+  assert.deepEqual(teamList(roll, [], "1").map((r) => r.team.number), ["100A", "1122A"], "prefix, not substring");
+  assert.deepEqual(teamList(roll, [], "quok").map((r) => r.team.number), ["100A"]);
+  assert.deepEqual(teamList(roll, [], "QUOK").map((r) => r.team.number), ["100A"]);
+  assert.deepEqual(teamList(roll, [], "1122a").map((r) => r.team.number), ["1122A"]);
+  assert.deepEqual(teamList(roll, [], "BYTE").map((r) => r.team.number), ["20B"]);
+  assert.deepEqual(teamList(roll, [], "zzz"), []);
+});
+
+test("teamList: pairs each team with its live request, else its booking, else null; does not reorder the input", () => {
+  const live = heldReq("t-100A", "requested");
+  const later = heldReq("t-20B", "scheduled");
+  const done = heldReq("t-9882K", "completed");
+  const input = [...roll];
+  const rows = teamList(input, [done, later, live], "");
+  assert.deepEqual(rows.map((r) => r.request?.id ?? null), [later.id, live.id, null, null]);
+  assert.deepEqual(input, roll, "the roster passed in is left as it was");
 });
