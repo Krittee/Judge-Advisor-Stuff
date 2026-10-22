@@ -427,7 +427,7 @@ test("loadState sends messages only to those who run interviews, and staff names
 
 test("no page reads the staff fields loadState nulls for the public", () => {
   // If one starts to, the board or a team page would silently go blank.
-  const pages = ["src/app/board/page.tsx", "src/app/team/[number]/page.tsx", "src/app/page.tsx"];
+  const pages = ["src/app/board/page.tsx", "src/app/team/[number]/page.tsx", "src/app/page.tsx", "src/app/team/page.tsx"];
   for (const page of pages) {
     assert.ok(!/\b(created_by|acknowledged_by|interviewer|outcome)\b/.test(read(page)), `${page} reads a nulled field`);
   }

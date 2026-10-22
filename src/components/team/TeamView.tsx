@@ -444,7 +444,7 @@ export function TeamNotFound({ number }: { number: string }) {
     <CenteredNote>
       <p className="mb-2 text-lg font-semibold">{`Team ${number} is not on the list.`}</p>
       <p className="text-ink-subtle">Check the number, or ask the Judge Advisor to add you.</p>
-      <Link href="/" className="mt-6 inline-block text-accent-quiet hover:text-accent">
+      <Link href="/team" className="mt-6 inline-block text-accent-quiet hover:text-accent">
         ← Try another number
       </Link>
     </CenteredNote>

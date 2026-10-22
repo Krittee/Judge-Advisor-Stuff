@@ -110,7 +110,7 @@ test("every page a person opens is covered by the browser checks", () => {
   walk("../src/app", "");
 
   const checked = [
-    "/", "/login", "/referee/login", "/team/[number]", "/queue",
+    "/", "/login", "/referee/login", "/team", "/team/[number]", "/queue",
     "/judge", "/referee", "/referee/teams", "/admin", "/board",
     "/judge/login", "/queue/login", "/admin/login",
   ];

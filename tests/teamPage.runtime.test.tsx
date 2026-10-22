@@ -313,7 +313,7 @@ test("a number that is not on the list says so, and offers another go", () => {
   const m = renderToStaticMarkup(<TeamNotFound number="9882K" />);
   assert.match(m, /<p class="mb-2 text-lg font-semibold">Team 9882K is not on the list\.<\/p>/);
   assert.match(m, /<p class="text-ink-subtle">Check the number, or ask the Judge Advisor to add you\.<\/p>/);
-  assert.match(m, /<a class="mt-6 inline-block text-accent-quiet hover:text-accent" href="\/">← Try another number<\/a>/);
+  assert.match(m, /<a class="mt-6 inline-block text-accent-quiet hover:text-accent" href="\/team">← Try another number<\/a>/);
 });
 
 /* ---- the page: what it keeps, read from source ------------------------------------------ */

@@ -102,7 +102,7 @@ export function SignInForm({
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M19 12H5M11 6l-6 6 6 6" />
           </svg>
-          Back to team view
+          Back to all doors
         </Link>
         {/* The app's theme toggle docks into this row via CSS. */}
       </header>

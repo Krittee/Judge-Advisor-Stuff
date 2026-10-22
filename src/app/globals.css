@@ -1071,13 +1071,9 @@ body:has(.landing) > .theme-toggle:hover {
  * ------------------------------------------------------------------ */
 
 .landing {
-  --lp-judge-tint: oklch(0.680 0.140 258 / 0.12);
-  --lp-judge-line: oklch(0.680 0.140 258 / 0.45);
   --lp-tile: oklch(0.955 0.005 265 / 0.08);
 }
 :root[data-theme="light"] .landing {
-  --lp-judge-tint: oklch(0.510 0.160 258 / 0.07);
-  --lp-judge-line: oklch(0.510 0.160 258 / 0.35);
   --lp-tile: oklch(0.225 0.016 265 / 0.06);
 }
 
@@ -1085,7 +1081,7 @@ body:has(.landing) > .theme-toggle:hover {
 body:has(.landing) > .theme-toggle { top: 0; }
 .lp-brand { display: flex; min-width: 0; align-items: center; gap: 8px; white-space: nowrap; }
 .lp-mark { display: grid; flex: none; width: 26px; height: 26px; place-items: center; border-radius: 8px; background: var(--accent); color: var(--accent-ink); }
-.lp-brand-n, .lp-title, .lp-input, .lp-h-small, .lp-h-caps, .lp-t-lg, .lp-pill {
+.lp-brand-n, .lp-title, .lp-input, .lp-t-lg, .lp-pill {
   font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
 .lp-brand-n { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
@@ -1119,18 +1115,12 @@ body:has(.landing) > .theme-toggle { top: 0; }
 .lp-btn { height: 52px; margin-top: 12px; }
 .lp-btn:active:not(:disabled) { transform: none; }
 
-.lp-legend { margin: 6px 16px 0; padding: 8px 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
-.lp-h-small { margin: 0 0 6px; color: var(--ink-subtle); font-weight: 600; font-size: 14px; line-height: 1.4; }
-.lp-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 0; padding: 0; list-style: none; }
-.lp-key { display: flex; align-items: center; gap: 8px; font-size: 14px; line-height: 1.4; }
-.lp-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; }
-
-.lp-board, .lp-row {
+.lp-board {
   display: flex; align-items: center; gap: 12px;
   border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink);
   text-decoration: none; transition: border-color 0.15s;
 }
-.lp-board:hover, .lp-board:focus-visible, .lp-row:hover, .lp-row:focus-visible { border-color: var(--accent); }
+.lp-board:hover, .lp-board:focus-visible { border-color: var(--accent); }
 .lp-board { min-height: 56px; margin: 8px 16px 0; padding: 8px 14px; }
 .lp-tile { flex: none; width: 40px; height: 40px; overflow: hidden; border-radius: 12px; background: var(--lp-tile); }
 .lp-tile img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -1141,40 +1131,156 @@ body:has(.landing) > .theme-toggle { top: 0; }
 }
 .lp-chev { flex: none; color: var(--ink-subtle); }
 
-.lp-staff, .lp-team { margin: 6px 16px 0; }
-.lp-h-caps { margin: 0 0 4px; color: var(--ink-subtle); font-weight: 700; font-size: 12px; line-height: 1.4; letter-spacing: 0.2em; text-transform: uppercase; }
-.lp-row { min-height: 48px; margin-bottom: 4px; padding: 4px 14px; }
-.lp-row:last-child { margin-bottom: 0; }
-.lp-row--judge {
-  min-height: 64px; margin-bottom: 0; padding: 10px 14px;
-  border-color: var(--lp-judge-line);
-  background: linear-gradient(var(--lp-judge-tint), var(--lp-judge-tint)), var(--surface);
-}
 .lp-rt { display: flex; flex: 1; min-width: 0; flex-direction: column; }
-.lp-t { font-weight: 500; font-size: 15px; line-height: 1.35; }
 .lp-t-lg { font-weight: 600; font-size: 16px; line-height: 1.3; }
 .lp-s { color: var(--ink-subtle); font-size: 13px; line-height: 1.35; }
-.lp-avs { display: flex; flex: none; }
-.lp-av { display: block; width: 32px; height: 32px; border-radius: 22%; box-shadow: 0 0 0 2px var(--surface); }
-.lp-av + .lp-av { margin-left: -8px; }
-.lp-av img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 22%; }
-.lp-row--judge .lp-av { width: 40px; height: 40px; box-shadow: none; }
+
+/* /team only: the quiet way back to the door page. */
+.lp-back {
+  display: inline-flex; min-height: 44px; align-items: center; gap: 6px; margin: 0 6px; padding: 0 10px;
+  border-radius: 10px; color: var(--ink-subtle); font-size: 15px; text-decoration: none;
+}
+.lp-back:hover { color: var(--ink); text-decoration: underline; }
 
 @media (min-width: 768px) {
   .lp-top { height: auto; padding: 20px 28px; }
   body:has(.landing) > .theme-toggle { top: 11px; right: 28px; }
   .lp-grid { display: grid; grid-template-columns: 1.15fr 1fr; align-items: start; gap: 32px; margin: auto; padding: 8px 32px 32px; }
-  .lp-ticket, .lp-legend { margin: 0; }
+  .lp-ticket { margin: 0; }
   .lp-title { font-size: 36px; }
   .lp-input { height: 84px; font-size: 46px; }
-  .lp-keys { grid-template-columns: 1fr; }
   .lp-board { margin: 16px 0 0; }
-  .lp-staff { margin: 20px 0 0; }
-  .lp-team { margin: 16px 0 0; }
+  .lp-back { grid-column: 1 / -1; justify-self: start; margin: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .landing *, .landing *::before, .landing *::after { transition: none !important; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Door page ("/", design/door-redesign/, direction B "Five doors", key 2)
+ *
+ * The root is `.landing .doorpage`: .landing lends the sign-in tokens, the
+ * full-height column, the top bar (.lp-top, .lp-brand, ...) and the docked
+ * theme toggle; everything else is scoped to .doorpage with a dp- prefix.
+ *
+ * Colour is signal: role colours only ring the avatars, status colours
+ * only fill the sample tiles (--c the fill, --ci the ink on it, the same
+ * pairs as the Live board), accent only on hover, focus and the LIVE pill.
+ * The tiles are a key, not controls: no hover, no focus. No animation:
+ * colour transitions only, and none of those under reduced motion.
+ * ------------------------------------------------------------------ */
+
+.doorpage {
+  --dp-tint: oklch(0.680 0.140 258 / 0.14);
+  /* Ink on the booked fill (--booked-quiet): the app has no token for it. */
+  --dp-booked-ink: oklch(0.200 0.014 265);
+  /* In srgb, not oklch: oklch takes the short hue arc to the blue-grey surface and the tint turns blue. */
+  --dp-done-tint: color-mix(in srgb, var(--done) 22%, var(--surface));
+  --dp-done-line: color-mix(in srgb, var(--done) 55%, transparent);
+}
+:root[data-theme="light"] .doorpage {
+  --dp-tint: oklch(0.510 0.160 258 / 0.09);
+  --dp-booked-ink: oklch(0.975 0.004 265);
+}
+
+.dp-title, .dp-dt, .dp-bt, .dp-pill, .dp-tl-n, .dp-tl-t {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+.doorpage ul { margin: 0; padding: 0; list-style: none; }
+
+.dp-stage { display: flex; flex: 1; }
+.dp-grid { width: 100%; max-width: 560px; margin: 0 auto; padding: 4px 16px 20px; }
+.dp-head { margin: 8px 0 14px; }
+.dp-title { margin: 0; font-weight: 700; font-size: 28px; line-height: 1.1; letter-spacing: -0.02em; }
+.dp-intro { margin: 6px 0 0; color: var(--ink-subtle); font-size: 15px; line-height: 1.4; }
+
+/* ---- the five doors ---- */
+.dp-doors { display: flex; flex-direction: column; gap: 8px; }
+.dp-cell { position: relative; }
+.dp-card {
+  display: flex; align-items: center; gap: 14px; min-height: 72px; padding: 8px 14px;
+  border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--ink);
+  text-decoration: none; transition: border-color 0.15s;
+}
+.dp-card:hover, .dp-card:focus-visible { border-color: var(--accent); }
+.dp-card > svg { flex: none; color: var(--ink-subtle); }
+.dp-rt { display: flex; flex: 1; min-width: 0; flex-direction: column; }
+.dp-dt { font-weight: 600; font-size: 17px; line-height: 1.3; }
+.dp-s { color: var(--ink-subtle); font-size: 13px; line-height: 1.35; }
+.dp-cap { margin: 4px 0 0 14px; color: var(--ink-subtle); font-size: 12px; line-height: 1.3; }
+
+/* The avatar: --rc is the role colour ringing it (the Team door has none). */
+.dp-av { --s: 48px; display: block; flex: none; width: var(--s); height: var(--s); padding: 2px; border-radius: 25%; background: var(--rc); }
+.dp-av img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 22%; }
+.dp-av--team { padding: 0; background: none; }
+.dp-gl { display: grid; width: 100%; height: 100%; place-items: center; border-radius: 25%; background: var(--lp-tile); color: var(--ink); }
+.dp-r-judge { --rc: var(--accent); }
+.dp-r-desk { --rc: var(--si-desk); }
+.dp-r-ja { --rc: var(--si-ja); }
+.dp-r-ref { --rc: repeating-linear-gradient(135deg, oklch(0.985 0.003 265) 0 4px, oklch(0.180 0.012 265) 4px 8px); }
+
+/* ---- the Live board card, with the colour key inside it ---- */
+.dp-below { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.dp-bcard { overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.dp-board {
+  display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 14px;
+  color: var(--ink); text-decoration: none; transition: background-color 0.15s;
+}
+.dp-board:hover, .dp-board:focus-visible { background: var(--dp-tint); }
+.dp-board > svg { flex: none; color: var(--ink-subtle); }
+.dp-btile { display: block; flex: none; width: 40px; height: 40px; overflow: hidden; border-radius: 12px; background: var(--lp-tile); }
+.dp-btile img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.dp-bt { font-weight: 600; font-size: 16px; line-height: 1.3; }
+.dp-pill {
+  display: inline-block; margin-left: 8px; padding: 2px 6px; vertical-align: middle;
+  border: 1px solid var(--accent); border-radius: 999px; color: var(--accent);
+  font-weight: 700; font-size: 10px; line-height: 1.2; letter-spacing: 0.16em;
+}
+.dp-samples { padding: 12px 14px 14px; border-top: 1px solid var(--line); }
+.dp-kn { margin: 0 0 10px; color: var(--ink-subtle); font-size: 13px; line-height: 1.35; }
+.dp-sg { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.dp-tl {
+  position: relative; display: flex; grid-column: span 2; height: 76px; flex-direction: column; gap: 2px;
+  padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: var(--c); color: var(--ci);
+}
+.dp-tl:nth-child(n+4) { grid-column: span 3; }
+.dp-tl-n { font-weight: 700; font-size: 20px; line-height: 22px; letter-spacing: -0.02em; white-space: nowrap; }
+.dp-tl-s { font-size: 13px; line-height: 16px; font-weight: 500; white-space: nowrap; }
+.dp-tl-t { font-weight: 700; font-size: 13px; line-height: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dp-s-bk { --c: var(--booked-quiet); --ci: var(--dp-booked-ink); }
+.dp-s-rq { --c: var(--waiting); --ci: var(--waiting-ink); }
+.dp-s-en { --c: var(--enroute); --ci: var(--enroute-ink); }
+.dp-s-in { --c: var(--active); --ci: var(--active-ink); }
+.dp-s-dn { border-color: var(--dp-done-line); background: var(--dp-done-tint); color: var(--ink); }
+
+@media (min-width: 1024px) {
+  .dp-grid { max-width: 1184px; margin: auto; padding: 8px 32px 40px; }
+  .dp-head { margin: 0 0 28px; text-align: center; }
+  .dp-title { font-size: 40px; }
+  .dp-intro { margin-top: 8px; font-size: 17px; }
+  .dp-doors { flex-direction: row; gap: 16px; }
+  .dp-cell { flex: 1; min-width: 0; }
+  .dp-card { min-height: 248px; flex-direction: column; align-items: center; gap: 0; padding: 22px 16px 16px; text-align: center; }
+  .dp-av { --s: 72px; }
+  .dp-rt { flex: 1 0 auto; margin-top: 16px; }
+  .dp-dt { font-size: 19px; }
+  .dp-s { margin-top: 4px; font-size: 14px; line-height: 1.4; }
+  .dp-card > svg { margin-top: 10px; }
+  .dp-cap { position: absolute; top: 100%; right: 0; left: 0; margin: 8px 0 0; text-align: center; }
+  .dp-below { display: grid; grid-template-columns: minmax(0, 760px); justify-content: center; gap: 0; margin-top: 52px; }
+  .dp-samples { padding: 14px 20px 20px; }
+  .dp-kn { margin-bottom: 12px; font-size: 14px; }
+  .dp-sg { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+  .dp-tl, .dp-tl:nth-child(n+4) { grid-column: auto; }
+  .dp-tl { height: 92px; padding: 12px 14px; border-radius: 12px; }
+  .dp-tl-n { font-size: 28px; line-height: 30px; }
+  .dp-tl-s { font-size: 15px; line-height: 18px; }
+  .dp-tl-t { font-size: 14px; line-height: 17px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doorpage *, .doorpage *::before, .doorpage *::after { transition: none !important; }
 }
 
 /* ------------------------------------------------------------------ *
