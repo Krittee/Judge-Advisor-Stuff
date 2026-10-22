@@ -235,7 +235,7 @@ export function pitFloor(): PitFloor {
 
 const LANGUAGE_FALLBACK: Language[] = [
   { id: "en", label: "English", short: "EN" },
-  { id: "th", label: "ไทย (Thai)", short: "TH" },
+  { id: "th", label: "Thai", short: "TH" },
 ];
 
 /** The languages interviews are conducted in. Always at least one. */
