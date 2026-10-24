@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync } from "node:fs";
 
 import { noSlotsLeftLine } from "../src/components/SlotPicker";
 import type { Slot } from "../src/lib/types";
@@ -46,10 +45,4 @@ test("a slot that passed while booked counts as taken, not as passed", () => {
     noSlotsLeftLine([slot(-2, booked), slot(-3)], now),
     "No slots left — 1 taken, 1 already passed",
   );
-});
-
-test("the picker uses the helper for its empty line rather than a fixed sentence", () => {
-  const src = readFileSync(new URL("../src/components/SlotPicker.tsx", import.meta.url), "utf8");
-  assert.ok(src.includes("noSlotsLeftLine(slots, now)"), "the empty line no longer distinguishes passed slots");
-  assert.ok(!src.includes("`All ${slots.length} slots are taken — nothing left to book`}"));
 });

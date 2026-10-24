@@ -60,10 +60,10 @@ export function QueueTab({
   const sections = groupQueue(cards, hero, completed);
   const heroWaiting = hero?.request?.status === "requested";
   const alert = heroWaiting ? [] : waitingAlert(sections.waiting, ctx.now);
-  const rows = (list: QueueCard[], done = false) =>
+  const rows = (list: QueueCard[]) =>
     list.map((c) => (
       <li key={c.team.id}>
-        <Row card={c} done={done} {...ctx} />
+        <Row card={c} {...ctx} />
       </li>
     ));
 
@@ -128,7 +128,7 @@ export function QueueTab({
             <span className="jg-dp">{sections.done.map((c) => c.team.number).join(" · ")}</span>
             <ChevronDown />
           </summary>
-          <ul className="jg-list">{rows(sections.done, true)}</ul>
+          <ul className="jg-list">{rows(sections.done)}</ul>
         </details>
       ) : null}
     </>
@@ -314,7 +314,7 @@ function Row({
   busy,
   onAdvance,
   onOpen,
-}: Context & { card: QueueCard; done?: boolean }) {
+}: Context & { card: QueueCard }) {
   const { team, request } = card;
   const status = request?.status;
   const meta = teamMeta(team, categories);

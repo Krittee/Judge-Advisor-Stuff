@@ -6,9 +6,6 @@ import {
   agoParts,
   statusCaps,
   bigTimeOf,
-  canCancel,
-  cancelAfterAsking,
-  cancelPrompt,
   clockParts,
   earlierToday,
   historyTime,
@@ -139,57 +136,6 @@ test("a clock time splits into big digits and a small AM/PM, and puts back the s
   assert.equal([time, period].filter(Boolean).join(" ").replace(/\s/g, " "), formatClock(SLOT).replace(/\s/g, " "));
 });
 
-/* ---- cancelling ------------------------------------------------------------------ */
-
-test("cancel is offered only while the request has not been picked up", () => {
-  assert.deepEqual(["scheduled", "requested", "acknowledged", "interviewing"].map((status) => canCancel({ status })), [true, true, false, false]);
-});
-
-test("the question names what is being given up", () => {
-  assert.deepEqual(cancelPrompt({ status: "scheduled", slot_start: SLOT }), { question: `Cancel your ${formatClock(SLOT)} booking?`, confirmLabel: "Cancel booking" });
-  assert.deepEqual(cancelPrompt({ status: "requested", slot_start: null }), { question: "Cancel your request for a judge?", confirmLabel: "Cancel request" });
-});
-
-test("cancel asks first, as a danger action; on a no nothing is sent", async () => {
-  const asked = [];
-  let sent = 0;
-  const ask = async (question, options) => {
-    asked.push([question, options]);
-    return false;
-  };
-  const did = await cancelAfterAsking(ask, { status: "requested", slot_start: null }, async () => {
-    sent++;
-  });
-  assert.equal(did, false);
-  assert.equal(sent, 0, "a declined cancel must send nothing");
-  assert.deepEqual(asked, [["Cancel your request for a judge?", { confirmLabel: "Cancel request", cancelLabel: "Keep it", danger: true }]]);
-});
-
-test("on a yes the cancel is sent, once, after the question", async () => {
-  const order = [];
-  const did = await cancelAfterAsking(
-    async () => {
-      order.push("asked");
-      return true;
-    },
-    { status: "scheduled", slot_start: SLOT },
-    async () => {
-      order.push("sent");
-    },
-  );
-  assert.equal(did, true);
-  assert.deepEqual(order, ["asked", "sent"]);
-});
-
-test("a failed send is the caller's to show: it is not swallowed", async () => {
-  await assert.rejects(
-    cancelAfterAsking(async () => true, { status: "requested", slot_start: null }, async () => {
-      throw new Error("Request failed (500)");
-    }),
-    /Request failed \(500\)/,
-  );
-});
-
 /* ---- earlier today ---------------------------------------------------------------- */
 
 test("earlier today is the team's other requests, at most five, in the order given", () => {
@@ -309,18 +255,21 @@ test("the page has no motion: no keyframes, no animation, and its transitions go
   }
 });
 
-test("the layout: one column to 560px, two columns from 1024px, a horizontal track and four slot columns there", () => {
+test("the layout: one column to 560px, two columns from 1024px, a horizontal track there", () => {
   assert.match(bare, /\.tp-grid \{[^}]*max-width: 560px/);
   const wide = bare.slice(bare.indexOf("@media (min-width: 1024px)"));
   assert.match(wide, /\.tp-grid \{[^}]*grid-template-columns: 1fr 1fr/);
   assert.match(wide, /\.tp-track ol \{[^}]*repeat\(5, minmax\(0, 1fr\)\)/);
-  assert.match(wide, /\.tp-slots \{[^}]*repeat\(4, minmax\(0, 1fr\)\)/);
 });
 
-test("controls keep 44px tap targets", () => {
-  for (const [selector, min] of [[".tp-btn--out", 44], [".tp-seg button", 44], [".tp-chip", 44], [".tp-alert-x", 44], [".tp-more", 44], [".tp-dsc-h", 56]]) {
-    const rule = new RegExp(`${selector.replace(/[.[\]]/g, "\\$&")} \\{[^}]*\\b(?:min-)?height: (\\d+)px`).exec(bare);
-    assert.ok(rule, `${selector} sets no height`);
-    assert.ok(Number(rule[1]) >= min, `${selector} is ${rule[1]}px tall`);
-  }
+test("the one control left, the board link, keeps a 44px tap target", () => {
+  const rule = /\.tp-more \{[^}]*\bmin-height: (\d+)px/.exec(bare);
+  assert.ok(rule, ".tp-more sets no height");
+  assert.ok(Number(rule[1]) >= 44, `.tp-more is ${rule[1]}px tall`);
+});
+
+test("the stylesheet carries nothing for what the page no longer has: alert, note field, buttons, slot grid", () => {
+  assert.doesNotMatch(bare, /\.tp-(?:alert|field|btn|pair|seg|chips?|dsc|slots?|lbl|fine|load|rule|h-q)\b/);
+  assert.doesNotMatch(bare, /--tp-(?:danger|tint|ring|disabled)\b|--tp-field\b(?!-)/);
+  assert.doesNotMatch(css, /\.jg-cx\b/, "the judge console's cancel-x button is gone");
 });

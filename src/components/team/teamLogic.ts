@@ -1,4 +1,3 @@
-import type { Ask } from "@/components/judge/logic";
 import { formatClock, formatMinutes } from "@/components/ui";
 import { STATUS_META, type Status } from "@/lib/status";
 import type { RequestRow } from "@/lib/types";
@@ -147,34 +146,6 @@ export function stepTime(at: StepAt, now: number): string {
   if (at.kind === "clock") return formatClock(at.iso);
   const { text, suffix } = agoParts(at.iso, now);
   return suffix ? `${text} ${suffix}` : text;
-}
-
-/* ---- cancelling -------------------------------------------------------------- */
-
-/** Cancel is offered only while nobody has picked the request up. */
-export const canCancel = (r: Pick<RequestRow, "status">): boolean =>
-  r.status === "requested" || r.status === "scheduled";
-
-/** What the "are you sure?" says, and what its confirming button reads. */
-export function cancelPrompt(r: Pick<RequestRow, "status" | "slot_start">): { question: string; confirmLabel: string } {
-  return r.status === "scheduled" && r.slot_start
-    ? { question: `Cancel your ${formatClock(r.slot_start)} booking?`, confirmLabel: "Cancel booking" }
-    : { question: "Cancel your request for a judge?", confirmLabel: "Cancel request" };
-}
-
-/**
- * Cancel, asked first. `send` is the write; on a no it is never called.
- * Returns whether it was.
- */
-export async function cancelAfterAsking(
-  ask: Ask,
-  request: Pick<RequestRow, "status" | "slot_start">,
-  send: () => Promise<void>,
-): Promise<boolean> {
-  const { question, confirmLabel } = cancelPrompt(request);
-  if (!(await ask(question, { confirmLabel, cancelLabel: "Keep it", danger: true }))) return false;
-  await send();
-  return true;
 }
 
 /* ---- earlier today ------------------------------------------------------------ */

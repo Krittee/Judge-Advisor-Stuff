@@ -1,15 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { PanelBusyLine, panelLoad, SlotPicker, type PanelLoad } from "@/components/SlotPicker";
+import { PanelBusyLine, panelLoad, type PanelLoad } from "@/components/SlotPicker";
 import { formatClock } from "@/components/ui";
 import { STATUS_META } from "@/lib/status";
-import type { AppState, PublicPanel, RequestRow, Slot, Team } from "@/lib/types";
+import type { AppState, PublicPanel, RequestRow, Team } from "@/lib/types";
 import {
   agoParts,
   bigTimeOf,
-  canCancel,
   clockParts,
   historyTime,
   statusCaps,
@@ -23,8 +21,9 @@ import {
 /**
  * The team page, drawn ("Status board", design/team-redesign/).
  *
- * Everything it shows comes in as props and everything it does goes out as a
- * callback, so the page keeps the polling and the writes. Styles are under
+ * Read-only: only the queue desk and the Judge Advisor create or change a
+ * request, so a team sees where it stands and is told who to ask. Everything
+ * it shows comes in as props; the page keeps the polling. Styles are under
  * `.teampage` in globals.css; the top bar is the landing page's.
  */
 
@@ -33,34 +32,21 @@ type Language = AppState["languages"][number];
 export type TeamViewProps = {
   team: Team;
   panel: PublicPanel | undefined;
-  /** The team's live request or booking (liveRequestFor), if any. */
+  /** What the page shows for the team: its live request or booking, else its latest. */
   current: RequestRow | null;
   /** Up to five of their other requests. */
   history: RequestRow[];
   languages: Language[];
-  /** Every request and team, for the busy line and the slot grid. */
+  /** Every request, for the panel's busy line. */
   requests: RequestRow[];
-  teams: Team[];
   /** False when the last poll failed: what is on screen may be stale. */
   online: boolean;
   /** The clock "4 min ago" is read against; the page ticks it. */
   now: number;
-  busy: boolean;
-  error: string | null;
-  onDismissError: () => void;
-  message: string;
-  onMessage: (message: string) => void;
-  /** Ask for a judge now; with a booking, turn it into the request. */
-  onReady: (language: string) => void;
-  onBook: (slot: Slot, language: string) => void;
-  onCancel: () => void;
 };
 
 export function TeamView(p: TeamViewProps) {
   const { team, panel, current, languages } = p;
-  // A booking is not the same as being in the queue: a team holding a
-  // later slot can still say they are ready now.
-  const booking = current?.status === "scheduled" ? current : null;
   const load = panel ? panelLoad(panel.id, p.requests) : null;
 
   return (
@@ -80,20 +66,6 @@ export function TeamView(p: TeamViewProps) {
 
       <main className="tp-stage">
         <div className="tp-grid">
-          {p.error ? (
-            <div className="tp-alert" role="alert">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 7.5v5.5M12 16.5v.01" />
-              </svg>
-              <span>{p.error}</span>
-              <button type="button" className="tp-alert-x" onClick={p.onDismissError} aria-label="Dismiss this message">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
-          ) : null}
           {/* A poll that failed after the first answer leaves the last status
               on screen; say so rather than let it pass for current. */}
           {p.online ? null : (
@@ -115,21 +87,9 @@ export function TeamView(p: TeamViewProps) {
           </div>
 
           <div className="tp-right">
-            {booking ? (
-              <BookedActions p={p} booking={booking} load={load} />
-            ) : current ? (
-              canCancel(current) ? (
-                <section className="tp-acts" aria-label="Your request">
-                  <button type="button" className="tp-btn tp-btn--out tp-btn--fit" onClick={p.onCancel} disabled={p.busy}>
-                    Cancel this request
-                  </button>
-                </section>
-              ) : null
-            ) : (
-              <IdleActions p={p} />
-            )}
-
-            {!current && panel ? <SlotSection p={p} panel={panel} /> : null}
+            <section className="tp-acts" aria-label="How to request a judge">
+              <p>Please ask the queue desk to request a judge or book a time for your team.</p>
+            </section>
 
             {p.history.length ? (
               <section className="tp-hist-s" aria-labelledby="tp-hist">
@@ -188,7 +148,7 @@ function StatusPanel({
       </div>
       {current ? <p className="tp-pan-lab">{statusCaps(current.status)}</p> : null}
       <h1 className="tp-pan-sent" id="tp-st">
-        {current ? STATUS_META[current.status].teamLabel : "Ask for a judge"}
+        {current ? STATUS_META[current.status].teamLabel : "No request yet"}
       </h1>
       {big ? <PanelTime big={big} now={now} /> : null}
       {!current && load ? (
@@ -276,154 +236,6 @@ function Track({ current, now }: { current: RequestRow | null; now: number }) {
         ))}
       </ol>
       {current ? null : <p className="tp-trk-cap">Not in the queue yet</p>}
-    </section>
-  );
-}
-
-/* ---- 3 · the actions ------------------------------------------------------------- */
-
-function NoteField({ p }: { p: TeamViewProps }) {
-  return (
-    <div>
-      <label className="tp-sr" htmlFor="tp-note">
-        Optional note for the judges
-      </label>
-      <input
-        id="tp-note"
-        className="tp-field"
-        type="text"
-        value={p.message}
-        onChange={(e) => p.onMessage(e.target.value)}
-        placeholder="Optional note for the judges"
-        maxLength={280}
-        autoComplete="off"
-      />
-    </div>
-  );
-}
-
-function IdleActions({ p }: { p: TeamViewProps }) {
-  const [picked, setPicked] = useState("");
-  const language = p.languages.some((l) => l.id === picked) ? picked : (p.languages[0]?.id ?? "");
-
-  return (
-    <section className="tp-acts" aria-label="Ask for a judge now">
-      {p.languages.length > 1 ? (
-        <div>
-          <span className="tp-lbl" id="tp-lang">
-            Which language would you like to be interviewed in?
-          </span>
-          <div className="tp-seg" role="group" aria-labelledby="tp-lang">
-            {p.languages.map((l) => (
-              <button key={l.id} type="button" aria-pressed={l.id === language} onClick={() => setPicked(l.id)}>
-                {l.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      <NoteField p={p} />
-      <button
-        type="button"
-        className="tp-btn"
-        disabled={p.busy || !p.team.panel_id}
-        onClick={() => p.onReady(language)}
-      >
-        {p.busy ? "Sending…" : "Request a judge"}
-      </button>
-    </section>
-  );
-}
-
-function BookedActions({
-  p,
-  booking,
-  load,
-}: {
-  p: TeamViewProps;
-  booking: RequestRow;
-  load: PanelLoad | null;
-}) {
-  const several = p.languages.length > 1;
-  // One accent button per language, each sending straight away.
-  const choices = several ? p.languages : [{ id: p.languages[0]?.id ?? "", label: "We're ready now" }];
-
-  return (
-    <section className="tp-acts" aria-labelledby="tp-ready">
-      <h2 className="tp-h-q" id="tp-ready">
-        Ready before your slot?
-      </h2>
-      <NoteField p={p} />
-      <div>
-        {several ? (
-          <span className="tp-lbl" id="tp-lang">
-            Which language would you like to be interviewed in?
-          </span>
-        ) : null}
-        <div
-          className={`tp-pair${several ? "" : " tp-pair--one"}`}
-          role="group"
-          aria-labelledby={several ? "tp-lang" : "tp-ready"}
-        >
-          {choices.map((l) => (
-            <button
-              key={l.id || "default"}
-              type="button"
-              className="tp-btn"
-              disabled={p.busy || !p.team.panel_id}
-              onClick={() => p.onReady(l.id)}
-            >
-              {p.busy ? "Sending…" : l.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <p className="tp-fine tp-fine--c">Either gives up your {formatClock(booking.slot_start)} slot.</p>
-      {load ? (
-        <p className="tp-load">
-          <PanelBusyLine load={load} />
-        </p>
-      ) : null}
-      <div className="tp-rule" aria-hidden="true" />
-      <button type="button" className="tp-btn tp-btn--out tp-btn--fit" onClick={p.onCancel} disabled={p.busy}>
-        Cancel this booking
-      </button>
-    </section>
-  );
-}
-
-function SlotSection({ p, panel }: { p: TeamViewProps; panel: PublicPanel }) {
-  const [open, setOpen] = useState(true);
-  const [picked, setPicked] = useState("");
-  const language = p.languages.some((l) => l.id === picked) ? picked : (p.languages[0]?.id ?? "");
-
-  return (
-    <section className="tp-dsc">
-      <button type="button" className="tp-dsc-h" aria-expanded={open} aria-controls="tp-slots" onClick={() => setOpen(!open)}>
-        <span>{`Book a time with ${panel.name} instead`}</span>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d={open ? "M6 15l6-6 6 6" : "M6 9l6 6 6-6"} />
-        </svg>
-      </button>
-      <div className="tp-dsc-b" id="tp-slots" hidden={!open}>
-        {p.languages.length > 1 ? (
-          <div className="tp-chips" role="group" aria-label="Interview language for the slot">
-            {p.languages.map((l) => (
-              <button key={l.id} type="button" className="tp-chip" aria-pressed={l.id === language} onClick={() => setPicked(l.id)}>
-                {l.label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        <SlotPicker
-          panel={panel}
-          requests={p.requests}
-          teams={p.teams}
-          teamId={p.team.id}
-          disabled={p.busy}
-          onPick={(slot) => p.onBook(slot, language)}
-        />
-      </div>
     </section>
   );
 }
