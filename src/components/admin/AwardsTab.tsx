@@ -10,9 +10,15 @@ import type { Rubric } from "@/lib/rubrics";
 import type { AppState, AwardsAdminView } from "@/lib/types";
 import {
   ALL_PANELS,
+  backing,
+  backingText,
   buildAwardPanels,
   buildMatrix,
   clearAfterAsking,
+  conductIn,
+  conductKeyText,
+  conductLine,
+  conductText,
   decidedCount,
   decidedText,
   detailFor,
@@ -21,7 +27,6 @@ import {
   hasText,
   hiddenNote,
   holdsText,
-  judgesText,
   loadView,
   nominationsIn,
   nominationsText,
@@ -231,11 +236,12 @@ export function AwardsBoard({
   const panel = panelsHere.find((p) => p.id === panelId) ?? null;
   const inDivision = nominationsIn(nominations, teams, division);
   const scoped = nominationsIn(nominations, teams, division, panel?.id);
+  const conduct = conductIn(flags, teams, division, panel?.id);
   const decided = winnersOf(winners, division);
-  const detail = sel ? detailFor(sel, { awards, nominations, winners, teams, panels }) : null;
+  const detail = sel ? detailFor(sel, { awards, nominations, winners, teams, panels, flags }) : null;
   const teamsHere = teams.filter((t) => t.division === division);
   const titleId = `${uid}-t`;
-  const matrix = buildMatrix(awards, scoped, decided, teamsHere, panels, panel?.id);
+  const matrix = buildMatrix(awards, scoped, decided, teamsHere, panels, panel?.id, conduct);
 
   const nominee = detail ? (
     <NomineePanel
@@ -256,7 +262,7 @@ export function AwardsBoard({
       <div className="ja-aw-top">
         <h2 className="ja-aw-h">Awards</h2>
         <p className="ja-aw-meta">
-          {division} · {panel ? panel.name : "all panels"} · <b>{decidedCount(winners, awards, division)} of {awards.length}</b> decided · {nominationsText(scoped.length, distinctTeams(scoped))}
+          {division} · {panel ? panel.name : "all panels"} · <b>{decidedCount(winners, awards, division)} of {awards.length}</b> decided · {nominationsText(scoped.length + conduct.size, distinctTeams(scoped, conduct.keys()))}
         </p>
         <p className="ja-aw-priv">
           <LockIcon />
@@ -288,7 +294,7 @@ export function AwardsBoard({
               Panel
             </span>
             <div className="ja-aw-chips">
-              {panelChips(panelsHere, inDivision).map((c) => (
+              {panelChips(panelsHere, inDivision, conduct).map((c) => (
                 <button key={c.id} type="button" className="ja-aw-chip" aria-pressed={c.id === (panel?.id ?? ALL_PANELS)} onClick={() => onPanel(c.id)}>
                   {c.label}
                   <span className="ja-aw-fn">
@@ -314,7 +320,7 @@ export function AwardsBoard({
               onSelect={onSelect}
             />
           ) : (
-            <AwardLists lists={buildAwardPanels(awards, scoped, decided, teamsHere, panels, panel?.id)} sel={sel} onSelect={onSelect} />
+            <AwardLists lists={buildAwardPanels(awards, scoped, decided, teamsHere, panels, panel?.id, conduct)} sel={sel} onSelect={onSelect} />
           )}
         </div>
         {wide ? (
@@ -355,8 +361,9 @@ export function ViewToggle({ view, onView }: { view: View; onView: (view: View) 
 
 /**
  * Teams down, awards across. A dot is a nomination (no counts: how many judges
- * is in the side panel), a tick is the winner, nothing is not nominated. Only
- * this box scrolls sideways, with the team column held in place.
+ * is in the side panel), a green dot is Sportsmanship from referees' Good
+ * conduct alone, a tick is the winner, nothing is not nominated. Only this box
+ * scrolls sideways, with the team column held in place.
  */
 export function MatrixView({
   matrix,
@@ -423,10 +430,10 @@ export function MatrixView({
                         type="button"
                         className={cell === "winner" ? "ja-aw-cell ja-aw-won" : "ja-aw-cell"}
                         aria-pressed={on}
-                        aria-label={`${row.team.number}, ${award.label}: ${cell === "winner" ? "winner" : "nominated"}`}
+                        aria-label={`${row.team.number}, ${award.label}: ${cell === "winner" ? "winner" : cell === "conduct" ? `nominated by referees (${conductText(row.conduct)})` : "nominated"}`}
                         onClick={() => onSelect(on ? null : { awardId: award.id, teamId: row.team.id })}
                       >
-                        {cell === "winner" ? <Tick size={16} strokeWidth={2.8} /> : <i className="ja-aw-mk" aria-hidden="true" />}
+                        {cell === "winner" ? <Tick size={16} strokeWidth={2.8} /> : <i className={cell === "conduct" ? "ja-aw-mk ja-aw-gd" : "ja-aw-mk"} aria-hidden="true" />}
                       </button>
                     </td>
                   );
@@ -449,6 +456,12 @@ export function MatrixView({
           </b>
           winner
         </span>
+        <span>
+          <b className="ja-aw-cell" aria-hidden="true">
+            <i className="ja-aw-mk ja-aw-gd" />
+          </b>
+          {conductKeyText}
+        </span>
         <span>Only nominated teams are listed. {note}</span>
       </p>
     </div>
@@ -456,6 +469,18 @@ export function MatrixView({
 }
 
 /* ---- by award ------------------------------------------------------------------ */
+
+/** "2 judges", or "Good conduct ×3" in green for a team only referees put up, or both. */
+function Backing({ judges, conduct }: { judges: number; conduct: number }) {
+  const b = backing(judges, conduct);
+  return (
+    <>
+      {b.judges}
+      {b.judges && b.conduct ? ", " : null}
+      {b.conduct ? <span className="ja-aw-good">{b.conduct}</span> : null}
+    </>
+  );
+}
 
 /** Every award in the config's order, nominated or not, each with its nominees as rows. */
 export function AwardLists({ lists, sel, onSelect }: { lists: AwardPanel[]; sel: Sel | null; onSelect: (sel: Sel | null) => void }) {
@@ -477,7 +502,7 @@ export function AwardLists({ lists, sel, onSelect }: { lists: AwardPanel[]; sel:
                       type="button"
                       className={n.winner ? "ja-aw-nr ja-aw-won" : "ja-aw-nr"}
                       aria-pressed={on}
-                      aria-label={`${n.team.number} ${n.team.name}, ${award.label}, ${n.winner ? "winner" : judgesText(n.judges)}${n.has.length ? `, ${hasText(n.has)}` : ""}`}
+                      aria-label={`${n.team.number} ${n.team.name}, ${award.label}, ${n.winner ? "winner" : backingText(n.judges, n.conduct)}${n.has.length ? `, ${hasText(n.has)}` : ""}`}
                       onClick={() => onSelect(on ? null : { awardId: award.id, teamId: n.team.id })}
                     >
                       <b>{n.team.number}</b>
@@ -488,7 +513,9 @@ export function AwardLists({ lists, sel, onSelect }: { lists: AwardPanel[]; sel:
                         </span>
                       ) : null}
                       <span className="ja-aw-ptag">{n.tag}</span>
-                      <span className="ja-aw-jc">{judgesText(n.judges)}</span>
+                      <span className="ja-aw-jc">
+                        <Backing judges={n.judges} conduct={n.conduct} />
+                      </span>
                       {n.winner ? (
                         <span className="ja-aw-win">
                           <Tick />
@@ -512,8 +539,9 @@ export function AwardLists({ lists, sel, onSelect }: { lists: AwardPanel[]; sel:
 /* ---- the side panel ---------------------------------------------------------------- */
 
 /**
- * One nominee for one award: the scores, why each panel nominated them, who
- * else is in the running, and the button that gives the award. "Already has"
+ * One nominee for one award: the scores, why each panel nominated them (and,
+ * for Sportsmanship, the referees' Good conduct flags), who else is in the
+ * running, and the button that gives the award. "Already has"
  * is only ever a line of amber text here; the button is never off for it.
  */
 export function NomineePanel({
@@ -586,9 +614,22 @@ export function NomineePanel({
             </ul>
           </Fragment>
         ))
-      ) : (
+      ) : detail.conduct.length ? null : (
         <p className="ja-aw-also">No judge is nominating {team.number} for {award.label} any more.</p>
       )}
+      {detail.conduct.length ? (
+        <>
+          <h3 className="ja-aw-sec ja-aw-good">Good conduct from referees</h3>
+          <ul className="ja-aw-qs ja-aw-gc">
+            {detail.conduct.map((f) => (
+              <li key={f.id}>
+                <b>{conductLine(f)}</b>
+                {f.body ? `“${f.body}”` : <span className="ja-aw-q0">No note</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
       <p className="ja-aw-also">
         {detail.alsoFor.length ? `Also nominated for ${detail.alsoFor.map((a) => a.label).join(", ")} · ` : ""}
         {referee.good || referee.caution ? (
@@ -611,7 +652,7 @@ export function NomineePanel({
             <div key={o.team.id} className="ja-aw-oth">
               <div>
                 <p>
-                  <b>{o.team.number}</b> {o.team.name} · {judgesText(o.judges)}
+                  <b>{o.team.number}</b> {o.team.name} · <Backing judges={o.judges} conduct={o.conduct} />
                 </p>
                 {o.has.length ? (
                   <p className="ja-aw-warnl">

@@ -11,7 +11,7 @@ import { rankTeams } from "../src/lib/ranking";
 import { rubrics } from "../src/lib/rubrics";
 import type { AppState, AwardsAdminView, FlagRow } from "../src/lib/types";
 import {
-  awards, byteMe, divisions, gearGrinders, labRats, MS, nominations, panels, teams, winners, HS,
+  awards, byteMe, divisions, gearGrinders, labRats, MS, nominations, panels, quiet, teams, torque, winners, HS,
 } from "./adminAwards.fixtures";
 
 /* The Judge Advisor Awards board, rendered to markup. Behaviour that needs a
@@ -35,9 +35,10 @@ const flagKinds: AppState["flagKinds"] = [
   { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },
   { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
 ];
-const flag = (team: { id: string }, kind: string): FlagRow => ({
-  id: `f-${team.id}-${kind}`, team_id: team.id, kind, body: "", author: "Jordan Lee", match_type: "Q", match_number: "1", field: "1", rule: null,
-  ruleset: "v5rc", manual_version: null, match_affecting: false, created_at: "2026-10-20T10:00:00.000Z",
+let flagId = 0;
+const flag = (team: { id: string }, kind: string, over: Partial<FlagRow> = {}): FlagRow => ({
+  id: `f${++flagId}`, team_id: team.id, kind, body: "", author: "Jordan Lee", match_type: "Q", match_number: "1", field: "1", rule: null,
+  ruleset: "v5rc", manual_version: null, match_affecting: false, created_at: "2026-10-20T10:00:00.000Z", ...over,
 });
 
 /** Every criterion marked `mark`; byteMe is the only team scored. */
@@ -50,14 +51,24 @@ const categories = [{ id: "developing", label: "Developing", color: "amber", exc
 const rows = withRanks(rankTeams(teams, [marked(notebook, 2), marked(interview, 1)], rubricList, categories));
 
 const data: AwardsAdminView = { awards, nominations, winners };
-const state = { teams, panels, divisions, flags: [flag(byteMe, "good"), flag(byteMe, "good")], flagKinds };
+// One Good conduct flag is below the two that count as a Sportsmanship nomination, so these flags change nothing on the board.
+const state = { teams, panels, divisions, flags: [flag(byteMe, "good")], flagKinds };
+/** Quiet Ones: three Good conduct flags and no judge. Torque Titans: two, beside a judge's Sportsmanship nomination. Byte Me: one. */
+const conductFlags = [
+  flag(quiet, "good", { author: "Ana Cruz", match_number: "3", body: "Lent the other alliance a cable." }),
+  flag(quiet, "good", { author: "Jordan Lee", match_number: "9", body: "" }),
+  flag(quiet, "good", { author: "Ana Cruz", match_type: "QF", match_number: "2-1", body: "Cheered for both teams." }),
+  flag(torque, "good", { author: "Ana Cruz", match_number: "4", body: "Reset the field for the next match." }),
+  flag(torque, "good", { author: "Jordan Lee", match_number: "11" }),
+  flag(byteMe, "good"),
+];
 const excellence7700B: Sel = { awardId: "excellence", teamId: byteMe.id };
 
-function board(over: { data?: AwardsAdminView; division?: string; panelId?: string; view?: View; sel?: Sel | null; wide?: boolean; busy?: boolean; rows?: typeof rows } = {}) {
+function board(over: { data?: AwardsAdminView; division?: string; panelId?: string; view?: View; sel?: Sel | null; wide?: boolean; busy?: boolean; rows?: typeof rows; flags?: FlagRow[] } = {}) {
   return renderToStaticMarkup(
     <AwardsBoard
       data={over.data ?? data}
-      state={state}
+      state={over.flags ? { ...state, flags: over.flags } : state}
       rows={over.rows ?? rows}
       rubricList={rubricList}
       division={over.division ?? MS}
@@ -292,7 +303,7 @@ test("a judge who gave no reason is still listed, as 'No reason given'", () => {
 
 test("also nominated for, and the referee flags: Good conduct in green, or 'No referee flags'", () => {
   const p = aside(board({ sel: excellence7700B }));
-  assert.match(p, /<p class="ja-aw-also">Also nominated for Design · <span class="ja-aw-good">Good conduct ×2<\/span><\/p>/);
+  assert.match(p, /<p class="ja-aw-also">Also nominated for Design · <span class="ja-aw-good">Good conduct ×1<\/span><\/p>/);
   const clean = aside(board({ sel: { awardId: "excellence", teamId: gearGrinders.id } }));
   assert.match(clean, /<p class="ja-aw-also">Also nominated for Innovate, Amaze · No referee flags<\/p>/);
   // The worst of the rest is the amber one.
@@ -380,6 +391,121 @@ test("no awards in the config, or no divisions, is said plainly", () => {
     <AwardsBoard data={data} state={{ ...state, divisions: [] }} rows={[]} rubricList={rubricList} division="" onDivision={noop} onPanel={noop} view="matrix" onView={noop} sel={null} onSelect={noop} onGive={noop} onClear={noop} />,
   );
   assert.match(none, /No divisions yet/);
+});
+
+/* ---- Good conduct from referees: two flags are a nomination for Sportsmanship, drawn in green ---------------------- */
+
+const sportsmanship = (teamId: string): Sel => ({ awardId: "sportsmanship", teamId });
+
+test("the matrix: a team referees flagged for Good conduct twice has a row and a green dot under Sportsmanship, and the key says what the dot is", () => {
+  const m = board({ flags: conductFlags });
+  const tr = (number: string) => m.match(new RegExp(`<tr><th scope="row" class="ja-aw-tm"><b>${number}</b>[\\s\\S]*?</tr>`))![0];
+  assert.ok(bodyRows(m).includes("1111Q"), "Quiet Ones: no judge, still a row");
+  assert.match(tr("1111Q"), /<span class="ja-aw-sub">Quiet Ones<\/span><\/th><td class="ja-aw-pn"><span class="ja-aw-ptag">P2<\/span>/);
+  assert.deepEqual([...tr("1111Q").matchAll(/aria-label="([^"]+)"/g)].map((c) => c[1]), ["1111Q, Sportsmanship: nominated by referees (Good conduct ×3)"]);
+  assert.match(tr("1111Q"), /<button type="button" class="ja-aw-cell" aria-pressed="false" aria-label="1111Q, Sportsmanship: nominated by referees \(Good conduct ×3\)"><i class="ja-aw-mk ja-aw-gd" aria-hidden="true"><\/i><\/button>/);
+  // A judge's nomination keeps the plain ink dot, whatever the referees say.
+  assert.match(tr("9882K"), /aria-label="9882K, Sportsmanship: nominated"><i class="ja-aw-mk" aria-hidden="true"><\/i><\/button>/);
+  // One flag is not a nomination: Byte Me gets no cell of it.
+  assert.doesNotMatch(tr("7700B"), /Sportsmanship/);
+  // The key gains a third entry: the green dot.
+  const key = m.match(/<p class="ja-aw-key">[\s\S]*?<\/p>/)![0];
+  assert.match(key, /<\/b>winner<\/span><span><b class="ja-aw-cell" aria-hidden="true"><i class="ja-aw-mk ja-aw-gd"><\/i><\/b>Good conduct ×2\+<\/span><span>Only nominated teams/);
+  // Without two flags nothing is drawn green on the board itself.
+  assert.equal(board().match(/ja-aw-mk ja-aw-gd/g)?.length, 1, "only the key's");
+  assert.equal(m.match(/ja-aw-mk ja-aw-gd/g)?.length, 2, "the key's and Quiet Ones'");
+});
+
+test("the Sportsmanship column appears when only referees put someone up, and the winner of it is a tick", () => {
+  const judged = nominations.filter((n) => n.award_id !== "sportsmanship");
+  const flagged = board({ data: { awards, nominations: judged, winners }, flags: conductFlags });
+  assert.match(flagged, /<abbr class="ja-aw-hl" title="Sportsmanship">Spt<\/abbr>/);
+  assert.match(text(flagged.match(/<p class="ja-aw-key">[\s\S]*?<\/p>/)![0]), /Only nominated teams are listed\. Energy has no nominations yet, so its column is hidden\.$/, "Sportsmanship's column is not among the hidden");
+  const bare = board({ data: { awards, nominations: judged, winners }, flags: [] });
+  assert.doesNotMatch(bare, /<abbr class="ja-aw-hl" title="Sportsmanship">/);
+  assert.match(text(bare.match(/<p class="ja-aw-key">[\s\S]*?<\/p>/)![0]), /Sportsmanship and Energy have no nominations yet, so their columns are hidden\.$/);
+
+  const won = board({ data: { awards, nominations, winners: [...winners, { award_id: "sportsmanship", division: MS, team_id: quiet.id, decided_by: "Alex Morgan", decided_at: "2026-10-20T15:00:00Z" }] }, flags: conductFlags });
+  assert.match(won, /<button type="button" class="ja-aw-cell ja-aw-won" aria-pressed="false" aria-label="1111Q, Sportsmanship: winner"><svg/);
+  assert.match(won, /<span class="ja-aw-sub ja-aw-has">Has Sportsmanship<\/span>/);
+});
+
+test("the header and the All panels chip count each Good conduct team once; a panel's own view leaves them out", () => {
+  const m = board({ flags: conductFlags });
+  assert.match(m, /<p class="ja-aw-meta">Middle School · all panels · <b>3 of 11<\/b> decided · 20 nominations for 10 teams<\/p>/, "18 by judges, and one each for Quiet Ones and Torque Titans");
+  assert.match(m, /aria-pressed="true">All panels<span class="ja-aw-fn">10<span class="sr-only"> teams<\/span><\/span>/);
+  assert.match(m, /Panel 2<span class="ja-aw-fn">5</, "a panel's chip is what that panel nominated");
+  const p2 = board({ flags: conductFlags, panelId: "p2" });
+  assert.match(p2, /Middle School · Panel 2 · <b>3 of 11<\/b> decided · 10 nominations for 5 teams/);
+  assert.ok(!bodyRows(p2).includes("1111Q"));
+  assert.match(board({ flags: [flag(byteMe, "good")] }), /18 nominations for 9 teams/, "one flag changes nothing");
+  assert.match(board({ flags: conductFlags, data: { awards, nominations, winners: [] } }), /<b>0 of 11<\/b> decided/, "the decided counts are the winners', not the flags'");
+});
+
+test("the matrix sorts a Good conduct team as one nomination", () => {
+  const rowsOf = bodyRows(board({ flags: conductFlags }));
+  assert.deepEqual(rowsOf, ["5150Z", "7700B", "4242F", "6060R", "8015M", "9882K", "1111Q", "1234A", "2088C", "3311X"], "after the two-nomination teams, among the one-nomination ones by number");
+});
+
+test("By award: a Good conduct team's row says so in green in place of judges, a team with both says both, and the status counts it", () => {
+  const m = board({ view: "award", flags: conductFlags });
+  const spt = sections(m).find((s) => s.name === "Sportsmanship Award")!.body;
+  assert.match(spt, /<span class="ja-aw-cst">2 nominees<\/span>/);
+  const rowsOf = [...spt.matchAll(/<li><button[\s\S]*?<\/button><\/li>/g)].map((r) => r[0]);
+  assert.equal(rowsOf.length, 2);
+  assert.match(rowsOf[0], /aria-label="9882K Torque Titans, Sportsmanship, 1 judge, Good conduct ×2"><b>9882K<\/b>/);
+  assert.match(rowsOf[0], /<span class="ja-aw-jc">1 judge, <span class="ja-aw-good">Good conduct ×2<\/span><\/span>/);
+  assert.match(rowsOf[1], /aria-label="1111Q Quiet Ones, Sportsmanship, Good conduct ×3"><b>1111Q<\/b><span class="ja-aw-nm">Quiet Ones<\/span><span class="ja-aw-ptag">P2<\/span><span class="ja-aw-jc"><span class="ja-aw-good">Good conduct ×3<\/span><\/span><\/button>/);
+  assert.doesNotMatch(rowsOf[1], /judge/, "no judges to count");
+  // No other award carries it.
+  assert.doesNotMatch(sections(m).filter((s) => s.name !== "Sportsmanship Award").map((s) => s.body).join(""), /Good conduct/);
+  // Without two flags Sportsmanship is the judge's alone.
+  assert.match(sections(board({ view: "award" })).find((s) => s.name === "Sportsmanship Award")!.body, /<span class="ja-aw-cst">1 nominee<\/span>/);
+});
+
+test("the side panel for a Good conduct team lists each flag with who saw it, the match and the note, in place of the judges' reasons", () => {
+  const p = aside(board({ sel: sportsmanship(quiet.id), flags: conductFlags }));
+  assert.match(p, /<h2 id="[^"]+">1111Q<span>Quiet Ones<\/span><\/h2>/);
+  assert.match(p, /<h3 class="ja-aw-sec ja-aw-good">Good conduct from referees<\/h3><ul class="ja-aw-qs ja-aw-gc">/);
+  const items = [...p.matchAll(/<li><b>([^<]*)<\/b>(.*?)<\/li>/g)].map((m) => [m[1], text(m[2])]);
+  assert.deepEqual(items, [
+    ["Ana Cruz · Q3", "“Lent the other alliance a cable.”"],
+    ["Jordan Lee · Q9", "No note"],
+    ["Ana Cruz · QF 2-1", "“Cheered for both teams.”"],
+  ]);
+  assert.doesNotMatch(p, /Why Panel|No judge is nominating/, "no judge, and no complaint about it");
+  assert.match(p, /<p class="ja-aw-also"><span class="ja-aw-good">Good conduct ×3<\/span><\/p>/, "nothing else to be nominated for; the flags the line already shows");
+  // The award can be given.
+  assert.match(p, /<button type="button" class="ja-aw-prim">Give Sportsmanship to 1111Q<\/button><p class="ja-aw-note">You can change it until the ceremony\.<\/p>/);
+  // Its rival is the judge's nominee, with both sorts of backing.
+  assert.match(p, /<h3 class="ja-aw-sec">Other Sportsmanship nominee<\/h3><div class="ja-aw-oth"><div><p><b>9882K<\/b> Torque Titans · 1 judge, <span class="ja-aw-good">Good conduct ×2<\/span><\/p>/);
+});
+
+test("a team with a judge's nomination and the referees' flags gets both sections; another award's panel for it gets only the judges'", () => {
+  const p = aside(board({ sel: sportsmanship(torque.id), flags: conductFlags }));
+  assert.match(p, /<h3 class="ja-aw-sec">Why Panel 2 nominated them<\/h3><ul class="ja-aw-qs"><li><b>Priya Nair<\/b><span class="ja-aw-q0">No reason given<\/span><\/li><\/ul><h3 class="ja-aw-sec ja-aw-good">Good conduct from referees<\/h3>/);
+  assert.deepEqual([...p.matchAll(/<ul class="ja-aw-qs ja-aw-gc">([\s\S]*?)<\/ul>/g)].map((m) => text(m[1])), ["Ana Cruz · Q4“Reset the field for the next match.”Jordan Lee · Q11No note"]);
+  assert.match(p, /<b>1111Q<\/b> Quiet Ones · <span class="ja-aw-good">Good conduct ×3<\/span><\/p>/, "the flag-only rival has no judges to count");
+  assert.match(p, /Give Sportsmanship to 9882K/);
+
+  const build = aside(board({ sel: { awardId: "build", teamId: torque.id }, flags: conductFlags }));
+  assert.doesNotMatch(build, /Good conduct from referees|ja-aw-gc/, "Good conduct counts for Sportsmanship alone");
+  assert.match(build, /Also nominated for Sportsmanship · <span class="ja-aw-good">Good conduct ×2<\/span>/);
+  // One flag lists nothing.
+  assert.doesNotMatch(aside(board({ sel: sportsmanship(torque.id), flags: [flag(torque, "good")] })), /Good conduct from referees/);
+});
+
+test("the Give button hands a Good conduct nominee to the board like any other", () => {
+  const given: Detail[] = [];
+  const d = detailFor(sportsmanship(quiet.id), { awards, nominations, winners, teams, panels, flags: conductFlags })!;
+  const give = walk(NomineePanel({ detail: d, row: undefined, rubricList, flags: conductFlags.filter((f) => f.team_id === quiet.id), flagKinds, titleId: "t", busy: false, onGive: (x) => given.push(x), onClear: noop })).find((e) => e.props.className === "ja-aw-prim")!;
+  click(give);
+  assert.deepEqual([given[0].team.number, given[0].award.id, given[0].current], ["1111Q", "sportsmanship", null]);
+  // And the cell opens its panel.
+  const m = buildMatrix(awards, nominationsIn(nominations, teams, MS), winnersOf(winners, MS), teams.filter((t) => t.division === MS), panels, "", new Map([[quiet.id, 3]]));
+  const picks: (Sel | null)[] = [];
+  click(walk(MatrixView({ matrix: m, sel: null, note: "", none: "", onSelect: (s) => picks.push(s) })).find((e) => e.props["aria-label"] === "1111Q, Sportsmanship: nominated by referees (Good conduct ×3)")!);
+  assert.deepEqual(picks, [sportsmanship(quiet.id)]);
 });
 
 /* ---- the phone --------------------------------------------------------------------------------------------- */
@@ -490,6 +616,10 @@ test("colour is signal: green is a winner or a decided award, amber is a caution
   assert.match(block, /\.ja-aw-seg button\[aria-pressed="true"\] \{[^}]*background: var\(--accent\)/);
   assert.match(block, /\.ja-aw-prim \{[^}]*background: var\(--accent\)/);
   assert.doesNotMatch(block, /\.ja-aw-mk[^{]*\{[^}]*var\(--(?:done|caution|waiting|danger)/, "no hue on a nomination");
+  // The one exception is Good conduct from referees alone: a green dot, in the quiet green that reads on both themes, and a tinted card in the side panel.
+  assert.match(block, /\.ja-aw-gd \{ background: var\(--done-quiet\); \}/);
+  assert.match(block, /\.ja-aw-gc li \{ border-color: color-mix\(in srgb, var\(--done\) 55%, transparent\); background: color-mix\(in srgb, var\(--done\) 10%, transparent\); \}/);
+  assert.match(block, /\.ja-aw-good \{ color: var\(--done-quiet\)/, "the text is the quiet green too");
 });
 
 test("only the matrix's box scrolls sideways, with the team column held in place; no scrollbar on a phone, a thin one for a mouse", () => {

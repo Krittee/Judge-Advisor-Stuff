@@ -3648,7 +3648,8 @@ body:has(.admin) > .theme-toggle:hover {
    side panel on a nominee, where the winner is given. From 1024px the panel is a 340px column beside the board; on a phone it is a bottom sheet (the Sections
    sheet's dialog) and only the matrix's own box scrolls sideways, its team column held in place.
    Colour is signal: green is a winner or a decided award, amber is a team that already holds another award or has a referee caution, accent is chrome (buttons,
-   the chosen chip and toggle, the selected cell); a nomination is an ink dot with no hue. Tints are color-mix in srgb. No motion at all. */
+   the chosen chip and toggle, the selected cell); a nomination is an ink dot with no hue, except the green one referees' Good conduct alone makes for
+   Sportsmanship. Tints are color-mix in srgb. No motion at all. */
 .ja-aw-h, .ja-aw-chip, .ja-aw-seg button, .ja-aw-tm b, .ja-aw-aph h2, .ja-aw-nr b, .ja-aw-dr h2, .ja-aw-oth p b, .ja-aw-prim {
   font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
@@ -3708,14 +3709,15 @@ body:has(.admin) > .theme-toggle:hover {
 }
 .ja-aw-mx .ja-aw-ptag { height: 24px; padding: 0 7px; }
 
-/* A cell: an ink dot is a nomination, a green tick the winner; the one whose panel is open wears the accent */
+/* A cell: an ink dot is a nomination, a green dot Good conduct from referees, a green tick the winner; the one whose panel is open wears the accent */
 .ja-aw-cell { display: inline-grid; width: 38px; height: 44px; place-items: center; border-radius: 8px; background: transparent; color: var(--ink); }
 .ja-aw-cell:hover { background: var(--surface-2); }
 .ja-aw-cell:focus-visible { outline-offset: -2px; }
 .ja-aw-mk { display: block; width: 12px; height: 12px; border-radius: 50%; background: var(--ink); }
+.ja-aw-gd { background: var(--done-quiet); }
 .ja-aw-cell.ja-aw-won { background: var(--done); color: var(--done-ink); }
 .ja-aw-cell[aria-pressed="true"] { background: var(--ja-accent-t); box-shadow: inset 0 0 0 2px var(--accent); }
-.ja-aw-cell[aria-pressed="true"] .ja-aw-mk { background: var(--accent); }
+.ja-aw-cell[aria-pressed="true"] .ja-aw-mk:not(.ja-aw-gd) { background: var(--accent); }
 .ja-aw-cell.ja-aw-won[aria-pressed="true"] { background: var(--done); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
 .ja-aw-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 0; color: var(--ink-subtle); font-size: 12.5px; }
 .ja-aw-key > span { display: inline-flex; align-items: center; gap: 6px; }
@@ -3761,6 +3763,7 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-aw-qs li { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--jg-field); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-line; }
 .ja-aw-qs li b { display: block; color: var(--ink-subtle); font-weight: 500; font-size: 12.5px; }
 .ja-aw-q0 { color: var(--ink-subtle); }
+.ja-aw-gc li { border-color: color-mix(in srgb, var(--done) 55%, transparent); background: color-mix(in srgb, var(--done) 10%, transparent); }
 .ja-aw-also { margin: 0; color: var(--ink-subtle); font-size: 13px; }
 .ja-aw-good { color: var(--done-quiet); }
 .ja-aw-caut { color: var(--caution-quiet); }

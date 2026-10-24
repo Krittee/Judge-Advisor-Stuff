@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { actorParts } from "@/lib/activity";
 import { canAdminister, getSession } from "@/lib/auth";
+import { goodConductTeams, SPORTSMANSHIP } from "@/lib/awards";
 import { store, StoreError } from "@/lib/db";
 import { awards } from "@/lib/presets";
 import { awardLabel, fields } from "../shared";
@@ -11,6 +12,9 @@ export const dynamic = "force-dynamic";
  * The winners: the Judge Advisor's call alone, one team per award per
  * division. Reading them is GET /api/awards, which only the Judge Advisor
  * gets them from.
+ *
+ * A winner is a nominee: a judge nominated the team, or, for Sportsmanship
+ * only, referees flagged it for Good conduct enough times (src/lib/awards.ts).
  *
  * "Already has another award" is a caution for the UI to show, not a rule:
  * the Judge Advisor decides, so nothing here refuses on it.
@@ -46,7 +50,9 @@ export async function PUT(request: Request) {
       { status: 400 },
     );
   }
-  const nominated = (await db.listNominations()).some((n) => n.award_id === awardId && n.team_id === teamId);
+  const nominated =
+    (await db.listNominations()).some((n) => n.award_id === awardId && n.team_id === teamId) ||
+    (awardId === SPORTSMANSHIP && goodConductTeams(await db.listFlags(teamId)).has(teamId));
   if (!nominated) {
     return NextResponse.json(
       { error: `Team ${team.number} has not been nominated for ${award.label}.` },

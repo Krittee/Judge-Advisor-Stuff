@@ -160,8 +160,12 @@ const ben = (w: World) => judgeOf(w.p1, "Ben");
 const cleo = (w: World) => judgeOf(w.p2, "Cleo");
 const nominate = (session: Session | null, award: string, team: Team, reason?: string) =>
   awardsApi(session, "POST", { awardId: award, teamId: team.id, ...(reason === undefined ? {} : { reason }) });
+// The log is stamped to the millisecond and listActivity keeps rows of one millisecond in the order they were
+// written (oldest first) inside a newest-first list, so the order of quick successive writes is not something to
+// assert: compare the lines as a set, sorted. `sameLines` sorts the expected side the same way.
+const sameLines = <T extends string | string[]>(lines: T[]): T[] => [...lines].sort((a, b) => String(a).localeCompare(String(b)));
 const logged = async (w: World) =>
-  (await w.db.listActivity()).filter((a) => a.kind === "award").map((a) => a.action).reverse();
+  sameLines((await w.db.listActivity()).filter((a) => a.kind === "award").map((a) => a.action));
 
 /* ===== nominating ======================================================== */
 
@@ -189,12 +193,12 @@ test("a judge nominates a team they interviewed; asking again is harmless; the r
   assert.equal((await w.db.listNominations()).length, 1, "all of that was one nomination");
   assert.deepEqual(
     await logged(w),
-    [
+    sameLines([
       "nominated 9882K for Excellence",
       "changed the reason for 9882K's Excellence nomination",
       "changed the reason for 9882K's Excellence nomination",
       "changed the reason for 9882K's Excellence nomination",
-    ],
+    ]),
     "a repeat tap writes nothing and so logs nothing; each real change is one line",
   );
   const [entry] = (await w.db.listActivity()).slice(-1);
@@ -291,13 +295,13 @@ test("withdrawing removes only your own nomination, and says whether there was o
   assert.deepEqual((await awardsApi(amy(w), "DELETE", { awardId: "excellence", teamId: "not-a-uuid" })).body, { ok: true, removed: false });
   assert.equal((await awardsApi(amy(w), "DELETE", { awardId: "excellence" })).status, 400);
 
-  assert.deepEqual(await logged(w), [
+  assert.deepEqual(await logged(w), sameLines([
     "nominated 9882K for Excellence",
     "nominated 9882K for Excellence",
     "nominated 1234 for Excellence",
     "withdrew 9882K from Excellence",
     "withdrew 9882K from Excellence",
-  ], "only a real withdrawal is logged");
+  ]), "only a real withdrawal is logged");
 });
 
 /* ===== reading =========================================================== */
@@ -443,15 +447,65 @@ test("the Judge Advisor decides, replaces and clears a winner, and each is logge
   assert.equal((await winnersApi(ADMIN, "DELETE", { awardId: "excellence" })).status, 400);
 
   assert.deepEqual(
-    (await w.db.listActivity()).filter((a) => a.kind === "award" && a.actor_role === "Judge Advisor").map((a) => [a.action, a.detail, a.team_number]).reverse(),
-    [
+    sameLines((await w.db.listActivity()).filter((a) => a.kind === "award" && a.actor_role === "Judge Advisor").map((a) => [a.action, a.detail ?? "", a.team_number ?? ""])),
+    sameLines([
       ["gave Excellence to 9882K", ES, "9882K"],
       ["gave Design to 9882K", ES, "9882K"],
       ["gave Excellence to 7700B", `${ES} · instead of 9882K`, "7700B"],
       ["cleared Excellence", `${ES} · was 7700B`, "7700B"],
-    ],
+    ]),
     "the same pick twice and clearing nothing log nothing",
   );
+});
+
+/** Referees flag a team `kind` once each time. */
+const flagTeam = async (w: World, team: Team, kind: string, times = 1) => {
+  for (let i = 0; i < times; i++) {
+    await w.db.createFlag({ teamId: team.id, kind, body: "Helped a rival fix their robot", author: "Ref", matchType: "Q", matchNumber: String(i + 1), field: "1", rule: null, ruleset: null, manualVersion: null, matchAffecting: false });
+  }
+};
+
+test("Sportsmanship also goes to a team referees flagged for Good conduct twice, with no judge nomination; one flag is not enough, and no other award takes it", async () => {
+  const w = await world();
+  const put = (awardId: string, team: Team) => winnersApi(ADMIN, "PUT", { awardId, division: ES, teamId: team.id });
+  await flagTeam(w, w.hawks, "good", 2);
+  await flagTeam(w, w.bolts, "good", 1);
+  await flagTeam(w, w.comets, "warning", 2);
+  await flagTeam(w, w.comets, "good", 1);
+  assert.deepEqual(await w.db.listNominations(), [], "no judge nominated anyone");
+
+  const flagged = await put("sportsmanship", w.hawks);
+  assert.equal(flagged.status, 200, "two Good conduct flags");
+  assert.deepEqual((await w.db.listWinners()).map((x) => [x.award_id, x.team_id]), [["sportsmanship", w.hawks.id]]);
+
+  const once = await put("sportsmanship", w.bolts);
+  assert.equal(once.status, 409, "one flag");
+  assert.match(once.body.error, /has not been nominated for Sportsmanship/);
+  assert.equal((await put("sportsmanship", w.comets)).status, 409, "a Warning does not count, and one Good conduct beside it is still one");
+  assert.equal((await put("sportsmanship", w.rookie)).status, 409, "no flags, no nomination");
+
+  for (const award of ["excellence", "design", "inspire"]) {
+    assert.equal((await put(award, w.hawks)).status, 409, `Good conduct does not nominate for ${award}`);
+  }
+  assert.deepEqual((await w.db.listWinners()).map((x) => [x.award_id, x.team_id]), [["sportsmanship", w.hawks.id]], "nothing else was decided");
+  assert.deepEqual(await logged(w), ["gave Sportsmanship to 9882K"]);
+
+  // The flags are the team's own: another division's two flags do not open this one.
+  await flagTeam(w, w.storm, "good", 2);
+  assert.equal((await winnersApi(ADMIN, "PUT", { awardId: "sportsmanship", division: ES, teamId: w.storm.id })).status, 400, "the division check still comes first");
+  assert.equal((await winnersApi(ADMIN, "PUT", { awardId: "sportsmanship", division: MS, teamId: w.storm.id })).status, 200);
+});
+
+test("Good conduct flags put no nomination in anyone's read: the judge's and the Judge Advisor's lists hold only what judges nominated", async () => {
+  const w = await world();
+  await flagTeam(w, w.hawks, "good", 3);
+  await nominate(amy(w), "excellence", w.bolts);
+
+  for (const session of [amy(w), ADMIN]) {
+    const reply = await awardsApi(session, "GET");
+    assert.deepEqual(reply.body.nominations.map((n: { award_id: string; team_id: string }) => [n.award_id, n.team_id]), [["excellence", w.bolts.id]]);
+    assert.ok(!JSON.stringify(reply.body).includes(w.hawks.id), "the flagged team is not in it");
+  }
 });
 
 test("a judge withdrawing a nomination does not undo a winner, and is told nothing of one", async () => {

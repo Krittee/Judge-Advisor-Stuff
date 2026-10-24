@@ -4,10 +4,16 @@ import test from "node:test";
 import {
   ALL_PANELS,
   alreadyHas,
+  backing,
+  backingText,
   buildAwardPanels,
   buildMatrix,
   clearAfterAsking,
   clearQuestion,
+  conductIn,
+  conductKeyText,
+  conductLine,
+  conductText,
   decidedCount,
   decidedText,
   defaultDivision,
@@ -36,7 +42,7 @@ import { withRanks } from "../src/components/admin/scoresLogic";
 import { rankTeams } from "../src/lib/ranking";
 import { rubrics } from "../src/lib/rubrics";
 import {
-  awards, byteMe, divisions, gearGrinders, HS, labRats, MS, momentum, monitors, nom, nominations, panels, quiet, roboraptors, teams, win, winners,
+  awards, byteMe, divisions, gearGrinders, HS, labRats, MS, momentum, monitors, nom, nominations, panels, quiet, roboraptors, teams, torque, win, winners,
 } from "./adminAwards.fixtures";
 
 /* The Judge Advisor Awards board's decisions, run for real against
@@ -409,4 +415,131 @@ test("the view is remembered in the browser, and a browser that will not say fal
   // No window at all (the tests run in Node): the default store throws inside the try.
   assert.equal(loadView(), "matrix");
   assert.doesNotThrow(() => saveView("award"));
+});
+
+/* ---- Good conduct from referees: two flags are a nomination for Sportsmanship ------------------------------------ */
+
+let flagId = 0;
+const flag = (t, kind, over = {}) => ({
+  id: `f${++flagId}`, team_id: t.id, kind, body: "", author: "Jordan Lee", match_type: "Q", match_number: "7", field: "1", rule: null, ruleset: "v5rc",
+  manual_version: null, match_affecting: false, created_at: "2026-10-20T10:00:00.000Z", ...over,
+});
+const good = (t, n) => Array.from({ length: n }, () => flag(t, "good"));
+/** Quiet Ones: three Good conduct flags and no judge. Torque Titans: two, and a judge's Sportsmanship nomination. Byte Me: one, which is not enough. Hall Monitors (High School): two. */
+const flags = [...good(quiet, 3), ...good(torque, 2), ...good(byteMe, 1), flag(roboraptors, "warning"), flag(roboraptors, "warning"), ...good(monitors, 2)];
+const conduct = conductIn(flags, teams, MS);
+const noJudgeSportsmanship = nominationsIn(nominations.filter((x) => !(x.award_id === "sportsmanship")), teams, MS);
+
+test("the teams Good conduct puts up are those of this division with two flags or more, and none under a panel", () => {
+  assert.deepEqual([...conduct], [[quiet.id, 3], [torque.id, 2]], "Byte Me has one, Roboraptors only Warnings, Hall Monitors another division");
+  assert.deepEqual([...conductIn(flags, teams, HS)], [[monitors.id, 2]]);
+  assert.deepEqual([...conductIn(flags, teams, MS, "p2")], [], "no panel nominated them, so a panel's view has none");
+  assert.deepEqual([...conductIn([], teams, MS)], []);
+});
+
+test("the words: Good conduct x3, the key's x2+, and what backs a nominee", () => {
+  assert.equal(conductText(3), "Good conduct ×3");
+  assert.equal(conductKeyText, "Good conduct ×2+");
+  assert.deepEqual(backing(2, 0), { judges: "2 judges", conduct: null });
+  assert.deepEqual(backing(0, 3), { judges: null, conduct: "Good conduct ×3" }, "flags alone: no judges to count, and none said");
+  assert.deepEqual(backing(1, 2), { judges: "1 judge", conduct: "Good conduct ×2" });
+  assert.deepEqual(backing(0, 0), { judges: "Withdrawn", conduct: null }, "a winner nobody backs any more");
+  assert.equal(backingText(1, 2), "1 judge, Good conduct ×2");
+  assert.equal(backingText(0, 3), "Good conduct ×3");
+  assert.equal(conductLine({ author: "Jordan Lee", match_type: "Q", match_number: "23" }), "Jordan Lee · Q23");
+  assert.equal(conductLine({ author: "Jordan Lee", match_type: null, match_number: null }), "Jordan Lee", "a flag from before matches were recorded");
+});
+
+test("the header and the All panels chip count each Good conduct team once, alongside the judges' nominations", () => {
+  assert.equal(distinctTeams(msNoms, conduct.keys()), 10, "Quiet Ones is new; Torque Titans was already counted");
+  assert.deepEqual(panelChips(panels.filter((p) => p.division === MS), msNoms, conduct).map((c) => c.count), [10, 5, 4], "a panel's chip is what that panel nominated");
+  assert.equal(distinctTeams(msNoms), 9, "without flags nothing changes");
+});
+
+test("the matrix gets a row for a Good conduct team and a green-dot cell, and the Sportsmanship column when only referees put someone up", () => {
+  const m = buildMatrix(awards, noJudgeSportsmanship, decided, msTeams, panels, ALL_PANELS, conduct);
+  const row = (number) => m.rows.find((r) => r.team.number === number);
+  const cellsOf = (number) => Object.fromEntries(m.columns.map((c, i) => [c.award.id, row(number).cells[i]]).filter(([, s]) => s !== "none"));
+  assert.ok(m.columns.some((c) => c.award.id === "sportsmanship"), "the column is there though no judge nominated for it");
+  assert.equal(m.hidden.some((a) => a.id === "sportsmanship"), false);
+  assert.deepEqual(cellsOf("1111Q"), { sportsmanship: "conduct" }, "Quiet Ones: no judge, only the referees");
+  assert.deepEqual(cellsOf("9882K"), { build: "nominated", sportsmanship: "conduct" }, "Torque Titans with the judge's Sportsmanship nomination taken away");
+  assert.deepEqual([row("1111Q").conduct, row("9882K").conduct, row("7700B").conduct], [3, 2, 0]);
+  assert.ok(!m.rows.some((r) => r.team.id === monitors.id), "another division's flags are not this board's");
+  // Without the flags nothing is added, and the column goes with the nomination.
+  const plain = buildMatrix(awards, noJudgeSportsmanship, decided, msTeams, panels);
+  assert.ok(!plain.rows.some((r) => r.team.number === "1111Q"));
+  assert.ok(plain.hidden.some((a) => a.id === "sportsmanship"));
+});
+
+test("a judge's nomination keeps the ink dot though the referees also put the team up; a winner keeps the tick", () => {
+  const m = buildMatrix(awards, msNoms, decided, msTeams, panels, ALL_PANELS, conduct);
+  const at = m.columns.findIndex((c) => c.award.id === "sportsmanship");
+  assert.equal(m.rows.find((r) => r.team.number === "9882K").cells[at], "nominated");
+  assert.equal(m.rows.find((r) => r.team.number === "1111Q").cells[at], "conduct");
+  const won = buildMatrix(awards, msNoms, winnersOf([...winners, win("sportsmanship", quiet)], MS), msTeams, panels, ALL_PANELS, conduct);
+  assert.equal(won.rows.find((r) => r.team.number === "1111Q").cells[at], "winner");
+  assert.equal(holdsText(won.rows.find((r) => r.team.number === "1111Q").has), "Has Sportsmanship");
+});
+
+test("a flag-only nomination sorts like one nomination; one beside a judge's own Sportsmanship nomination adds nothing", () => {
+  const m = buildMatrix(awards, msNoms, decided, msTeams, panels, ALL_PANELS, conduct);
+  const count = (number) => m.rows.find((r) => r.team.number === number).count;
+  assert.equal(count("1111Q"), 1);
+  assert.equal(count("9882K"), 2, "Build and Sportsmanship by judges, already two");
+  assert.deepEqual(m.rows.slice(-4).map((r) => r.team.number), ["1111Q", "1234A", "2088C", "3311X"], "with the other one-nomination teams, by team number");
+  // A flag-only team beside a judge's other award is one more.
+  const other = buildMatrix(awards, nominationsIn(nominations.filter((x) => x.award_id !== "sportsmanship"), teams, MS), decided, msTeams, panels, ALL_PANELS, conduct);
+  assert.equal(other.rows.find((r) => r.team.number === "9882K").count, 2, "Build by a judge, and Good conduct as one more");
+});
+
+test("under a panel the matrix is that panel's nominations only: Good conduct belongs to no panel", () => {
+  const p3 = buildMatrix(awards, nominationsIn(nominations, teams, MS, "p3"), decided, msTeams, panels, "p3", conductIn(flags, teams, MS, "p3"));
+  assert.ok(!p3.rows.some((r) => r.team.number === "1111Q"));
+  assert.ok(p3.hidden.some((a) => a.id === "sportsmanship"));
+});
+
+test("By award: Sportsmanship lists a Good conduct team with its flags and no judges, beside the judges' nominee; no other award does", () => {
+  const lists = buildAwardPanels(awards, msNoms, decided, msTeams, panels, ALL_PANELS, conduct);
+  const of = (id) => lists.find((l) => l.award.id === id);
+  assert.deepEqual(of("sportsmanship").nominees.map((n) => [n.team.number, n.judges, n.conduct]), [["9882K", 1, 2], ["1111Q", 0, 3]], "the judge's nominee first, as for any award");
+  assert.equal(of("sportsmanship").status, "2 nominees", "the header's count includes them");
+  assert.equal(of("sportsmanship").nominees[1].tag, "P2", "its own panel, as for a winner nobody nominates");
+  assert.equal(backingText(0, 3), "Good conduct ×3");
+  for (const l of lists.filter((x) => x.award.id !== "sportsmanship")) assert.ok(l.nominees.every((n) => n.conduct === 0), l.award.label);
+  assert.equal(of("energy").status, "Open");
+  // With no flags, Sportsmanship is the judges' alone.
+  const plain = buildAwardPanels(awards, msNoms, decided, msTeams, panels);
+  assert.deepEqual(plain.find((l) => l.award.id === "sportsmanship").nominees.map((n) => [n.team.number, n.conduct]), [["9882K", 0]]);
+  // Under a panel, none.
+  assert.equal(buildAwardPanels(awards, nominationsIn(nominations, teams, MS, "p2"), decided, msTeams, panels, "p2", conductIn(flags, teams, MS, "p2")).find((l) => l.award.id === "sportsmanship").nominees.length, 1);
+});
+
+test("the side panel for a Good conduct nominee holds the flags themselves; for another award it holds none", () => {
+  const f = [flag(quiet, "good", { author: "Ana Cruz", match_number: "3", body: "Lent them a cable." }), ...good(quiet, 1), flag(quiet, "warning")];
+  const d = detailFor({ awardId: "sportsmanship", teamId: quiet.id }, { ...everything, flags: f });
+  assert.deepEqual(d.reasons, [], "no judge");
+  assert.deepEqual(d.conduct.map((x) => x.kind), ["good", "good"], "the Good conduct flags, not the Warning");
+  assert.equal(d.conduct[0].author, "Ana Cruz");
+  assert.equal(d.isWinner, false);
+  assert.equal(d.has.length, 0);
+  assert.deepEqual(detailFor({ awardId: "sportsmanship", teamId: quiet.id }, { ...everything, flags: [flag(quiet, "good")] }).conduct, [], "one flag is not a nomination");
+  assert.deepEqual(detailFor({ awardId: "sportsmanship", teamId: quiet.id }, everything).conduct, [], "no flags passed");
+  // Another award's panel for a team the judges nominated: no conduct section, but Sportsmanship is among its other nominations.
+  const tt = detailFor({ awardId: "build", teamId: torque.id }, { ...everything, flags });
+  assert.deepEqual(tt.conduct, []);
+  assert.deepEqual(tt.alsoFor.map((a) => a.label), ["Sportsmanship"]);
+});
+
+test("the other Sportsmanship nominees include the Good conduct teams, with the flags that put them up", () => {
+  const d = detailFor({ awardId: "sportsmanship", teamId: torque.id }, { ...everything, flags });
+  assert.deepEqual(d.reasons.map((r) => r.panel), ["Panel 2"], "the judge's reason is still there");
+  assert.equal(d.conduct.length, 2, "and the referees' flags beside it");
+  assert.deepEqual(d.others.map((o) => [o.team.number, o.judges, o.conduct]), [["1111Q", 0, 3]]);
+  // The other way round: the flag-only team sees the judges' nominee as a rival.
+  const q = detailFor({ awardId: "sportsmanship", teamId: quiet.id }, { ...everything, flags });
+  assert.deepEqual(q.others.map((o) => [o.team.number, o.judges, o.conduct]), [["9882K", 1, 2]]);
+  // For another award the rivals carry no Good conduct.
+  const build = detailFor({ awardId: "build", teamId: torque.id }, { ...everything, flags });
+  assert.ok(build.others.every((o) => o.conduct === 0));
 });
