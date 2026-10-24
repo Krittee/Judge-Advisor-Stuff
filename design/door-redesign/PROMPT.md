@@ -53,7 +53,7 @@ store, schema, auth or API changes. One commit.
   to its door:
   | Door | Goes to | Line | Visual |
   |---|---|---|---|
-  | Team | `/team` | "Book a time or call a judge" | neutral tile with the ticket glyph (no avatar, no ring); small muted caption under the card: "Opens the team ticket" |
+  | Team | `/team` | "Check your judging status" | neutral tile with the ticket glyph (no avatar, no ring); small muted caption under the card: "Opens the team ticket" |
   | Judge | `/judge/login` | "Panel code from your Judge Advisor" | `/avatars/judge.jpg`, accent ring |
   | Referee | `/referee/login` | "Referees and the head referee" | `/avatars/referee.jpg`, the striped ink ring |
   | Queue desk | `/queue/login` | "Check teams in and book times" | `/avatars/queue-desk.jpg`, teal `--desk` ring |

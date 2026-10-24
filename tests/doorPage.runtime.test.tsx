@@ -28,7 +28,7 @@ test("/: five doors in order, each a link to its sign-in", () => {
   assert.deepEqual(names, ["Team", "Judge", "Referee", "Queue desk", "Judge Advisor"]);
   const lines = [...door.matchAll(/<span class="dp-s">([^<]+)<\/span>/g)].map((m) => m[1]);
   assert.deepEqual(lines.slice(0, 5), [
-    "Book a time or call a judge",
+    "Check your judging status",
     "Panel code from your Judge Advisor",
     "Referees and the head referee",
     "Check teams in and book times",

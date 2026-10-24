@@ -13,7 +13,7 @@ type Door = { name: string; line: string; href: string; ring: string | null; ava
 
 /** Most people first. The Team door has no avatar and no ring: it opens the ticket. */
 const DOORS: Door[] = [
-  { name: "Team", line: "Book a time or call a judge", href: "/team", ring: null },
+  { name: "Team", line: "Check your judging status", href: "/team", ring: null },
   { name: "Judge", line: "Panel code from your Judge Advisor", href: "/judge/login", ring: "judge", avatar: "judge" },
   { name: "Referee", line: "Referees and the head referee", href: "/referee/login", ring: "ref", avatar: "referee" },
   { name: "Queue desk", line: "Check teams in and book times", href: "/queue/login", ring: "desk", avatar: "queue-desk" },
