@@ -10,10 +10,13 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { Banner } from "@/components/ui";
 import { JudgeFrame } from "@/components/judge/JudgeFrame";
 import { QueueTab } from "@/components/judge/QueueTab";
+import { NominateSheet, type NominateView } from "@/components/judge/Nominate";
 import { ScoresTab } from "@/components/judge/ScoresTab";
 import { TeamSheet } from "@/components/judge/TeamSheet";
 import { TodayTab } from "@/components/judge/TodayTab";
-import { type JudgeTab } from "@/components/judge/logic";
+import { primaryAction, type JudgeTab } from "@/components/judge/logic";
+import { pickFinished } from "@/components/judge/nominations";
+import { useNominations } from "@/components/judge/useNominations";
 import type { Session } from "@/lib/auth";
 import type { RequestRow, Team } from "@/lib/types";
 
@@ -30,6 +33,13 @@ export default function JudgePage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [sheetId, setSheetId] = useState<string | null>(null);
+  /* Awards: the team whose interview this judge last finished (the Queue's
+     "Nominate for an award?" card), the teams whose card they have tapped Done
+     on, and the nominate sheet. All in memory: a reload starts without the card,
+     and the team's Done row has the Edit / Nominate link. */
+  const [finishedId, setFinishedId] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
+  const [nominating, setNominating] = useState<{ teamId: string; view: NominateView } | null>(null);
   const [tab, setTab] = useState<JudgeTab>("queue");
   const { ask, dialog } = useConfirm();
   /* On for every tab: the Scores tab ranks them, and the hero card shows each
@@ -72,6 +82,13 @@ export default function JudgePage() {
     [state.teams, panelId],
   );
 
+  // This judge's own panel's nominations and the awards to choose from; the Judge Advisor reads neither here.
+  const me = useMemo(
+    () => (session?.role === "judge" ? { judge: session.name, panelId: session.panelId } : null),
+    [session],
+  );
+  const awards = useNominations(me);
+
   /* Ranked once, for the Scores tab and for the total on each card. Totalled
      against the rubrics this team's category is actually judged on -- an
      Ungraded notebook is unmarked, not zero -- so the number on the card reads
@@ -92,6 +109,10 @@ export default function JudgePage() {
   );
 
   const completed = useMemo(() => completedTeamIds(state.requests), [state.requests]);
+  const finished = useMemo(
+    () => (awards.awards.length ? pickFinished(cards, state.requests, finishedId, dismissed) : null),
+    [awards.awards.length, cards, state.requests, finishedId, dismissed],
+  );
   const interviewed = myTeams.filter((t) => completed.has(t.id)).length;
   const waiting = cards.filter(({ request }) => request?.status === "requested").length;
 
@@ -126,6 +147,13 @@ export default function JudgePage() {
         // advancing it a second time from under whoever got there first.
         body: { action, from: request.status, ...extra },
       });
+      // Finishing an interview puts the team's award chips in the hero slot.
+      // Marked before the refresh so the card is there the moment the queue is.
+      if (action === "advance" && primaryAction(request.status)?.to === "completed") {
+        setFinishedId(request.team_id);
+        
+        setDismissed((d) => new Set([...d].filter((id) => id !== request.team_id)));
+      }
       await refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -155,6 +183,8 @@ export default function JudgePage() {
 
   const sheetTeam = myTeams.find((t) => t.id === sheetId) ?? null;
   const open = (team: Team) => setSheetId(team.id);
+  // A team that has left the panel (a conflict declared) closes the sheet, as it does the team sheet.
+  const nominateTeam = (nominating && myTeams.find((t) => t.id === nominating.teamId)) || null;
 
   return (
     <JudgeFrame
@@ -186,6 +216,21 @@ export default function JudgePage() {
           busy={busy}
           onAdvance={(request) => advance(request)}
           onOpen={open}
+          nominate={
+            me
+              ? {
+                  awards: awards.awards,
+                  nominations: awards.nominations,
+                  me,
+                  finished,
+                  // A failed tap shows in the banner above, and the chip goes back as it was.
+                  onToggle: (teamId, awardId, on) =>
+                    awards.set(teamId, awardId, on).then((failed) => failed && setError(failed)),
+                  onDone: (team) => setDismissed((d) => new Set(d).add(team.id)),
+                  onNominate: (team, view) => setNominating({ teamId: team.id, view }),
+                }
+              : undefined
+          }
         />
       ) : null}
 
@@ -228,6 +273,17 @@ export default function JudgePage() {
         ask={ask}
         onClose={() => setSheetId(null)}
       />
+      {me ? (
+        <NominateSheet
+          team={nominateTeam}
+          view={nominating?.view ?? "chips"}
+          awards={awards.awards}
+          nominations={awards.nominations}
+          me={me}
+          onSet={awards.set}
+          onClose={() => setNominating(null)}
+        />
+      ) : null}
       {dialog}
     </JudgeFrame>
   );

@@ -2099,6 +2099,43 @@ body:has(.judge) > .theme-toggle:hover {
 .jg-sf p { display: flex; align-items: center; gap: 6px; color: var(--ink-subtle); font-size: 13px; }
 .jg-sf .jg-quiet { padding: 0 0 0 8px; font-size: 13px; }
 
+/* Awards: the judge nominates (design/awards-redesign/reference-judge-nominate.dc.html)
+   The green card the Queue shows right after Finish, its award chips, the Done rows' award line and the
+   small sheet they open. Green means finished; the accent is the pressed chip and the links only. No motion. */
+.jg-t-done {
+  --hb: color-mix(in srgb, var(--done) 14%, transparent); --hr: color-mix(in srgb, var(--done) 55%, transparent);
+  --he: var(--done-quiet);
+}
+.jg-fin { gap: 10px; }
+.jg-fin .jg-hn { font-size: 34px; }
+.jg-fin .jg-hname { margin-top: 3px; font-size: 16px; }
+.jg-fq { font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 16px; }
+.jg-fq small { display: block; color: var(--ink-subtle); font-family: var(--font-fira), ui-sans-serif, system-ui, sans-serif; font-weight: 400; font-size: 12.5px; }
+.jg-agrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.jg-ach {
+  display: flex; min-width: 0; height: 46px; align-items: center; gap: 6px; padding: 0 10px;
+  border: 1.5px solid var(--jg-field-line); border-radius: 12px; background: var(--jg-field); color: var(--ink);
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: clamp(12.5px, 3.9vw, 15px); text-align: left;
+}
+.jg-ach svg { display: none; flex: none; }
+/* The label scales a little below 385px so "Sportsmanship" beside its check stays on one line down to a 340px phone;
+   narrower, it wraps (at a syllable where the browser can hyphenate) and never clips. */
+.jg-ach span { min-width: 0; line-height: 1.1; hyphens: auto; overflow-wrap: anywhere; }
+.jg-ach:hover:not([aria-pressed="true"]) { background: var(--surface-2); }
+.jg-ach[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.jg-ach[aria-pressed="true"] svg { display: block; }
+
+.jg-drow { min-height: 60px; }
+.jg-dn { display: flex; align-items: flex-start; gap: 5px; color: var(--ink); font-size: 12.5px; line-height: 1.3; }
+.jg-dn svg { flex: none; margin-top: 2px; color: var(--ink-subtle); }
+.jg-dn.jg-no { color: var(--ink-subtle); }
+
+/* The small sheet is as tall as its content, up to the team sheet's height; a modal dialog with height auto would stretch to fill the screen. */
+.jg-nsheet { height: fit-content; }
+.jg-rsn { display: flex; flex-direction: column; gap: 4px; }
+.jg-rsn label { font-weight: 500; font-size: 15px; }
+.jg-rsn small { color: var(--ink-subtle); font-size: 12.5px; line-height: 1.35; }
+
 @keyframes si-bar { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
 @keyframes si-shimmer { from { transform: translateX(-130%) skewX(-20deg); } to { transform: translateX(380%) skewX(-20deg); } }
 @keyframes si-pole { to { transform: translateX(17px); } }

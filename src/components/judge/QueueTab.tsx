@@ -5,8 +5,10 @@ import { FlagSummary } from "@/components/Flags";
 import { formatClock, formatMinutes } from "@/components/ui";
 import { groupQueue, minutesSince, pickHero, waitingAlert, type QueueCard } from "@/lib/judgeQueue";
 import { STATUS_META } from "@/lib/status";
-import type { AppState, FlagRow, RequestRow, Team } from "@/lib/types";
-import { BandPill, ChevronDown, ChevronRight, Dot, MessageIcon, StatusPill } from "./parts";
+import type { AppState, AwardView, FlagRow, NominationRow, RequestRow, Team } from "@/lib/types";
+import { FinishedCard, type NominateView } from "./Nominate";
+import { myAwards, nominationSummary, type Finished, type Me } from "./nominations";
+import { BandPill, ChevronDown, ChevronRight, Dot, MessageIcon, StatusPill, TrophyIcon } from "./parts";
 import {
   dueText,
   flagDetail,
@@ -22,6 +24,25 @@ export type QueueActions = {
   onAdvance: (request: RequestRow) => void;
   /** Open the team sheet. */
   onOpen: (team: Team) => void;
+};
+
+/**
+ * What the Queue tab needs to let a judge nominate. Left out (or with no
+ * awards configured) the tab is as it was before awards.
+ */
+export type NominateActions = {
+  awards: AwardView[];
+  /** The panel's nominations, with any tap still saving laid over them. */
+  nominations: NominationRow[];
+  me: Me;
+  /** The team whose finished-interview card takes the hero slot (pickFinished), if any. */
+  finished: Finished | null;
+  /** A chip tap: nominate (`on`) or withdraw. */
+  onToggle: (teamId: string, awardId: string, on: boolean) => void;
+  /** The card's Done: collapse it for this team. */
+  onDone: (team: Team) => void;
+  /** Open the sheet on the chips (a Done row) or on the reasons (the card's Add a reason). */
+  onNominate: (team: Team, view: NominateView) => void;
 };
 
 type Context = QueueActions & {
@@ -41,11 +62,13 @@ type Context = QueueActions & {
 export function QueueTab({
   cards,
   completed,
+  nominate,
   ...ctx
 }: Context & {
   cards: QueueCard[];
   /** Teams with a finished interview (completedTeamIds). */
   completed: ReadonlySet<string>;
+  nominate?: NominateActions;
 }) {
   if (!cards.length) {
     return (
@@ -56,16 +79,28 @@ export function QueueTab({
     );
   }
 
+  // Awards on: the just-finished team's card takes the hero slot (so it is not in Done while it is there),
+  // and the Done rows list their nominations. The teams that would be the hero wait below the card instead.
+  const nom = nominate?.awards.length ? nominate : null;
+  const finished = nom?.finished ?? null;
   const hero = pickHero(cards);
-  const sections = groupQueue(cards, hero, completed);
+  const sections = groupQueue(cards, finished?.card ?? hero, completed);
   const heroWaiting = hero?.request?.status === "requested";
-  const alert = heroWaiting ? [] : waitingAlert(sections.waiting, ctx.now);
+  const alert = finished || heroWaiting ? [] : waitingAlert(sections.waiting, ctx.now);
   const rows = (list: QueueCard[]) =>
     list.map((c) => (
       <li key={c.team.id}>
         <Row card={c} {...ctx} />
       </li>
     ));
+  const doneRows = (list: QueueCard[]) =>
+    nom
+      ? list.map((c) => (
+          <li key={c.team.id}>
+            <DoneRow card={c} nominate={nom} onOpen={ctx.onOpen} />
+          </li>
+        ))
+      : rows(list);
 
   return (
     <>
@@ -90,7 +125,16 @@ export function QueueTab({
         </div>
       ) : null}
 
-      {hero ? (
+      {nom && finished ? (
+        <FinishedCard
+          finished={finished}
+          awards={nom.awards}
+          pressed={myAwards(nom.nominations, finished.card.team.id, nom.me)}
+          onToggle={(awardId, on) => nom.onToggle(finished.card.team.id, awardId, on)}
+          onDone={() => nom.onDone(finished.card.team)}
+          onReason={() => nom.onNominate(finished.card.team, "reasons")}
+        />
+      ) : hero ? (
         <Hero card={hero} {...ctx} />
       ) : (
         <p className="jg-empty">Nobody is waiting or booked right now.</p>
@@ -128,10 +172,53 @@ export function QueueTab({
             <span className="jg-dp">{sections.done.map((c) => c.team.number).join(" · ")}</span>
             <ChevronDown />
           </summary>
-          <ul className="jg-list">{rows(sections.done)}</ul>
+          <ul className="jg-list">{doneRows(sections.done)}</ul>
         </details>
       ) : null}
     </>
+  );
+}
+
+/**
+ * A finished team's row once awards are on: the panel's nominations for it on
+ * one line ("Excellence ×2 · Design", ×2 being two judges) and a link to the
+ * chips -- Edit, or Nominate when there are none. The rest of the row still
+ * opens the team sheet.
+ */
+function DoneRow({
+  card,
+  nominate,
+  onOpen,
+}: {
+  card: QueueCard;
+  nominate: NominateActions;
+  onOpen: (team: Team) => void;
+}) {
+  const { team } = card;
+  const summary = nominationSummary(nominate.nominations, nominate.awards, team.id, nominate.me);
+  return (
+    <div className="jg-qrow jg-drow">
+      <button type="button" className="jg-qmain" onClick={() => onOpen(team)}>
+        <span className="jg-qt">
+          <span className="jg-q1">
+            <b>{team.number}</b>
+            <span>{team.name}</span>
+          </span>
+          <span className={summary ? "jg-dn" : "jg-dn jg-no"}>
+            <TrophyIcon />
+            {summary || "No nominations"}
+          </span>
+        </span>
+      </button>
+      <button
+        type="button"
+        className="jg-lnk"
+        aria-label={`${summary ? "Edit nominations for" : "Nominate"} ${team.number}`}
+        onClick={() => nominate.onNominate(team, "chips")}
+      >
+        {summary ? "Edit" : "Nominate"}
+      </button>
+    </div>
   );
 }
 

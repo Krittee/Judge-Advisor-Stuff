@@ -54,6 +54,11 @@ export const MessageIcon = () => (
     <path d="M4 5h16v11H9l-5 4V5z" />
   </Svg>
 );
+export const TrophyIcon = () => (
+  <Svg size={13} strokeWidth={2}>
+    <path d="M8 4h8v6a4 4 0 0 1-8 0zM8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3M12 14v3M8 20h8" />
+  </Svg>
+);
 export const WarnIcon = () => (
   <Svg>
     <path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01" />
