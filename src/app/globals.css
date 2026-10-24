@@ -410,10 +410,12 @@ body:has(.board) {
 .bd-ld { width: 10px; height: 10px; border-radius: 50%; background: var(--done); }
 .bd-live--off { color: var(--caution-quiet); }
 .bd-live--off .bd-ld { background: var(--caution); }
-.bd-links nav { gap: 12px; }
-.bd-links a { padding: 2px 4px; border-radius: 4px; background: none; color: var(--ink-subtle); font-size: inherit; text-decoration: underline; transition: color 0.15s; }
-.bd-links a:hover { background: none; color: var(--ink); }
-.bd-links a[aria-current] { background: none; color: var(--ink); font-weight: 500; }
+/* The way back, top-left above the brand: quiet like the rest of the chrome, but on every screen. */
+.bd-back {
+  display: inline-flex; align-items: center; align-self: flex-start; gap: 0.4em; min-height: max(24px, calc(28 * var(--bd-h)));
+  color: var(--ink-subtle); font-size: max(13px, calc(15 * var(--bd-h))); line-height: 1.3; white-space: nowrap; text-decoration: none;
+}
+.bd-back:hover { color: var(--ink); }
 .bd-fs {
   display: inline-flex; align-items: center; gap: 8px; height: max(28px, calc(32 * var(--bd-h))); padding: 0 12px;
   border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink-subtle);
@@ -555,9 +557,11 @@ body:has(.board) {
   /* .lp-brand (the landing's, later in this file) sets display:flex, so out-rank it. */
   .board .bd-brand { display: none; }
   .bd-title { font-size: 22px; letter-spacing: -0.01em; }
+  .bd-back { min-height: 44px; font-size: 15px; }
   .bd-chrome, .bd-crow { display: contents; font-size: 15px; }
-  .bd-live { grid-column: 2; grid-row: 1; color: var(--ink-subtle); font-size: 14px; }
-  .bd-crow .theme-toggle { grid-column: 3; grid-row: 1; width: 44px; height: 44px; margin-right: -12px; border-radius: 12px; }
+  /* Live and the toggle share the back link's 44px row; the title sits under it. */
+  .bd-live { grid-column: 2; grid-row: 1; align-self: start; height: 44px; color: var(--ink-subtle); font-size: 14px; }
+  .bd-crow .theme-toggle { grid-column: 3; grid-row: 1; align-self: start; width: 44px; height: 44px; margin-right: -12px; border-radius: 12px; }
   .bd-wait { grid-column: 1 / -1; grid-row: 2; height: 84px; gap: 16px; padding: 0 20px; border-radius: 18px; }
   .bd-wait b { font-size: 64px; }
   .bd-wait span { max-width: none; font-size: 22px; }
@@ -570,7 +574,6 @@ body:has(.board) {
   .bd-seg button { height: 36px; padding: 0 12px; font-size: 15px; }
   .bd-chk { grid-column: 2 / 4; grid-row: 4; min-height: 44px; font-size: 15px; }
   .bd-chk input { width: 22px; height: 22px; }
-  .bd-links { grid-column: 1; grid-row: 5; }
   .bd-fs { grid-column: 2 / 4; grid-row: 5; }
 
   .bd-body { flex-direction: column; align-items: stretch; gap: 12px; }
@@ -583,7 +586,7 @@ body:has(.board) {
   body:has(.board) { --bd-u: 1px; --bd-h: 1px; }
   .board { gap: 10px; padding: 0 16px 24px; }
   .bd-title { font-size: 18px; }
-  .bd-links, .bd-fs { display: none; }
+  .bd-fs { display: none; }
   .bd-main { gap: 10px; }
   .bd-body, .bd-panels, .bd-side { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
   .bd-side .bd-key { display: none; }

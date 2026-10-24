@@ -10,6 +10,7 @@ import {
   markerKey,
   notebookMarker,
   waitParts,
+  backLinkFor,
 } from "../src/components/board/boardLogic";
 
 /* The Live board's decisions, apart from how it is drawn: the tile order, the
@@ -288,10 +289,13 @@ test("the tiles never shrink below the mock's sizes on a laptop: the unit only s
   assert.match(bare, /--bd-u: max\(1px, calc\(100vw \/ 1920\)\)/);
 });
 
-test("phone: the toggle and Hide completed are at least 44px tall, and no console links or Fullscreen", () => {
+test("phone: the toggle, Hide completed and the way back are at least 44px tall; only Fullscreen goes", () => {
   const phone = bare.slice(bare.indexOf("@media (max-width: 767px)"));
-  assert.match(phone, /\.bd-links, \.bd-fs \{ display: none; \}/);
+  assert.match(phone, /\.bd-fs \{ display: none; \}/);
+  assert.doesNotMatch(phone, /\.bd-back[^{]*\{[^}]*display: none/, "the way back stays on a phone");
+  assert.doesNotMatch(bare, /bd-links/);
   const stacked = bare.slice(bare.indexOf("@media (max-width: 1199px)"), bare.indexOf("@media (max-width: 767px)"));
+  assert.match(stacked, /\.bd-back \{[^}]*min-height: 44px/);
   assert.match(stacked, /\.theme-toggle \{[^}]*width: 44px; height: 44px/);
   assert.match(stacked, /\.bd-chk \{[^}]*min-height: 44px/);
 });
@@ -320,4 +324,13 @@ test("the keys list only divisions that have teams, in config order", () => {
   assert.deepEqual(divisionsInUse(divisions, []), []);
   // A division's colour still comes from its place in the whole list.
   assert.equal(divisionClass("Middle School", divisions), "bd-dv-2");
+});
+
+test("the way back: each role's own screen, anyone else Home", () => {
+  assert.deepEqual(backLinkFor("admin"), { href: "/admin", label: "Judge Advisor" });
+  assert.deepEqual(backLinkFor("queuer"), { href: "/queue", label: "Queue desk" });
+  assert.deepEqual(backLinkFor("judge"), { href: "/judge", label: "My panel" });
+  assert.deepEqual(backLinkFor("referee"), { href: "/referee", label: "Referee" });
+  assert.deepEqual(backLinkFor("team"), { href: "/", label: "Home" });
+  assert.deepEqual(backLinkFor("public"), { href: "/", label: "Home" });
 });

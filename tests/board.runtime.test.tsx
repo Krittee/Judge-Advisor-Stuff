@@ -146,22 +146,33 @@ test("the toggle is a real button group with aria-pressed, and the view follows 
   assert.doesNotMatch(pits, /bd-panel/);
 });
 
-test("Fullscreen and the theme toggle are there; console links are staff-only", () => {
+test("Fullscreen and the theme toggle are there; the old console links row is gone", () => {
   const markup = board(day);
   assert.match(text(markup), /Fullscreen/);
   assert.match(markup, /class="theme-toggle"/);
-  assert.doesNotMatch(markup, /aria-label="Switch view"/, "a team sees no console links");
-  const admin = renderToStaticMarkup(
-    <BoardView
-      state={{ ...day, viewer: { ...day.viewer, role: "admin" } }}
-      online
-      view="queue"
-      hideDone={false}
-      onView={noop}
-      onHideDone={noop}
-    />,
-  );
-  assert.match(admin, /aria-label="Switch view"/);
+  assert.doesNotMatch(markup, /aria-label="Switch view"|bd-links|Console/);
+});
+
+test("the way back is a link at the top of the header, named for who is looking", () => {
+  const back = (markup: string) => /<a [^>]*class="bd-back"[^>]*>.*?<\/a>/.exec(markup)?.[0] ?? "";
+  const as = (role: string, view: "queue" | "pits" = "queue") =>
+    board({ ...day, viewer: { ...day.viewer, role } } as unknown as AppState, { view });
+  const admin = as("admin");
+  assert.match(back(admin), /href="\/admin"/);
+  assert.match(back(admin), /aria-label="Back to Judge Advisor"/);
+  assert.match(back(admin), /<span aria-hidden="true">←<\/span>Judge Advisor<\/a>$/, "the arrow is decorative");
+  assert.ok(admin.indexOf("bd-back") < admin.indexOf("lp-brand"), "it sits above the brand, in the header's left block");
+  assert.match(back(as("queuer")), /href="\/queue"/);
+  assert.match(back(as("queuer")), /Back to Queue desk/);
+  assert.match(back(as("judge")), /href="\/judge"/);
+  assert.match(back(as("judge")), /Back to My panel/);
+  assert.match(back(as("referee")), /href="\/referee"/);
+  assert.match(back(as("referee")), /Back to Referee/);
+  // A team, or anyone not signed in, gets Home -- the old row gave them nothing at all.
+  assert.match(back(board(day)), /href="\/"/);
+  assert.match(back(board(day)), /Back to Home/);
+  // The pit floor shares the header, so it has the link too.
+  assert.match(back(as("admin", "pits")), /href="\/admin"/);
 });
 
 test("the key names the statuses, the three markers and the divisions", () => {

@@ -170,3 +170,23 @@ export function divisionsInUse(divisions: string[], teams: { division: string }[
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
+
+/**
+ * The board opens in a new tab from the consoles, so browser Back is no way
+ * home: it links to where this viewer came from. `label` is the destination's
+ * name; the page draws the arrow and says "Back to ..." to a screen reader.
+ */
+export function backLinkFor(role: string): { href: string; label: string } {
+  switch (role) {
+    case "admin":
+      return { href: "/admin", label: "Judge Advisor" };
+    case "queuer":
+      return { href: "/queue", label: "Queue desk" };
+    case "judge":
+      return { href: "/judge", label: "My panel" };
+    case "referee":
+      return { href: "/referee", label: "Referee" };
+    default:
+      return { href: "/", label: "Home" };
+  }
+}

@@ -1,13 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { STATUS_META } from "@/lib/status";
-import { ConsoleLinks } from "@/components/nav";
 import { PitMap, StatusSwatches } from "@/components/PitMap";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { formatClock } from "@/components/ui";
 import type { AppState, TeamCategoryView } from "@/lib/types";
 import {
+  backLinkFor,
   divisionClass,
   divisionsInUse,
   groupByPanel,
@@ -56,11 +57,17 @@ export function BoardView({ state, online, view, hideDone, onView, onHideDone }:
 
   const unassigned = groups.find((g) => !g.panel);
   const panels = groups.filter((g) => g.panel);
+  const back = backLinkFor(state.viewer.role);
 
   return (
     <div className="board">
       <header className="bd-hd">
         <div className="bd-hl">
+          {/* The board opens in a new tab, so Back does nothing: say where to go. */}
+          <Link href={back.href} className="bd-back" aria-label={`Back to ${back.label}`}>
+            <span aria-hidden="true">←</span>
+            {back.label}
+          </Link>
           <div className="lp-brand bd-brand">
             <span className="lp-mark" aria-hidden="true">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
@@ -118,10 +125,6 @@ export function BoardView({ state, online, view, hideDone, onView, onHideDone }:
               Hide completed
             </label>
             <LiveDot online={online} />
-            {/* Whoever opened this on a laptop still has to get back. */}
-            <span className="bd-links">
-              <ConsoleLinks role={state.viewer.role} current="/board" />
-            </span>
             <button type="button" className="bd-fs" onClick={() => document.documentElement.requestFullscreen?.()}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
