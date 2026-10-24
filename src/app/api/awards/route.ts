@@ -1,0 +1,154 @@
+import { NextResponse } from "next/server";
+import { actorParts } from "@/lib/activity";
+import { canReadNotes, getSession, mayActOnPanel, type Session } from "@/lib/auth";
+import { store, StoreError } from "@/lib/db";
+import { blockedTeams, CONFLICT_MESSAGE, isConflicted, loadBlocks } from "@/lib/conflicts";
+import { completedTeamIds } from "@/lib/judgeQueue";
+import { awards } from "@/lib/presets";
+import type { NominationRow } from "@/lib/types";
+import { awardLabel, fields, REASON_MAX } from "./shared";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * Award nominations.
+ *
+ * Judges nominate the teams they interviewed; the Judge Advisor sees every
+ * nomination and decides the winners (see ./winners). Winners are secret
+ * until the ceremony, so a judge's reply has no `winners` key at all, and
+ * nothing here is ever part of /api/state.
+ *
+ *   judge  reads their own panel's nominations; nominates and withdraws
+ *          their own, for completed, non-conflicted teams on their panel
+ *   admin  reads every nomination and every winner
+ *   anyone else is refused
+ */
+export async function GET() {
+  const session = await getSession();
+  if (!canReadNotes(session)) {
+    return NextResponse.json({ error: "Not authorised." }, { status: 403 });
+  }
+
+  const db = store();
+  const nominations = await db.listNominations();
+  const noStore = { headers: { "Cache-Control": "no-store" } };
+
+  if (session?.role === "admin") {
+    const winners = await db.listWinners();
+    return NextResponse.json({ awards: awards(), nominations, winners }, noStore);
+  }
+
+  // A judge gets their own panel's nominations, minus any team the panel has
+  // since been barred from: the same wall the notes use. Winners are never read.
+  const judge = session as Extract<Session, { role: "judge" }>;
+  const barred = blockedTeams(await loadBlocks(), judge.panelId);
+  return NextResponse.json(
+    {
+      awards: awards(),
+      nominations: nominations.filter((n) => n.panel_id === judge.panelId && !barred.has(n.team_id)),
+    },
+    noStore,
+  );
+}
+
+/** Nominate a team for an award, or change the reason. Asking again is harmless. */
+export async function POST(request: Request) {
+  const session = await getSession();
+  if (session?.role !== "judge") {
+    return NextResponse.json({ error: "Only a judge can nominate a team for an award." }, { status: 403 });
+  }
+
+  const body = await fields(request);
+  const awardId = String(body.awardId ?? "");
+  const teamId = String(body.teamId ?? "");
+  if (!awardId || !teamId) {
+    return NextResponse.json({ error: "An award and a team are required." }, { status: 400 });
+  }
+
+  const db = store();
+  const team = (await db.listTeams()).find((t) => t.id === teamId);
+  if (!team) {
+    return NextResponse.json({ error: "That team no longer exists." }, { status: 404 });
+  }
+  // Scope before anything else, as the notes do: a judge who may not touch
+  // this team is told that, not how to format their request. Conflict first,
+  // because declaring one takes the team off the panel and the panel check
+  // would otherwise answer with the vaguer message.
+  if (await isConflicted(session, teamId)) {
+    return NextResponse.json({ error: CONFLICT_MESSAGE }, { status: 403 });
+  }
+  if (!mayActOnPanel(session, team.panel_id)) {
+    return NextResponse.json({ error: "That team is not assigned to your judge panel." }, { status: 403 });
+  }
+  if (!completedTeamIds(await db.listRequests()).has(teamId)) {
+    return NextResponse.json(
+      { error: `Team ${team.number} has not finished an interview yet. Nominate it once you have met it.` },
+      { status: 409 },
+    );
+  }
+  const award = awards().find((a) => a.id === awardId);
+  if (!award) {
+    return NextResponse.json({ error: "That award does not exist." }, { status: 400 });
+  }
+
+  // Left out, the reason stays as it was (a chip tap sends none); an empty one clears it.
+  const reason = body.reason === undefined ? undefined : String(body.reason ?? "").trim().slice(0, REASON_MAX) || null;
+  const key = { awardId, teamId, panelId: session.panelId, judge: session.name };
+  const before = (await db.listNominations()).find((n) => isMine(n, key));
+
+  let nomination: NominationRow;
+  try {
+    nomination = await db.nominate({ ...key, reason });
+  } catch (e) {
+    if (e instanceof StoreError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+
+  // Only a write is logged: a repeat tap changes nothing.
+  const action = !before
+    ? `nominated ${team.number} for ${award.label}`
+    : reason !== undefined && reason !== before.reason
+      ? `changed the reason for ${team.number}'s ${award.label} nomination`
+      : null;
+  if (action) await db.logActivity({ teamId, kind: "award", ...actorParts(session), action });
+
+  return NextResponse.json({ nomination });
+}
+
+/** Withdraw your own nomination. Nobody else's can be touched from here. */
+export async function DELETE(request: Request) {
+  const session = await getSession();
+  if (session?.role !== "judge") {
+    return NextResponse.json({ error: "Only a judge can withdraw a nomination." }, { status: 403 });
+  }
+
+  const body = await fields(request);
+  const awardId = String(body.awardId ?? "");
+  const teamId = String(body.teamId ?? "");
+  if (!awardId || !teamId) {
+    return NextResponse.json({ error: "An award and a team are required." }, { status: 400 });
+  }
+
+  // Looked up rather than passed straight through: an id that matches nothing
+  // is "nothing to withdraw", not a database error.
+  const db = store();
+  const key = { awardId, teamId, panelId: session.panelId, judge: session.name };
+  if (!(await db.listNominations()).some((n) => isMine(n, key))) {
+    return NextResponse.json({ ok: true, removed: false });
+  }
+
+  const removed = await db.withdrawNomination(key);
+  if (removed) {
+    const team = (await db.listTeams()).find((t) => t.id === teamId);
+    await db.logActivity({
+      teamId,
+      kind: "award",
+      ...actorParts(session),
+      action: `withdrew ${team?.number ?? "a team"} from ${awardLabel(awardId)}`,
+    });
+  }
+  return NextResponse.json({ ok: true, removed });
+}
+
+const isMine = (n: NominationRow, k: { awardId: string; teamId: string; panelId: string; judge: string }) =>
+  n.award_id === k.awardId && n.team_id === k.teamId && n.panel_id === k.panelId && n.judge === k.judge;

@@ -107,8 +107,8 @@ test("the footer names the 150 once the log is that long, and the whole log befo
 /* ---- the filters --------------------------------------------------------------- */
 
 test("the kind chips count the loaded entries, whatever else is filtered", () => {
-  assert.deepEqual(chipCounts(log), { all: 8, request: 3, referee: 2, conflict: 1, setup: 2 });
-  assert.deepEqual(chipCounts([]), { all: 0, request: 0, referee: 0, conflict: 0, setup: 0 });
+  assert.deepEqual(chipCounts(log), { all: 8, request: 3, referee: 2, conflict: 1, setup: 2, award: 0 });
+  assert.deepEqual(chipCounts([]), { all: 0, request: 0, referee: 0, conflict: 0, setup: 0, award: 0 });
 });
 
 test("the kind filter keeps one kind, and All keeps everything", () => {

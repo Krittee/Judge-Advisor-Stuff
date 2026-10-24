@@ -89,11 +89,11 @@ export const KIND_CHIPS: { id: KindFilter; label: string }[] = [
 ];
 
 /** What the dot's screen-reader text says. */
-export const KIND_NAMES: Record<ActivityKind, string> = { request: "Requests", referee: "Referee", conflict: "Conflicts", setup: "Setup" };
+export const KIND_NAMES: Record<ActivityKind, string> = { request: "Requests", referee: "Referee", conflict: "Conflicts", setup: "Setup", award: "Awards" };
 
 /** How many loaded entries each kind chip stands for. The other two filters do not change them. */
 export function chipCounts(rows: Pick<ActivityRow, "kind">[]): Record<KindFilter, number> {
-  const counts: Record<KindFilter, number> = { all: rows.length, request: 0, referee: 0, conflict: 0, setup: 0 };
+  const counts: Record<KindFilter, number> = { all: rows.length, request: 0, referee: 0, conflict: 0, setup: 0, award: 0 };
   for (const r of rows) counts[r.kind]++;
   return counts;
 }

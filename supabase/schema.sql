@@ -3,9 +3,10 @@
 -- Paste this whole file into: Supabase Dashboard > SQL Editor > New query
 --
 -- DESTRUCTIVE. This drops every application table before recreating
--- them, deleting all teams, panels, requests, notes, scores, flags,
--- conflicts and activity — irreversibly. Only run this against an empty
--- project, or one you have deliberately decided to wipe. It is
+-- them, deleting all teams, panels, requests, notes, scores, nominations,
+-- award winners, flags, conflicts and activity — irreversibly. Only run
+-- this against an empty project, or one you have deliberately decided to
+-- wipe. It is
 -- "re-runnable" only in the narrow sense that running it twice in a row
 -- on an already-empty database is harmless; running it against a live
 -- event destroys that event's data.
@@ -20,6 +21,8 @@
 -- =====================================================================
 
 drop table if exists activity  cascade;
+drop table if exists award_winners cascade;
+drop table if exists nominations cascade;
 drop table if exists scores    cascade;
 drop table if exists referee_setup cascade;
 drop table if exists flags     cascade;
@@ -230,13 +233,46 @@ create table scores (
 create index scores_team_idx on scores (team_id);
 
 -- ---------------------------------------------------------------------
+-- Awards — a judge's nomination of a team, and the Judge Advisor's winner.
+-- One nomination per judge per award per team. panel_id is the panel the
+-- judge nominated from, nulled when it is deleted (as scores do). A plain
+-- unique constraint treats NULLs as distinct, which is harmless: the app only
+-- ever writes a nomination with a panel, so its upsert matches a full key.
+-- ---------------------------------------------------------------------
+create table nominations (
+  id         uuid primary key default gen_random_uuid(),
+  award_id   text not null,                   -- an id from config/event.json's awards
+  team_id    uuid not null references teams(id) on delete cascade,
+  panel_id   uuid references panels(id) on delete set null,
+  judge      text not null,                   -- the judge's session name
+  reason     text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (award_id, team_id, panel_id, judge)
+);
+
+create index nominations_team_idx on nominations (team_id);
+
+-- One winner per award per division. Secret until the ceremony.
+create table award_winners (
+  award_id   text not null,
+  division   text not null,
+  team_id    uuid not null references teams(id) on delete cascade,
+  decided_by text not null,
+  decided_at timestamptz not null default now(),
+  primary key (award_id, division)
+);
+
+create index award_winners_team_idx on award_winners (team_id);
+
+-- ---------------------------------------------------------------------
 -- Activity log — who changed what, for untangling event-day confusion
 -- ---------------------------------------------------------------------
 create table activity (
   id         uuid primary key default gen_random_uuid(),
   request_id uuid references requests(id) on delete cascade,
   team_id    uuid references teams(id) on delete set null,
-  kind       text,                            -- request / referee / conflict / setup; null = an older row, read from its action
+  kind       text,                            -- request / referee / conflict / setup / award; null = an older row, read from its action
   actor      text not null,                   -- the plain name
   actor_role text,                            -- 'Judge Advisor', 'Panel 2', 'Referee', 'Front desk', 'Team'
   action     text not null,
@@ -280,4 +316,6 @@ alter table judges    enable row level security;
 alter table flags     enable row level security;
 alter table referee_setup enable row level security;
 alter table scores    enable row level security;
+alter table nominations enable row level security;
+alter table award_winners enable row level security;
 alter table activity  enable row level security;

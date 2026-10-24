@@ -176,7 +176,59 @@ export type ScoreRow = {
   updated_at: string;
 };
 
-export type ActivityKind = "request" | "referee" | "conflict" | "setup";
+/** One of config/event.json's awards, as the browser receives it (judges and the Judge Advisor only). */
+export type AwardView = {
+  id: string;
+  label: string;
+  short: string;
+  blurb: string;
+};
+
+/**
+ * One judge's nomination of one team for one award. The key is
+ * (award_id, team_id, panel_id, judge): two judges on a panel nominating the
+ * same team are two rows, which is what "2 judges" counts.
+ */
+export type NominationRow = {
+  id: string;
+  /** One of config/event.json's awards ids. */
+  award_id: string;
+  team_id: string;
+  /** The nominating judge's panel; null once that panel has been deleted. */
+  panel_id: string | null;
+  /** The judge's session name, like a note's author. */
+  judge: string;
+  reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** The Judge Advisor's pick for one award in one division. Secret until the ceremony. */
+export type WinnerRow = {
+  award_id: string;
+  division: string;
+  team_id: string;
+  decided_by: string;
+  decided_at: string;
+};
+
+/**
+ * GET /api/awards for the Judge Advisor: every nomination and every winner.
+ * A judge's reply is `AwardsJudgeView` and has no `winners` key at all, so
+ * `"winners" in reply` tells the two apart.
+ */
+export type AwardsAdminView = { awards: AwardView[]; nominations: NominationRow[]; winners: WinnerRow[] };
+/** GET /api/awards for a judge: their own panel's nominations only, and never a winner. */
+export type AwardsJudgeView = { awards: AwardView[]; nominations: NominationRow[] };
+
+/** POST /api/awards (nominate, or change the reason). */
+export type NominateReply = { nomination: NominationRow };
+/** DELETE /api/awards (withdraw your own) and DELETE /api/awards/winners (clear). `removed` is false when there was nothing to remove. */
+export type RemoveReply = { ok: true; removed: boolean };
+/** PUT /api/awards/winners. */
+export type WinnerReply = { winner: WinnerRow };
+
+export type ActivityKind = "request" | "referee" | "conflict" | "setup" | "award";
 
 export type ActivityRow = {
   id: string;

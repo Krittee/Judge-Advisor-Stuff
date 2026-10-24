@@ -13,12 +13,14 @@ import type {
   ConflictRow,
   FlagRow,
   JudgeRow,
+  NominationRow,
   Note,
   Panel,
   RefereeSetup,
   RequestRow,
   ScoreRow,
   Team,
+  WinnerRow,
 } from "../types";
 import type { Status } from "../status";
 import { readActivity, type StoredActivity } from "../activity";
@@ -45,6 +47,9 @@ import {
   type NewConflict,
   type NewFlag,
   type NewJudge,
+  type NewNomination,
+  type NewWinner,
+  type NominationKey,
   type FlagEdit,
   type NewRefereeSetup,
   type NewRequest,
@@ -80,6 +85,10 @@ type Data = {
   requests: RequestRow[];
   notes: Note[];
   scores: ScoreRow[];
+  /** Judges' award nominations, oldest first. */
+  nominations: NominationRow[];
+  /** The Judge Advisor's pick per (award, division). */
+  winners: WinnerRow[];
   conflicts: ConflictRow[];
   /** The judge roster, in the order judges were added. */
   judges: JudgeRow[];
@@ -156,6 +165,8 @@ function empty(): Data {
     requests: [],
     notes: [],
     scores: [],
+    nominations: [],
+    winners: [],
     conflicts: [],
     judges: [],
     flags: [],
@@ -238,6 +249,8 @@ function load(): Data {
  */
 function migrate(data: Data): Data {
   data.scores ??= [];
+  data.nominations ??= [];
+  data.winners ??= [];
   data.conflicts ??= [];
   data.judges ??= [];
   data.flags ??= [];
@@ -717,6 +730,9 @@ function deleteTeam(id: string): void {
   state().requests = state().requests.filter((r) => r.team_id !== id);
   state().notes = state().notes.filter((n) => n.team_id !== id);
   state().scores = state().scores.filter((s) => s.team_id !== id);
+  // Nominations and winners cascade with the team in Postgres (on delete cascade).
+  state().nominations = state().nominations.filter((n) => n.team_id !== id);
+  state().winners = state().winners.filter((w) => w.team_id !== id);
   state().conflicts = state().conflicts.filter((c) => c.team_id !== id);
   // Postgres cascades flags on team delete and nulls activity.team_id
   // (on delete set null) rather than dropping the row. Match both here so
@@ -884,6 +900,8 @@ function deletePanel(id: string): void {
   state().panels = state().panels.filter((p) => p.id !== id);
   for (const t of state().teams) if (t.panel_id === id) t.panel_id = null;
   for (const r of state().requests) if (r.panel_id === id) r.panel_id = null;
+  // A nomination outlives its panel, as a score does (on delete set null).
+  for (const n of state().nominations) if (n.panel_id === id) n.panel_id = null;
   // A whole-panel conflict names a panel that no longer exists; it protects
   // nobody. A judge's conflict stays: the judge just has no panel for now.
   state().conflicts = state().conflicts.filter((c) => c.panel_id !== id);
@@ -933,6 +951,7 @@ function deleteAllPanels(): number {
   for (const j of state().judges) j.panel_id = null;
   for (const t of state().teams) t.panel_id = null;
   for (const r of state().requests) r.panel_id = null;
+  for (const n of state().nominations) n.panel_id = null;
   save();
   return removed;
 }
@@ -1198,6 +1217,90 @@ function clearScore(teamId: string, rubricId: string): boolean {
   return removed;
 }
 
+/* ------------------------------------------------------------------ *
+ * Awards: nominations and winners
+ * ------------------------------------------------------------------ */
+
+// Copies, not the stored rows: a caller holding one across a later write
+// (the route comparing a reason before and after) must not see it change.
+function listNominations(): NominationRow[] {
+  return state().nominations.map((n) => ({ ...n }));
+}
+
+const sameNomination = (n: NominationRow, k: NominationKey) =>
+  n.award_id === k.awardId && n.team_id === k.teamId && n.panel_id === k.panelId && n.judge === k.judge;
+
+/**
+ * One row per judge per award per team, so asking twice is asking once.
+ * Only a changed reason writes: a repeat tap must not look like an edit.
+ */
+function nominate(input: NewNomination): NominationRow {
+  // Postgres refuses these through the foreign keys; so does this.
+  if (!state().teams.some((t) => t.id === input.teamId)) throw new StoreError("That team no longer exists.", 404);
+  if (!state().panels.some((p) => p.id === input.panelId)) throw new StoreError("That panel no longer exists.", 404);
+
+  const now = new Date().toISOString();
+  let row = state().nominations.find((n) => sameNomination(n, input));
+  if (!row) {
+    row = {
+      id: randomUUID(),
+      award_id: input.awardId,
+      team_id: input.teamId,
+      panel_id: input.panelId,
+      judge: input.judge,
+      reason: input.reason ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+    state().nominations.push(row);
+  } else if (input.reason !== undefined && input.reason !== row.reason) {
+    row.reason = input.reason;
+    row.updated_at = now;
+  }
+
+  save();
+  return { ...row };
+}
+
+function withdrawNomination(key: NominationKey): boolean {
+  const before = state().nominations.length;
+  state().nominations = state().nominations.filter((n) => !sameNomination(n, key));
+  const removed = state().nominations.length < before;
+  if (removed) save();
+  return removed;
+}
+
+function listWinners(): WinnerRow[] {
+  return state().winners.map((w) => ({ ...w }));
+}
+
+/** Awards are decided per division, so (award, division) holds one team and a second replaces it. */
+function setWinner(input: NewWinner): WinnerRow {
+  if (!state().teams.some((t) => t.id === input.teamId)) throw new StoreError("That team no longer exists.", 404);
+
+  const row: WinnerRow = {
+    award_id: input.awardId,
+    division: input.division,
+    team_id: input.teamId,
+    decided_by: input.decidedBy,
+    decided_at: new Date().toISOString(),
+  };
+  const at = state().winners.findIndex((w) => w.award_id === row.award_id && w.division === row.division);
+  if (at >= 0) state().winners[at] = row;
+  else state().winners.push(row);
+
+  save();
+  return { ...row };
+}
+
+function clearWinner(awardId: string, division: string): boolean {
+  const before = state().winners.length;
+  state().winners = state().winners.filter((w) => !(w.award_id === awardId && w.division === division));
+  const removed = state().winners.length < before;
+  if (removed) save();
+  return removed;
+}
+
 function logActivity(entry: NewActivity): void {
   state().activity.push({
     id: randomUUID(),
@@ -1226,6 +1329,8 @@ function resetDay(): void {
   state().requests = [];
   state().notes = [];
   state().scores = [];
+  state().nominations = [];
+  state().winners = [];
   state().activity = [];
   save();
 }
@@ -1386,6 +1491,8 @@ function demoData(): Data {
     requests,
     notes: [],
     scores: [],
+    nominations: [],
+    winners: [],
     conflicts: [],
     judges,
     flags: [],
@@ -1459,6 +1566,13 @@ export const fileStore: Store = {
   saveScore: async (input) => saveScore(input),
   clearScore: async (teamId, rubricId) => clearScore(teamId, rubricId),
   logActivity: async (entry) => logActivity(entry),
+
+  listNominations: async () => listNominations(),
+  nominate: async (input) => nominate(input),
+  withdrawNomination: async (key) => withdrawNomination(key),
+  listWinners: async () => listWinners(),
+  setWinner: async (input) => setWinner(input),
+  clearWinner: async (awardId, division) => clearWinner(awardId, division),
 
   resetDay: async () => resetDay(),
   resetAll: async () => resetAll(),

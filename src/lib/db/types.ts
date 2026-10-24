@@ -5,11 +5,13 @@ import type {
   FlagRow,
   JudgeRow,
   Note,
+  NominationRow,
   Panel,
   RefereeSetup,
   RequestRow,
   ScoreRow,
   Team,
+  WinnerRow,
 } from "../types";
 
 /** Thrown for rule violations we want to show the user verbatim. */
@@ -120,6 +122,31 @@ export type NewRefereeSetup = {
   setBy: string;
   /** YYYY-MM-DD, already validated. */
   setOn: string;
+};
+
+/**
+ * A nomination always names the panel it is made from: the key is
+ * (awardId, teamId, panelId, judge), and a panel's later deletion is what
+ * leaves a stored row with none.
+ */
+export type NominationKey = {
+  awardId: string;
+  teamId: string;
+  panelId: string;
+  /** The judge's session name, like a note's author. */
+  judge: string;
+};
+
+export type NewNomination = NominationKey & {
+  /** Left out, an existing nomination keeps its reason; null clears it. A new one starts with none. */
+  reason?: string | null;
+};
+
+export type NewWinner = {
+  awardId: string;
+  division: string;
+  teamId: string;
+  decidedBy: string;
 };
 
 export type NewActivity = {
@@ -243,6 +270,22 @@ export type Store = {
   /** Wipe one rubric's scores for one team. Returns whether there were any. */
   clearScore(teamId: string, rubricId: string): Promise<boolean>;
   logActivity(entry: NewActivity): Promise<void>;
+
+  /** Every nomination, oldest first. Who may see which is the route's call. */
+  listNominations(): Promise<NominationRow[]>;
+  /**
+   * Idempotent on (awardId, teamId, panelId, judge): asking again returns the
+   * same row, and only a changed `reason` writes. 404 if the team or panel is gone.
+   */
+  nominate(input: NewNomination): Promise<NominationRow>;
+  /** Returns whether it existed. */
+  withdrawNomination(key: NominationKey): Promise<boolean>;
+  /** Who won what, per division. Secret until the ceremony: never part of the shared state. */
+  listWinners(): Promise<WinnerRow[]>;
+  /** One winner per (awardId, division): setting another replaces it. 404 if the team is gone. */
+  setWinner(input: NewWinner): Promise<WinnerRow>;
+  /** Returns whether there was one. */
+  clearWinner(awardId: string, division: string): Promise<boolean>;
 
   resetDay(): Promise<void>;
   resetAll(): Promise<void>;

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Judge nominate · C · Right after the interview</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Fira+Sans:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+button,input,textarea{font:inherit;color:inherit}
+.stage{display:flex;flex-direction:column;gap:40px}
+.row{display:flex;gap:40px}
+.jq{--canvas:oklch(0.968 0.005 265);--surface:oklch(0.995 0.002 265);--ink:oklch(0.225 0.016 265);--muted:oklch(0.520 0.014 265);--line:oklch(0.885 0.010 265);--accent:oklch(0.510 0.160 258);--on-accent:oklch(0.995 0.002 265);--ring:oklch(0.510 0.160 258 / 0.25);--field:oklch(0.995 0.002 265);--field-line:oklch(0.640 0.012 265);--hover:oklch(0.940 0.008 265);--waiting:oklch(0.700 0.180 52);--waiting-ink:oklch(0.200 0.050 52);--done:oklch(0.735 0.135 158);--done-ink:oklch(0.200 0.050 158);--done-quiet:oklch(0.430 0.105 158);--warn:oklch(0.700 0.150 82);--caution-ink:oklch(0.450 0.110 82);--top-i:oklch(0.440 0.100 175);--strong-i:oklch(0.440 0.090 220);--middle-i:oklch(0.460 0.110 80);--emerging-i:oklch(0.450 0.010 265);--scrim:oklch(0.225 0.016 265 / 0.45);--shadow:0 1px 2px oklch(0.225 0.016 265 / 0.05),0 18px 40px -24px oklch(0.225 0.016 265 / 0.25)}
+.jq[data-theme="dark"]{--canvas:oklch(0.165 0.012 265);--surface:oklch(0.205 0.014 265);--ink:oklch(0.955 0.005 265);--muted:oklch(0.670 0.013 265);--line:oklch(0.320 0.016 265);--accent:oklch(0.680 0.140 258);--on-accent:oklch(0.165 0.012 265);--ring:oklch(0.680 0.140 258 / 0.35);--field:oklch(0.180 0.013 265);--field-line:oklch(0.520 0.014 265);--hover:oklch(0.245 0.016 265);--waiting:oklch(0.735 0.185 58);--waiting-ink:oklch(0.200 0.050 52);--done:oklch(0.745 0.140 158);--done-ink:oklch(0.200 0.050 158);--done-quiet:oklch(0.775 0.100 158);--warn:oklch(0.790 0.150 82);--caution-ink:oklch(0.840 0.100 82);--top-i:oklch(0.850 0.110 175);--strong-i:oklch(0.850 0.080 210);--middle-i:oklch(0.860 0.100 88);--emerging-i:oklch(0.820 0.008 265);--scrim:oklch(0.100 0.010 265 / 0.68);--shadow:none}
+.jq{--accent-t:color-mix(in srgb,var(--accent) 13%,transparent);--done-t:color-mix(in srgb,var(--done) 14%,transparent);--done-l:color-mix(in srgb,var(--done) 55%,transparent);--caution-bg:color-mix(in srgb,var(--warn) 13%,transparent);--caution-line:color-mix(in srgb,var(--warn) 40%,transparent);position:relative;flex:none;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;background:var(--canvas);color:var(--ink);font-family:'Fira Sans',system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.jq *,.jq *::before,.jq *::after{box-sizing:border-box}
+:where(.jq) :is(h1,h2,h3,p,ul,ol,li,blockquote,table){margin:0;padding:0}
+:where(.jq) :is(ul,ol){list-style:none}
+.jq :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rule{flex:none;height:1px;background:var(--line)}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.av{flex:none;width:28px;height:28px;display:block}
+.av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:22%;box-shadow:0 0 0 2px var(--accent)}
+.who-t{display:flex;flex-direction:column;line-height:1.15}
+.who-t b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.who-t span{font-size:12px;color:var(--muted)}
+.top-r{display:flex;align-items:center;gap:2px}
+.live{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--done-quiet)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--done)}
+.signout{min-height:44px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:14px;text-decoration:underline;cursor:pointer}
+.band{flex:none;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;border:1px solid color-mix(in srgb,var(--bi) 40%,transparent);background:color-mix(in srgb,var(--bi) 12%,transparent);color:var(--bi);font-size:12px;font-weight:500;white-space:nowrap}
+.b-top{--bi:var(--top-i)}.b-strong{--bi:var(--strong-i)}.b-middle{--bi:var(--middle-i)}.b-emerging{--bi:var(--emerging-i)}
+.ptag{display:inline-flex;align-items:center;height:24px;padding:0 7px;border:1px solid var(--line);border-radius:6px;color:var(--muted);font-size:12px;font-weight:500;letter-spacing:.04em;white-space:nowrap}
+.ta{display:block;width:100%;margin:0;padding:10px 14px;border:1.5px solid var(--field-line);border-radius:12px;background:var(--field);color:var(--ink);font-family:inherit;font-size:16px;line-height:1.4;resize:none}
+.ta.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+/* Judge phone shell */
+.ph{width:375px;height:812px}
+.top{flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 6px 0 14px}
+.mbar{flex:none;height:56px;display:flex;align-items:center;gap:8px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.mm{display:flex;flex-direction:column;line-height:1;margin-right:2px}
+.mm span{margin-bottom:3px;font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.mm b{font-family:Archivo,sans-serif;font-weight:700;font-size:28px;line-height:1;letter-spacing:-.01em}
+.pr{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.pr b{font-weight:500;color:var(--ink)}
+.body{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:12px;padding:12px 16px}
+.body>*{flex:none}
+.tabs{flex:none;height:64px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.tab{position:relative;flex:1;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--muted);text-decoration:none;font-size:12px;font-weight:500}
+.tab[aria-current]{color:var(--accent)}
+.tab[aria-current]::before{content:"";position:absolute;top:-1px;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--accent)}
+.ico{position:relative;display:block;width:22px;height:22px}
+.bdg{position:absolute;top:-6px;left:12px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--waiting);color:var(--waiting-ink);font-size:11px;font-weight:500;line-height:18px;text-align:center}
+.sec{display:flex;align-items:center;gap:8px;min-height:24px;font-size:12px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.hint{font-size:13.5px;line-height:1.4;color:var(--muted)}
+.hint b{font-weight:500;color:var(--ink)}
+.dim{position:absolute;inset:0;z-index:5;background:var(--scrim)}
+.sheet{position:absolute;z-index:6;left:0;right:0;top:56px;bottom:0;display:flex;flex-direction:column;background:var(--surface);border-radius:24px 24px 0 0;border-top:1px solid var(--field-line);overflow:hidden}
+.grab{flex:none;width:40px;height:4px;margin:8px auto 0;border-radius:2px;background:var(--field-line)}
+.sh-top{flex:none;display:flex;flex-direction:column;gap:8px;padding:6px 16px 10px}
+.sh-h{display:flex;align-items:flex-start;gap:8px}
+.sh-id{flex:1;min-width:0}
+.sh-id h2{font-family:Archivo,sans-serif;font-weight:700;font-size:30px;line-height:1.05;letter-spacing:-.01em}
+.sh-id .nm{margin-top:3px;font-size:16px;line-height:1.2}
+.sh-id .sub{font-size:12.5px;color:var(--muted)}
+.sh-tot{display:flex;flex-direction:column;align-items:flex-end;gap:4px;padding-top:2px}
+.sh-tot b{font-family:Archivo,sans-serif;font-weight:700;font-size:24px;line-height:1;font-variant-numeric:tabular-nums}
+.sh-tot small{font-size:14px;font-weight:500;color:var(--muted)}
+.x{flex:none;width:44px;height:44px;margin:-2px -8px 0 0;border:0;border-radius:12px;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.privl{font-size:12.5px;color:var(--muted)}
+.seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:var(--field);border:1.5px solid var(--line)}
+.seg button{flex:1;min-width:0;height:52px;padding:0;border:0;border-radius:10px;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;line-height:1.15}
+.seg button span{font-family:Archivo,sans-serif;font-weight:600;font-size:14.5px}
+.seg button small{font-size:12px;font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.seg button[aria-pressed="true"] small{color:var(--on-accent)}
+.sh-scroll{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:8px;padding:2px 16px 12px}
+.sh-scroll>*{flex:none}
+.sh-foot{flex:none;display:flex;align-items:center;gap:8px;padding:12px 16px 18px;background:var(--surface);border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+.sh-foot svg{flex:none;color:var(--done-quiet)}
+/* C · nominate right after the interview */
+.jq{--enroute:oklch(0.745 0.120 232);--enroute-ink:oklch(0.200 0.040 232)}
+.jq[data-theme="dark"]{--enroute:oklch(0.720 0.140 232);--enroute-ink:oklch(0.200 0.040 232)}
+.eyebrow{font-size:12px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--done-quiet)}
+.sc{display:inline-flex;align-items:center;flex:none;height:24px;padding:0 10px;border-radius:999px;background:var(--done);color:var(--done-ink);font-size:12px;font-weight:500;white-space:nowrap}
+.hero{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:18px;background:var(--done-t);border:1.5px solid var(--done-l)}
+.hero-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hn{font-family:Archivo,sans-serif;font-weight:700;font-size:34px;line-height:1;letter-spacing:-.01em}
+.hname{margin-top:3px;font-size:16px;line-height:1.25}
+.q{font-family:Archivo,sans-serif;font-weight:600;font-size:16px}
+.q small{display:block;font-family:'Fira Sans',sans-serif;font-weight:400;font-size:12.5px;color:var(--muted)}
+.agrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.ach{display:flex;align-items:center;gap:8px;min-width:0;height:46px;padding:0 12px;border:1.5px solid var(--field-line);border-radius:12px;background:var(--field);color:var(--ink);font-family:Archivo,sans-serif;font-weight:600;font-size:15px;text-align:left;cursor:pointer}
+.ach svg{flex:none;display:none}
+.ach[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.ach[aria-pressed="true"] svg{display:block}
+.hrow{display:flex;align-items:center;gap:8px}
+.ghost{display:inline-flex;align-items:center;justify-content:center;flex:1;height:48px;padding:0 14px;border:1.5px solid var(--field-line);border-radius:12px;background:transparent;color:var(--ink);font-size:15px;font-weight:500;cursor:pointer}
+.lnk{flex:none;min-height:44px;padding:0 8px;border:0;background:transparent;color:var(--accent);font-size:14px;font-weight:500;text-decoration:underline;cursor:pointer}
+.grp{display:flex;flex-direction:column;gap:6px}
+.dotw{flex:none;display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--waiting)}
+.dotd{flex:none;display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--done)}
+.qrow{display:flex;align-items:center;gap:8px;min-height:56px;padding:4px 8px 4px 12px;border:1px solid color-mix(in srgb,var(--waiting) 45%,transparent);border-radius:14px;background:var(--surface)}
+.qt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.q1{display:flex;align-items:baseline;gap:8px;min-width:0}
+.q1 b{flex:none;font-family:Archivo,sans-serif;font-weight:700;font-size:19px}
+.q1 span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.q2{font-size:12.5px;color:var(--muted)}
+.q2 b{font-weight:500;color:var(--waiting-q,var(--ink))}
+.go{flex:none;height:44px;padding:0 14px;border:0;border-radius:12px;background:var(--enroute);color:var(--enroute-ink);font-family:Archivo,sans-serif;font-weight:700;font-size:14px;cursor:pointer}
+.drow{display:flex;align-items:center;gap:8px;min-height:60px;padding:6px 4px 6px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.dn{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink)}
+.dn svg{flex:none;color:var(--muted)}
+.dn.no{color:var(--muted)}
+</style>
+</helmet>
+<div class="stage">
+<sc-for list="{{themes}}" as="t" hint-placeholder-count="2">
+<div class="row">
+
+<div class="jq ph" data-theme="{{t.id}}">
+<header class="top"><div class="who"><span class="av"><img src="/avatars/judge.jpg" alt="" width="28" height="28"></span><span class="who-t"><b>Judge</b><span>Sam Rivera</span></span></div><div class="top-r"><span class="live"><i aria-hidden="true"></i>Live</span><button type="button" class="signout">Sign out</button></div></header>
+<div class="rule" aria-hidden="true"></div>
+<section class="mbar" aria-label="Your panel"><div class="mm"><span>Your panel</span><b>Panel 2</b></div><span class="ptag">MS</span><p class="pr"><b>5/6</b> interviewed</p></section>
+<main class="body">
+<section class="hero" aria-label="Interview finished">
+<div class="hero-top"><span class="eyebrow">Interview finished · 10:58</span><span class="sc">Complete</span></div>
+<div><h2 class="hn">7700B</h2><p class="hname">Byte Me</p></div>
+<p class="q">Nominate 7700B for an award?<small>Each tap saves. The Judge Advisor decides.</small></p>
+<div class="agrid" role="group" aria-label="Awards for 7700B">
+<sc-for list="{{chips}}" as="c" hint-placeholder-count="11"><button type="button" class="ach" aria-pressed="{{c.pressed}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>{{c.label}}</button></sc-for>
+</div>
+<div class="hrow"><button type="button" class="ghost">Done</button><button type="button" class="lnk">Add a reason</button></div>
+</section>
+<div class="grp"><h2 class="sec"><i class="dotw" aria-hidden="true"></i>Waiting · 1</h2>
+<div class="qrow"><span class="qt"><span class="q1"><b>3456P</b><span>Pixel Pushers</span></span><span class="q2">Waiting 2 min · Pit 31</span></span><button type="button" class="go">On our way</button></div>
+</div>
+</main>
+<nav class="tabs" aria-label="Judge sections"><sc-for list="{{tabs}}" as="b" hint-placeholder-count="3"><a class="tab" href="#" aria-current="{{b.cur}}"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{b.d}}"></path></svg><sc-if value="{{b.badge}}" hint-placeholder-val="{{ false }}"><b class="bdg">1</b></sc-if></span>{{b.label}}</a></sc-for></nav>
+</div>
+
+<div class="jq ph" data-theme="{{t.id}}">
+<header class="top"><div class="who"><span class="av"><img src="/avatars/judge.jpg" alt="" width="28" height="28"></span><span class="who-t"><b>Judge</b><span>Sam Rivera</span></span></div><div class="top-r"><span class="live"><i aria-hidden="true"></i>Live</span><button type="button" class="signout">Sign out</button></div></header>
+<div class="rule" aria-hidden="true"></div>
+<section class="mbar" aria-label="Your panel"><div class="mm"><span>Your panel</span><b>Panel 2</b></div><span class="ptag">MS</span><p class="pr"><b>5/6</b> interviewed</p></section>
+<main class="body">
+<div class="grp"><h2 class="sec"><i class="dotw" aria-hidden="true"></i>Waiting · 1</h2>
+<div class="qrow"><span class="qt"><span class="q1"><b>3456P</b><span>Pixel Pushers</span></span><span class="q2">Waiting 4 min · Pit 31</span></span><button type="button" class="go">On our way</button></div>
+</div>
+<div class="grp"><h2 class="sec"><i class="dotd" aria-hidden="true"></i>Done · 5</h2>
+<ul class="grp">
+<sc-for list="{{done}}" as="d" hint-placeholder-count="5"><li class="drow"><span class="qt"><span class="q1"><b>{{d.num}}</b><span>{{d.name}}</span></span><span class="dn {{d.cls}}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v6a4 4 0 0 1-8 0zM8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3M12 14v3M8 20h8"></path></svg>{{d.awards}}</span></span><button type="button" class="lnk" aria-label="{{d.aria}}">{{d.action}}</button></li></sc-for>
+</ul>
+</div>
+</main>
+<nav class="tabs" aria-label="Judge sections"><sc-for list="{{tabs}}" as="b" hint-placeholder-count="3"><a class="tab" href="#" aria-current="{{b.cur}}"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{b.d}}"></path></svg><sc-if value="{{b.badge}}" hint-placeholder-val="{{ false }}"><b class="bdg">1</b></sc-if></span>{{b.label}}</a></sc-for></nav>
+</div>
+
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":790,"height":1664}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const TABS = [
+      { label: 'Queue', d: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01', cur: 'page', badge: true },
+      { label: 'Scores', d: 'M5 20v-7M12 20V5M19 20V10' },
+      { label: 'Today', d: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M12 7v5l3 2' }
+    ];
+    const tabs = TABS.map((t) => ({ ...t, cur: t.cur || null, badge: !!t.badge }));
+    const L = ['Excellence', 'Design', 'Innovate', 'Think', 'Amaze', 'Build', 'Create', 'Judges', 'Inspire', 'Sportsmanship', 'Energy'];
+    const chips = L.map((label) => ({ label, pressed: label === 'Excellence' ? 'true' : 'false' }));
+    const D = [
+      { num: '7700B', name: 'Byte Me', awards: 'Excellence ×2 · Design' },
+      { num: '1234A', name: 'Circuit Breakers', awards: 'Think' },
+      { num: '6060R', name: 'Roboraptors', awards: 'Innovate · Create' },
+      { num: '8015M', name: 'Momentum', awards: 'Inspire ×2' },
+      { num: '9882K', name: 'Torque Titans', awards: '' }
+    ];
+    const done = D.map((d) => ({
+      ...d,
+      cls: d.awards ? '' : 'no',
+      awards: d.awards || 'No nominations',
+      action: d.awards ? 'Edit' : 'Nominate',
+      aria: (d.awards ? 'Edit nominations for ' : 'Nominate ') + d.num
+    }));
+    return { themes: [{ id: 'dark' }, { id: 'light' }], tabs, chips, done };
+  }
+}
+</script>
+</body>
+</html>

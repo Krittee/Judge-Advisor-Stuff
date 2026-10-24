@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Awards board · C4 · Matrix + by award</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Fira+Sans:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+button,input,textarea{font:inherit;color:inherit}
+.stage{display:flex;flex-direction:column;gap:40px}
+.jq{--canvas:oklch(0.968 0.005 265);--surface:oklch(0.995 0.002 265);--ink:oklch(0.225 0.016 265);--muted:oklch(0.520 0.014 265);--line:oklch(0.885 0.010 265);--accent:oklch(0.510 0.160 258);--on-accent:oklch(0.995 0.002 265);--ring:oklch(0.510 0.160 258 / 0.25);--field:oklch(0.995 0.002 265);--field-line:oklch(0.640 0.012 265);--hover:oklch(0.940 0.008 265);--waiting:oklch(0.700 0.180 52);--waiting-ink:oklch(0.200 0.050 52);--done:oklch(0.735 0.135 158);--done-ink:oklch(0.200 0.050 158);--done-quiet:oklch(0.430 0.105 158);--warn:oklch(0.700 0.150 82);--caution-ink:oklch(0.450 0.110 82);--top-i:oklch(0.440 0.100 175);--strong-i:oklch(0.440 0.090 220);--middle-i:oklch(0.460 0.110 80);--emerging-i:oklch(0.450 0.010 265);--scrim:oklch(0.225 0.016 265 / 0.45);--shadow:0 1px 2px oklch(0.225 0.016 265 / 0.05),0 18px 40px -24px oklch(0.225 0.016 265 / 0.25)}
+.jq[data-theme="dark"]{--canvas:oklch(0.165 0.012 265);--surface:oklch(0.205 0.014 265);--ink:oklch(0.955 0.005 265);--muted:oklch(0.670 0.013 265);--line:oklch(0.320 0.016 265);--accent:oklch(0.680 0.140 258);--on-accent:oklch(0.165 0.012 265);--ring:oklch(0.680 0.140 258 / 0.35);--field:oklch(0.180 0.013 265);--field-line:oklch(0.520 0.014 265);--hover:oklch(0.245 0.016 265);--waiting:oklch(0.735 0.185 58);--waiting-ink:oklch(0.200 0.050 52);--done:oklch(0.745 0.140 158);--done-ink:oklch(0.200 0.050 158);--done-quiet:oklch(0.775 0.100 158);--warn:oklch(0.790 0.150 82);--caution-ink:oklch(0.840 0.100 82);--top-i:oklch(0.850 0.110 175);--strong-i:oklch(0.850 0.080 210);--middle-i:oklch(0.860 0.100 88);--emerging-i:oklch(0.820 0.008 265);--scrim:oklch(0.100 0.010 265 / 0.68);--shadow:none}
+.jq{--accent-t:color-mix(in srgb,var(--accent) 13%,transparent);--done-t:color-mix(in srgb,var(--done) 14%,transparent);--done-l:color-mix(in srgb,var(--done) 55%,transparent);--caution-bg:color-mix(in srgb,var(--warn) 13%,transparent);--caution-line:color-mix(in srgb,var(--warn) 40%,transparent);position:relative;flex:none;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;background:var(--canvas);color:var(--ink);font-family:'Fira Sans',system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.jq *,.jq *::before,.jq *::after{box-sizing:border-box}
+:where(.jq) :is(h1,h2,h3,p,ul,ol,li,blockquote,table){margin:0;padding:0}
+:where(.jq) :is(ul,ol){list-style:none}
+.jq :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rule{flex:none;height:1px;background:var(--line)}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.av{flex:none;width:28px;height:28px;display:block}
+.av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:22%;box-shadow:0 0 0 2px var(--accent)}
+.who-t{display:flex;flex-direction:column;line-height:1.15}
+.who-t b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.who-t span{font-size:12px;color:var(--muted)}
+.top-r{display:flex;align-items:center;gap:2px}
+.live{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--done-quiet)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--done)}
+.signout{min-height:44px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:14px;text-decoration:underline;cursor:pointer}
+.win{display:inline-flex;align-items:center;gap:4px;flex:none;height:26px;padding:0 10px;border-radius:999px;background:var(--done);color:var(--done-ink);font-size:12.5px;font-weight:500;white-space:nowrap}
+.warnl{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--caution-ink)}
+.warnl svg{flex:none}
+.goodl{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--done-quiet)}
+/* Judge Advisor shell */
+.ja{width:1280px;height:1120px}
+.top{flex:none;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 12px 0 20px}
+.shell{flex:1;min-height:0;display:flex}
+.rail{flex:none;width:224px;display:flex;flex-direction:column;gap:14px;padding:16px 0;background:var(--surface);border-right:1px solid var(--line)}
+.rl{padding:0 20px;margin-bottom:4px;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.ri{position:relative;display:flex;align-items:center;gap:12px;height:44px;margin-right:12px;padding:0 12px 0 20px;border-radius:0 10px 10px 0;color:var(--muted);text-decoration:none;font-size:15px;font-weight:500}
+.ri svg{flex:none}
+.ri[aria-current]{background:var(--accent-t);color:var(--ink)}
+.ri[aria-current]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.ri[aria-current] svg{color:var(--accent)}
+.rc{margin-left:auto;font-size:13px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
+.rb{margin-left:auto;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--waiting);color:var(--waiting-ink);font-size:12px;font-weight:500;line-height:22px;text-align:center;font-variant-numeric:tabular-nums}
+.main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:14px;padding:20px 24px 24px;overflow:hidden}
+.main>*{flex:none}
+.tit{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;min-height:40px}
+.tit h1{font-family:Archivo,sans-serif;font-weight:700;font-size:26px;line-height:1.15;letter-spacing:-.01em}
+.meta{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.meta b{font-weight:500;color:var(--ink)}
+.priv{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.fchips{display:flex;flex-wrap:wrap;gap:6px}
+.fchip{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:10px;border:1.5px solid var(--field-line);background:var(--field);color:var(--ink);font-family:Archivo,sans-serif;font-weight:600;font-size:14px;white-space:nowrap;cursor:pointer}
+.fchip .fn{font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
+.fchip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.fchip[aria-pressed="true"] .fn{color:var(--on-accent)}
+/* C4 · one board, two views */
+.ja{width:1280px;height:1060px}
+.vseg{margin-left:auto;display:inline-flex;gap:2px;padding:3px;border:1.5px solid var(--line);border-radius:12px;background:var(--field)}
+.vseg button{height:38px;padding:0 16px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-family:Archivo,sans-serif;font-weight:600;font-size:14px;cursor:pointer}
+.vseg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.trow{display:flex;gap:40px}
+/* C2 · nominee matrix, all panels, nominated only */
+.fbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 28px}
+.fg{display:flex;align-items:center;gap:10px}
+.fg .cl{font-size:11.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.cols{display:flex;align-items:flex-start;gap:20px}
+.mxw{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.mx{border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+.mx table{width:100%;border-collapse:collapse;table-layout:fixed}
+.mx th,.mx td{padding:0;text-align:center;vertical-align:middle;font-weight:400}
+.mx thead th{height:58px;border-bottom:1px solid var(--line);font-size:12px;font-weight:500;color:var(--muted)}
+.mx thead th.tm{width:146px;padding-left:16px;text-align:left}
+.mx thead th.pn{width:66px;text-align:left}
+.mx thead th .hl{display:block;line-height:1.2}
+.mx thead th .hk{display:flex;justify-content:center;height:16px;margin-top:3px;color:var(--done-quiet)}
+.mx thead th.on{color:var(--ink)}
+.mx abbr{text-decoration:none}
+.mx tbody tr+tr{border-top:1px solid var(--line)}
+.mx tbody th{height:56px;padding:6px 8px 6px 16px;text-align:left}
+.mx tbody th b{display:block;font-family:Archivo,sans-serif;font-weight:700;font-size:16px;line-height:1.2;font-variant-numeric:tabular-nums}
+.mx tbody th span{display:block;font-size:12.5px;line-height:1.3;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mx tbody th span.has{color:var(--done-quiet)}
+.mx td.pn{text-align:left}
+.ptag{display:inline-flex;align-items:center;height:24px;padding:0 7px;border:1px solid var(--line);border-radius:6px;color:var(--muted);font-size:12px;font-weight:500;white-space:nowrap}
+.cell{display:inline-grid;place-items:center;width:38px;height:44px;border:0;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer}
+.cell:hover{background:var(--hover)}
+.mk{display:block;width:12px;height:12px;border-radius:50%;background:var(--ink)}
+.cell.won{background:var(--done);color:var(--done-ink)}
+.cell.sel{background:var(--accent-t);box-shadow:inset 0 0 0 2px var(--accent)}
+.cell.sel .mk{background:var(--accent)}
+.key{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;font-size:12.5px;color:var(--muted)}
+.key span{display:inline-flex;align-items:center;gap:6px}
+.key .cell{width:24px;height:24px;border-radius:6px;cursor:default}
+.key .mk{width:10px;height:10px}
+.aps{flex:1;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.ap{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+.ap.dec{border-color:var(--done-l)}
+.aph{display:flex;align-items:center;gap:10px;min-height:48px;padding:8px 14px}
+.aph h2{flex:1;min-width:0;font-family:Archivo,sans-serif;font-weight:700;font-size:16px;line-height:1.2}
+.cst{flex:none;font-size:12.5px;font-weight:500;color:var(--muted);white-space:nowrap}
+.cst.ok{color:var(--done-quiet)}
+.cnone{padding:12px 14px;border-top:1px solid var(--line);font-size:13.5px;color:var(--muted)}
+.ap li{border-top:1px solid var(--line)}
+.nr{display:flex;align-items:center;gap:8px;width:100%;min-height:52px;padding:6px 12px 6px 14px;border:0;background:transparent;color:var(--ink);text-align:left;cursor:pointer}
+.nr:hover{background:var(--hover)}
+.nr.won{background:var(--done-t)}
+.nr[aria-pressed="true"]{background:var(--accent-t);box-shadow:inset 3px 0 0 var(--accent)}
+.nr b{flex:none;font-family:Archivo,sans-serif;font-weight:700;font-size:16px;font-variant-numeric:tabular-nums}
+.nr .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.ptag{flex:none;display:inline-flex;align-items:center;height:22px;padding:0 6px;border:1px solid var(--line);border-radius:6px;color:var(--muted);font-size:12px;font-weight:500;white-space:nowrap}
+.jc{flex:none;font-size:12px;color:var(--muted);white-space:nowrap}
+.cau{flex:none;display:inline-flex;color:var(--caution-ink)}
+.nr .win{height:24px;padding:0 8px}
+.dr{flex:none;width:340px;display:flex;flex-direction:column;gap:12px;padding:16px 18px 18px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow)}
+.eyebrow{font-size:12px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.dr h2{font-family:Archivo,sans-serif;font-weight:700;font-size:26px;line-height:1.1}
+.dr h2 span{display:block;margin-top:2px;font-family:'Fira Sans',sans-serif;font-weight:400;font-size:16px}
+.dst{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:13.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.dst b{font-weight:500;color:var(--ink)}
+.band{flex:none;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;border:1px solid color-mix(in srgb,var(--bi) 40%,transparent);background:color-mix(in srgb,var(--bi) 12%,transparent);color:var(--bi);font-size:12px;font-weight:500;white-space:nowrap}
+.b-top{--bi:var(--top-i)}
+.sec{font-size:11.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.qs{display:flex;flex-direction:column;gap:8px}
+.qs li{padding:8px 10px;border-radius:10px;background:var(--field);border:1px solid var(--line);font-size:14px;line-height:1.4}
+.qs li b{display:block;font-size:12.5px;font-weight:500;color:var(--muted)}
+.also{font-size:13px;color:var(--muted)}
+.oth{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;border:1px solid var(--line)}
+.oth>div{flex:1;min-width:0}
+.oth p{font-size:14px}
+.oth p b{font-family:Archivo,sans-serif;font-weight:700}
+.prim{display:flex;align-items:center;justify-content:center;width:100%;height:48px;border:0;border-radius:12px;background:var(--accent);color:var(--on-accent);font-family:Archivo,sans-serif;font-weight:700;font-size:16px;cursor:pointer}
+.note{font-size:12px;color:var(--muted);text-align:center}
+</style>
+</helmet>
+<div class="stage">
+<sc-for list="{{themes}}" as="t" hint-placeholder-count="2"><div class="trow">
+<sc-for list="{{views}}" as="v" hint-placeholder-count="2">
+<div class="jq ja" data-theme="{{t.id}}">
+<header class="top">
+<div class="who"><span class="av"><img src="/avatars/judge-advisor.jpg" alt="" width="28" height="28"></span><span class="who-t"><b>Judge Advisor</b><span>Alex Morgan</span></span></div>
+<div class="top-r"><span class="live"><i aria-hidden="true"></i>Live</span><button type="button" class="signout">Sign out</button></div>
+</header>
+<div class="rule" aria-hidden="true"></div>
+<div class="shell">
+<nav class="rail" aria-label="Judge Advisor sections">
+<sc-for list="{{rail}}" as="g" hint-placeholder-count="3"><div class="rg"><h2 class="rl">{{g.label}}</h2><ul>
+<sc-for list="{{g.items}}" as="i" hint-placeholder-count="3"><li><a class="ri" href="#" aria-current="{{i.cur}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{i.d}}"></path></svg><span>{{i.label}}</span><sc-if value="{{i.hasBadge}}" hint-placeholder-val="{{ false }}"><b class="rb">{{i.badge}}</b></sc-if><sc-if value="{{i.hasCount}}" hint-placeholder-val="{{ false }}"><span class="rc">{{i.count}}</span></sc-if></a></li></sc-for>
+</ul></div></sc-for>
+</nav>
+<main class="main">
+<div class="tit"><h1>Awards</h1><p class="meta">Middle School · all panels · <b>3 of 11</b> decided · 18 nominations for 9 teams</p><p class="priv"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"></path></svg>Winners stay private to you until the ceremony</p></div>
+<div class="fbar">
+<div class="fg" role="group" aria-label="Division"><span class="cl" aria-hidden="true">Division</span><div class="fchips"><button type="button" class="fchip" aria-pressed="false">ES <span class="fn">5/11</span></button><button type="button" class="fchip" aria-pressed="true">MS <span class="fn">3/11</span></button><button type="button" class="fchip" aria-pressed="false">HS <span class="fn">0/11</span></button><button type="button" class="fchip" aria-pressed="false">Blended <span class="fn">0/11</span></button></div></div>
+<div class="fg" role="group" aria-label="Judging panel"><span class="cl" aria-hidden="true">Panel</span><div class="fchips"><button type="button" class="fchip" aria-pressed="true">All panels <span class="fn">9</span></button><button type="button" class="fchip" aria-pressed="false">Panel 2 <span class="fn">5</span></button><button type="button" class="fchip" aria-pressed="false">Panel 3 <span class="fn">4</span></button></div></div>
+<div class="vseg" role="group" aria-label="View"><button type="button" aria-pressed="{{v.isMatrix}}">Matrix</button><button type="button" aria-pressed="{{v.isAward}}">By award</button></div>
+</div>
+<div class="cols">
+<sc-if value="{{v.isMatrixB}}" hint-placeholder-val="{{ true }}">
+<div class="mxw">
+<div class="mx"><table>
+<thead><tr><th scope="col" class="tm">Team</th><th scope="col" class="pn">Panel</th>
+<sc-for list="{{cols}}" as="c" hint-placeholder-count="10"><th scope="col" class="{{c.cls}}"><abbr class="hl" title="{{c.label}}">{{c.short}}</abbr><span class="hk"><sc-if value="{{c.decided}}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="decided"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></sc-if></span></th></sc-for>
+</tr></thead>
+<tbody>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="9"><tr><th scope="row"><b>{{r.num}}</b><span class="{{r.subCls}}">{{r.sub}}</span></th><td class="pn"><span class="ptag">{{r.panel}}</span></td>
+<sc-for list="{{r.cells}}" as="x" hint-placeholder-count="10"><td>
+<sc-if value="{{x.nom}}" hint-placeholder-val="{{ false }}"><button type="button" class="cell {{x.cls}}" aria-label="{{x.aria}}" aria-pressed="{{x.pressed}}"><i class="mk" aria-hidden="true"></i></button></sc-if>
+<sc-if value="{{x.won}}" hint-placeholder-val="{{ false }}"><button type="button" class="cell won" aria-label="{{x.aria}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></button></sc-if>
+</td></sc-for>
+</tr></sc-for>
+</tbody>
+</table></div>
+<p class="key"><span><b class="cell"><i class="mk"></i></b>nominated</span><span><b class="cell won"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></b>winner</span><span>Only nominated teams are listed. Energy has no nominations yet, so its column is hidden.</span></p>
+</div>
+</sc-if>
+<sc-if value="{{v.isAwardB}}" hint-placeholder-val="{{ false }}">
+<div class="aps">
+<sc-for list="{{awards}}" as="a" hint-placeholder-count="11">
+<section class="ap {{a.cls}}" aria-label="{{a.label}} Award">
+<header class="aph"><h2>{{a.label}}</h2><span class="cst {{a.stCls}}">{{a.st}}</span></header>
+<sc-if value="{{a.empty}}" hint-placeholder-val="{{ false }}"><p class="cnone">No nominations yet</p></sc-if>
+<ul>
+<sc-for list="{{a.noms}}" as="n" hint-placeholder-count="2"><li><button type="button" class="nr {{n.cls}}" aria-pressed="{{n.pressed}}" aria-label="{{n.aria}}"><b>{{n.num}}</b><span class="nm">{{n.name}}</span>
+<sc-if value="{{n.hasWarn}}" hint-placeholder-val="{{ false }}"><span class="cau" title="{{n.warn}}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01"></path></svg></span></sc-if>
+<span class="ptag">{{n.panel}}</span><span class="jc">{{n.jc}}</span>
+<sc-if value="{{n.win}}" hint-placeholder-val="{{ false }}"><span class="win"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Winner</span></sc-if>
+</button></li></sc-for>
+</ul>
+</section>
+</sc-for>
+</div>
+</sc-if>
+<aside class="dr" aria-label="Excellence · 7700B">
+<p class="eyebrow">Excellence · Middle School</p>
+<h2>7700B<span>Byte Me</span></h2>
+<p class="dst"><span>Notebook <b>55/64</b></span><span>Interview <b>11/12</b></span><span><b>66/76</b></span><span class="band b-top">Top</span></p>
+<h3 class="sec">Why Panel 2 nominated them</h3>
+<ul class="qs"><li><b>Sam Rivera</b>“Top notebook, and strong in every match.”</li><li><b>Priya Nair</b>“Every entry names who did the work.”</li></ul>
+<p class="also">Also nominated for Design · No referee flags</p>
+<h3 class="sec">Other Excellence nominee</h3>
+<div class="oth"><div><p><b>5150Z</b> Gear Grinders · 1 judge</p><p class="warnl"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01"></path></svg>Already has Amaze</p></div></div>
+<button type="button" class="prim">Give Excellence to 7700B</button>
+<p class="note">You can change it until the ceremony.</p>
+</aside>
+</div>
+</main>
+</div>
+</div>
+</sc-for>
+</div></sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2600,"height":2160}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const TROPHY = 'M8 4h8v6a4 4 0 0 1-8 0zM8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3M12 14v3M8 20h8M9.5 17h5';
+    const RAIL = [
+      { label: 'Live', items: [
+        { label: 'Floor', d: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z', badge: '3' },
+        { label: 'Referee', d: 'M5 21V4M5 4h12l-2.5 4L17 12H5', count: '9' } ] },
+      { label: 'Setup', items: [
+        { label: 'Teams', d: 'M5.8 8a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 5.2a3 3 0 0 1 0 5.6M18.5 14.8c1.7.8 2.7 2.4 2.7 4.2', count: '48' },
+        { label: 'Panels', d: 'M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM9 4v16M15 4v16', count: '4' },
+        { label: 'Conflicts', d: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M5.6 5.6l12.8 12.8', count: '5' },
+        { label: 'Import', d: 'M12 4v11M7.5 10.5L12 15l4.5-4.5M4 19h16' } ] },
+      { label: 'Results', items: [
+        { label: 'Scores', d: 'M5 20v-7M12 20V5M19 20V10' },
+        { label: 'Awards', d: TROPHY, count: '3/11', cur: 'page' },
+        { label: 'Activity', d: 'M3 12h4l3-8 4 16 3-8h4' } ] }
+    ];
+    const rail = RAIL.map((g) => ({ ...g, items: g.items.map((i) => ({ ...i, cur: i.cur || null, hasBadge: !!i.badge, hasCount: !!i.count })) }));
+    const A = [
+      ['Excellence', 'Exc'], ['Design', 'Des', true], ['Innovate', 'Inn'], ['Think', 'Thk', true], ['Amaze', 'Amz', true],
+      ['Build', 'Bld'], ['Create', 'Cre'], ['Judges', 'Jdg'], ['Inspire', 'Ins'], ['Sportsmanship', 'Spt'], ['Energy', 'Enr']
+    ];
+    // Every judging panel in the division, combined. n: awards nominated; w: won; s: selected cell.
+    const T = [
+      { num: '5150Z', name: 'Gear Grinders', panel: 'Panel 3', has: 'Has Amaze', n: ['Excellence', 'Innovate', 'Amaze'], w: 'Amaze' },
+      { num: '7700B', name: 'Byte Me', panel: 'Panel 2', n: ['Excellence', 'Design'], s: 'Excellence' },
+      { num: '6060R', name: 'Roboraptors', panel: 'Panel 2', n: ['Innovate', 'Create'] },
+      { num: '4242F', name: 'Forty-Two', panel: 'Panel 3', n: ['Think', 'Build'] },
+      { num: '9882K', name: 'Torque Titans', panel: 'Panel 2', n: ['Build', 'Sportsmanship'] },
+      { num: '8015M', name: 'Momentum', panel: 'Panel 2', n: ['Inspire'] },
+      { num: '2088C', name: 'Lab Rats', panel: 'Panel 3', has: 'Has Design', n: ['Design'], w: 'Design' },
+      { num: '1234A', name: 'Circuit Breakers', panel: 'Panel 2', has: 'Has Think', n: ['Think'], w: 'Think' },
+      { num: '3311X', name: 'Hex Appeal', panel: 'Panel 3', n: ['Judges'] }
+    ];
+    // A column only appears once someone is nominated for it.
+    const shown = A.filter(([label]) => T.some((r) => r.n.includes(label)));
+    const cols = shown.map(([label, short, decided], i) => ({ label, short, decided: !!decided, cls: i === 0 ? 'on' : '' }));
+    const rows = T.map((r) => ({
+      num: r.num,
+      panel: r.panel.replace('Panel ', 'P'),
+      sub: r.has || r.name,
+      subCls: r.has ? 'has' : '',
+      cells: shown.map(([label]) => {
+        const won = r.w === label;
+        const nom = r.n.includes(label) && !won;
+        return {
+          nom,
+          won,
+          cls: r.s === label ? 'sel' : '',
+          pressed: r.s === label ? 'true' : 'false',
+          aria: r.num + ', ' + label + (won ? ': winner' : ': nominated')
+        };
+      })
+    }));
+    const AW = [
+      { label: 'Excellence', noms: [['7700B', 'Byte Me', 'P2', 2, '', true], ['5150Z', 'Gear Grinders', 'P3', 1, 'Already has Amaze']] },
+      { label: 'Design', winner: '2088C', noms: [['2088C', 'Lab Rats', 'P3', 1], ['7700B', 'Byte Me', 'P2', 1]] },
+      { label: 'Innovate', noms: [['5150Z', 'Gear Grinders', 'P3', 1, 'Already has Amaze'], ['6060R', 'Roboraptors', 'P2', 1]] },
+      { label: 'Think', winner: '1234A', noms: [['1234A', 'Circuit Breakers', 'P2', 1], ['4242F', 'Forty-Two', 'P3', 1]] },
+      { label: 'Amaze', winner: '5150Z', noms: [['5150Z', 'Gear Grinders', 'P3', 2]] },
+      { label: 'Build', noms: [['4242F', 'Forty-Two', 'P3', 1], ['9882K', 'Torque Titans', 'P2', 1]] },
+      { label: 'Create', noms: [['6060R', 'Roboraptors', 'P2', 1]] },
+      { label: 'Judges', noms: [['3311X', 'Hex Appeal', 'P3', 1]] },
+      { label: 'Inspire', noms: [['8015M', 'Momentum', 'P2', 2]] },
+      { label: 'Sportsmanship', noms: [['9882K', 'Torque Titans', 'P2', 1]] },
+      { label: 'Energy', noms: [] }
+    ];
+    const awards = AW.map((a) => {
+      const k = a.noms.length;
+      return {
+        label: a.label,
+        cls: a.winner ? 'dec' : '',
+        stCls: a.winner ? 'ok' : '',
+        st: a.winner ? 'Decided' : k ? (k === 1 ? '1 nominee' : k + ' nominees') : 'Open',
+        empty: k === 0,
+        noms: a.noms.map(([num, name, panel, judges, warn, sel]) => ({
+          num, name, panel, warn,
+          jc: judges === 1 ? '1 judge' : judges + ' judges',
+          hasWarn: !!warn,
+          win: a.winner === num,
+          cls: a.winner === num ? 'won' : '',
+          pressed: sel ? 'true' : 'false',
+          aria: num + ' ' + name + ', ' + a.label + ', ' + (a.winner === num ? 'winner' : judges + (judges === 1 ? ' judge' : ' judges')) + (warn ? ', ' + warn : '')
+        }))
+      };
+    });
+    const views = [{ isMatrix: 'true', isAward: 'false', isMatrixB: true, isAwardB: false }, { isMatrix: 'false', isAward: 'true', isMatrixB: false, isAwardB: true }];
+    return { themes: [{ id: 'dark' }, { id: 'light' }], views, rail, cols, rows, awards };
+  }
+}
+</script>
+</body>
+</html>

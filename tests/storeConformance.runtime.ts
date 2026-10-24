@@ -67,6 +67,11 @@ function requestInput(teamId: string, panelId: string, over: Record<string, unkn
   } as Parameters<Store["createRequest"]>[0];
 }
 
+/** A nomination from Amy on `panelId` for Excellence, unless `over` says otherwise. */
+function nominationInput(teamId: string, panelId: string, over: Partial<Parameters<Store["nominate"]>[0]> = {}) {
+  return { awardId: "excellence", teamId, panelId, judge: "Amy", ...over };
+}
+
 /** A slot time far enough out that no other test collides with it. */
 const SLOT_A = "2026-09-01T14:00:00.000Z";
 const SLOT_B = "2026-09-01T14:20:00.000Z";
@@ -1180,6 +1185,194 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
 
     await store.resetDay();
     assert.deepEqual(await store.listActivity(), [], "a day reset clears the log");
+  });
+
+  /* ---- awards: nominations and winners ------------------------------- */
+
+  it("a nomination is one row per judge, award and team: asking again is the same row, and only a changed reason writes", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+
+    const first = await store.nominate(nominationInput(team.id, panel.id));
+    assert.deepEqual(
+      [first.award_id, first.team_id, first.panel_id, first.judge, first.reason],
+      ["excellence", team.id, panel.id, "Amy", null],
+    );
+    assert.equal(first.created_at, first.updated_at);
+
+    const again = await store.nominate(nominationInput(team.id, panel.id));
+    assert.equal(again.id, first.id, "the same nomination, not a second one");
+    assert.equal(again.updated_at, first.updated_at, "a repeat tap writes nothing");
+    assert.equal((await store.listNominations()).length, 1);
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const why = await store.nominate(nominationInput(team.id, panel.id, { reason: "Best notebook in the hall" }));
+    assert.equal(why.id, first.id);
+    assert.equal(why.reason, "Best notebook in the hall");
+    assert.equal(why.created_at, first.created_at);
+    assert.ok(why.updated_at > first.updated_at, "a new reason moves updated_at");
+
+    const kept = await store.nominate(nominationInput(team.id, panel.id));
+    assert.equal(kept.reason, "Best notebook in the hall", "no reason given leaves the one there");
+    const cleared = await store.nominate(nominationInput(team.id, panel.id, { reason: null }));
+    assert.equal(cleared.reason, null, "null takes it back out");
+    assert.equal((await store.listNominations()).length, 1);
+
+    // Anything that differs in the key is another nomination.
+    const other = await store.createPanel(panelInput({ name: "Panel B", code: "CONF02" }));
+    await store.nominate(nominationInput(team.id, panel.id, { judge: "Ben" }));
+    await store.nominate(nominationInput(team.id, panel.id, { awardId: "design" }));
+    await store.nominate(nominationInput(team.id, other.id));
+    assert.equal((await store.listNominations()).length, 4);
+  });
+
+  it("a nomination for a team or panel that is gone is a 404, not a stored orphan", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+    const nobody = "00000000-0000-0000-0000-000000000000";
+
+    for (const input of [nominationInput(nobody, panel.id), nominationInput(team.id, nobody)]) {
+      await assert.rejects(
+        () => store.nominate(input),
+        (e: unknown) => e instanceof StoreError && e.status === 404,
+      );
+    }
+    await assert.rejects(
+      () => store.setWinner({ awardId: "design", division: ES, teamId: nobody, decidedBy: "JA" }),
+      (e: unknown) => e instanceof StoreError && e.status === 404,
+    );
+    assert.deepEqual(await store.listNominations(), []);
+    assert.deepEqual(await store.listWinners(), []);
+  });
+
+  it("withdrawing a nomination removes that judge's row and nobody else's", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+    await store.nominate(nominationInput(team.id, panel.id));
+    await store.nominate(nominationInput(team.id, panel.id, { judge: "Ben" }));
+
+    const key = (over: Partial<Parameters<Store["withdrawNomination"]>[0]> = {}) => ({
+      awardId: "excellence",
+      teamId: team.id,
+      panelId: panel.id,
+      judge: "Amy",
+      ...over,
+    });
+    assert.equal(await store.withdrawNomination(key({ judge: "Cleo" })), false, "someone who never nominated removes nothing");
+    assert.equal(await store.withdrawNomination(key({ awardId: "design" })), false);
+    assert.equal(await store.withdrawNomination(key()), true);
+    assert.equal(await store.withdrawNomination(key()), false, "and once it is gone it is gone");
+    assert.deepEqual(
+      (await store.listNominations()).map((n) => n.judge),
+      ["Ben"],
+    );
+  });
+
+  it("an award has one winner per division: setting another replaces it, and each division keeps its own", async (store) => {
+    await store.upsertTeams([teamInput("1001"), teamInput("1002"), teamInput("2001", { division: MS })]);
+    const [a, b, c] = await Promise.all(["1001", "1002", "2001"].map((n) => store.findTeamByNumber(n)));
+    assert.ok(a && b && c);
+
+    const first = await store.setWinner({ awardId: "design", division: ES, teamId: a.id, decidedBy: "Alex" });
+    assert.deepEqual(
+      [first.award_id, first.division, first.team_id, first.decided_by],
+      ["design", ES, a.id, "Alex"],
+    );
+    await store.setWinner({ awardId: "design", division: MS, teamId: c.id, decidedBy: "Alex" });
+    await store.setWinner({ awardId: "excellence", division: ES, teamId: a.id, decidedBy: "Alex" });
+    assert.equal((await store.listWinners()).length, 3, "another award, or another division, is another winner");
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const replaced = await store.setWinner({ awardId: "design", division: ES, teamId: b.id, decidedBy: "Sam" });
+    assert.equal(replaced.team_id, b.id);
+    assert.ok(replaced.decided_at > first.decided_at, "a replacement is decided again");
+    const winners = await store.listWinners();
+    assert.equal(winners.length, 3, "a replacement takes the place, it does not add one");
+    const design = winners.find((w) => w.award_id === "design" && w.division === ES);
+    assert.deepEqual([design?.team_id, design?.decided_by], [b.id, "Sam"]);
+
+    assert.equal(await store.clearWinner("design", ES), true);
+    assert.equal(await store.clearWinner("design", ES), false, "nothing left to clear");
+    assert.deepEqual(
+      (await store.listWinners()).map((w) => `${w.award_id}/${w.division}`).sort(),
+      [`design/${MS}`, `excellence/${ES}`],
+      "clearing one leaves the rest",
+    );
+  });
+
+  it("deleting a team takes its nominations and wins with it, and no other team's", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001"), teamInput("1002")]);
+    const doomed = await store.findTeamByNumber("1001");
+    const bystander = await store.findTeamByNumber("1002");
+    assert.ok(doomed && bystander);
+    for (const t of [doomed, bystander]) {
+      await store.nominate(nominationInput(t.id, panel.id));
+      await store.nominate(nominationInput(t.id, panel.id, { awardId: "design" }));
+    }
+    await store.setWinner({ awardId: "excellence", division: ES, teamId: doomed.id, decidedBy: "Alex" });
+    await store.setWinner({ awardId: "design", division: ES, teamId: bystander.id, decidedBy: "Alex" });
+
+    await store.deleteTeam(doomed.id);
+
+    assert.deepEqual(
+      (await store.listNominations()).map((n) => n.team_id),
+      [bystander.id, bystander.id],
+      "the nominations of the team are gone, the other team's stay",
+    );
+    assert.deepEqual(
+      (await store.listWinners()).map((w) => w.team_id),
+      [bystander.id],
+      "a deleted team does not stay the winner",
+    );
+  });
+
+  it("deleting a panel keeps its nominations with no panel, as a score keeps its", async (store) => {
+    const gone = await store.createPanel(panelInput());
+    const kept = await store.createPanel(panelInput({ name: "Panel B", code: "CONF02" }));
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+    await store.nominate(nominationInput(team.id, gone.id, { reason: "Lovely" }));
+    await store.nominate(nominationInput(team.id, kept.id, { judge: "Ben" }));
+
+    await store.deletePanel(gone.id);
+
+    const after = await store.listNominations();
+    assert.equal(after.length, 2, "the nomination survives its panel");
+    const orphan = after.find((n) => n.judge === "Amy");
+    assert.deepEqual([orphan?.panel_id, orphan?.reason], [null, "Lovely"]);
+    assert.equal(after.find((n) => n.judge === "Ben")?.panel_id, kept.id, "another panel's is untouched");
+
+    await store.deleteAllPanels();
+    assert.ok((await store.listNominations()).every((n) => n.panel_id === null), "clearing every panel does the same");
+    assert.equal((await store.listNominations()).length, 2);
+  });
+
+  it("a day reset clears the nominations and winners with the day's scores; the roster stays", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+    await store.nominate(nominationInput(team.id, panel.id));
+    await store.setWinner({ awardId: "excellence", division: ES, teamId: team.id, decidedBy: "Alex" });
+
+    await store.resetDay();
+    assert.deepEqual(await store.listNominations(), []);
+    assert.deepEqual(await store.listWinners(), []);
+    assert.equal((await store.listTeams()).length, 1);
+
+    await store.nominate(nominationInput(team.id, panel.id));
+    await store.setWinner({ awardId: "excellence", division: ES, teamId: team.id, decidedBy: "Alex" });
+    await store.resetAll();
+    assert.deepEqual(await store.listNominations(), []);
+    assert.deepEqual(await store.listWinners(), []);
   });
 
   it("the same panel code cannot be issued twice", async (store) => {

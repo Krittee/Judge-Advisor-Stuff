@@ -15,7 +15,11 @@
     "`teamCategories` is the notebook classification. The FIRST one listed is what",
     "a team gets until someone says otherwise — put `ungraded` first if you would",
     "rather teams start unclassified and be graded up. Rename the labels or change",
-    "the colours to suit your event; keep the ids stable once teams are assigned."
+    "the colours to suit your event; keep the ids stable once teams are assigned.",
+    "",
+    "`awards` are what judges nominate teams for and the Judge Advisor decides, per",
+    "division. The order here is the order everywhere. Keep the ids stable once a",
+    "nomination has been made; label, short and blurb can be reworded freely."
   ],
   "divisions": [
     "Elementary School",
@@ -93,6 +97,74 @@
       "excludesRubrics": [
         "notebook"
       ]
+    }
+  ],
+  "awards": [
+    {
+      "id": "excellence",
+      "label": "Excellence",
+      "short": "Exc",
+      "blurb": "Overall excellence in the Engineering Notebook, Team Interview and competition performance."
+    },
+    {
+      "id": "design",
+      "label": "Design",
+      "short": "Des",
+      "blurb": "An organized, student-driven Engineering Design Process."
+    },
+    {
+      "id": "innovate",
+      "label": "Innovate",
+      "short": "Inn",
+      "blurb": "A novel, well-documented part of the robot design or gameplay strategy."
+    },
+    {
+      "id": "think",
+      "label": "Think",
+      "short": "Thk",
+      "blurb": "Coding, programming and software development."
+    },
+    {
+      "id": "amaze",
+      "label": "Amaze",
+      "short": "Amz",
+      "blurb": "A highly capable, competitive, consistently performing robot."
+    },
+    {
+      "id": "build",
+      "label": "Build",
+      "short": "Bld",
+      "blurb": "Robot construction, craftsmanship, reliability and attention to detail."
+    },
+    {
+      "id": "create",
+      "label": "Create",
+      "short": "Cre",
+      "blurb": "A creative engineering solution to this season's game."
+    },
+    {
+      "id": "judges",
+      "label": "Judges",
+      "short": "Jdg",
+      "blurb": "Qualities worth recognising that may not fit another award."
+    },
+    {
+      "id": "inspire",
+      "label": "Inspire",
+      "short": "Ins",
+      "blurb": "The passion, enthusiasm and spirit of the program."
+    },
+    {
+      "id": "sportsmanship",
+      "label": "Sportsmanship",
+      "short": "Spt",
+      "blurb": "Respect, professionalism, fairness and positive conduct all event."
+    },
+    {
+      "id": "energy",
+      "label": "Energy",
+      "short": "Enr",
+      "blurb": "Enthusiasm, excitement, positivity and spirit that lift the event for others."
     }
   ],
   "booking": {

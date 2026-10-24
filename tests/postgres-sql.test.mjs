@@ -923,3 +923,155 @@ test("listActivity joins the team's number in one query, and reads an old row (n
     ["referee", "Jordan", "Referee", null, "2026-10-20T09:00:00.000Z"],
   ]);
 });
+
+/* ---- Awards: nominations and winners (no database here either) ----------
+
+   What is checked is what migrate() declares and what the store sends: the
+   tables and their keys by reading the source, the statements and parameters
+   against the recording stand-in. What this cannot show is that Postgres
+   accepts the SQL -- the conformance suite does that under TEST_DATABASE_URL. */
+
+test("migrate() creates nominations keyed on (award, team, panel, judge), cascading with the team and nulling with the panel", () => {
+  assert.match(
+    migrateBody,
+    /create table if not exists nominations \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*award_id\s+text not null,\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*panel_id\s+uuid references panels\(id\) on delete set null,\s*judge\s+text not null,\s*reason\s+text,\s*created_at timestamptz not null default now\(\),\s*updated_at timestamptz not null default now\(\),\s*unique \(award_id, team_id, panel_id, judge\)\s*\);/,
+  );
+  assert.ok(migrateBody.includes("create index if not exists nominations_team_idx on nominations (team_id);"));
+  assert.ok(
+    after(migrateBody, "create table if not exists teams (") < after(migrateBody, "create table if not exists nominations ("),
+    "nominations reference teams and panels, so they come after both",
+  );
+});
+
+test("migrate() creates award_winners with one row per (award, division), cascading with the team", () => {
+  assert.match(
+    migrateBody,
+    /create table if not exists award_winners \(\s*award_id\s+text not null,\s*division\s+text not null,\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*decided_by text not null,\s*decided_at timestamptz not null default now\(\),\s*primary key \(award_id, division\)\s*\);/,
+  );
+  assert.ok(migrateBody.includes("create index if not exists award_winners_team_idx on award_winners (team_id);"));
+});
+
+test("both award tables are locked down like every other, and supabase/schema.sql agrees with migrate()", () => {
+  for (const table of ["nominations", "award_winners"]) {
+    assert.ok(migrateBody.includes(`alter table ${table} enable row level security;`), `${table}: RLS in migrate()`);
+    assert.ok(schemaSql.includes(`alter table ${table} enable row level security;`), `${table}: RLS in schema.sql`);
+    assert.ok(schemaSql.includes(`drop table if exists ${table} cascade;`), `${table}: dropped before it is recreated`);
+  }
+  assert.match(
+    schemaSql,
+    /create table nominations \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*award_id\s+text not null,[^\n]*\n\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*panel_id\s+uuid references panels\(id\) on delete set null,\s*judge\s+text not null,[^\n]*\n\s*reason\s+text,\s*created_at timestamptz not null default now\(\),\s*updated_at timestamptz not null default now\(\),\s*unique \(award_id, team_id, panel_id, judge\)\s*\);/,
+  );
+  assert.match(
+    schemaSql,
+    /create table award_winners \(\s*award_id\s+text not null,\s*division\s+text not null,\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*decided_by text not null,\s*decided_at timestamptz not null default now\(\),\s*primary key \(award_id, division\)\s*\);/,
+  );
+  assert.ok(schemaSql.includes("create index nominations_team_idx on nominations (team_id);"));
+  assert.ok(schemaSql.includes("create index award_winners_team_idx on award_winners (team_id);"));
+});
+
+const NOMINATION = { id: "n1", award_id: "excellence", team_id: "t1", panel_id: "p1", judge: "Amy", reason: null, created_at: new Date("2026-10-24T08:00:00.000Z"), updated_at: new Date("2026-10-24T08:00:00.000Z") };
+
+test("nominate is one upsert on the full non-null key: no reason keeps the stored one, a reason (or null) sets it", async () => {
+  calls.length = 0;
+  answer = () => [NOMINATION];
+  const made = await postgresStore.nominate({ awardId: "excellence", teamId: "t1", panelId: "p1", judge: "Amy" });
+  const [upsert] = sent(/^insert into nominations/);
+  assert.match(
+    upsert.sql,
+    /^insert into nominations \(award_id, team_id, panel_id, judge, reason\) values \(\$1, \$2, \$3, \$4, \$5\) on conflict \(award_id, team_id, panel_id, judge\) do update set reason = case when \$6::boolean then excluded\.reason else nominations\.reason end, updated_at = case when \$6::boolean and excluded\.reason is distinct from nominations\.reason then now\(\) else nominations\.updated_at end returning \*$/,
+  );
+  assert.deepEqual(upsert.params, ["excellence", "t1", "p1", "Amy", null, false], "no reason given: $6 says leave the stored one");
+  assert.deepEqual(made, { ...NOMINATION, created_at: "2026-10-24T08:00:00.000Z", updated_at: "2026-10-24T08:00:00.000Z" });
+  assert.equal(sent(/for update/).length, 0, "one statement, so there is nothing to lock");
+
+  calls.length = 0;
+  await postgresStore.nominate({ awardId: "excellence", teamId: "t1", panelId: "p1", judge: "Amy", reason: "Lovely notebook" });
+  assert.deepEqual(sent(/^insert into nominations/)[0].params, ["excellence", "t1", "p1", "Amy", "Lovely notebook", true]);
+
+  calls.length = 0;
+  await postgresStore.nominate({ awardId: "excellence", teamId: "t1", panelId: "p1", judge: "Amy", reason: null });
+  assert.deepEqual(sent(/^insert into nominations/)[0].params, ["excellence", "t1", "p1", "Amy", null, true], "null clears it, which is not the same as leaving it out");
+});
+
+test("nominate turns a vanished team or panel into a 404, and lets any other error through", async () => {
+  const input = { awardId: "excellence", teamId: "t1", panelId: "p1", judge: "Amy" };
+  const failWith = (code, constraint) => () => {
+    throw pgError(code, constraint);
+  };
+
+  answer = failWith("23503", "nominations_team_id_fkey");
+  await assert.rejects(() => postgresStore.nominate(input), (e) => e.status === 404 && /team no longer exists/.test(e.message));
+  answer = failWith("23503", "nominations_panel_id_fkey");
+  await assert.rejects(() => postgresStore.nominate(input), (e) => e.status === 404 && /panel no longer exists/.test(e.message));
+  answer = failWith("40001");
+  await assert.rejects(() => postgresStore.nominate(input), (e) => e.code === "40001");
+});
+
+test("withdrawing deletes by the whole key and says whether anything went", async () => {
+  calls.length = 0;
+  answer = () => [{ id: "n1" }];
+  assert.equal(await postgresStore.withdrawNomination({ awardId: "excellence", teamId: "t1", panelId: "p1", judge: "Amy" }), true);
+  const [del] = sent(/^delete from nominations/);
+  assert.equal(del.sql, "delete from nominations where award_id = $1 and team_id = $2 and panel_id = $3 and judge = $4 returning id");
+  assert.deepEqual(del.params, ["excellence", "t1", "p1", "Amy"]);
+
+  answer = () => [];
+  assert.equal(await postgresStore.withdrawNomination({ awardId: "excellence", teamId: "t1", panelId: "p1", judge: "Amy" }), false);
+});
+
+test("nominations and winners are read whole, oldest first", async () => {
+  calls.length = 0;
+  answer = () => [NOMINATION];
+  await postgresStore.listNominations();
+  assert.equal(sent(/from nominations/)[0].sql, "select * from nominations order by created_at, id");
+
+  const decided = new Date("2026-10-24T09:00:00.000Z");
+  answer = () => [{ award_id: "design", division: "Middle School", team_id: "t1", decided_by: "Alex", decided_at: decided }];
+  const winners = await postgresStore.listWinners();
+  assert.equal(sent(/from award_winners/)[0].sql, "select * from award_winners order by decided_at, award_id, division");
+  assert.equal(winners[0].decided_at, "2026-10-24T09:00:00.000Z");
+});
+
+test("setWinner upserts on (award, division) so a replacement takes the place; clearWinner deletes by the same key", async () => {
+  calls.length = 0;
+  answer = () => [{ award_id: "design", division: "Middle School", team_id: "t2", decided_by: "Alex", decided_at: new Date("2026-10-24T09:00:00.000Z") }];
+  await postgresStore.setWinner({ awardId: "design", division: "Middle School", teamId: "t2", decidedBy: "Alex" });
+  const [upsert] = sent(/^insert into award_winners/);
+  assert.match(
+    upsert.sql,
+    /^insert into award_winners \(award_id, division, team_id, decided_by\) values \(\$1, \$2, \$3, \$4\) on conflict \(award_id, division\) do update set team_id = excluded\.team_id, decided_by = excluded\.decided_by, decided_at = now\(\) returning \*$/,
+  );
+  assert.deepEqual(upsert.params, ["design", "Middle School", "t2", "Alex"]);
+
+  answer = () => {
+    throw pgError("23503", "award_winners_team_id_fkey");
+  };
+  await assert.rejects(() => postgresStore.setWinner({ awardId: "design", division: "Middle School", teamId: "t2", decidedBy: "Alex" }), (e) => e.status === 404);
+
+  calls.length = 0;
+  answer = () => [{ award_id: "design" }];
+  assert.equal(await postgresStore.clearWinner("design", "Middle School"), true);
+  const [del] = sent(/^delete from award_winners/);
+  assert.equal(del.sql, "delete from award_winners where award_id = $1 and division = $2 returning award_id");
+  assert.deepEqual(del.params, ["design", "Middle School"]);
+  answer = () => [];
+  assert.equal(await postgresStore.clearWinner("design", "Middle School"), false);
+});
+
+test("a day reset names the nominations and winners (and still spares flags and the setup); a full wipe reaches them through teams", async () => {
+  answer = () => [];
+  calls.length = 0;
+  await postgresStore.resetDay();
+  const [day] = sent(/^truncate/);
+  assert.match(day.sql, /\bnominations\b/);
+  assert.match(day.sql, /\baward_winners\b/);
+  assert.ok(!/\bflags\b|referee_setup/.test(day.sql));
+
+  // Both tables reference teams, so truncating teams with cascade empties them.
+  calls.length = 0;
+  await postgresStore.resetAll();
+  const [wipe] = sent(/^truncate/);
+  assert.match(wipe.sql, /\bteams\b/);
+  assert.ok(wipe.sql.endsWith("cascade"));
+  assert.match(migrateBody, /nominations \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*award_id\s+text not null,\s*team_id\s+uuid not null references teams\(id\)/);
+});

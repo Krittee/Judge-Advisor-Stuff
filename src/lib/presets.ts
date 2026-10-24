@@ -1,6 +1,7 @@
 import presetFile from "../../config/event.json";
 import { normalizePanelCode } from "./panelCode";
 import { getRuleset, type MatchType } from "./rules";
+import type { AwardView } from "./types";
 
 /**
  * Preset panels, read from config/event.json.
@@ -48,6 +49,7 @@ type RawPreset = {
   languages?: unknown;
   refereeFlags?: unknown;
   teamCategories?: unknown;
+  awards?: unknown;
   booking?: unknown;
   panels?: unknown;
 };
@@ -324,6 +326,41 @@ export function resolveCategory(input: unknown): string {
     (c) => c.id.toLowerCase() === wanted || c.label.toLowerCase() === wanted,
   );
   return match ? match.id : defaultCategory();
+}
+
+/**
+ * The awards judges nominate for, in the order the file lists them (that is
+ * the presentation order everywhere).
+ *
+ * A malformed entry is dropped rather than thrown, and so is a repeated id:
+ * the first one wins, as with preset panel codes. Nominations and winners
+ * are stored against the id, so a second award sharing it would be
+ * indistinguishable from the first. No awards at all is allowed -- there is
+ * simply nothing to nominate for.
+ */
+export function parseAwards(list: unknown): AwardView[] {
+  const seen = new Set<string>();
+  const parsed: AwardView[] = [];
+
+  for (const entry of Array.isArray(list) ? list : []) {
+    const o = (entry ?? {}) as Record<string, unknown>;
+    const id = String(o.id ?? "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const label = String(o.label ?? "").trim() || id;
+    parsed.push({
+      id,
+      label,
+      short: String(o.short ?? "").trim() || label,
+      blurb: String(o.blurb ?? "").trim(),
+    });
+  }
+
+  return parsed;
+}
+
+export function awards(): AwardView[] {
+  return parseAwards(raw.awards);
 }
 
 /** The booking grid every preset panel starts with. */
