@@ -342,7 +342,7 @@ test("one column per panel, in order, headed by name, division, languages, judge
 
   const p2 = columnOf(markup, "Panel 2");
   assert.match(p2, /<h2 id="[^"]+">Panel 2<\/h2><span class="jg-ptag">Middle School<\/span>/);
-  assert.match(p2, /<span class="ja-tags"><span class="jg-ptag" lang="en">EN<\/span><span class="jg-ptag" lang="th">TH<\/span><\/span>/);
+  assert.match(p2, /<span class="ja-tags"><span class="jg-ptag">EN<\/span><span class="jg-ptag">TH<\/span><\/span>/);
   assert.match(p2, /<p class="ja-jn">Priya Nair, Lee Chen<\/p>/);
   assert.match(p2, /<p class="ja-ld"><span class="ja-wt">2 waiting<\/span> · with 2011A<\/p>/);
 
@@ -350,12 +350,14 @@ test("one column per panel, in order, headed by name, division, languages, judge
   assert.match(columnOf(markup, "Panel 3"), /<p class="ja-ld"><span class="ja-wt">1 waiting<\/span> · panel free<\/p>/);
   assert.match(columnOf(markup, "Panel 4"), /none waiting · with 6036D/);
   // A panel covering one language says so.
-  assert.match(columnOf(markup, "Panel 1"), /<span class="jg-ptag" lang="en">EN only<\/span>/);
+  assert.match(columnOf(markup, "Panel 1"), /<span class="jg-ptag">EN only<\/span>/);
+  // The language labels are English text, so none of them carries a lang attribute.
+  assert.doesNotMatch(markup, /lang="/, "the Floor sets no lang on its language labels");
 });
 
 test("a panel that cannot cover a requested language shows the caution pill; one that can does not", () => {
   const markup = board();
-  assert.match(columnOf(markup, "Panel 3"), /<span class="ja-gapp">[\s\S]*<span lang="th">ไทย \(Thai\)<\/span> not covered<\/span>/);
+  assert.match(columnOf(markup, "Panel 3"), /<span class="ja-gapp">[\s\S]*<span>ไทย \(Thai\)<\/span> not covered<\/span>/);
   // Panel 2 covers Thai, so Byte Me's request there is no gap.
   assert.doesNotMatch(columnOf(markup, "Panel 2"), /ja-gapp|not covered/);
   assert.doesNotMatch(columnOf(markup, "Panel 1"), /ja-gapp/);
@@ -405,10 +407,10 @@ test("each status shows its own clock: time on the way, time in the room, the sl
 test("a language the panel does not cover is a caution box on the card and a caution tag; a covered one is plain", () => {
   const markup = board();
   const c = cardOf(markup, "5150Z");
-  assert.match(c, /<span class="jg-ptag ja-warn" lang="th" title="ไทย \(Thai\)">TH<\/span>/);
+  assert.match(c, /<span class="jg-ptag ja-warn" title="ไทย \(Thai\)">TH<\/span>/);
   assert.match(c, /<div class="jg-caution ja-lw" role="note">[\s\S]*<p>Panel 3 interviews in English only — this team asked for ไทย \(Thai\)\.<\/p><\/div>/);
   const covered = cardOf(markup, "7700B");
-  assert.match(covered, /<span class="jg-ptag" lang="th"/);
+  assert.match(covered, /<span class="jg-ptag" title="ไทย \(Thai\)">TH<\/span>/);
   assert.doesNotMatch(covered, /jg-caution|ja-warn/);
 });
 
@@ -475,7 +477,7 @@ test("Move to panel… lists only panels in the team's division without a confli
     [...pop.matchAll(/<button type="button" class="ja-opt"[^>]*><b>(.*?)<\/b>(?:<!-- -->)?<span class="jg-ptag"><span aria-hidden="true">(.*?)<\/span><span class="sr-only">(.*?)<\/span><\/span>/g)].map((m) => [m[1], m[2], m[3]]),
     [["Panel 2", "MS", "Middle School"]],
   );
-  assert.match(pop, /<span class="ja-tags"><span class="jg-ptag" lang="en">EN<\/span><span class="jg-ptag" lang="th">TH<\/span><\/span>/);
+  assert.match(pop, /<span class="ja-tags"><span class="jg-ptag">EN<\/span><span class="jg-ptag">TH<\/span><\/span>/);
   assert.match(pop, /<p class="ja-pop-c">Only Middle School panels without a conflict<\/p>/);
   assert.doesNotMatch(pop, /Panel 1|Panel 3|Panel 4/, "High School and Elementary panels are out, and so is where it already is");
 

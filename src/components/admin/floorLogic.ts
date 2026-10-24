@@ -184,7 +184,7 @@ export function coverTags(
   }));
 }
 
-/** "Panel 3 interviews in English only — this team asked for ไทย (Thai)." */
+/** "Panel 3 interviews in English only — this team asked for Thai." */
 export function gapNote(
   panel: Pick<PublicPanel, "name" | "languages">,
   languages: AppState["languages"],
@@ -215,7 +215,7 @@ export function sinceFor(request: RequestRow): string | null {
   }
 }
 
-/** The phone chip's spoken label: "Panel 3, 2 teams, 1 waiting, ไทย (Thai) not covered". */
+/** The phone chip's spoken label: "Panel 3, 2 teams, 1 waiting, Thai not covered". */
 export function chipSpeech(
   column: FloorColumn,
   languages: AppState["languages"],

@@ -192,11 +192,11 @@ test("the language toggles are pressed buttons; with none on it says Not stated"
   const group = cardOf(m, "Panel 2").match(/<div class="ja-pn-lts"[\s\S]*?<\/div>/)?.[0] ?? "";
   assert.match(group, /role="group" aria-labelledby="[^"]+-lg"/);
   assert.deepEqual(
-    [...group.matchAll(/<button type="button" class="ja-pn-lt" aria-pressed="(\w+)">(?:<svg[\s\S]*?<\/svg>)?<span lang="(\w+)">(.*?)<\/span>/g)].map((x) => [x[1], x[2], x[3]]),
-    [["true", "en", "English"], ["true", "th", "ไทย"]],
+    [...group.matchAll(/<button type="button" class="ja-pn-lt" aria-pressed="(\w+)">(?:<svg[\s\S]*?<\/svg>)?<span>(.*?)<\/span>/g)].map((x) => [x[1], x[2]]),
+    [["true", "English"], ["true", "ไทย"]],
   );
   assert.doesNotMatch(cardOf(m, "Panel 2"), /Not stated/);
-  assert.match(cardOf(m, "Panel 1").match(/<div class="ja-pn-lts"[\s\S]*?<\/div>/)?.[0] ?? "", /aria-pressed="false"><span lang="th">/);
+  assert.match(cardOf(m, "Panel 1").match(/<div class="ja-pn-lts"[\s\S]*?<\/div>/)?.[0] ?? "", /aria-pressed="false"><span>ไทย<\/span>/);
 
   const none = board({ state: { panels: [panel(1, "High School", { languages: [] })] } });
   assert.match(none, /<p class="ja-hint">Not stated — no request will be flagged\.<\/p>/);

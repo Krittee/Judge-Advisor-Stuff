@@ -288,7 +288,7 @@ function Column({
         {panel && panel.languages.length ? (
           <span className="ja-tags">
             {coverTags(panel, ctx.languages).map((t) => (
-              <span key={t.id} className="jg-ptag" lang={t.id}>
+              <span key={t.id} className="jg-ptag">
                 {t.text}
               </span>
             ))}
@@ -307,7 +307,7 @@ function Column({
               {gaps.map((id, i) => (
                 <Fragment key={id}>
                   {i ? ", " : null}
-                  <span lang={id}>{label(id)}</span>
+                  <span>{label(id)}</span>
                 </Fragment>
               ))}{" "}
               not covered
@@ -384,7 +384,7 @@ function Card({
           </span>
         ) : null}
         {language ? (
-          <span className={`jg-ptag${gap ? " ja-warn" : ""}`} lang={language.id} title={language.label}>
+          <span className={`jg-ptag${gap ? " ja-warn" : ""}`} title={language.label}>
             {language.short}
           </span>
         ) : null}
@@ -462,7 +462,7 @@ function Card({
                       </span>
                       <span className="ja-tags">
                         {coverTags(p, languages).map((t) => (
-                          <span key={t.id} className="jg-ptag" lang={t.id}>
+                          <span key={t.id} className="jg-ptag">
                             {t.text}
                           </span>
                         ))}

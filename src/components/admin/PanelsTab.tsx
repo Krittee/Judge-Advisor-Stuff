@@ -677,7 +677,7 @@ function PanelCard({
             return (
               <button key={l.id} type="button" className="ja-pn-lt" aria-pressed={on} onClick={() => onToggleLanguage(panel, l.id)}>
                 {on ? <CheckIcon /> : null}
-                <span lang={l.id}>{l.label}</span>
+                <span>{l.label}</span>
               </button>
             );
           })}
