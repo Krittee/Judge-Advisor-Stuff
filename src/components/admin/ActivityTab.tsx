@@ -244,6 +244,10 @@ export function ActivityBoard({
                 <i className="ja-ac-dd ja-ac-d-setup" aria-hidden="true" />
                 Setup
               </span>
+              <span>
+                <i className="ja-ac-dd ja-ac-d-award" aria-hidden="true" />
+                Award
+              </span>
             </div>
           </div>
         </section>

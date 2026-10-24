@@ -89,6 +89,8 @@ test("the kind chips count the loaded entries and show which is pressed", () => 
   assert.deepEqual(chip("Referee"), ["false", "2"]);
   assert.deepEqual(chip("Conflicts"), ["false", "1"]);
   assert.deepEqual(chip("Setup"), ["false", "2"]);
+  assert.deepEqual(chip("Awards"), ["false", "0"], "the Awards kind has its chip, last");
+  assert.ok(m.indexOf(">Setup<") < m.indexOf(">Awards<"));
   const referee = board({ filters: { kind: "referee" } });
   assert.deepEqual(referee.match(/class="ja-ac-chip" aria-pressed="(true|false)">Referee/)?.slice(1), ["true"]);
   assert.match(referee, /class="ja-ac-chip" aria-pressed="false">All/);
@@ -137,7 +139,8 @@ test("the footer says how much is shown, and the key explains the dots", () => {
   assert.match(m, /<div class="ja-ac-lf"><p>Showing all 8 events<\/p>/);
   const key = m.match(/<div class="ja-ac-key"[\s\S]*?<\/div><\/div>/)![0];
   assert.match(key, /role="group" aria-label="Dot key"/);
-  for (const word of ["Request", "Referee flag, by severity", "Conflict", "Setup"]) assert.ok(key.includes(word), word);
+  for (const word of ["Request", "Referee flag, by severity", "Conflict", "Setup", "Award"]) assert.ok(key.includes(word), word);
+  assert.match(key, /<i class="ja-ac-dd ja-ac-d-award" aria-hidden="true"><\/i>Award/);
   // The referee entry in the key is one dot per severity the config has, in its own colours.
   assert.deepEqual([...key.matchAll(/ja-ac-d-referee (bg-[\w-]+)/g)].map((x) => x[1]), ["bg-done", "bg-caution", "bg-waiting", "bg-danger", "bg-ink"]);
 
@@ -188,6 +191,9 @@ test("the dot: request neutral, conflict caution, setup an outline, referee the 
   assert.equal(dot(ev(m, "11:12")), "ja-ac-d-referee bg-danger", "corrected to Major: the new severity");
   assert.equal(dot(ev(m, "10:42")), "ja-ac-d-conflict");
   assert.equal(dot(ev(m, "10:15")), "ja-ac-d-setup");
+  const awardEntry = entry("award", at(11, 50), { action: "gave Design to 2088C", detail: "Middle School", ...forTeam("2011A") });
+  assert.equal(dot(ev(board({ poll: { rows: [awardEntry] } }), "11:50")), "ja-ac-d-award");
+  assert.match(css.slice(css.indexOf("/* @ja-block activity */")), /\.ja-ac-d-award \{ background: var\(--done\); \}/, "an award is the winner's green");
   const block = css.slice(css.indexOf("/* @ja-block activity */"));
   assert.match(block, /\.ja-ac-d-request \{ background: var\(--ink-muted\)/);
   assert.match(block, /\.ja-ac-d-conflict \{ background: var\(--caution\)/);

@@ -656,9 +656,9 @@ test("the phone bar says how many are scored on Scores, and nowhere else", () =>
 test("the Scores block: its own prefix, after the import block, tokens only, no motion, 44px taps on a phone", () => {
   const start = css.indexOf("/* @ja-block scores */");
   assert.ok(start > css.indexOf("/* @ja-block import */"), "appended after the existing blocks");
-  // Activity (step 10) is appended after it.
-  const end = css.indexOf("/* @ja-block activity */");
-  assert.ok(end > start, "Activity follows it");
+  // Awards (v2.2) is appended after it, and Activity after that.
+  const end = css.indexOf("/* @ja-block awards */");
+  assert.ok(end > start, "Awards follows it");
   const block = css.slice(start, end);
   assert.ok(!/@ja-block (?!scores)/.test(block), "the scores block runs up to the next one");
   assert.doesNotMatch(block, /transition|animation|@keyframes/, "no motion");

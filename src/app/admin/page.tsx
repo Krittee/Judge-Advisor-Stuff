@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { liveRequestFor } from "@/lib/data";
 import { ActivityTab } from "@/components/admin/ActivityTab";
 import { AdminFrame, railCounts, type AdminTab as Tab } from "@/components/admin/AdminFrame";
+import { AwardsTab } from "@/components/admin/AwardsTab";
+import { decidedText, pickDivision } from "@/components/admin/awardsLogic";
 import { ConflictsTab } from "@/components/admin/ConflictsTab";
 import { FloorTab } from "@/components/admin/FloorTab";
 import { ImportTab } from "@/components/admin/ImportTab";
@@ -13,6 +15,7 @@ import { RefereeTab } from "@/components/admin/RefereeTab";
 import { ScoresTab } from "@/components/admin/ScoresTab";
 import { scoredText } from "@/components/admin/scoresLogic";
 import { TeamsTab } from "@/components/admin/TeamsTab";
+import { useAwards } from "@/components/admin/useAwards";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { TeamSheet } from "@/components/judge/TeamSheet";
 import { call, useAppState, useScores } from "@/components/useAppState";
@@ -41,6 +44,12 @@ export default function AdminPage() {
      rubric totals, so polling for them behind the other five tabs would
      be a request every 15 seconds that nothing renders. */
   const scoreData = useScores({ enabled: tab === "scores" });
+  /* Winners are not in /api/state (they stay secret until the ceremony), so the
+     rail's "3/11" comes from here: asked on every section, and only once the
+     session is known to be the Judge Advisor's. The division it counts is the
+     one the Awards board has open. */
+  const awards = useAwards({ enabled: Boolean(session) });
+  const [awardDivision, setAwardDivision] = useState<string | null>(null);
   /* Ranked once, by the same rankTeams the judge console uses, and only while
      Scores is open: no other tab reads it. */
   const ranked = useMemo(
@@ -71,7 +80,11 @@ export default function AdminPage() {
      "Conflicts 2" sends you there. Floor's is only the teams actually
      waiting, Conflicts' only the judges' (older whole-panel entries are not
      counted); a total that is merely large is not a reason to look. */
-  const counts = railCounts(state);
+  const division = pickDivision(awardDivision, state.divisions, awards.data?.nominations ?? [], state.teams);
+  const counts = {
+    ...railCounts(state),
+    ...(awards.data?.awards.length ? { awards: decidedText(awards.data.winners, awards.data.awards, division) } : {}),
+  };
   const sheetTeam = state.teams.find((t) => t.id === sheetId) ?? null;
 
   return (
@@ -90,7 +103,7 @@ export default function AdminPage() {
         }}
       >
         {/* The redesigned tabs fill the width the rail leaves; the older ones keep the width and padding they had. */}
-        <div className={tab === "floor" || tab === "conflicts" || tab === "panels" || tab === "flags" || tab === "teams" || tab === "import" || tab === "scores" || tab === "log" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
+        <div className={tab === "floor" || tab === "conflicts" || tab === "panels" || tab === "flags" || tab === "teams" || tab === "import" || tab === "awards" || tab === "scores" || tab === "log" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
           {error ? (
             <div className="mb-4">
               <Banner kind="error" onDismiss={() => setError(null)}>
@@ -115,6 +128,17 @@ export default function AdminPage() {
                 setFocusFlagTeam(team.id);
                 setTab("flags");
               }}
+            />
+          ) : null}
+          {tab === "awards" ? (
+            <AwardsTab
+              state={state}
+              data={awards.data}
+              error={awards.error}
+              reload={awards.reload}
+              division={division}
+              onDivision={setAwardDivision}
+              onError={setError}
             />
           ) : null}
           {tab === "teams" ? (

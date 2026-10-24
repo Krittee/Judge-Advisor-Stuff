@@ -16,6 +16,7 @@ export type AdminTab =
   | "panels"
   | "import"
   | "scores"
+  | "awards"
   | "log";
 
 function Icon({ children }: { children: React.ReactNode }) {
@@ -77,6 +78,7 @@ export const SECTION_GROUPS: { label: string; items: Section[] }[] = [
     label: "Results",
     items: [
       { id: "scores", label: "Scores", icon: <path d="M5 20v-7M12 20V5M19 20V10" /> },
+      { id: "awards", label: "Awards", icon: <path d="M8 4h8v6a4 4 0 0 1-8 0zM8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3M12 14v3M8 20h8M9.5 17h5" /> },
       { id: "log", label: "Activity", icon: <path d="M3 12h4l3-8 4 16 3-8h4" /> },
     ],
   },
@@ -84,13 +86,16 @@ export const SECTION_GROUPS: { label: string; items: Section[] }[] = [
 
 const ALL_SECTIONS = SECTION_GROUPS.flatMap((g) => g.items);
 
+/** A section's count in the rail: a number, or for Awards the "3/11" of awards decided (winners are not in /api/state, so the page adds it). */
+export type RailCounts = Partial<Record<AdminTab, number | string>>;
+
 /**
  * The rail's counts: Floor's is the teams requesting, Conflicts' is the
  * judges' conflicts (the older whole-panel entries are not counted).
  */
 export function railCounts(
   state: Pick<AppState, "requests" | "conflicts" | "flags" | "teams" | "panels">,
-): Partial<Record<AdminTab, number>> {
+): RailCounts {
   return {
     floor: state.requests.filter((r) => r.status === "requested").length,
     conflicts: judgeConflictCount(state.conflicts),
@@ -109,7 +114,7 @@ export const OTHER_CONSOLES = [
 ] as const;
 
 /** Floor's count is the teams requesting: the same orange as the waiting colour. Zero shows nothing. */
-function Count({ id, count }: { id: AdminTab; count?: number }) {
+function Count({ id, count }: { id: AdminTab; count?: number | string }) {
   if (!count) return null;
   return id === "floor" ? (
     <>
@@ -128,7 +133,7 @@ function SectionList({
   Heading,
 }: {
   tab: AdminTab;
-  counts: Partial<Record<AdminTab, number>>;
+  counts: RailCounts;
   onPick: (id: AdminTab) => void;
   /** The group labels sit one level under whatever names the list: the page's h1, or the sheet's h2. */
   Heading: "h2" | "h3";
@@ -202,7 +207,7 @@ export function AdminFrame({
   tab: AdminTab;
   onTab: (tab: AdminTab) => void;
   /** Per-section counts; Floor's is the teams requesting. Omit or 0 for none. */
-  counts: Partial<Record<AdminTab, number>>;
+  counts: RailCounts;
   /** "9 of 48 scored": the phone bar's note on Scores, which the rail does not count. */
   scoredNote?: string;
   children: React.ReactNode;
@@ -297,6 +302,8 @@ export function AdminFrame({
             <span className="ja-rc">
               {counts[tab]} {counts[tab] === 1 ? "panel" : "panels"}
             </span>
+          ) : tab === "awards" ? (
+            <span className="ja-rc">{counts[tab]} decided</span>
           ) : (
             <span className="ja-rc">{counts[tab]}</span>
           )

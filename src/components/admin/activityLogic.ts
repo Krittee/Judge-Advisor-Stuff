@@ -86,6 +86,7 @@ export const KIND_CHIPS: { id: KindFilter; label: string }[] = [
   { id: "referee", label: "Referee" },
   { id: "conflict", label: "Conflicts" },
   { id: "setup", label: "Setup" },
+  { id: "award", label: "Awards" },
 ];
 
 /** What the dot's screen-reader text says. */
@@ -159,7 +160,7 @@ export function namedFlag(action: string, kinds: FlagKind[]): FlagKind | null {
   return kindOf(ids[ids.length - 1] ?? "", kinds);
 }
 
-/** The timeline dot's classes: a request is neutral ink, a conflict caution, a setup an accent outline, and a referee entry the colour of the severity it names (neutral when it names none). */
+/** The timeline dot's classes: a request is neutral ink, a conflict caution, a setup an accent outline, an award the green of a winner, and a referee entry the colour of the severity it names (neutral when it names none). */
 export function dotFor(r: Pick<ActivityRow, "kind" | "action">, kinds: FlagKind[]): string {
   if (r.kind !== "referee") return `ja-ac-d-${r.kind}`;
   return `ja-ac-d-referee ${dotClass(namedFlag(r.action, kinds)?.color ?? "zinc")}`;

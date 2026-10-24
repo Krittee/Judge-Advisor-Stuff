@@ -11,6 +11,8 @@ import {
   filterRows,
   footText,
   hourGroups,
+  KIND_CHIPS,
+  KIND_NAMES,
   namedFlag,
   NO_FILTERS,
   NO_POLL,
@@ -118,6 +120,16 @@ test("the kind filter keeps one kind, and All keeps everything", () => {
     assert.equal(shown.length, count, kind);
     assert.ok(shown.every((r) => r.kind === kind));
   }
+});
+
+test("every kind the log can hold has a chip, so the awards entries can be filtered to", () => {
+  assert.deepEqual(KIND_CHIPS.map((c) => c.id), ["all", "request", "referee", "conflict", "setup", "award"]);
+  assert.equal(KIND_CHIPS.at(-1).label, "Awards");
+  assert.deepEqual(Object.keys(KIND_NAMES).sort(), KIND_CHIPS.map((c) => c.id).filter((id) => id !== "all").sort());
+  const rows = [...log, { ...log[0], id: "aw1", kind: "award", action: "gave Design to 2088C" }, { ...log[0], id: "aw2", kind: "award", action: "nominated 7700B for Excellence" }];
+  assert.deepEqual(filterRows(rows, { ...NO_FILTERS, kind: "award" }).map((r) => r.id), ["aw1", "aw2"]);
+  assert.equal(chipCounts(rows).award, 2);
+  assert.equal(dotFor(rows.at(-1), []), "ja-ac-d-award");
 });
 
 test("the team search matches inside the number, in any case, and drops entries that name no team", () => {

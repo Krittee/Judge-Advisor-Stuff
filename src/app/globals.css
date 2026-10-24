@@ -2389,7 +2389,7 @@ body:has(.desk) > .theme-toggle:hover {
  * One stylesheet serves every tab, so a class one tab styles is a class the
  * others' markup can pick up. Each feature's CSS opens with an @ja-block
  * marker comment, and a class is styled bare by one block only: another tab
- * takes its own prefix (.ja-cf-, .ja-tm-, .ja-pn-, .ja-rf-, .ja-im-, .ja-sc-, .ja-ac-) or anchors a rule on
+ * takes its own prefix (.ja-cf-, .ja-tm-, .ja-pn-, .ja-rf-, .ja-im-, .ja-sc-, .ja-aw-, .ja-ac-) or anchors a rule on
  * a class of its own. tests/adminCssScope.test.mjs fails on a second definition.
  * ------------------------------------------------------------------ */
 
@@ -3643,11 +3643,184 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-sc-cbtn { min-height: 32px; }
 }
 
+/* @ja-block awards */
+/* Awards (design/awards-redesign/reference-awards-board.dc.html): every nomination the judges made, read as a team-by-award matrix or as a list per award, and one
+   side panel on a nominee, where the winner is given. From 1024px the panel is a 340px column beside the board; on a phone it is a bottom sheet (the Sections
+   sheet's dialog) and only the matrix's own box scrolls sideways, its team column held in place.
+   Colour is signal: green is a winner or a decided award, amber is a team that already holds another award or has a referee caution, accent is chrome (buttons,
+   the chosen chip and toggle, the selected cell); a nomination is an ink dot with no hue. Tints are color-mix in srgb. No motion at all. */
+.ja-aw-h, .ja-aw-chip, .ja-aw-seg button, .ja-aw-tm b, .ja-aw-aph h2, .ja-aw-nr b, .ja-aw-dr h2, .ja-aw-oth p b, .ja-aw-prim {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+.ja-aw { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
+
+/* The title row: on a phone the section bar names the page, so the meta line and the privacy line stand alone */
+.ja-aw-top { display: flex; flex-direction: column; gap: 4px; }
+.ja-aw-h { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; font-weight: 700; font-size: 26px; line-height: 1.15; letter-spacing: -0.01em; }
+.ja-aw-meta { margin: 0; color: var(--ink-subtle); font-size: 13px; font-variant-numeric: tabular-nums; }
+.ja-aw-meta b { color: var(--ink); font-weight: 500; }
+.ja-aw-priv { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink-subtle); font-size: 12.5px; }
+
+/* The filters: division and panel chips, and the Matrix | By award toggle */
+.ja-aw-fbar { display: flex; flex-direction: column; gap: 10px; }
+.ja-aw-fg { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 6px; }
+.ja-aw-cl { flex: none; color: var(--ink-subtle); font-weight: 500; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ja-aw-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ja-aw-chip {
+  display: inline-flex; height: 44px; align-items: center; gap: 8px; padding: 0 14px; border: 1.5px solid var(--jg-field-line); border-radius: 10px;
+  background: var(--jg-field); color: var(--ink); font-weight: 600; font-size: 14px; white-space: nowrap;
+}
+.ja-aw-chip:hover:not([aria-pressed="true"]) { background: var(--surface-2); }
+.ja-aw-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.ja-aw-fn { color: var(--ink-subtle); font-weight: 500; font-variant-numeric: tabular-nums; }
+.ja-aw-chip[aria-pressed="true"] .ja-aw-fn { color: var(--accent-ink); }
+.ja-aw-seg { display: flex; gap: 2px; padding: 3px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--jg-field); }
+.ja-aw-seg button { flex: 1; height: 44px; padding: 0 16px; border-radius: 9px; background: transparent; color: var(--ink-subtle); font-weight: 600; font-size: 14px; }
+.ja-aw-seg button:hover:not([aria-pressed="true"]) { background: var(--surface-2); color: var(--ink); }
+.ja-aw-seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+/* The board and, beside it from 1024px, the side panel */
+.ja-aw-cols { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
+.ja-aw-view { min-width: 0; }
+
+/* The matrix: the box scrolls, the page does not. The team column stays; borders sit on the cells so they travel with it. */
+.ja-aw-mxw { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
+.ja-aw-mx { overflow-x: auto; scrollbar-width: none; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.ja-aw-mx::-webkit-scrollbar { display: none; }
+.ja-aw-mx table { width: 100%; min-width: calc(168px + var(--n) * 40px); border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.ja-aw-mx th, .ja-aw-mx td { padding: 0; text-align: center; vertical-align: middle; font-weight: 400; }
+.ja-aw-mx thead th { height: 58px; border-bottom: 1px solid var(--line); color: var(--ink-subtle); font-weight: 500; font-size: 12px; }
+.ja-aw-mx thead th.ja-aw-tm { width: 112px; padding-left: 12px; text-align: left; }
+.ja-aw-mx thead th.ja-aw-pn { width: 56px; text-align: left; }
+.ja-aw-mx thead th.ja-aw-on { color: var(--ink); }
+.ja-aw-hl { display: block; line-height: 1.2; text-decoration: none; }
+.ja-aw-hk { display: flex; justify-content: center; height: 16px; margin-top: 3px; color: var(--done-quiet); }
+.ja-aw-mx tbody tr + tr > * { border-top: 1px solid var(--line); }
+.ja-aw-mx tbody th { height: 56px; padding: 6px 8px 6px 12px; text-align: left; }
+.ja-aw-mx td.ja-aw-pn { text-align: left; }
+.ja-aw-mx .ja-aw-tm { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: 1px 0 0 var(--line); }
+.ja-aw-mx tbody th b { display: block; font-weight: 700; font-size: 16px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.ja-aw-sub { display: block; overflow: hidden; color: var(--ink-subtle); text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; line-height: 1.3; }
+.ja-aw-sub.ja-aw-has { color: var(--done-quiet); }
+.ja-aw-ptag {
+  display: inline-flex; flex: none; height: 22px; align-items: center; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink-subtle);
+  font-weight: 500; font-size: 12px; white-space: nowrap;
+}
+.ja-aw-mx .ja-aw-ptag { height: 24px; padding: 0 7px; }
+
+/* A cell: an ink dot is a nomination, a green tick the winner; the one whose panel is open wears the accent */
+.ja-aw-cell { display: inline-grid; width: 38px; height: 44px; place-items: center; border-radius: 8px; background: transparent; color: var(--ink); }
+.ja-aw-cell:hover { background: var(--surface-2); }
+.ja-aw-cell:focus-visible { outline-offset: -2px; }
+.ja-aw-mk { display: block; width: 12px; height: 12px; border-radius: 50%; background: var(--ink); }
+.ja-aw-cell.ja-aw-won { background: var(--done); color: var(--done-ink); }
+.ja-aw-cell[aria-pressed="true"] { background: var(--ja-accent-t); box-shadow: inset 0 0 0 2px var(--accent); }
+.ja-aw-cell[aria-pressed="true"] .ja-aw-mk { background: var(--accent); }
+.ja-aw-cell.ja-aw-won[aria-pressed="true"] { background: var(--done); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+.ja-aw-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 0; color: var(--ink-subtle); font-size: 12.5px; }
+.ja-aw-key > span { display: inline-flex; align-items: center; gap: 6px; }
+.ja-aw-key .ja-aw-cell { width: 24px; height: 24px; border-radius: 6px; pointer-events: none; }
+.ja-aw-key .ja-aw-mk { width: 10px; height: 10px; }
+
+/* By award: a list per award */
+.ja-aw-aps { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 12px; }
+.ja-aw-ap { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.ja-aw-ap.ja-aw-dec { border-color: color-mix(in srgb, var(--done) 55%, transparent); }
+.ja-aw-aph { display: flex; min-height: 48px; align-items: center; gap: 10px; padding: 8px 14px; }
+.ja-aw-aph h2 { flex: 1; min-width: 0; font-weight: 700; font-size: 16px; line-height: 1.2; }
+.ja-aw-cst { flex: none; color: var(--ink-subtle); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
+.ja-aw-cst.ja-aw-ok { color: var(--done-quiet); }
+.ja-aw-cnone { margin: 0; padding: 12px 14px; border-top: 1px solid var(--line); color: var(--ink-subtle); font-size: 13.5px; }
+.ja-aw-ap li { border-top: 1px solid var(--line); }
+.ja-aw-nr { display: flex; width: 100%; min-height: 52px; align-items: center; gap: 8px; padding: 6px 12px 6px 14px; background: transparent; color: var(--ink); text-align: left; }
+.ja-aw-nr:hover { background: var(--surface-2); }
+.ja-aw-nr:focus-visible { outline-offset: -2px; }
+.ja-aw-nr.ja-aw-won { background: color-mix(in srgb, var(--done) 14%, transparent); }
+.ja-aw-nr[aria-pressed="true"] { background: var(--ja-accent-t); box-shadow: inset 3px 0 0 var(--accent); }
+.ja-aw-nr b { flex: none; font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
+.ja-aw-nm { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.ja-aw-jc { flex: none; color: var(--ink-subtle); font-size: 12px; white-space: nowrap; }
+.ja-aw-cau { display: inline-flex; flex: none; color: var(--caution-quiet); }
+.ja-aw-win {
+  display: inline-flex; flex: none; height: 26px; align-items: center; gap: 4px; padding: 0 10px; border-radius: 999px; background: var(--done); color: var(--done-ink);
+  font-weight: 500; font-size: 12.5px; white-space: nowrap;
+}
+.ja-aw-nr .ja-aw-win { height: 24px; padding: 0 8px; }
+
+/* The side panel: the same in both views */
+.ja-aw-dr { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.ja-aw-dr0 { align-items: center; justify-content: center; padding: 40px 16px; border: 1px dashed var(--line-strong); background: transparent; text-align: center; }
+.ja-aw-dr0 p { margin: 0; color: var(--ink-subtle); font-size: 14px; }
+.ja-aw-eyebrow { margin: 0; color: var(--ink-subtle); font-weight: 500; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; }
+.ja-aw-dr h2 { font-weight: 700; font-size: 26px; line-height: 1.1; }
+.ja-aw-dr h2 span { display: block; margin-top: 2px; font-family: var(--font-fira), ui-sans-serif, system-ui, sans-serif; font-weight: 400; font-size: 16px; }
+.ja-aw-dst { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; color: var(--ink-subtle); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.ja-aw-dst b { color: var(--ink); font-weight: 500; }
+.ja-aw-sec { margin: 0; color: var(--ink-subtle); font-weight: 500; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ja-aw-qs { display: flex; flex-direction: column; gap: 8px; }
+.ja-aw-qs li { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--jg-field); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-line; }
+.ja-aw-qs li b { display: block; color: var(--ink-subtle); font-weight: 500; font-size: 12.5px; }
+.ja-aw-q0 { color: var(--ink-subtle); }
+.ja-aw-also { margin: 0; color: var(--ink-subtle); font-size: 13px; }
+.ja-aw-good { color: var(--done-quiet); }
+.ja-aw-caut { color: var(--caution-quiet); }
+.ja-aw-warnl { display: flex; align-items: center; gap: 5px; margin: 0; color: var(--caution-quiet); font-size: 12.5px; }
+.ja-aw-warnl svg { flex: none; }
+.ja-aw-oth { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.ja-aw-oth > div { min-width: 0; flex: 1; }
+.ja-aw-oth p { margin: 0; font-size: 14px; }
+.ja-aw-oth p b { font-weight: 700; }
+.ja-aw-oth .ja-aw-warnl { font-size: 12.5px; }
+.ja-aw-prim { display: flex; width: 100%; height: 48px; align-items: center; justify-content: center; border-radius: 12px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 16px; }
+.ja-aw-prim:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, var(--ink)); }
+.ja-aw-prim:disabled { opacity: 0.6; }
+.ja-aw-note { margin: 0; color: var(--ink-subtle); text-align: center; font-size: 12px; }
+.ja-aw-held { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ja-aw-lnk { min-width: 56px; min-height: 44px; padding: 0 10px; background: transparent; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
+.ja-aw-lnk:hover:not(:disabled) { color: var(--ink); }
+.ja-aw-lnk:disabled { opacity: 0.5; }
+
+/* On a phone the panel is the bottom sheet's body, under a grab handle and a Close at its corner */
+.ja-aw-sheet .ja-aw-dr { flex: 1; min-height: 0; padding: 16px 20px max(20px, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; border: 0; border-radius: 0; background: transparent; }
+.ja-aw-sheet .ja-aw-eyebrow { padding-right: 48px; }
+.ja-aw-sx { position: absolute; top: 12px; right: 8px; }
+
+@media (min-width: 1024px) {
+  .ja-aw { gap: 14px; }
+
+  .ja-aw-top { flex-flow: row wrap; align-items: center; gap: 6px 16px; min-height: 40px; }
+  .ja-aw-h { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; white-space: normal; }
+  .ja-aw-meta { font-size: 14px; }
+  .ja-aw-priv { margin-left: auto; font-size: 13px; }
+
+  .ja-aw-fbar { flex-flow: row wrap; align-items: center; gap: 10px 28px; }
+  .ja-aw-fg { flex-direction: row; align-items: center; gap: 10px; }
+  .ja-aw-chip { height: 40px; }
+  .ja-aw-seg { margin-left: auto; }
+  .ja-aw-seg button { flex: none; height: 38px; }
+
+  .ja-aw-cols { flex-direction: row; align-items: flex-start; gap: 20px; }
+  .ja-aw-view { flex: 1; }
+  .ja-aw-aps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ja-aw-dr { position: sticky; top: 12px; flex: none; width: 340px; max-height: calc(100dvh - 80px); overflow-y: auto; }
+
+  /* A mouse has no swipe: from here the box keeps a thin scrollbar for the narrow windows where it scrolls at all */
+  .ja-aw-mx { overflow: auto; scrollbar-width: thin; }
+  .ja-aw-mx::-webkit-scrollbar { display: block; height: 8px; }
+  .ja-aw-mx::-webkit-scrollbar-thumb { border-radius: 4px; background: var(--line-strong); }
+  .ja-aw-mx table { min-width: calc(212px + var(--n) * 40px); }
+  .ja-aw-mx thead th.ja-aw-tm { width: 146px; padding-left: 16px; }
+  .ja-aw-mx thead th.ja-aw-pn { width: 66px; }
+  .ja-aw-mx tbody th { padding: 6px 8px 6px 16px; }
+  /* The divider that shows the team column is held is for a phone, where the box always scrolls */
+  .ja-aw-mx .ja-aw-tm { box-shadow: none; }
+}
+
 /* @ja-block activity */
 /* Activity (design/admin-redesign/reference-activity-*.dc.html): the log as a timeline, grouped by the hour. From 1024px the timeline is a card that scrolls on its
    own under the toolbar, its hour headers stuck to the top; on a phone the page scrolls and the headers stay in the flow.
    Colour is signal: a request's dot is neutral ink, a referee entry's is the colour of the severity it names (the Referee tab's dot classes, in the markup),
-   a conflict's is caution and a setup's is an accent outline; accent is chrome (the chosen chip, links). */
+   a conflict's is caution, a setup's an accent outline and an award's the winner's green; accent is chrome (the chosen chip, links). */
 .ja-ac-h, .ja-ac-chip, .ja-ac-hh b, .ja-ac-tcv {
   font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
@@ -3702,9 +3875,10 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-ac-ev:last-child .ja-ac-rl::before { bottom: calc(100% - 18px); }
 .ja-ac-dd { position: absolute; z-index: 1; top: 18px; left: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; box-shadow: 0 0 0 3px var(--canvas); }
 .ja-ac-d-request { background: var(--ink-muted); }
-.ja-ac-d-referee, .ja-ac-d-conflict, .ja-ac-d-setup { width: 12px; height: 12px; margin: -6px 0 0 -6px; }
+.ja-ac-d-referee, .ja-ac-d-conflict, .ja-ac-d-setup, .ja-ac-d-award { width: 12px; height: 12px; margin: -6px 0 0 -6px; }
 .ja-ac-d-conflict { background: var(--caution); }
 .ja-ac-d-setup { background: var(--canvas); border: 2px solid var(--accent); }
+.ja-ac-d-award { background: var(--done); }
 
 /* An entry: two lines on a phone (time and who, then what and the team), the cells of a row from 1024px */
 .ja-ac-bx { min-width: 0; padding: 8px 0; }
@@ -3779,7 +3953,7 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-ac-ev:first-child .ja-ac-rl::before { top: 50%; }
   .ja-ac-ev:last-child .ja-ac-rl::before { bottom: 50%; }
   .ja-ac-dd { position: relative; top: auto; left: auto; margin: 0; box-shadow: 0 0 0 3px var(--surface); }
-  .ja-ac-d-referee, .ja-ac-d-conflict, .ja-ac-d-setup { margin: 0; }
+  .ja-ac-d-referee, .ja-ac-d-conflict, .ja-ac-d-setup, .ja-ac-d-award { margin: 0; }
   .ja-ac-d-setup { background: var(--surface); }
   .ja-ac-sep { display: none; }
   .ja-ac-tm { grid-column: 2; color: var(--ink-muted); font-weight: 400; font-size: 14px; }
