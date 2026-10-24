@@ -4,7 +4,7 @@ import Link from "next/link";
 import { PanelBusyLine, panelLoad, type PanelLoad } from "@/components/SlotPicker";
 import { formatClock } from "@/components/ui";
 import { STATUS_META } from "@/lib/status";
-import type { AppState, PublicPanel, RequestRow, Team } from "@/lib/types";
+import type { AppState, PublicPanel, RequestRow, Team, TeamCategoryView } from "@/lib/types";
 import {
   agoParts,
   bigTimeOf,
@@ -37,6 +37,8 @@ export type TeamViewProps = {
   /** Up to five of their other requests. */
   history: RequestRow[];
   languages: Language[];
+  /** The event's notebook categories, to name the team's. */
+  categories: TeamCategoryView[];
   /** Every request, for the panel's busy line. */
   requests: RequestRow[];
   /** False when the last poll failed: what is on screen may be stale. */
@@ -75,6 +77,7 @@ export function TeamView(p: TeamViewProps) {
           )}
 
           <div className="tp-left">
+            <TeamDetails team={team} panel={panel} categories={p.categories} />
             <StatusPanel
               team={team}
               panel={panel}
@@ -114,6 +117,44 @@ export function TeamView(p: TeamViewProps) {
         </div>
       </main>
     </div>
+  );
+}
+
+/* ---- 0 · the details row ------------------------------------------------------- */
+
+/**
+ * "1150 | Silver Sprockets | Pit 12 | Elementary School | Developing | Panel A".
+ * The bars are CSS borders, so a screen reader reads the six values only. A
+ * missing pit or panel keeps its place, so the order never shifts.
+ */
+function TeamDetails({ team, panel, categories }: { team: Team; panel: PublicPanel | undefined; categories: TeamCategoryView[] }) {
+  const category = categories.find((c) => c.id === team.category)?.label ?? team.category;
+  return (
+    <ul className="tp-meta" aria-label="Team details">
+      <li>
+        <b>{team.number}</b>
+      </li>
+      <li>{team.name}</li>
+      <li>
+        {team.pit ? (
+          `Pit ${team.pit}`
+        ) : (
+          <>
+            <span aria-hidden="true">—</span>
+            <span className="tp-sr">No pit</span>
+          </>
+        )}
+      </li>
+      <li>
+        <span className="tp-sr">Division: </span>
+        {team.division}
+      </li>
+      <li>
+        <span className="tp-sr">Notebook: </span>
+        {category}
+      </li>
+      <li>{panel ? panel.name : "No panel"}</li>
+    </ul>
   );
 }
 

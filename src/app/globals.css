@@ -1352,6 +1352,15 @@ body:has(.teampage) > .theme-toggle:hover {
   background: var(--surface); color: var(--caution-quiet); font-size: 14px; line-height: 1.4;
 }
 
+/* 0 · The details row. The bars are borders; the list is shifted left by one item's padding
+   and clips, so the bar at the start of a wrapped line falls outside it. */
+.tp-meta {
+  display: flex; flex-wrap: wrap; row-gap: 2px; margin: 0 0 0 -10px; padding: 0; overflow: hidden;
+  color: var(--ink-subtle); font-size: 14px; line-height: 1.4; list-style: none;
+}
+.tp-meta li { min-width: 0; margin-left: -1px; padding: 0 10px; border-left: 1px solid var(--tp-field-line); overflow-wrap: anywhere; }
+.tp-meta b { color: var(--ink); font-weight: 700; }
+
 /* 1 · The status panel */
 .tp-pan { padding: 18px 20px; border-radius: 24px; background: var(--c); color: var(--ci); }
 .tp-pan--idle { --c: var(--surface); --ci: var(--ink); border: 1px solid var(--line); box-shadow: var(--tp-shadow); }
