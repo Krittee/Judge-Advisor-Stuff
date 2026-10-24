@@ -122,11 +122,10 @@ data). Deploy: Vercel + a free Postgres, see `DEPLOY.md`; laptop setup in
   judge, referee and Judge Advisor consoles). All local commits on
   `version-2.0`; nothing pushed. Releasing 2.0 means merging into the default
   branch.
-- **In the working tree, not committed:** an audit pass from another session
-  (`AUDIT_STATUS.md`). It makes the public team page read-only (only the desk
-  or JA can create or change requests), tightens API permissions, makes
-  reassignments and panel edits atomic, and limits flag corrections to the
-  head referee and JA.
+- **Audit pass** (`AUDIT_STATUS.md`, committed): the public team page is
+  read-only (only the desk or JA can create or change requests), API
+  permissions are tightened, reassignments and panel edits are atomic, and
+  flag corrections are limited to the head referee and JA.
 - **Known gaps:** the Postgres SQL has never run against a real database
   (run the conformance tests before an event); referee names are typed, not
   verified; team status is public to anyone who knows a number.
