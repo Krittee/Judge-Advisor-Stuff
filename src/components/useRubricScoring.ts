@@ -9,13 +9,10 @@ import type { ScoreRow } from "@/lib/types";
  * What a finished save should do to the sheet.
  *
  * A judge can tap several criteria before the first answer is back, and the
- * answers can arrive in any order. Each one is the server's merged row as of
- * that request, so only the newest request's answer describes the whole
- * burst: applying an older one would knock the later taps back out and leave
- * the total showing a score nobody entered. Failures are not rolled back to
- * the `score` prop for the same reason -- it is as stale as the old answer.
- * Instead, once the last request of a burst has settled, a burst that failed
- * anywhere asks the server what is actually stored.
+ * answers can arrive in any order. An older request may save last, so even
+ * the newest response can miss a criterion. Once overlapping saves settle,
+ * read the combined row back from the server. Failures also need a readback;
+ * the `score` prop can be stale.
  */
 export function settleSave(s: {
   /** This request's number, from a counter bumped on every tap. */
@@ -27,9 +24,11 @@ export function settleSave(s: {
   drained: boolean;
   /** An earlier request in this burst failed. */
   burstFailed: boolean;
+  /** At least two saves in this burst were in flight together. */
+  burstOverlapped: boolean;
 }) {
   const failed = s.burstFailed || !s.ok;
-  const refetch = s.drained && failed;
+  const refetch = s.drained && (failed || s.burstOverlapped);
   return {
     apply: s.ok && s.mine === s.newest,
     refetch,
@@ -64,6 +63,7 @@ export function useRubricScoring({
   const pendingNow = useRef(pending);
   const issued = useRef(0); // numbers saves so settleSave can tell the newest
   const burstFailed = useRef(false);
+  const burstOverlapped = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [armed, setArmed] = useState(false);
 
@@ -119,6 +119,7 @@ export function useRubricScoring({
     else optimistic[criterionId] = value;
     setValues(optimistic);
 
+    if (pendingNow.current.size > 0) burstOverlapped.current = true;
     const mine = ++issued.current;
     track(criterionId, true);
     setError(null);
@@ -140,10 +141,14 @@ export function useRubricScoring({
       ok: saved !== null,
       drained: pendingNow.current.size === 0,
       burstFailed: burstFailed.current,
+      burstOverlapped: burstOverlapped.current,
     });
     burstFailed.current = next.burstFailed;
     if (next.apply && saved) onSaved(saved);
-    if (next.refetch) await reload();
+    if (next.refetch) {
+      burstOverlapped.current = false;
+      await reload();
+    }
   }
 
   /** Start this rubric over, leaving the other one alone. */

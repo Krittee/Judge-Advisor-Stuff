@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { createHmac } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { store } from "./db";
 
@@ -13,7 +14,15 @@ export type Session =
   | { role: "referee"; name: string; head?: true };
 
 const COOKIE = "jq_session";
-const MAX_AGE = 60 * 60 * 16; // one long event day
+const MAX_AGE = 60 * 60 * 16; // upper bound; judges also stop at the next Bangkok day
+
+// shortcut: the event is in Bangkok; add an event timezone setting if this app runs elsewhere.
+const judgeDayFormat = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit",
+});
+const judgeDay = () => judgeDayFormat.format(new Date());
+const panelAuth = (id: string, code: string) =>
+  createHmac("sha256", secret()).update(id).update("\0").update(code.trim().toUpperCase()).digest("hex");
 
 /**
  * Whether this looks like a real deployment rather than a laptop running
@@ -80,8 +89,12 @@ function secret(): Uint8Array {
   return new TextEncoder().encode(value);
 }
 
-export async function createSession(session: Session): Promise<void> {
-  const token = await new SignJWT({ ...session })
+export async function createSession(session: Session, code?: string): Promise<void> {
+  if (session.role === "judge" && !code) throw new Error("A judge session needs the panel code.");
+  const claims = session.role === "judge"
+    ? { panelAuth: panelAuth(session.panelId, code!), judgeDay: judgeDay() }
+    : {};
+  const token = await new SignJWT({ ...session, ...claims })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
@@ -116,11 +129,14 @@ export async function getSession(): Promise<Session | null> {
       return payload.head === true ? { role, name, head: true } : { role, name };
     }
     if (role === "judge" && typeof payload.panelId === "string") {
+      if (typeof payload.panelAuth !== "string" || payload.judgeDay !== judgeDay()) return null;
+      const panel = await store().findPanelById(payload.panelId);
+      if (!panel || !sameCode(payload.panelAuth, panelAuth(panel.id, panel.code))) return null;
       return {
         role: "judge",
         name: String(payload.name ?? "Judge"),
         panelId: payload.panelId,
-        panelName: String(payload.panelName ?? "Panel"),
+        panelName: panel.name,
       };
     }
     return null;
@@ -392,14 +408,12 @@ export function clientKeyFor(request: Request): string {
  * do, but hiding is not the control.
  *
  *                    create   advance     cancel        notes       admin
- *   team (no login)   own       no       any early (!)   no          no
- *   queuer            any       no       any early       no          no
- *   judge             own      own panel own panel      own panel    no
- *   admin             any       any       any            any         yes
+ *   team (no login)   no        no         no             no          no
+ *   queuer            any       no         any early      no          no
+ *   judge             no        own panel  no             own panel   no
+ *   admin             any       any        any            any         yes
  *
- * (!) not tied to the team's own request -- see the risk noted on canCancel.
- *
- * "own panel" is the load-bearing part: a judge may only advance, cancel,
+ * "own panel" is the load-bearing part: a judge may only advance,
  * read or write against teams assigned to the panel whose code they
  * typed. Divisions sit above that — a panel only ever holds teams from
  * its own division.
@@ -468,33 +482,14 @@ export function mayActOnPanel(s: Session | null, panelId: string | null): boolea
  * same cancel-and-rebook with the slot never left empty, reschedule a
  * booking or move it into the queue ("ready now").
  *
- * The queue desk may do all three to ANY request that is still early
- * (requested or scheduled), whoever created it: a team that booked from
- * its own phone and then walks up to the desk is exactly who the desk is
- * there for. Once judges have acknowledged it, it is out of their hands.
- * Drop the "queuer" branch to make the role create-only.
- *
- * A team with no session at all is a separate case, not a queuer acting
- * without a login: creating a request needs no login (see POST
- * /api/requests), so cancelling the one they just created -- the "Cancel
- * this request" / "Cancel this booking" button on their own team page --
- * cannot need one either, or that button is dead on arrival for every
- * team, every time.
- *
- * KNOWN, ACCEPTED RISK (decided by the product owner for a LAN event app):
- * that anonymous branch proves nothing about WHOSE request it is. Request
- * ids are public (they are in /api/state), so anyone on the network who
- * can read an id can cancel or reschedule any early request. There is
- * deliberately no per-request token. Do not add a check on `createdBy`
- * here to "fix" this -- it would only break the team page for the people
- * it is meant to serve. See "Known limitations" in the README.
+ * The queue desk may do all three to any request that is still early
+ * (requested or scheduled), whoever created it. Once judges have
+ * acknowledged it, only the Judge Advisor can correct the booking.
  */
 export function canCancel(s: Session | null, status: string): boolean {
-  if (s?.role === "admin" || s?.role === "judge") return true;
+  if (s?.role === "admin") return true;
   const early = status === "requested" || status === "scheduled";
-  if (!s) return early;
-  if (s.role === "queuer") return early;
-  return false;
+  return s?.role === "queuer" && early;
 }
 
 
@@ -504,18 +499,4 @@ export function actorLabel(s: Session | null): string {
   if (s.role === "queuer") return `queuer:${s.name}`;
   if (s.role === "referee") return `referee:${s.name}`;
   return `admin:${s.name}`;
-}
-
-/**
- * Whether two sign-in names are the same person for the purpose of owning
- * a report.
- *
- * A referee's name is typed by hand on a phone, so "dana", "Dana " and
- * "DANA" are one person -- comparing exactly would lock a referee out of
- * their own flag over a capital letter. This is a stopgap, not identity:
- * two referees who type the same name are still the same author until
- * referees get individual codes.
- */
-export function sameAuthor(a: string, b: string): boolean {
-  return a.trim().toLowerCase() === b.trim().toLowerCase();
 }

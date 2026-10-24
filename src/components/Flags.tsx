@@ -1,17 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import type { AppState, FlagRow } from "@/lib/types";
-import { tone, toneSolid } from "@/lib/tone";
+import { tone } from "@/lib/tone";
 import { fieldLabel, matchReference } from "@/lib/match";
 import { getRuleset, parseRuleList, ruleDisplayLabel } from "@/lib/rules";
-import {
-  MATCH_AFFECTING_KINDS,
-  MAX_FIELD_COUNT,
-  type FlagReport,
-} from "@/lib/flagValidation";
-import { MatchFields, type MatchDraft } from "@/components/MatchFields";
-import { AllRulesPicker } from "@/components/AllRulesPicker";
 
 export type FlagKind = AppState["flagKinds"][number];
 
@@ -137,115 +129,21 @@ export function FlagSummary({
 }
 
 /** The full record, in the referee's own words. */
-export function FlagList({
-  flags,
-  kinds,
-  fieldCount = MAX_FIELD_COUNT,
-  onRemove,
-  onEdit,
-}: {
-  flags: FlagRow[];
-  kinds: FlagKind[];
-  /** How many fields the event has, for the correction form's field choices. */
-  fieldCount?: number;
-  /** Only the Judge Advisor passes this. */
-  onRemove?: (id: string) => void;
-  /**
-   * A referee re-selecting the wrong severity, or fixing a mis-typed
-   * match number, is not the same act as making the flag disappear — so
-   * this is offered wherever raising a flag is, not only where removing
-   * one is.
-   */
-  onEdit?: (id: string, edit: FlagReport) => Promise<void>;
-}) {
+export function FlagList({ flags, kinds, onEdit }: { flags: FlagRow[]; kinds: FlagKind[]; onEdit?: (flag: FlagRow) => void }) {
   if (!flags.length) {
     return <p className="text-sm text-ink-faint">Nothing flagged by a referee.</p>;
   }
   return (
     <ul className="space-y-2">
-      {flags.map((f) => (
-        <FlagListItem
-          key={f.id}
-          flag={f}
-          kinds={kinds}
-          fieldCount={fieldCount}
-          onRemove={onRemove}
-          onEdit={onEdit}
-        />
-      ))}
+      {flags.map((flag) => <FlagListItem key={flag.id} flag={flag} kinds={kinds} onEdit={onEdit} />)}
     </ul>
   );
 }
 
-/** What a correction starts from: the match the flag was recorded against. */
-function matchOf(f: FlagRow): MatchDraft {
-  return { matchType: f.match_type ?? "", matchNumber: f.match_number ?? "", field: f.field ?? "" };
-}
-
-function FlagListItem({
-  flag: f,
-  kinds,
-  fieldCount,
-  onRemove,
-  onEdit,
-}: {
-  flag: FlagRow;
-  kinds: FlagKind[];
-  fieldCount: number;
-  onRemove?: (id: string) => void;
-  onEdit?: (id: string, edit: FlagReport) => Promise<void>;
-}) {
+function FlagListItem({ flag: f, kinds, onEdit }: { flag: FlagRow; kinds: FlagKind[]; onEdit?: (flag: FlagRow) => void }) {
   const ruleIds = parseRuleList(f.rule);
-  // A flag keeps the ruleset it was recorded under: a correction cannot move it.
   const ruleset = getRuleset(f.ruleset);
   const field = fieldLabel(f.field);
-  const [editing, setEditing] = useState(false);
-  const [draftBody, setDraftBody] = useState(f.body);
-  const [draftMatch, setDraftMatch] = useState(matchOf(f));
-  const [draftRules, setDraftRules] = useState<string[]>(parseRuleList(f.rule));
-  const [draftMatchAffecting, setDraftMatchAffecting] = useState(f.match_affecting);
-  const [rulesOpen, setRulesOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  function startEditing() {
-    setDraftBody(f.body);
-    setDraftMatch(matchOf(f));
-    setDraftRules(parseRuleList(f.rule));
-    setDraftMatchAffecting(f.match_affecting);
-    setError(null);
-    setEditing(true);
-  }
-
-  // Tapping a severity button submits the whole correction, the same way
-  // it does when a flag is first raised — a referee re-selecting "Minor"
-  // instead of "Major" is doing exactly the gesture they did the first
-  // time, not filling in a separate form. The match, field and rules are
-  // picked the same way too, so a correction can only produce a value the
-  // raise form could have produced. What the flag already holds (an "HS2"
-  // field) is sent back as it is.
-  async function save(kind: string) {
-    if (!onEdit) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await onEdit(f.id, {
-        kind,
-        body: draftBody,
-        matchType: draftMatch.matchType,
-        matchNumber: draftMatch.matchNumber,
-        field: draftMatch.field,
-        ruleset: ruleset.id,
-        rules: draftRules,
-        matchAffecting: draftMatchAffecting,
-      });
-      setEditing(false);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <li className="rounded-xl bg-surface p-3 ring-1 ring-inset ring-line">
@@ -257,8 +155,6 @@ function FlagListItem({
             minute: "2-digit",
           })}
         </span>
-        {/* The match reference: what makes this traceable back to a
-            moment on the field, not just a comment. */}
         {matchReference(f.match_type, f.match_number) ? (
           <span
             title="Match · Field"
@@ -276,32 +172,18 @@ function FlagListItem({
             Match affecting
           </span>
         ) : null}
-        <span className="ml-auto flex items-center">
-          {onEdit ? (
-            <button
-              type="button"
-              onClick={() => (editing ? setEditing(false) : startEditing())}
-              className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-xs text-ink-faint hover:text-accent"
-            >
-              {editing ? "cancel" : "edit"}
-            </button>
-          ) : null}
-          {onRemove ? (
-            <button
-              type="button"
-              onClick={() => onRemove(f.id)}
-              className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-xs text-ink-faint hover:text-danger-quiet"
-            >
-              remove
-            </button>
-          ) : null}
-        </span>
+        {onEdit ? (
+          <button
+            type="button"
+            className="ml-auto min-h-11 px-2 text-xs text-accent-quiet"
+            aria-label={`Edit ${matchReference(f.match_type, f.match_number) ?? "flag"} by ${f.author}`}
+            onClick={() => onEdit(f)}
+          >
+            Edit
+          </button>
+        ) : null}
       </div>
 
-      {/* Which rules this was against, when there are any -- never shown for
-          Good Conduct, an optional-rule Warning, or a flag recorded before
-          this existed (f.rule is null in each, so nothing renders). Under
-          the header row rather than in it: V5RC titles are whole sentences. */}
       {ruleIds.length ? (
         <div title="Rules violated" className="mt-1.5 space-y-1">
           <p className="text-[11px] text-ink-faint">
@@ -318,106 +200,7 @@ function FlagListItem({
         </div>
       ) : null}
 
-      {editing ? (
-        <div className="mt-2 space-y-3 rounded-lg bg-sunken/60 p-3 ring-1 ring-inset ring-line">
-          {error ? <p className="text-xs text-danger-quiet">{error}</p> : null}
-          {/* One native switch for the whole group while a save is in flight. */}
-          <fieldset disabled={busy} className="min-w-0 space-y-3">
-            <MatchFields
-              rulesetId={ruleset.id}
-              fieldCount={fieldCount}
-              value={draftMatch}
-              onChange={setDraftMatch}
-              idPrefix={`edit-${f.id}`}
-              legacy={{ matchType: f.match_type, field: f.field }}
-            />
-          </fieldset>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink">Note</span>
-            <textarea
-              value={draftBody}
-              onChange={(e) => setDraftBody(e.target.value)}
-              rows={2}
-              maxLength={500}
-              disabled={busy}
-              className="w-full rounded-lg bg-surface px-3 py-2 text-sm ring-1 ring-inset ring-line disabled:opacity-50"
-            />
-          </label>
-          <div>
-            <span className="mb-1.5 block text-sm font-medium text-ink">Rules violated</span>
-            {draftRules.length ? (
-              <ul className="mb-2 flex flex-wrap gap-1.5">
-                {draftRules.map((id) => (
-                  <li key={id}>
-                    <button
-                      type="button"
-                      onClick={() => setDraftRules(draftRules.filter((r) => r !== id))}
-                      disabled={busy}
-                      aria-label={`Remove ${id}`}
-                      title={ruleDisplayLabel(id, ruleset.id) ?? id}
-                      className="inline-flex min-h-11 items-center rounded-full bg-accent/12 px-4 text-sm font-semibold text-accent-quiet ring-1 ring-inset ring-accent/40 hover:bg-accent/20 disabled:opacity-50"
-                    >
-                      {`${id} ×`}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => setRulesOpen(true)}
-              disabled={busy}
-              aria-haspopup="dialog"
-              className="flex h-12 w-full items-center gap-2 rounded-xl border-[1.5px] border-ink-faint bg-sunken px-3.5 text-left text-[15px] font-medium text-ink hover:bg-surface-2 disabled:opacity-50"
-            >
-              <span className="min-w-0 flex-1 truncate">
-                All rules <span className="text-sm font-normal text-ink-subtle">{`· ${ruleset.rules.length} in ${ruleset.label}`}</span>
-              </span>
-              {draftRules.length ? (
-                <span className="shrink-0 rounded-full bg-accent/25 px-2.5 py-0.5 text-xs">{`${draftRules.length} selected`}</span>
-              ) : null}
-            </button>
-            <AllRulesPicker
-              open={rulesOpen}
-              rulesetId={ruleset.id}
-              value={draftRules}
-              onChange={setDraftRules}
-              onClose={() => setRulesOpen(false)}
-            />
-          </div>
-          {draftRules.length || MATCH_AFFECTING_KINDS.includes(f.kind) ? (
-            <MatchAffectingCheck
-              checked={draftMatchAffecting}
-              onChange={setDraftMatchAffecting}
-              disabled={busy}
-            />
-          ) : null}
-          <div className="flex flex-wrap gap-2">
-            {kinds.map((k) => {
-              // Minor and Major need a rule, except a legacy flag that has
-              // none may be corrected in its own kind -- the same allowance
-              // the server makes.
-              const legacyKeep = k.id === f.kind && !ruleIds.length;
-              return (
-                <button
-                  key={k.id}
-                  type="button"
-                  disabled={busy || (k.requiresRule && !draftRules.length && !legacyKeep)}
-                  onClick={() => save(k.id)}
-                  className={`min-h-11 rounded-lg px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                    k.id === f.kind ? "ring-2 ring-ink/60" : ""
-                  } ${toneSolid(k.color)}`}
-                  title={k.id === f.kind ? "Currently set to this" : undefined}
-                >
-                  {k.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : f.body ? (
-        <p className="mt-1.5 text-sm text-ink">{f.body}</p>
-      ) : null}
+      {f.body ? <p className="mt-1.5 text-sm text-ink">{f.body}</p> : null}
     </li>
   );
 }

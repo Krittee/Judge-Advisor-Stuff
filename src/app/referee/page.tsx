@@ -6,6 +6,7 @@ import { call, useAppState } from "@/components/useAppState";
 import { Banner } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { FlagList, FlagSummary, flagsOnDay, kindOf } from "@/components/Flags";
+import { CorrectSheet } from "@/components/admin/RefereeTab";
 import { AllRulesPicker } from "@/components/AllRulesPicker";
 import { ProgramTag, SetupGate } from "@/components/referee/HeadReferee";
 import { MatchSheet } from "@/components/referee/MatchSheet";
@@ -86,6 +87,7 @@ function Referee() {
   const [matchAffecting, setMatchAffecting] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [editingFlag, setEditingFlag] = useState<FlagRow | null>(null);
 
   const [editingSetup, setEditingSetup] = useState(false);
   const [setupBusy, setSetupBusy] = useState(false);
@@ -104,6 +106,7 @@ function Referee() {
   // Only the head referee (or the Judge Advisor) sets it up; the rest wait for
   // it and see it read-only.
   const mayEditSetup = canSetUp(session);
+  const mayCorrectFlags = session?.role === "admin" || (session?.role === "referee" && session.head === true);
 
   /* Arriving from the all-teams list, which passes the team it picked.
      Only seeds the box: typing over it afterwards is the point of the
@@ -202,7 +205,7 @@ function Referee() {
   });
 
   async function correctFlag(id: string, edit: FlagReport) {
-    await call(`/api/flags`, { method: "PATCH", body: { id, ...edit } });
+    await call("/api/flags", { method: "PATCH", body: { id, ...edit } });
     await refresh();
   }
 
@@ -473,8 +476,7 @@ function Referee() {
             <FlagList
               flags={flagsFor(team.id)}
               kinds={state.flagKinds}
-              fieldCount={fieldCount}
-              onEdit={correctFlag}
+              onEdit={mayCorrectFlags ? setEditingFlag : undefined}
             />
           </section>
         ) : null}
@@ -501,7 +503,7 @@ function Referee() {
                     <FlagSummary flags={flags} kinds={state.flagKinds} />
                   </div>
                   <div className="mt-3">
-                    <FlagList flags={flags} kinds={state.flagKinds} fieldCount={fieldCount} />
+                    <FlagList flags={flags} kinds={state.flagKinds} onEdit={mayCorrectFlags ? setEditingFlag : undefined} />
                   </div>
                 </li>
               ))}
@@ -533,6 +535,15 @@ function Referee() {
         </button>
       </div>
 
+      <CorrectSheet
+        flag={editingFlag}
+        team={editingFlag ? state.teams.find((t) => t.id === editingFlag.team_id) ?? null : null}
+        kinds={kinds}
+        fieldCount={fieldCount}
+        correctorName={session?.name}
+        onSave={correctFlag}
+        onClose={() => setEditingFlag(null)}
+      />
       <MatchSheet
         open={sheetOpen}
         rulesetId={rulesetId}

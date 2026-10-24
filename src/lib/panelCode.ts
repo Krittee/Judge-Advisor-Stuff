@@ -14,8 +14,6 @@ export function normalizePanelCode(input: unknown): string {
 }
 
 export function randomPanelCode(length = 6): string {
-  return Array.from(
-    { length },
-    () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)],
-  ).join("");
+  const values = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(values, (value) => ALPHABET[value % ALPHABET.length]).join("");
 }

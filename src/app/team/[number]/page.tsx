@@ -1,130 +1,81 @@
 "use client";
 
+import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { liveRequestFor } from "@/lib/data";
-import { call, useAppState } from "@/components/useAppState";
+import { useAppState } from "@/components/useAppState";
 import { normalizeTeamNumber } from "@/lib/teamNumber";
-import { useConfirm } from "@/components/ConfirmDialog";
-import { CenteredNote, TeamNotFound, TeamView } from "@/components/team/TeamView";
-import { cancelAfterAsking, earlierToday } from "@/components/team/teamLogic";
+import { CenteredNote, TeamNotFound } from "@/components/team/TeamView";
+import { stepTime, toneOf, trackSteps } from "@/components/team/teamLogic";
+import { formatClock } from "@/components/ui";
+import { STATUS_META } from "@/lib/status";
 
-/**
- * A team's own page: where it stands, and what it can ask for.
- *
- * What is drawn is in components/team/TeamView.tsx ("Status board",
- * design/team-redesign/). This page keeps the polling and every write.
- */
+/** Public team status. Requests and bookings are entered at the queue desk. */
 export default function TeamPage({ params }: { params: Promise<{ number: string }> }) {
   const { number } = use(params);
-  // The URL may carry any casing; the roster stores one canonical form.
   const teamNumber = normalizeTeamNumber(decodeURIComponent(number));
-  const { state, loaded, online, refresh } = useAppState(4000);
-  const { ask, dialog } = useConfirm();
-
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
-  // "4 min ago" moves without any new state arriving, so it has its own tick.
+  const { state, loaded, online } = useAppState(4000);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 15_000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(timer);
   }, []);
 
-  const team = state.teams.find((t) => t.number === teamNumber);
-  const panel = state.panels.find((p) => p.id === team?.panel_id);
-  const current = team ? liveRequestFor(team.id, state.requests) : null;
-  // A booking is not the same as being in the queue: a team holding a
-  // later slot can still say they are ready now.
-  const booking = current?.status === "scheduled" ? current : null;
-
-  /** `bookingId`: turn that held booking into the request in place, rather than creating a second one. */
-  async function act(body: Record<string, unknown>, bookingId?: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      await (bookingId
-        ? call(`/api/requests/${bookingId}`, { method: "PATCH", body: { action: "ready-now", ...body } })
-        : call("/api/requests", { body }));
-      setMessage("");
-      await refresh();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /**
-   * Ready early: a held slot becomes the queue request, so it does not sit
-   * there unused. One call, not cancel-then-create -- if that second step
-   * failed the team was left with neither the slot nor a place in line.
-   */
-  function readyNow(language: string) {
-    return act({ teamNumber: team!.number, kind: "queue", language, message }, booking?.id);
-  }
-
-  /** Cancel asks first: it is the one thing here a team cannot take back. */
-  async function cancel() {
-    if (!current) return;
-    await cancelAfterAsking(ask, current, async () => {
-      setBusy(true);
-      setError(null);
-      try {
-        await call(`/api/requests/${current.id}`, { method: "PATCH", body: { action: "cancel" } });
-        await refresh();
-      } catch (e) {
-        setError((e as Error).message);
-      } finally {
-        setBusy(false);
-      }
-    });
-  }
-
   if (!loaded) {
-    // Nothing has come back yet, so there is no roster to look the team up
-    // in. If the first fetch failed, say so: "not on the list" would send a
-    // team off to hunt for a Judge Advisor over a bad wifi signal. The poll
-    // keeps going, so this clears by itself once the server answers.
-    return (
-      <CenteredNote>
-        {online ? "Loading…" : "Can't reach the server — retrying…"}
-      </CenteredNote>
-    );
+    return <CenteredNote>{online ? "Loading…" : "Can't reach the server — retrying…"}</CenteredNote>;
   }
 
+  const team = state.teams.find((t) => t.number === teamNumber);
   if (!team) return <TeamNotFound number={teamNumber} />;
 
+  const panel = state.panels.find((p) => p.id === team.panel_id);
+  const requests = state.requests.filter((r) => r.team_id === team.id);
+  const current = liveRequestFor(team.id, requests) ??
+    [...requests].sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ?? null;
+
   return (
-    <>
-      <TeamView
-        team={team}
-        panel={panel}
-        current={current}
-        history={earlierToday(state.requests, team.id, current?.id)}
-        languages={state.languages}
-        requests={state.requests}
-        teams={state.teams}
-        online={online}
-        now={now}
-        busy={busy}
-        error={error}
-        onDismissError={() => setError(null)}
-        message={message}
-        onMessage={setMessage}
-        onReady={readyNow}
-        onBook={(slot, language) =>
-          act({
-            teamNumber: team.number,
-            kind: "slot",
-            language,
-            slotStart: slot.start,
-            slotEnd: slot.end,
-          })
-        }
-        onCancel={cancel}
-      />
-      {dialog}
-    </>
+    <div className="teampage">
+      <header className="lp-top">
+        <div className="lp-brand"><span className="lp-brand-n">Judge Queue</span></div>
+      </header>
+      <main className="tp-stage">
+        <div className="tp-grid">
+          {!online ? <p className="tp-offline" role="status">Can&apos;t reach the server — retrying…</p> : null}
+          <div className="tp-left">
+            <section className={`tp-pan ${current ? `tp-s-${toneOf(current.status)}` : "tp-pan--idle"}`} aria-labelledby="tp-st">
+              <div className="tp-pan-top"><p className="tp-pan-team">Team {team.number} · {team.name}</p></div>
+              {current ? <p className="tp-pan-lab">{STATUS_META[current.status].label}</p> : null}
+              <h1 className="tp-pan-sent" id="tp-st">
+                {current ? STATUS_META[current.status].teamLabel : "No request yet"}
+              </h1>
+              {current?.slot_start ? <p className="tp-pan-time"><span>Booked slot</span><b>{formatClock(current.slot_start)}</b></p> : null}
+              <p className="tp-pan-foot">
+                {panel ? <b>{panel.name} · {panel.division}</b> : "No judge panel assigned yet."}
+              </p>
+            </section>
+            <section className="tp-track" aria-labelledby="tp-trk">
+              <h2 className="tp-sr" id="tp-trk">Where you are in the queue</h2>
+              <ol>
+                {trackSteps(current).map((step) => (
+                  <li key={step.key} className={`tp-st tp-st--${step.state} tp-s-${toneOf(step.status)}`}
+                    aria-current={step.state === "current" ? "step" : undefined}>
+                    <span className="tp-mk" aria-hidden="true">{step.state === "done" ? "✓" : null}</span>
+                    <span className="tp-st-l">{step.label}</span>
+                    {step.at ? <span className="tp-st-m">{stepTime(step.at, now)}</span> : null}
+                  </li>
+                ))}
+              </ol>
+              {current ? null : <p className="tp-trk-cap">Not in the queue yet</p>}
+            </section>
+          </div>
+          <div className="tp-right">
+            <section className="tp-acts" aria-label="How to request a judge">
+              <p>Please ask the queue desk to request a judge or book a time for your team.</p>
+            </section>
+            <Link href="/board" className="tp-more">See the full board →</Link>
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }

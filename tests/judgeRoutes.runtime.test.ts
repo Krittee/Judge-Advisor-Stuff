@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { createHmac } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SignJWT } from "jose";
@@ -43,7 +44,16 @@ async function inRequestScope<T>(session: Session | null, fn: () => Promise<T>):
 
   const headers = new Headers();
   if (session) {
-    const token = await new SignJWT({ ...session })
+    const panel = session.role === "judge"
+      ? await (await import("../src/lib/db/file")).fileStore.findPanelById(session.panelId)
+      : null;
+    if (session.role === "judge") assert.ok(panel);
+    const judgeClaims = panel ? {
+        panelAuth: createHmac("sha256", process.env.SESSION_SECRET!)
+          .update(panel.id).update("\0").update(panel.code.toUpperCase()).digest("hex"),
+        judgeDay: new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
+      } : {};
+    const token = await new SignJWT({ ...session, ...judgeClaims })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
       .setExpirationTime("1h")

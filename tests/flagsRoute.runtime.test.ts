@@ -23,6 +23,7 @@ delete process.env.DATABASE_URL;
 (globalThis as Record<string, unknown>).AsyncLocalStorage = AsyncLocalStorage;
 
 const REFEREE: Session = { role: "referee", name: "Dana" };
+const HEAD_REFEREE: Session = { role: "referee", name: "Morgan", head: true };
 const ADMIN: Session = { role: "admin", name: "Judge Advisor" };
 
 async function inRequestScope<T>(session: Session, fn: () => Promise<T>): Promise<T> {
@@ -78,6 +79,28 @@ const base = {
 };
 /** SG6 exists in both rulesets, so a Minor with it records under either. */
 const sg6 = { rules: ["SG6"] };
+
+test("only the head referee and Judge Advisor can correct a filed flag", async () => {
+  const t = await team();
+  const created = await send("POST", REFEREE, { ...base, ...sg6, teamId: t.id });
+  assert.equal(created.status, 200, created.body.error);
+  const original = created.body.flag!;
+
+  const denied = await send("PATCH", REFEREE, { id: original.id, ...base, ...sg6, body: "changed" });
+  assert.equal(denied.status, 403);
+  assert.equal(denied.body.flag, undefined);
+  assert.equal((await (await store()).listFlags(t.id))[0].body, original.body);
+
+  const headed = await send("PATCH", HEAD_REFEREE, { id: original.id, ...base, ...sg6, body: "head correction" });
+  assert.equal(headed.status, 200, headed.body.error);
+  assert.equal(headed.body.flag?.body, "head correction");
+  const [entry] = (await (await store()).listActivity()).filter((a) => a.action === "corrected a flag");
+  assert.equal(entry.actor_role, "Head referee");
+
+  const advised = await send("PATCH", ADMIN, { id: original.id, ...base, ...sg6, body: "advisor correction" });
+  assert.equal(advised.status, 200, advised.body.error);
+  assert.equal(advised.body.flag?.body, "advisor correction");
+});
 
 /** Save the event's setup straight into the store, as PUT /api/referee-setup would. */
 async function setUp(ruleset: string, fieldCount = 3) {
@@ -170,7 +193,7 @@ test("a correction changes rules, ruleset and match affecting, and the Activity 
   });
   const id = created.body.flag!.id;
 
-  const { status, body } = await send("PATCH", REFEREE, {
+  const { status, body } = await send("PATCH", ADMIN, {
     id,
     ...base,
     ruleset: "v5rc",
@@ -202,7 +225,7 @@ test("a correction changes rules, ruleset and match affecting, and the Activity 
 test("a correction that names no ruleset keeps the flag's own", async () => {
   const t = await team();
   const created = await send("POST", REFEREE, { ...base, teamId: t.id, ruleset: "v5rc", rules: ["GG17"] });
-  const { status, body } = await send("PATCH", REFEREE, { id: created.body.flag!.id, ...base, rules: ["GG17"] });
+  const { status, body } = await send("PATCH", ADMIN, { id: created.body.flag!.id, ...base, rules: ["GG17"] });
   assert.equal(status, 200, body.error);
   assert.equal(body.flag?.ruleset, "v5rc", "an older client must not move a V5RC flag to IQ");
   assert.equal(body.flag?.manual_version, "2.1");
@@ -224,7 +247,7 @@ test("correcting a legacy flag (no ruleset) does not log a phantom ruleset chang
     manualVersion: null,
     matchAffecting: false,
   });
-  const { status, body } = await send("PATCH", REFEREE, { id: legacy.id, ...base, body: "reworded", rule: "SG6" });
+  const { status, body } = await send("PATCH", ADMIN, { id: legacy.id, ...base, body: "reworded", rule: "SG6" });
   assert.equal(status, 200, body.error);
   const log = (await db.listActivity()).find((a) => a.action === "corrected a flag");
   assert.ok(log);
@@ -287,7 +310,7 @@ test("an alliance in the request is accepted and nothing alliance-like is stored
   assert.equal(q?.detail, "Team 1852B · Q1 · Field 2");
 
   // A correction that sends one changes nothing, and the log says so.
-  const fix = await send("PATCH", REFEREE, { id: stored[0].id, ...base, ...sg6, matchType: stored[0].match_type, matchNumber: "1", alliance: "blue" });
+  const fix = await send("PATCH", ADMIN, { id: stored[0].id, ...base, ...sg6, matchType: stored[0].match_type, matchNumber: "1", alliance: "blue" });
   assert.equal(fix.status, 200, fix.body.error);
   assert.equal("alliance" in fix.body.flag!, false);
   const [entry] = (await db.listActivity()).filter((a) => a.action === "corrected a flag");
@@ -315,7 +338,7 @@ test("\"QF 2-1\" round-trips: stored as 2-1, read back, and logged as QF 2-1", a
   assert.equal(log?.detail, "Team 1852B · QF 2-1 · Field 2");
 
   // A correction can move it to another match in the bracket, and says so.
-  const moved = await send("PATCH", REFEREE, { id: stored.id, ...base, matchType: "QF", matchNumber: "2-2", rules: ["GG17"] });
+  const moved = await send("PATCH", ADMIN, { id: stored.id, ...base, matchType: "QF", matchNumber: "2-2", rules: ["GG17"] });
   assert.equal(moved.status, 200, moved.body.error);
   assert.equal(moved.body.flag?.match_number, "2-2");
   const [latest] = (await (await store()).listActivity()).filter((a) => a.action === "corrected a flag");
@@ -350,7 +373,7 @@ test("a field above the event's field count is a 400; the count is the ceiling, 
   assert.equal(last.body.flag?.field, "3");
 
   // A correction is held to it as well.
-  const fix = await send("PATCH", REFEREE, { id: last.body.flag!.id, ...base, ...sg6, field: "4" });
+  const fix = await send("PATCH", ADMIN, { id: last.body.flag!.id, ...base, ...sg6, field: "4" });
   assert.equal(fix.status, 400);
 });
 
@@ -396,7 +419,7 @@ test("legacy flags (SK, an HS2 field) survive a correction that changes none of 
   const quals = await db.createFlag({ ...old, matchType: "Q", matchNumber: "23", field: "ES2" });
 
   for (const flag of [skills, quals]) {
-    const { status, body } = await send("PATCH", REFEREE, { ...unchanged(flag), body: "reworded" });
+    const { status, body } = await send("PATCH", ADMIN, { ...unchanged(flag), body: "reworded" });
     assert.equal(status, 200, body.error);
     assert.equal(body.flag?.body, "reworded");
     assert.equal(body.flag?.match_type, flag.match_type, "the legacy type is kept");
@@ -430,7 +453,7 @@ test("a legacy flag can be given a real field, and the log says what changed", a
     });
   const quals = await legacyQuals();
 
-  const { status, body } = await send("PATCH", REFEREE, { ...unchanged(quals), field: "2" });
+  const { status, body } = await send("PATCH", ADMIN, { ...unchanged(quals), field: "2" });
   assert.equal(status, 200, body.error);
   assert.equal(body.flag?.field, "2");
   const [entry] = (await db.listActivity()).filter((a) => a.action === "corrected a flag");
@@ -438,5 +461,5 @@ test("a legacy flag can be given a real field, and the log says what changed", a
 
   // Only the value it already holds is exempt: another prefixed field is not a pick.
   const other = await legacyQuals();
-  assert.equal((await send("PATCH", REFEREE, { ...unchanged(other), field: "ES3" })).status, 400);
+  assert.equal((await send("PATCH", ADMIN, { ...unchanged(other), field: "ES3" })).status, 400);
 });

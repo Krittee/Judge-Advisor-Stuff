@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
@@ -89,7 +88,7 @@ const rangers = team("4410C", "Robo Rangers", { pit: "9", category: "ungraded" }
 const quantum = team("9090Q", "Quantum", { pit: "17" });
 const sparky = team("5150Z", "Sparky", { pit: "5" });
 
-const handlers: QueueActions = { onAdvance: noop, onCancel: noop, onSummon: noop, onOpen: noop };
+const handlers: QueueActions = { onAdvance: noop, onOpen: noop };
 
 function queue(cards: QueueCard[], over: { busy?: string | null; flags?: FlagRow[]; completed?: string[] } = {}) {
   return renderToStaticMarkup(
@@ -130,7 +129,7 @@ test("the hero is the longest-waiting team, with On our way as its primary actio
   // The button wears the colour of the status it moves the team to.
   assert.match(h, /<button type="button" class="jg-go jg-s-acknowledged">On our way<\/button>/);
   assert.match(h, />Notes &amp; scores</);
-  assert.match(h, />Cancel request</);
+  assert.doesNotMatch(h, />Cancel request</);
   // The hero is not repeated in the list below it.
   assert.doesNotMatch(markup.replace(h, ""), /9882K/);
   assert.doesNotMatch(markup, /jg-alert/, "a waiting hero needs no alert about waiting teams");
@@ -140,7 +139,6 @@ test("the primary action is Saving… and disabled while its write is in the air
   const t = card(titans, request(titans, "requested"));
   const h = hero(queue([t], { busy: "r-9882K" }));
   assert.match(h, /<button type="button" class="jg-go jg-s-acknowledged" disabled="">Saving…<\/button>/);
-  assert.match(h, /<button[^>]*class="jg-quiet"[^>]*disabled=""/, "Cancel request waits too");
   assert.doesNotMatch(hero(queue([t])), /Saving…|disabled/);
 });
 
@@ -157,7 +155,7 @@ test("the primary action's fill is the colour of the status it moves the team to
   assert.match(talking, /<b>7 min<\/b>/, "how long they have been in");
   assert.match(talking, /class="jg-opensheet"[\s\S]*Open team sheet[\s\S]*Score the interview/);
   assert.doesNotMatch(talking, /Notes &amp; scores/, "the larger Open team sheet button replaces it");
-  assert.match(talking, />Cancel request</, "an interview can still be called off, behind the confirm");
+  assert.doesNotMatch(talking, />Cancel request</);
 });
 
 test("with nobody live the hero is the next booked slot", () => {
@@ -260,9 +258,8 @@ test("the list runs Waiting, With us, Booked, Not in queue, Done, and omits what
   assert.match(markup, /<details class="jg-done"><summary><i class="jg-dot jg-s-completed" aria-hidden="true"><\/i>Done · 1<span class="jg-dp">5150Z<\/span>/);
   // With us: the one on the way is offered Start interview.
   assert.match(markup, /<b>9882K<\/b>[\s\S]*?jg-go jg-sm jg-s-interviewing">Start interview</);
-  // Not in queue: a 44px ghost button, and Saving… becomes Adding… while it is in the air.
-  assert.match(markup, /<button type="button" class="jg-ghost"><svg[\s\S]*?<\/svg>Add to queue<\/button>/);
-  assert.match(queue([card(quantum, null)], { busy: quantum.id }), /class="jg-ghost" disabled="">Adding…</);
+  // A judge sees teams not in the queue, while the desk enters their requests.
+  assert.doesNotMatch(markup, /Add to queue/);
 
   const none = queue([card(gremlins, request(gremlins, "interviewing", { started_at: ago(7) }))]);
   assert.doesNotMatch(none, /jg-sec|jg-done/, "empty sections are left out");
@@ -284,7 +281,7 @@ test("a booked row has its time chip, and says in N min only inside ten minutes"
   assert.match(rows[1], /Ungraded · Pit 9/);
 });
 
-test("every row with a live or booked request has a Cancel outside its tap target; the others have none", () => {
+test("judge rows provide status actions and no booking changes", () => {
   const markup = queue(
     [
       card(gremlins, request(gremlins, "interviewing", { started_at: ago(7) })), // hero
@@ -298,73 +295,8 @@ test("every row with a live or booked request has a Cancel outside its tap targe
   );
   const rows = markup.match(/<div class="jg-qrow[^"]*">[\s\S]*?<\/div>(?=<\/li>)/g) ?? [];
   assert.equal(rows.length, 5);
-  const cancelled = rows.filter((r) => r.includes('class="jg-cx"')).map((r) => r.match(/<b>(\w+)<\/b>/)?.[1]);
-  assert.deepEqual(cancelled, ["7700B", "9882K", "4410C"], "Waiting, With us and Booked; not Not in queue or Done");
-  const row = rows.find((r) => r.includes("7700B"))!;
-  assert.match(row, /<button type="button" class="jg-cx" aria-label="Cancel 7700B&#x27;s request">/);
-  // Beside the tap target that opens the sheet, never inside it, and after the primary action.
-  assert.ok(row.indexOf("</button>") < row.indexOf("jg-cx"), "after the row's own button closes");
-  assert.ok(row.indexOf("jg-go") < row.indexOf("jg-cx"));
-  assert.match(queue([card(byteMe, request(byteMe, "requested")), card(titans, request(titans, "requested", { requested_at: ago(9) }))], { busy: "r-7700B" }), /class="jg-cx" aria-label="[^"]*" disabled=""/);
-  // 44px, and the primary action keeps its size: it is the name that gives way.
-  const css = read("src/app/globals.css");
-  assert.match(css, /\.jg-cx \{[^}]*width: 44px; height: 44px;/);
-  assert.match(css, /\.jg-go\.jg-sm \{ width: auto; flex: none; height: 44px;/);
-});
-
-/** Walks a function-component tree (QueueTab and its rows hold no hooks) to the button with this label. */
-function findByLabel(node: ReactNode, label: string): ReactElement<{ onClick?: () => void }> | null {
-  if (Array.isArray(node)) {
-    for (const n of node) {
-      const found = findByLabel(n, label);
-      if (found) return found;
-    }
-    return null;
-  }
-  if (!isValidElement(node)) return null;
-  const el = node as ReactElement<{ "aria-label"?: string; children?: ReactNode; onClick?: () => void }>;
-  if (typeof el.type === "function") return findByLabel((el.type as (p: unknown) => ReactNode)(el.props), label);
-  return el.props["aria-label"] === label ? el : findByLabel(el.props.children, label);
-}
-
-test("a list row's Cancel asks first, sends nothing until confirmed, and never opens the sheet", async () => {
-  const sent: string[] = [];
-  const opened: string[] = [];
-  const shown: (Pending | null)[] = [];
-  const { ask, settle } = createConfirmer((p) => shown.push(p));
-  const waiting = request(byteMe, "requested");
-  const tree = (
-    <QueueTab
-      cards={[card(titans, request(titans, "requested", { requested_at: ago(9) })), card(byteMe, waiting)]}
-      completed={new Set()}
-      categories={categories}
-      languages={languages}
-      flags={[]}
-      flagKinds={flagKinds}
-      now={NOW}
-      busy={null}
-      {...handlers}
-      onCancel={(t, r) => void cancelAfterAsking(ask, t, r, async () => void sent.push(r.id))}
-      onOpen={(t) => opened.push(t.number)}
-    />
-  );
-  const cancel = findByLabel(tree, "Cancel 7700B's request");
-  assert.ok(cancel, "the row has a Cancel");
-
-  cancel.props.onClick!();
-  assert.equal(shown.length, 1, "a confirm dialog opened");
-  assert.match(shown[0]!.question, /Cancel 7700B's request\?/);
-  assert.equal(shown[0]!.danger, true);
-  assert.deepEqual(sent, [], "nothing sent while the question is open");
-  settle(false);
-  await Promise.resolve();
-  assert.deepEqual(sent, [], "declined: still nothing");
-
-  cancel.props.onClick!();
-  settle(true);
-  await new Promise((r) => setTimeout(r, 0));
-  assert.deepEqual(sent, ["r-7700B"], "confirmed: sent once");
-  assert.deepEqual(opened, [], "Cancel is not the row's open button");
+  assert.doesNotMatch(markup, /jg-cx|Add to queue|Cancel request/);
+  assert.match(rows.find((r) => r.includes("7700B"))!, /jg-go jg-sm jg-s-acknowledged/);
 });
 
 test("a panel with no teams gets the notice, restyled", () => {
@@ -701,15 +633,13 @@ function read(path: string) {
   return readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 }
 
-test("the page cancels only through the confirm, and advances through the guarded advance()", () => {
+test("the page only advances interview status", () => {
   assert.ok(page.includes('import { useConfirm } from "@/components/ConfirmDialog"'));
   assert.ok(page.includes("const { ask, dialog } = useConfirm();"));
-  assert.ok(page.includes('cancelAfterAsking(ask, team, request, () => advance(request, "cancel"))'));
-  assert.equal(page.match(/advance\(request, "cancel"\)/g)?.length, 1, "no cancel that skips the question");
+  assert.doesNotMatch(page, /advance\(request, "cancel"\)|function summon/);
   assert.ok(page.includes("{dialog}"), "the confirm is rendered");
   const queue = read("src/components/judge/QueueTab.tsx");
-  assert.match(queue, /onClick=\{\(\) => onCancel\(team, request\)\}/);
-  assert.ok(!queue.includes('"cancel"'), "the tab never sends a cancel itself");
+  assert.doesNotMatch(queue, /onCancel|onSummon|Add to queue/);
 });
 
 test("the clear-scores confirm is worded by its helper", () => {
@@ -718,13 +648,12 @@ test("the clear-scores confirm is worded by its helper", () => {
   assert.ok(!src.includes("Clear all ${answered}"));
 });
 
-test("the writes keep their guards: a synchronous writing ref, from: request.status, Saving… and Adding…", () => {
+test("status writes keep their guards and current status", () => {
   assert.ok(page.includes("const writing = useRef(new Set<string>());"));
   assert.match(page, /if \(writing\.current\.has\(request\.id\)\) return;\s*writing\.current\.add\(request\.id\);/);
   assert.match(page, /body: \{ action, from: request\.status, \.\.\.extra \}/);
-  assert.match(page, /if \(writing\.current\.has\(team\.id\)\) return;\s*writing\.current\.add\(team\.id\);/);
   const queue = read("src/components/judge/QueueTab.tsx");
-  assert.ok(queue.includes('"Saving…"') && queue.includes('"Adding…"'));
+  assert.ok(queue.includes('"Saving…"'));
 });
 
 test("the page keeps its session gate, polling and error banner, and no longer uses the old drawer or window.confirm", () => {

@@ -265,29 +265,6 @@ test("the activity log entry carries the match reference, so Activity can trace 
 
 /* ---- correcting a flag already on record ------------------------------ */
 
-/* A referee tapping "Major" when they meant "Minor" is a slip of the
-   finger, not a request to erase the incident. Unlike removal, a
-   correction leaves the flag on the board -- just described more
-   accurately -- so it stands on different footing than deletion and gets
-   a wider set of hands. */
-
-test("both a referee and the Judge Advisor may correct a flag", () => {
-  const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
-  const fn = src.slice(src.indexOf("export async function PATCH"));
-  const guard = fn.slice(0, fn.indexOf("\n}"));
-  assert.ok(
-    /!canFlag\(session\)\s*&&\s*!canAdminister\(session\)/.test(guard),
-    "PATCH no longer accepts both a referee and the Judge Advisor",
-  );
-});
-
-test("a judge cannot correct a flag -- canFlag and canAdminister are both false for one", () => {
-  const canFlag = (role) => role === "referee";
-  const canAdminister = (role) => role === "admin";
-  const role = "judge";
-  assert.ok(!(canFlag(role) || canAdminister(role)), "a judge must not pass the PATCH guard");
-});
-
 test("PATCH validates with the same rules as POST, not a looser copy", () => {
   const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
   // Both handlers must route through the one shared validator, or a
@@ -320,7 +297,7 @@ test("removal stays the Judge Advisor's alone -- correction is not a route aroun
   const del = src.slice(src.indexOf("export async function DELETE"));
   assert.ok(
     /!canAdminister\(session\)/.test(del) && !/canFlag\(session\)/.test(del),
-    "DELETE must remain admin-only even though PATCH is not",
+    "DELETE must remain admin-only",
   );
 });
 
@@ -483,23 +460,6 @@ test("a correction can change the rule, not only keep the one already on record"
   assert.equal(edit.ok && edit.rule, "SG7");
 });
 
-test("the correction form offers the match fields and rule picker and sends everything it shows", () => {
-  const flags = readFileSync(new URL("../src/components/Flags.tsx", import.meta.url), "utf8");
-  const form = flags.slice(flags.indexOf("function FlagListItem"));
-  // The match, field and rules are the shared controls, not selects of its own.
-  assert.ok(form.includes("<MatchFields"), "the correction form lost the match fields");
-  assert.ok(form.includes("rulesetId={ruleset.id}") && form.includes("fieldCount={fieldCount}"), "MatchFields is not given the flag's ruleset and the event's field count");
-  assert.ok(form.includes("legacy={{ matchType: f.match_type, field: f.field }}"), "an old match type or field can no longer be kept through a correction");
-  assert.ok(form.includes("<AllRulesPicker"), "the correction form lost the all-rules picker");
-  assert.ok(!/<select|<RulePicker|<RulesetPicker|<FieldPicker/.test(form), "the correction form is back to its own selects or a removed picker");
-  assert.ok(form.includes("matchType: draftMatch.matchType"), "the correction form no longer sends its match type");
-  assert.ok(form.includes("matchNumber: draftMatch.matchNumber"), "the correction form no longer sends its match number");
-  assert.ok(form.includes("field: draftMatch.field"), "the correction form no longer sends its field");
-  assert.ok(form.includes("rules: draftRules"), "the correction form no longer sends the rules it shows");
-  assert.ok(form.includes("ruleset: ruleset.id"), "the correction form no longer sends the flag's ruleset");
-  assert.ok(form.includes("matchAffecting: draftMatchAffecting"), "the correction form lost match affecting");
-});
-
 test("the alliance concept is gone from the shared match and flag components", () => {
   for (const file of ["Flags.tsx", "MatchFields.tsx"]) {
     const src = readFileSync(new URL(`../src/components/${file}`, import.meta.url), "utf8");
@@ -507,10 +467,4 @@ test("the alliance concept is gone from the shared match and flag components", (
   }
   const match = readFileSync(new URL("../src/components/MatchFields.tsx", import.meta.url), "utf8");
   assert.ok(!/export\s+function\s+AllianceToggle/.test(match), "AllianceToggle is exported again");
-  const flags = readFileSync(new URL("../src/components/Flags.tsx", import.meta.url), "utf8");
-  const form = flags.slice(flags.indexOf("function FlagListItem"));
-  // The correction's PATCH body is what onEdit receives: no alliance key in it.
-  const body = form.slice(form.indexOf("await onEdit("), form.indexOf("setEditing(false)"));
-  assert.ok(!/alliance/i.test(body), "the correction body sends an alliance");
-  for (const key of ["matchType:", "matchNumber:", "field:"]) assert.ok(body.includes(key), `the correction body lost ${key}`);
 });

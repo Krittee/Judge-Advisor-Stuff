@@ -13,7 +13,7 @@ import { QueueTab } from "@/components/judge/QueueTab";
 import { ScoresTab } from "@/components/judge/ScoresTab";
 import { TeamSheet } from "@/components/judge/TeamSheet";
 import { TodayTab } from "@/components/judge/TodayTab";
-import { cancelAfterAsking, type JudgeTab } from "@/components/judge/logic";
+import { type JudgeTab } from "@/components/judge/logic";
 import type { Session } from "@/lib/auth";
 import type { RequestRow, Team } from "@/lib/types";
 
@@ -57,6 +57,12 @@ export default function JudgePage() {
       })
       .catch(() => router.replace("/judge/login"));
   }, [router]);
+
+  useEffect(() => {
+    if (loaded && session?.role === "judge" && state.viewer.role !== "judge") {
+      router.replace("/judge/login");
+    }
+  }, [loaded, session, state.viewer.role, router]);
 
   const panelId = session?.role === "judge" ? session.panelId : null;
   const panel = state.panels.find((p) => p.id === panelId);
@@ -129,22 +135,6 @@ export default function JudgePage() {
     }
   }
 
-  async function summon(team: Team) {
-    if (writing.current.has(team.id)) return;
-    writing.current.add(team.id);
-    setBusy(team.id);
-    setError(null);
-    try {
-      await call("/api/requests", { body: { teamNumber: team.number, kind: "queue" } });
-      await refresh();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      writing.current.delete(team.id);
-      setBusy(null);
-    }
-  }
-
   if (!session) {
     return <p className="p-10 text-center text-ink-faint">Loading…</p>;
   }
@@ -195,10 +185,6 @@ export default function JudgePage() {
           now={now}
           busy={busy}
           onAdvance={(request) => advance(request)}
-          onCancel={(team, request) =>
-            cancelAfterAsking(ask, team, request, () => advance(request, "cancel"))
-          }
-          onSummon={summon}
           onOpen={open}
         />
       ) : null}

@@ -149,7 +149,7 @@ export function RefereeTab({
         team={editedTeam}
         kinds={kinds}
         fieldCount={state.refereeSetup?.field_count ?? MAX_FIELD_COUNT}
-        adminName={adminName}
+        correctorName={adminName}
         onSave={save}
         onClose={() => setEditing(null)}
       />
@@ -455,7 +455,7 @@ export function CorrectSheet({
   team,
   kinds,
   fieldCount,
-  adminName,
+  correctorName,
   onSave,
   onClose,
 }: {
@@ -465,7 +465,7 @@ export function CorrectSheet({
   /** Least to most serious. */
   kinds: FlagKind[];
   fieldCount: number;
-  adminName?: string | null;
+  correctorName?: string | null;
   onSave: (id: string, patch: FlagReport) => Promise<void>;
   onClose: () => void;
 }) {
@@ -503,7 +503,7 @@ export function CorrectSheet({
           team={team}
           kinds={kinds}
           fieldCount={fieldCount}
-          adminName={adminName}
+          correctorName={correctorName}
           onSave={onSave}
           onClose={onClose}
         />
@@ -518,7 +518,7 @@ function CorrectBody({
   team,
   kinds,
   fieldCount,
-  adminName,
+  correctorName,
   onSave,
   onClose,
 }: {
@@ -527,7 +527,7 @@ function CorrectBody({
   team: Team | null;
   kinds: FlagKind[];
   fieldCount: number;
-  adminName?: string | null;
+  correctorName?: string | null;
   onSave: (id: string, patch: FlagReport) => Promise<void>;
   onClose: () => void;
 }) {
@@ -661,7 +661,7 @@ function CorrectBody({
           <button type="submit" className="ja-prim" disabled={busy || Boolean(blocker)} aria-describedby={blocker ? `${uid}-need` : undefined}>
             {busy ? "Saving…" : "Save correction"}
           </button>
-          <p className="ja-rf-log">Logged as a correction by {adminName ?? "the Judge Advisor"}</p>
+          <p className="ja-rf-log">Logged as a correction by {correctorName ?? "the Judge Advisor"}</p>
         </div>
       </form>
 

@@ -64,6 +64,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         { status: 403 },
       );
     }
+  } else if (action === "reopen" && session?.role !== "admin") {
+    return NextResponse.json({ error: "Only the Judge Advisor can reopen a request." }, { status: 403 });
   } else if (!canAdvance(session)) {
     return NextResponse.json(
       { error: "Only judges and the Judge Advisor can update interview status." },
@@ -81,13 +83,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ error: CONFLICT_MESSAGE }, { status: 403 });
   }
 
-  // The queuer works across every panel, so this wall does not apply to
-  // them -- and neither does it apply to a team with no session at all:
-  // by the time execution reaches here the only action such a caller can
-  // have gotten past the permission gate above with is "cancel" (see
-  // canCancel), on the one request their own page is showing them. A
-  // "panel" is not a concept a team is scoped to in the first place.
-  if (session && session.role !== "queuer" && !mayActOnPanel(session, current.panel_id)) {
+  // The queuer works across every panel; judges stay on their own panel.
+  if (session?.role !== "queuer" && !mayActOnPanel(session, current.panel_id)) {
     return NextResponse.json(
       { error: "That request belongs to another judge panel." },
       { status: 403 },
@@ -118,9 +115,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const actor = actorLabel(session);
   const patch: Partial<RequestRow> = {};
   let logLine: string = action;
-  // The team follows its request to the new panel -- but only after the
-  // request itself has moved (see where this is used below).
-  let moveTeam: { id: string; panelId: string } | null = null;
+  let targetPanelId: string | null = null;
 
   if (action === "reassign") {
     const panelId = String(body.panelId ?? "");
@@ -158,22 +153,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       );
     }
 
-    // The team's own panel_id is what every other view -- the judge
-    // console's team list, /api/state's division scoping, auto-assign's
-    // load counts -- actually reads to decide who owns this team.
-    // Moving only the request would leave the two disagreeing: the
-    // request says one panel, the team still says another, and the
-    // judge this was reassigned to may not even see it. Reassigning a
-    // request IS reassigning the team; keep them as one operation.
-    //
-    // The team is moved AFTER the request, not here: updating the request
-    // can still be refused (the 20-minute booking gap on the new panel),
-    // and a team already moved by then is stranded on the new panel with
-    // its request still on the old one. Everything that can be checked
-    // up front has been, above; the one write that can still fail goes first.
-    if (team) moveTeam = { id: team.id, panelId };
-
-    patch.panel_id = panelId;
+    targetPanelId = panelId;
     logLine = `reassigned to ${target.name}`;
   } else if (action === "cancel") {
     patch.status = "cancelled";
@@ -317,13 +297,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   try {
-    // current.status is the status every decision above was made from;
-    // handing it to the store makes the write conditional on it still
-    // being true, so a second screen acting at the same moment gets a 409
-    // instead of silently overwriting (or double-advancing) the first.
-    const updated = await store().updateRequest(id, patch, current.status);
-
-    if (moveTeam) await store().updateTeam(moveTeam.id, { panel_id: moveTeam.panelId });
+    // Every decision above used this status; reassignment also checks the
+    // panel, since two moves can leave the status unchanged.
+    const updated = targetPanelId
+      ? await store().reassignRequest(id, current.panel_id, targetPanelId, current.status)
+      : await store().updateRequest(id, patch, current.status);
 
     await store().logActivity({
       requestId: id,

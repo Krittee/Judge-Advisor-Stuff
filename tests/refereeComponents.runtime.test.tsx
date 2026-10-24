@@ -478,7 +478,7 @@ test("there is no alliance: no toggle, no helper, no caption, no token, no PATCH
   }
 });
 
-/* ---- the correction form ------------------------------------------------------ */
+/* ---- the read-only referee flag list ----------------------------------------- */
 
 const kinds: FlagKind[] = [
   { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
@@ -504,13 +504,13 @@ function flag(values: Partial<FlagRow> = {}): FlagRow {
   };
 }
 
-test("the list's edit and remove buttons and the correction's actions are 44px targets", () => {
-  const markup = renderToStaticMarkup(
-    <FlagList flags={[flag()]} kinds={kinds} onEdit={async () => {}} onRemove={() => {}} />,
-  );
-  assert.match(markup, /<button[^>]*min-h-11[^>]*>edit<\/button>/);
-  assert.match(markup, /<button[^>]*min-h-11[^>]*>remove<\/button>/);
-  const flags = source("../src/components/Flags.tsx");
-  assert.match(flags, /min-h-11 rounded-lg px-3 text-sm font-semibold/, "severity buttons in a correction");
-  assert.ok(flags.includes("<fieldset disabled={busy}"), "the whole match group is locked while a save is in flight");
+test("the referee flag list shows the report without correction controls", () => {
+  const markup = renderToStaticMarkup(<FlagList flags={[flag()]} kinds={kinds} />);
+  assert.match(markup, /Head Referee/);
+  assert.doesNotMatch(markup, /<button|<textarea|<select/);
+});
+
+test("the head referee can open a correction from the flag list", () => {
+  const markup = renderToStaticMarkup(<FlagList flags={[flag()]} kinds={kinds} onEdit={() => {}} />);
+  assert.match(markup, /<button[^>]*>Edit<\/button>/);
 });

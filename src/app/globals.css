@@ -1559,6 +1559,9 @@ body:has(.teampage) > .theme-toggle:hover {
   --rf-field: oklch(0.180 0.013 265);
   --rf-field-line: oklch(0.520 0.014 265);
   --rf-ring: oklch(0.680 0.140 258 / 0.35);
+  --jg-field: var(--rf-field);
+  --jg-field-line: var(--rf-field-line);
+  --jg-ring: var(--rf-ring);
   --rf-ref: oklch(0.860 0.110 55);
   --rf-ref-tint: oklch(0.760 0.150 55 / 0.15);
   --rf-disabled: oklch(0.280 0.014 265);

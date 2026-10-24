@@ -165,6 +165,7 @@ export type Store = {
   listActivity(limit?: number): Promise<ActivityRow[]>;
 
   findPanelByCode(code: string): Promise<Panel | null>;
+  findPanelById(id: string): Promise<Panel | null>;
   findTeamByNumber(number: string): Promise<Team | null>;
   findRequest(id: string): Promise<RequestRow | null>;
 
@@ -179,6 +180,13 @@ export type Store = {
     id: string,
     patch: Partial<RequestRow>,
     ifStatus?: RequestRow["status"],
+  ): Promise<RequestRow>;
+  /** Move a request and its team together, only from the panel and status the caller read. */
+  reassignRequest(
+    id: string,
+    fromPanelId: string | null,
+    toPanelId: string,
+    ifStatus: RequestRow["status"],
   ): Promise<RequestRow>;
 
   upsertTeams(rows: ImportedTeam[]): Promise<number>;

@@ -1,8 +1,8 @@
 # Judge Queue
 
-A judging queue and interview tracker for a robotics-style event. Teams request
-a judge from their phone; judges work the queue; a colour-coded board shows the
-whole floor at a glance.
+A judging queue and interview tracker for a robotics-style event. Teams ask the
+queue desk for an interview and follow its status on their phones; judges work
+the queue; a colour-coded board shows the whole floor at a glance.
 
 ## Two ways to run it
 
@@ -45,9 +45,9 @@ cp .env.example .env.local     # then edit the codes
 |---|---|---|
 | `ADMIN_CODE` | `JA2026` | First Judge Advisor. Full control. |
 | `ADMIN_CODE_2`–`ADMIN_CODE_4` | unset | Optional codes for up to three more Judge Advisors. |
-| `QUEUER_CODE` | `DESK01` | Queue desk. Can only add teams to the queue. |
+| `QUEUER_CODE` | `DESK01` | Queue desk. Can request or book for teams and change early bookings. |
 | `REFEREE_CODE` | `REF001` | Referees. Can only flag what they saw on the field. Referees must enter their name to sign in; flags are recorded under it. |
-| `HEAD_REFEREE_CODE` | `HREF01` | The head referee: a referee who can also set the program and number of fields for the event. Keep it different from `REFEREE_CODE`. |
+| `HEAD_REFEREE_CODE` | `HREF01` | The head referee: a referee who can also set the event program and fields and correct filed flags. Keep it different from `REFEREE_CODE`. |
 | `SESSION_SECRET` | insecure key | Signs the login cookie. `openssl rand -base64 32` |
 | `TRUST_PROXY` | unset | Set to `1` only if a reverse proxy **you control** sits in front of the app and sets `X-Forwarded-For` itself. See below. |
 | `DATABASE_URL` | unset | Set it to use Postgres; unset uses the JSON file. |
@@ -75,7 +75,10 @@ it unset.
 
 Judge panel codes are **not** environment variables. Each panel gets its own,
 generated in the admin console under **Panels** — so you can add a panel
-mid-event without restarting anything.
+mid-event without restarting anything. Removing or moving a judge off a panel
+generates a new shared code for that panel and signs out everyone on it. Give
+the new code to the remaining judges. Judges also sign in again on each new
+Bangkok calendar day.
 
 ---
 
@@ -145,9 +148,9 @@ same refusal.
 
 | | request | advance status | cancel | judging notes | manage teams & panels |
 |---|:---:|:---:|:---:|:---:|:---:|
-| **Team** (no login) | own team | — | own request | — | — |
+| **Team** (no login) | — | — | — | — | — |
 | **Queue desk** (`QUEUER_CODE`) | any team | — | un-seen only | — | — |
-| **Judge** (panel code) | own panel | **own panel** | own panel | **own panel** | — |
+| **Judge** (panel code) | — | **own panel** | — | **own panel** | — |
 | **Referee** (`REFEREE_CODE`) | — | — | — | — | — |
 | **Head referee** (`HEAD_REFEREE_CODE`) | — | — | — | — | — |
 | **Judge Advisor** (`ADMIN_CODE`–`ADMIN_CODE_4`) | any | any | any | any | ✅ |
@@ -161,7 +164,7 @@ poll `/api/state` with no login, so conflicts go only to the Judge Advisor and,
 for their own panel, to judges. The desk and anonymous viewers get an empty
 list — not a filtered one.
 
-**"Own panel" is the load-bearing part.** A judge may only advance, cancel, read
+**"Own panel" is the load-bearing part.** A judge may only advance, read
 or write against teams assigned to the panel whose code they typed. Another
 panel's team returns `403` on every one of those, and a judge's `/api/state` is
 scoped to their own division — they do not receive the other division's teams at
@@ -172,16 +175,14 @@ board change without you touching it. If you would rather they could not, one
 line in `canAdvance()` in [`src/lib/auth.ts`](src/lib/auth.ts) turns it off.
 
 The queue desk can also **cancel, reschedule or mark "ready now"** any request
-that is still early (*requested* or *scheduled*), whoever made it — a team that
-booked from its phone and then walks up to the desk is who the desk is for. Once
+that is still early (*requested* or *scheduled*), whoever entered it. Once
 judges acknowledge it, it is out of their hands.
 
 ---
 
 ## Booking: now, or later
 
-Both routes are offered side by side, on the team's own page and at the queue
-desk:
+Both routes are offered at the queue desk. The team's page shows status only:
 
 - **Interview now** — joins the walk-up queue and goes straight to orange.
 - **Book a time** — claims one of the panel's slots and waits at *scheduled*
@@ -233,14 +234,13 @@ For a **walk-up**, the ask is one button per language rather than a button plus
 a menu — the language is chosen in the same tap as the request, so it cannot be
 left on whatever the last team picked:
 
-- team's own page — *"Request a judge — English"* / *"Request a judge — ไทย"*
 - queue desk — *"Request — English"* / *"Request — ไทย"*
 
-(If the team already holds a booking, those read *"We're ready now — …"* and
-*"Now — …"*, and either one frees the slot before queueing them.)
+(If the team already holds a booking, the desk can choose *"Now — …"* to free
+the slot before queueing them.)
 
-For a **booking**, the language is picked once above the slot grid — chips on
-the team page, a dropdown at the desk — then applies to the slot they claim.
+For a **booking**, the language is picked once above the desk's slot grid and
+applies to the slot they claim.
 
 The language travels with the request: a short **EN**/**TH** tag on the judge
 console and the board, and a `language` column in storage.
@@ -518,18 +518,14 @@ shows up in three places:
 - **Only a referee raises a flag.** Not a judge, not the Judge Advisor.
   A flag is a record of what an official saw; if anyone could add one it
   would stop meaning that, so the API refuses all three.
-- **A referee or the Judge Advisor can correct one** — the wrong severity
-  tapped, a mis-typed match number. Tapping "edit" on a flag reopens the
-  same form it was raised with, pre-filled, and re-selecting a kind saves
-  the whole correction the same way raising it did in the first place.
-- **Only the Judge Advisor removes one** — and a referee cannot remove
-  their own, or a flag could be quietly unsaid after a team complained.
-  Correcting is not that: the incident stays on the board, just described
-  more accurately, and every correction is logged to Activity (`corrected
-  a flag: major → minor`) so nothing about it happens quietly either.
-  Team and author cannot be changed this way — reassigning a flag to a
-  different team is a bigger mistake than this fixes, and goes through
-  the Judge Advisor deleting and refiling it.
+- **The Head Referee or Judge Advisor corrects one; only the Judge Advisor
+  removes one.** Ordinary referees discuss a correction with either of them.
+  A correction stays on the board and is logged to Activity (`corrected a flag:
+  major → minor`). Ordinary referees share an access code, so a typed name
+  cannot prove who filed a report.
+  Team and author cannot be changed by correction — reassigning a flag to a
+  different team requires the Judge Advisor to remove the wrong report and
+  a referee to file the replacement.
 - **Judges read their own panel's only**, the same wall notes and scores
   sit behind. They cannot correct or remove a flag — read-only, same as
   everything else in judging.
@@ -812,7 +808,7 @@ labels and ordering all live in one table.
 
 ## On a phone
 
-Teams request from their own phones and judges work off theirs, so every
+Teams read status from their own phones and judges work off theirs, so every
 screen is checked at phone size rather than assumed to reflow.
 
 - **Nothing scrolls sideways** on any screen, down to a 320px-wide viewport.
@@ -833,7 +829,7 @@ screen is checked at phone size rather than assumed to reflow.
   number on a phone in a loud hall.
 
 Checked on iPhone SE (375x667), iPhone 14 (390x844) and Pixel 7 (412x915),
-by driving real taps through each screen: a team requesting a judge, a judge
+by driving real taps through each screen: a desk worker requesting a judge, a judge
 advancing the status and saving a note, and the Judge Advisor reaching every
 tab.
 
@@ -844,7 +840,7 @@ tab.
 | URL | Who | What |
 |---|---|---|
 | `/` | teams | Enter team number |
-| `/team/1234` | teams | Status, request a judge, book a slot |
+| `/team/1234` | teams | Read request and booking status |
 | `/board` | everyone | Big-screen board. Has a fullscreen button. |
 | `/login` | staff | One code box for all three staff roles |
 | `/judge` | judges | Your panel's queue, oldest orange first |
@@ -888,11 +884,11 @@ rather than demo data, so a real event never finds itself with invented teams.
 
 ## Known limitations
 
-- **Anyone on the network can cancel or reschedule an early request.** A team
-  needs no login to cancel its own request, and request ids are public (they are
-  in `/api/state`), so anyone who can reach the app can cancel or move any
-  *requested* or *scheduled* request. Accepted for a LAN event; there are
-  deliberately no per-request tokens.
+The recent audit fixes, agreed role permissions, verification, and remaining decisions are tracked in [Audit status and change log](AUDIT_STATUS.md).
+
+- **Team status is public.** Anyone who knows a team number can view its queue
+  and booking status. Request creation and booking changes require a queue desk
+  or Judge Advisor session.
 
 ---
 
@@ -915,7 +911,9 @@ Four runtime dependencies: `next`, `react`, `react-dom`, `jose`.
   to another panel from the dropdown.
 - **Someone queued the wrong team.** Queue desk can undo it while it is orange;
   after that, admin cancels it from the Floor tab.
-- **A judge lost their code.** Admin → Panels shows every code.
+- **A judge lost their code.** Admin → Panels shows every current code. If a
+  judge was removed or moved, share the new code with everyone remaining on
+  their old panel.
 - **You need to know what happened.** Admin → Activity logs every status change
   with who did it.
 - **The server restarted.** Nothing is lost — it reloads from the file.

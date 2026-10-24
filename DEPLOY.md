@@ -141,7 +141,8 @@ All in the browser, at `your-address.vercel.app/admin`:
 
 1. **Panels tab** — click **Add preset panels**, then fill in each group's
    judge names. Each panel has a **code** and a **division**; write the codes
-   down and hand each one to that group.
+   down and hand each one to that group. Removing or moving a judge off a
+   panel rotates that panel's code; give its remaining judges the new code.
 2. **Import tab** — paste your team list, one per line:
    ```
    1234, Iron Hawks, Pit 12

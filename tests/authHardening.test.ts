@@ -8,7 +8,7 @@ import { join } from "node:path";
 import type { Session } from "../src/lib/auth";
 
 /* Phase 2 security fixes (BUG-004, 013, 020, 026): the session secret
-   placeholder, the login throttle, referee report ownership, what the
+   placeholder, the login throttle, referee sign-in names, what the
    state payload tells whom, and the doctor script.
 
    Where a function can be imported it is -- these call the real code, not
@@ -292,23 +292,6 @@ test("a named referee gets past the name check; other roles never needed one", a
       assert.equal(res, "reached createSession", `${code} wrongly demanded a name`);
     }
   });
-});
-
-test("report authors compare case-insensitively and trimmed", async () => {
-  const { sameAuthor } = await importAuth();
-  assert.equal(sameAuthor("Dana", "Dana"), true);
-  assert.equal(sameAuthor("Dana", "dana"), true);
-  assert.equal(sameAuthor("  DANA ", "dana"), true);
-  assert.equal(sameAuthor("Dana", "Dane"), false);
-  assert.equal(sameAuthor("Dana", "Dana Smith"), false);
-  assert.equal(sameAuthor("Dana", ""), false);
-});
-
-test("PATCH /api/flags checks authorship with sameAuthor, not an exact string compare", () => {
-  const src = read("src/app/api/flags/route.ts");
-  const patch = src.slice(src.indexOf("export async function PATCH"), src.indexOf("export async function DELETE"));
-  assert.match(patch, /!canAdminister\(session\)\s*&&\s*!sameAuthor\(existing\.author,\s*session!\.name\)/);
-  assert.ok(!/existing\.author\s*!==/.test(patch), "the exact-match author compare is back");
 });
 
 test("a flag edit logs before -> after for every field it changed", () => {

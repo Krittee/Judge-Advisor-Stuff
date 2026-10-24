@@ -18,6 +18,13 @@ const severitySrc = read("src/components/referee/SeverityButtons.tsx");
 const logicSrc = read("src/components/referee/logic.ts");
 const css = read("src/app/globals.css");
 
+test("only a head referee sees flag edit controls on the referee page", () => {
+  assert.match(pageSrc, /const mayCorrectFlags = session\?\.role === "admin" \|\| \(session\?\.role === "referee" && session\.head === true\)/);
+  assert.equal(pageSrc.match(/onEdit=\{mayCorrectFlags \? setEditingFlag : undefined\}/g)?.length, 2);
+  assert.ok(pageSrc.includes("<CorrectSheet"));
+  assert.ok(pageSrc.includes("onSave={correctFlag}"));
+});
+
 /** The text of one CSS rule or block, from its selector to the closing brace. */
 function rule(selector) {
   const start = css.indexOf(selector);

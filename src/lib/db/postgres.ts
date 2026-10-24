@@ -545,7 +545,19 @@ async function panelById(id: string): Promise<Panel | null> {
  * leaves the roster; their conflicts stay with them. Run it inside the
  * caller's transaction.
  */
-async function syncPanelJudges(run: Run, panelId: string, names: string[]): Promise<void> {
+async function rotatePanelCode(run: Run, panelId: string): Promise<void> {
+  const panel = one(await run<{ code: string }>("select code from panels where id = $1 for update", [panelId]));
+  if (!panel) return; // a deleted panel already invalidates its sessions
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const code = randomPanelCode(8);
+    if (code.toUpperCase() === panel.code.toUpperCase()) continue;
+    await run("update panels set code = $2 where id = $1", [panelId, code]);
+    return;
+  }
+  throw new Error("Could not generate a new panel code.");
+}
+
+async function syncPanelJudges(run: Run, panelId: string, names: string[], keepCodeFor?: string): Promise<void> {
   const seen = new Set<string>();
   const wanted: string[] = [];
   for (const raw of names) {
@@ -554,6 +566,20 @@ async function syncPanelJudges(run: Run, panelId: string, names: string[]): Prom
     seen.add(judgeKey(name));
     wanted.push(name);
   }
+
+  const before = await run<{ name: string; panel_id: string | null }>(
+    `select name, panel_id from judges
+      where panel_id = $1::uuid
+         or lower(name) in (select lower(n) from unnest($2::text[]) as t(n))
+      for update`,
+    [panelId, wanted],
+  );
+  const wantedKeys = new Set(wanted.map(judgeKey));
+  const left = new Set(
+    before
+      .filter((j) => j.panel_id && (j.panel_id === panelId ? !wantedKeys.has(judgeKey(j.name)) : wantedKeys.has(judgeKey(j.name))))
+      .map((j) => j.panel_id!),
+  );
 
   await run(
     `update judges set panel_id = $1::uuid
@@ -573,6 +599,7 @@ async function syncPanelJudges(run: Run, panelId: string, names: string[]): Prom
         and lower(name) not in (select lower(n) from unnest($2::text[]) as t(n))`,
     [panelId, wanted],
   );
+  for (const id of left) if (id !== keepCodeFor) await rotatePanelCode(run, id);
 }
 
 /** Postgres hands back Date objects; the app speaks ISO strings. */
@@ -647,6 +674,10 @@ export const postgresStore: Store = {
     return one(
       await query<Panel>(`${PANEL_SELECT} where upper(p.code) = upper($1)`, [code.trim()]),
     );
+  },
+
+  async findPanelById(id) {
+    return panelById(id);
   },
 
   async seedPresetPanels() {
@@ -791,6 +822,45 @@ export const postgresStore: Store = {
     } catch (e) {
       if (e instanceof StoreError) throw e;
       translate(e, "queue");
+    }
+  },
+
+  async reassignRequest(id, fromPanelId, toPanelId, ifStatus) {
+    try {
+      return await withClient(async (run) => {
+        const current = one(await run<RequestRow>("select * from requests where id = $1 for update", [id]));
+        if (!current) throw new StoreError("That request no longer exists.", 404);
+        if (current.status !== ifStatus || current.panel_id !== fromPanelId) {
+          throw new StoreError(STALE_STATUS_MESSAGE, 409);
+        }
+
+        if (current.kind === "slot" && current.status !== "cancelled" && current.slot_start) {
+          const nearby = await run<RequestRow>(
+            `select * from requests where panel_id = $1 and kind = 'slot' and status <> 'cancelled' and id <> $2`,
+            [toPanelId, id],
+          );
+          if (hasNearbyBooking(nearby, toPanelId, new Date(current.slot_start).getTime())) {
+            throw new StoreError("Someone already has a booking within 20 minutes of that time on this panel.", 409);
+          }
+        }
+
+        const updated = one(await run<RequestRow>(
+          "update requests set panel_id = $2, updated_at = now() where id = $1 returning *",
+          [id, toPanelId],
+        ));
+        if (!updated) throw new StoreError("That request no longer exists.", 404);
+        const team = one(await run<Team>(
+          "update teams set panel_id = $2 where id = $1 returning *",
+          [current.team_id, toPanelId],
+        ));
+        if (!team) throw new StoreError("That team no longer exists.", 404);
+        return updated;
+      });
+    } catch (e) {
+      if ((e as { constraint?: string }).constraint === "requests_unique_slot") {
+        throw new StoreError("Someone just took that slot. Pick another one.", 409);
+      }
+      throw e;
     }
   },
 
@@ -981,55 +1051,43 @@ export const postgresStore: Store = {
       return (await panelById(id))!;
     }
 
-    // The division this panel had before any change, so the "moved to a
-    // new division" side effect below compares against what it actually
-    // was -- once the panel's own row is updated, a live subquery for its
-    // division would just read back the NEW value and never fire.
-    const before = one(
-      await query<{ division: string }>("select division from panels where id = $1", [id]),
-    );
-    if (!before) throw new StoreError("That panel no longer exists.", 404);
-
     const assignments = columns.map((c, i) => `${c} = $${i + 2}`).join(", ");
-    let updated: { id: string } | null;
     try {
-      updated = one(
-        await query<{ id: string }>(
+      await withClient(async (run) => {
+        const before = one(await run<{ division: string; code: string }>(
+          "select division, code from panels where id = $1 for update", [id],
+        ));
+        if (!before) throw new StoreError("That panel no longer exists.", 404);
+
+        let release: string[] = [];
+        if (patch.division && patch.division !== before.division) {
+          const moved = patch.division;
+          const held = await run<{ id: string; division: string }>(
+            "select id, division from teams where panel_id = $1 for update", [id],
+          );
+          release = held.filter((t) => !divisionsCompatible(t.division, moved)).map((t) => t.id);
+          if (release.length && (await run(
+            `select 1 from requests where team_id = any($1::uuid[])
+             and status in ('requested', 'acknowledged', 'interviewing', 'scheduled') limit 1`,
+            [release],
+          )).length) {
+            throw new StoreError("Reassign or cancel this panel's active requests before changing its division.", 409);
+          }
+        }
+
+        const updated = one(await run<{ id: string }>(
           `update panels set ${assignments} where id = $1 returning id`,
           [id, ...columns.map((c) => (fields as Record<string, unknown>)[c])],
-        ),
-      );
+        ));
+        if (!updated) throw new StoreError("That panel no longer exists.", 404);
+        if (release.length) await run("update teams set panel_id = null where id = any($1::uuid[])", [release]);
+        if (judges) await syncPanelJudges(run, id, judges,
+          patch.code && patch.code.toUpperCase() !== before.code?.toUpperCase() ? id : undefined);
+      });
     } catch (e) {
       if (e instanceof StoreError) throw e;
       translate(e, "panel");
     }
-    if (!updated) throw new StoreError("That panel no longer exists.", 404);
-
-    // Moving a panel across the wall cannot drag its teams with it — those
-    // teams belong to the division they compete in, so they are released
-    // for another panel in that division to pick up. Done only now, after
-    // the panel's own update has actually committed: a rejected update —
-    // a duplicate code, say — must never unassign a single team on its
-    // way to being refused.
-    if (patch.division && patch.division !== before.division) {
-      // A team the panel may still judge after the move stays with it --
-      // a blended team belongs on either side of the wall. Filtered here
-      // with the same predicate the rest of the app uses rather than in
-      // SQL, so the two backends cannot answer this differently.
-      const moved = patch.division;
-      const held = await query<{ id: string; division: string }>(
-        "select id, division from teams where panel_id = $1",
-        [id],
-      );
-      const release = held
-        .filter((t) => !divisionsCompatible(t.division, moved))
-        .map((t) => t.id);
-      if (release.length) {
-        await query("update teams set panel_id = null where id = any($1::uuid[])", [release]);
-      }
-    }
-
-    if (judges) await withClient((run) => syncPanelJudges(run, id, judges));
     return (await panelById(id))!;
   },
 
@@ -1112,7 +1170,19 @@ export const postgresStore: Store = {
       ? `update judges set ${sets.join(", ")} where id = $1 returning id, name, note, panel_id, created_at`
       : "select id, name, note, panel_id, created_at from judges where id = $1";
     try {
-      const updated = one(await query<JudgeRow>(sql, values));
+      const save = async (run: Run) => {
+        const before = patch.panel_id === undefined ? null : one(await run<{ panel_id: string | null }>(
+          "select panel_id from judges where id = $1 for update", [id],
+        ));
+        const updated = one(await run<JudgeRow>(sql, values));
+        if (before?.panel_id && updated && updated.panel_id !== before.panel_id) {
+          await rotatePanelCode(run, before.panel_id);
+        }
+        return updated;
+      };
+      const updated = patch.panel_id === undefined
+        ? await save(query)
+        : await withClient(save);
       if (!updated) throw new StoreError("That judge is no longer on the roster.", 404);
       return updated;
     } catch (e) {
@@ -1123,8 +1193,13 @@ export const postgresStore: Store = {
 
   /** The judge's conflicts go with them (on delete cascade). */
   async removeJudge(id) {
-    const gone = await query<{ id: string }>("delete from judges where id = $1 returning id", [id]);
-    return gone.length > 0;
+    return withClient(async (run) => {
+      const gone = one(await run<{ id: string; panel_id: string | null }>(
+        "delete from judges where id = $1 returning id, panel_id", [id],
+      ));
+      if (gone?.panel_id) await rotatePanelCode(run, gone.panel_id);
+      return Boolean(gone);
+    });
   },
 
   /** Declaring the same pair twice returns the one already recorded. */

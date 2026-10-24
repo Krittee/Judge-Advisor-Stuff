@@ -490,6 +490,40 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     );
   });
 
+  for (const kind of ["queue", "slot"] as const) {
+    it(`changing a panel's division refuses to strand an active ${kind === "slot" ? "booking" : "request"}`, async (store) => {
+      const panel = await store.createPanel(panelInput({ division: ES }));
+      await store.upsertTeams([teamInput("1001", { division: ES })]);
+      const team = await store.findTeamByNumber("1001");
+      assert.ok(team);
+      await store.updateTeam(team.id, { panel_id: panel.id });
+      await store.createRequest(requestInput(team.id, panel.id, kind === "slot"
+        ? { kind, slotStart: SLOT_A, slotEnd: SLOT_B }
+        : { kind }));
+
+      await assert.rejects(
+        () => store.updatePanel(panel.id, { division: MS }),
+        (e: unknown) => e instanceof StoreError && e.status === 409,
+      );
+      assert.equal((await store.listPanels()).find((p) => p.id === panel.id)?.division, ES);
+      assert.equal((await store.findTeamByNumber("1001"))?.panel_id, panel.id);
+    });
+  }
+
+  it("a completed interview does not block a panel division change", async (store) => {
+    const panel = await store.createPanel(panelInput({ division: ES }));
+    await store.upsertTeams([teamInput("1001", { division: ES })]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+    await store.updateTeam(team.id, { panel_id: panel.id });
+    const request = await store.createRequest(requestInput(team.id, panel.id));
+    await store.updateRequest(request.id, { status: "completed" });
+
+    await store.updatePanel(panel.id, { division: MS });
+    assert.equal((await store.listPanels()).find((p) => p.id === panel.id)?.division, MS);
+    assert.equal((await store.findTeamByNumber("1001"))?.panel_id, null);
+  });
+
   /* ---- teams and identity -------------------------------------------- */
 
   it("a team number cannot be taken twice", async (store) => {
@@ -923,6 +957,41 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     assert.equal(await store.removeJudge(sam.id), false, "removing twice is harmless");
   });
 
+  it("taking a judge off a panel rotates that panel's shared code", async (store) => {
+    const a = await store.createPanel(panelInput({ judges: ["Dana Ruiz", "Sam Okafor"] }));
+    const b = await store.createPanel(panelInput({ name: "Panel B", code: "CONF02" }));
+    const [dana, sam] = await store.listJudges();
+
+    await store.updateJudge(dana.id, { note: "new note" });
+    assert.equal((await store.findPanelById(a.id))?.code, a.code, "a note does not revoke access");
+
+    await store.updateJudge(dana.id, { panel_id: b.id });
+    const afterMove = (await store.findPanelById(a.id))!.code;
+    assert.notEqual(afterMove, a.code, "leaving Panel A revokes its old shared code");
+    assert.equal((await store.findPanelById(b.id))?.code, b.code, "joining Panel B does not revoke its judges");
+
+    assert.equal(await store.removeJudge(sam.id), true);
+    const afterRemoval = (await store.findPanelById(a.id))!.code;
+    assert.notEqual(afterRemoval, afterMove, "deleting a seated judge revokes the remaining judges' old code");
+    assert.equal(await store.removeJudge(sam.id), false);
+    assert.equal((await store.findPanelById(a.id))?.code, afterRemoval, "a missing judge changes nothing");
+  });
+
+  it("a panel roster edit rotates its code only when someone leaves", async (store) => {
+    const a = await store.createPanel(panelInput({ judges: ["Dana Ruiz", "Sam Okafor"] }));
+    await store.updatePanel(a.id, { judges: ["Dana Ruiz", "Sam Okafor"] });
+    assert.equal((await store.findPanelById(a.id))?.code, a.code);
+
+    await store.updatePanel(a.id, { code: a.code, judges: ["Dana Ruiz"] });
+    const rotated = (await store.findPanelById(a.id))!.code;
+    assert.notEqual(rotated, a.code, "resubmitting the old code must not undo revocation");
+    assert.equal(await store.findPanelByCode(a.code), null);
+
+    const b = await store.createPanel(panelInput({ name: "Panel B", code: "CONF02", judges: ["Dana Ruiz"] }));
+    assert.equal(b.code, "CONF02");
+    assert.notEqual((await store.findPanelById(a.id))?.code, rotated, "moving a judge while creating a panel also revokes the old code");
+  });
+
   it("a panel's judges are the roster's: found or added by name ignoring case, and they move with the judge", async (store) => {
     const one = await store.createPanel(panelInput({ judges: ["Dana Ruiz", "Sam Okafor"] }));
     assert.deepEqual(one.judges, ["Dana Ruiz", "Sam Okafor"]);
@@ -933,7 +1002,7 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       panelInput({ name: "Panel B", code: "CONF02", judges: ["sam okafor", "Priya Nair"] }),
     );
     assert.deepEqual(two.judges, ["Sam Okafor", "Priya Nair"], "in roster order, not the order typed");
-    assert.equal((await store.findPanelByCode("conf01"))?.judges.join(), "Dana Ruiz");
+    assert.equal((await store.findPanelById(one.id))?.judges.join(), "Dana Ruiz");
     assert.equal((await store.listJudges()).length, 3, "nobody was added twice");
 
     // Saving the field again with fewer names takes the others off the panel, not off the roster.

@@ -6,7 +6,7 @@ import { formatClock, formatMinutes } from "@/components/ui";
 import { groupQueue, minutesSince, pickHero, waitingAlert, type QueueCard } from "@/lib/judgeQueue";
 import { STATUS_META } from "@/lib/status";
 import type { AppState, FlagRow, RequestRow, Team } from "@/lib/types";
-import { BandPill, ChevronDown, ChevronRight, CloseIcon, Dot, MessageIcon, PlusIcon, StatusPill } from "./parts";
+import { BandPill, ChevronDown, ChevronRight, Dot, MessageIcon, StatusPill } from "./parts";
 import {
   dueText,
   flagDetail,
@@ -20,10 +20,6 @@ import {
 export type QueueActions = {
   /** Move the request one step on (On our way / Start / Finish). */
   onAdvance: (request: RequestRow) => void;
-  /** Cancel the request. The page asks first. */
-  onCancel: (team: Team, request: RequestRow) => void;
-  /** Put a team with no request into the queue. */
-  onSummon: (team: Team) => void;
   /** Open the team sheet. */
   onOpen: (team: Team) => void;
 };
@@ -189,7 +185,6 @@ function Hero({
   now,
   busy,
   onAdvance,
-  onCancel,
   onOpen,
 }: Context & { card: QueueCard }) {
   const { team, score } = card;
@@ -297,14 +292,6 @@ function Hero({
             Notes &amp; scores
           </button>
         )}
-        <button
-          type="button"
-          className="jg-quiet"
-          disabled={working}
-          onClick={() => onCancel(team, request)}
-        >
-          Cancel request
-        </button>
       </div>
     </section>
   );
@@ -322,13 +309,10 @@ function Timer({ since, now }: { since: string; now: number }) {
 
 function Row({
   card,
-  done = false,
   categories,
   now,
   busy,
   onAdvance,
-  onCancel,
-  onSummon,
   onOpen,
 }: Context & { card: QueueCard; done?: boolean }) {
   const { team, request } = card;
@@ -338,7 +322,6 @@ function Row({
   const working = busy === (request?.id ?? team.id);
   // A booked team has no button here: it becomes the hero when its turn comes.
   const advanceable = Boolean(request && action && status !== "scheduled");
-  const addable = !request && !done;
 
   // The second line: how long they have stood there, or where they are in the day.
   let line: React.ReactNode = meta;
@@ -386,7 +369,7 @@ function Row({
         {status === "scheduled" && request?.slot_start ? (
           <span className="jg-sc jg-s-scheduled">{formatClock(request.slot_start)}</span>
         ) : null}
-        {advanceable || addable ? null : <ChevronRight />}
+        {advanceable ? null : <ChevronRight />}
       </button>
 
       {advanceable && request && action ? (
@@ -400,31 +383,6 @@ function Row({
         </button>
       ) : null}
 
-      {/* A sibling of the row's tap target, so it never opens the sheet. Quiet, and the page asks first. */}
-      {request ? (
-        <button
-          type="button"
-          className="jg-cx"
-          aria-label={`Cancel ${team.number}'s request`}
-          disabled={working}
-          onClick={() => onCancel(team, request)}
-        >
-          <CloseIcon />
-        </button>
-      ) : null}
-
-      {addable ? (
-        <button type="button" className="jg-ghost" disabled={working} onClick={() => onSummon(team)}>
-          {working ? (
-            "Adding…"
-          ) : (
-            <>
-              <PlusIcon />
-              Add to queue
-            </>
-          )}
-        </button>
-      ) : null}
     </div>
   );
 }

@@ -23,7 +23,6 @@ const ES = "Elementary School";
 
 const ADMIN: Session = { role: "admin", name: "Alex" };
 const QUEUER: Session = { role: "queuer", name: "Desk" };
-const judgeOf = (panel: Panel): Session => ({ role: "judge", name: "Amy", panelId: panel.id, panelName: panel.name });
 
 async function inRequestScope<T>(session: Session | null, fn: () => Promise<T>): Promise<T> {
   const [{ workAsyncStorage }, { workUnitAsyncStorage }, { RequestCookies }, { RequestCookiesAdapter }] =
@@ -115,24 +114,23 @@ const lines = async (db: Awaited<ReturnType<typeof store>>) => (await log(db)).m
 /* ===== kind, name, role, team number ==================================== */
 
 test("an entry carries its kind, the actor's plain name and role, and the number of the team it names", async () => {
-  const { db, p1 } = await world();
+  const { db } = await world();
 
-  const made = await hit(requestsRoute, "POST", null, "/api/requests", { teamNumber: "9882K" });
+  const made = await hit(requestsRoute, "POST", QUEUER, "/api/requests", { teamNumber: "9882K" });
   assert.equal(made.status, 200);
   const requestId = made.body.request.id as string;
   assert.equal((await patchRequest(QUEUER, requestId, { action: "cancel" })).status, 200);
-  assert.equal((await patchRequest(judgeOf(p1), requestId, { action: "reopen" })).status, 200);
+  assert.equal((await patchRequest(ADMIN, requestId, { action: "reopen" })).status, 200);
 
   const [joined, cancelled, reopened] = await log(db);
   assert.deepEqual(
     [joined.kind, joined.actor, joined.actor_role, joined.team_number, joined.request_id],
-    ["request", "team", "Team", "9882K", requestId],
+    ["request", "Desk", "Front desk", "9882K", requestId],
   );
   assert.deepEqual([cancelled.kind, cancelled.actor, cancelled.actor_role], ["request", "Desk", "Front desk"]);
   assert.deepEqual(
     [reopened.kind, reopened.actor, reopened.actor_role, reopened.team_number],
-    ["request", "Amy", "Panel 1", "9882K"],
-    "a judge's role is the panel's real name",
+    ["request", "Alex", "Judge Advisor", "9882K"],
   );
 
   // An entry that names no team joins no number.

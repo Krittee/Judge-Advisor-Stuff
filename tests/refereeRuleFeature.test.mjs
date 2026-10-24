@@ -137,10 +137,9 @@ test("the rule list wraps on a phone: no nowrap on the rows, long official title
   assert.ok(rows.includes("min-h-12"), "rows are at least 48px tall");
 });
 
-test("match affecting is a switch that appears once a rule is picked, in the raise form and the correction form", () => {
+test("match affecting is a switch that appears once a rule is picked in the raise form", () => {
   assert.match(pageSrc, /rules\.length \? \(\s*<label className="rf-row">/);
   assert.match(pageSrc, /type="checkbox"\s+role="switch"/);
-  assert.match(flagsSrc, /draftRules\.length \|\| MATCH_AFFECTING_KINDS\.includes\(f\.kind\)/);
 });
 
 test("a field is a number from the event's setup; the division prefix is gone", () => {
@@ -153,11 +152,7 @@ test("a field is a number from the event's setup; the division prefix is gone", 
   assert.ok(!pageSrc.includes("FieldPicker") && !pageSrc.includes("FIELD_PREFIXES"));
   assert.ok(pageSrc.includes("const fieldCount = setup?.field_count ?? MAX_FIELD_COUNT"));
   assert.match(pageSrc, /<MatchSheet[^>]*fieldCount=\{fieldCount\}/);
-  assert.equal(
-    pageSrc.match(/<FlagList[^>]*fieldCount=\{fieldCount\}/g)?.length,
-    pageSrc.match(/<FlagList/g)?.length,
-    "every FlagList is given the event's field count",
-  );
+  assert.ok(!/<FlagList[^>]*fieldCount=/.test(pageSrc), "read-only flag lists have no field picker");
   assert.ok(!pageSrc.includes("matchTypes={"), "FlagList's deprecated matchTypes prop is no longer passed");
 });
 
@@ -187,12 +182,6 @@ test("Flagged Today renders each complete report and legacy null rules remain gu
   assert.ok(flagsSrc.includes("ruleDisplayLabel(id, f.ruleset)"));
   assert.ok(flagsSrc.includes("ruleIds.length ? ("), "no rules (Good Conduct, legacy) must render no rule block");
   assert.ok(flagsSrc.includes("matchReference(f.match_type, f.match_number) ?"));
-});
-
-test("correction UI sends the ruleset and rules it shows and blocks unsafe rule-less severity changes", () => {
-  assert.ok(flagsSrc.includes("rules: draftRules"));
-  assert.ok(flagsSrc.includes("ruleset: ruleset.id"), "a correction keeps the flag's own ruleset");
-  assert.match(flagsSrc, /k\.requiresRule && !draftRules\.length && !legacyKeep/);
 });
 
 test("the app's existing full wipe remains the active-event boundary", () => {

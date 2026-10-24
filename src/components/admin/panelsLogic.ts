@@ -179,7 +179,8 @@ export async function moveJudgeShowing(
 /** "Remove Jordan Kim from the roster?", and what goes with them if they have conflicts. */
 export function removeJudgeQuestion(name: string, conflicts: number): string {
   const head = `Remove ${name} from the roster?`;
-  return conflicts ? `${head}\n\nRemoving ${name} also withdraws ${conflictsLabel(conflicts)}.` : head;
+  const detail = conflicts ? `\n\nRemoving ${name} also withdraws ${conflictsLabel(conflicts)}.` : "";
+  return `${head}${detail}\n\nIf they are on a panel, its shared code will change and everyone there will need to sign in again.`;
 }
 
 /** Ask, then remove the judge. A No sends nothing. Returns whether they were removed. */

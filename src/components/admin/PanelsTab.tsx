@@ -156,6 +156,7 @@ export function PanelsTab({
   async function patchPanel(id: string, body: Record<string, unknown>) {
     await call("/api/admin/panels", { method: "PATCH", body: { id, ...body } });
     await refresh();
+    await loadCodes();
   }
 
   async function move(judge: JudgeRow, panelId: string) {
@@ -163,6 +164,10 @@ export function PanelsTab({
     moving.current = true;
     onError(null);
     try {
+      if (judge.panel_id && judge.panel_id !== panelId) {
+        const oldPanel = state.panels.find((p) => p.id === judge.panel_id)?.name ?? "their old panel";
+        if (!(await ask(`Move ${judge.name} off ${oldPanel}?\n\nThat panel gets a new shared code. Everyone still on it will need to sign in again.`, { confirmLabel: "Move judge" }))) return;
+      }
       const panelName = state.panels.find((p) => p.id === panelId)?.name ?? "that panel";
       await moveJudgeShowing(
         call,
@@ -175,6 +180,7 @@ export function PanelsTab({
         setPending,
         async () => {
           await refresh();
+          await loadCodes();
           setFocusEl(selectId(judge.id));
         },
       );
@@ -193,7 +199,10 @@ export function PanelsTab({
   async function remove(judge: JudgeRow) {
     setMenu(null);
     await run(async () => {
-      if (await removeJudgeAfterAsking(ask, call, judge, judgeConflicts(judge.id, state.conflicts))) await refresh();
+      if (await removeJudgeAfterAsking(ask, call, judge, judgeConflicts(judge.id, state.conflicts))) {
+        await refresh();
+        await loadCodes();
+      }
       else setFocusEl(moreId(judge.id));
     });
   }

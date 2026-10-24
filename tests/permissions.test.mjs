@@ -69,17 +69,9 @@ test("the queue desk can cancel an early request, and nothing the judges have ta
   }
 });
 
-/* Regression: the public team page has always shown a "Cancel this
-   request" / "Cancel this booking" button to every visitor with no
-   login, but canCancel(null, ...) used to return false unconditionally
-   -- the button 403'd every single time, for every team, since the
-   app's first commit. Creating a request needs no login (POST
-   /api/requests is open to everyone), so cancelling the one a team just
-   created cannot need one either. A team's own request is always
-   createdBy "team", so the null-session branch never has to consult it. */
-test("a team with no login can cancel their own request while it is still early, same as the queue desk", () => {
-  assert.ok(canCancel(TEAM, "requested"), "a team must be able to cancel their own live request");
-  assert.ok(canCancel(TEAM, "scheduled"), "a team must be able to give up their own booking");
+test("a team with no login can only read status", () => {
+  assert.ok(!canCancel(TEAM, "requested"));
+  assert.ok(!canCancel(TEAM, "scheduled"));
   for (const s of ["acknowledged", "interviewing", "completed"]) {
     assert.ok(!canCancel(TEAM, s), `a team must not cancel a ${s} interview out from under a judge`);
   }
@@ -100,11 +92,11 @@ test("a queuer can cancel an early request whoever created it", () => {
   }
 });
 
-test("only the roles that touch interviews may cancel at all", () => {
+test("only the desk and Judge Advisor may change bookings", () => {
   const REFEREE = { role: "referee", name: "Ref" };
   assert.ok(!canCancel(REFEREE, "requested"), "a referee has no part in the queue");
   assert.ok(canCancel(JA, "completed"), "the Judge Advisor's reach is unchanged here (the transition table narrows it)");
-  assert.ok(canCancel(JUDGE_A, "interviewing"));
+  assert.ok(!canCancel(JUDGE_A, "interviewing"));
 });
 
 /* ---- the status transition table (BUG-011) ------------------------- */
@@ -135,16 +127,6 @@ test("actions the table does not name are not restricted by it", () => {
     assert.equal(ACTION_FROM[action], undefined, `${action} unexpectedly entered the table`);
     for (const s of STATUSES) assert.ok(canTransition(action, s), `${action} from ${s}`);
   }
-});
-
-test("the route's panel-scope wall exempts a team with no login, the same way it exempts the queue desk", () => {
-  const src = readFileSync(new URL("../src/app/api/requests/[id]/route.ts", import.meta.url), "utf8");
-  assert.ok(
-    /if \(session && session\.role !== "queuer" && !mayActOnPanel\(/.test(src),
-    "the panel-scope check no longer exempts an anonymous (team) caller -- " +
-      "without this, canCancel's null-session branch above can never actually be reached, " +
-      "and the team page's cancel button is dead again",
-  );
 });
 
 /* ---- the division wall ------------------------------------------- */

@@ -281,6 +281,48 @@ test("a booking turned into a walk-up request skips the booking-gap lookup; an o
   );
 });
 
+test("reassignRequest rolls back the request move if updating its team fails", async () => {
+  const { error } = await run(
+    (sql) => {
+      if (sql.startsWith("select * from requests where id") && sql.includes("for update")) return [ROW];
+      if (sql.startsWith("update requests set panel_id")) return [{ ...ROW, panel_id: "p2" }];
+      if (sql.startsWith("update teams set panel_id")) throw new Error("team write failed");
+      return [];
+    },
+    () => postgresStore.reassignRequest("r1", "p1", "p2", "requested"),
+  );
+  assert.equal(error?.message, "team write failed");
+  assert.ok(calls.some((c) => c.sql === "begin"));
+  assert.ok(calls.some((c) => c.sql === "rollback"));
+  assert.ok(!calls.some((c) => c.sql === "commit"));
+});
+
+test("reassignRequest locks the row and rejects an old panel even when status still matches", async () => {
+  const { error } = await run(
+    (sql) => (sql.startsWith("select * from requests where id") ? [{ ...ROW, panel_id: "p2" }] : []),
+    () => postgresStore.reassignRequest("r1", "p1", "p3", "requested"),
+  );
+  assert.equal(error?.status, 409);
+  assert.ok(calls.some((c) => c.sql.includes("for update")));
+  assert.ok(!calls.some((c) => c.sql.startsWith("update requests")));
+});
+
+test("reassignRequest keeps a booked team in place when the target panel has a nearby booking", async () => {
+  const booked = { ...ROW, status: "scheduled", kind: "slot", slot_start: "2099-01-01T14:00:00.000Z" };
+  const { error } = await run(
+    (sql) => {
+      if (sql.startsWith("select * from requests where id") && sql.includes("for update")) return [booked];
+      if (sql.includes("kind = 'slot'")) return [{ ...booked, id: "r2", panel_id: "p2" }];
+      return [];
+    },
+    () => postgresStore.reassignRequest("r1", "p1", "p2", "scheduled"),
+  );
+  assert.equal(error?.status, 409);
+  assert.ok(!calls.some((c) => c.sql.startsWith("update requests")));
+  assert.ok(!calls.some((c) => c.sql.startsWith("update teams")));
+  assert.ok(calls.some((c) => c.sql === "rollback"));
+});
+
 /* ---- the live-request index can be created on an old database (NEW-B3) ----
 
    A database that predates 'scheduled' in the index may already hold two live
@@ -563,12 +605,50 @@ test("removeJudge deletes by id and reports whether there was one; their conflic
   answer = () => [{ id: "j1" }];
   assert.equal(await postgresStore.removeJudge("j1"), true);
   const [del] = sent(/^delete from judges/);
-  assert.equal(del.sql, "delete from judges where id = $1 returning id");
+  assert.equal(del.sql, "delete from judges where id = $1 returning id, panel_id");
   assert.deepEqual(del.params, ["j1"]);
   answer = () => [];
   assert.equal(await postgresStore.removeJudge("j1"), false);
   const method = src.slice(src.indexOf("async removeJudge(id) {"));
   assert.ok(!/conflicts/.test(method.slice(0, method.indexOf("\n  },"))), "removeJudge deletes no conflict by hand: on delete cascade does");
+});
+
+test("removing or moving a seated judge rotates the old panel code in the same transaction", async () => {
+  calls.length = 0;
+  answer = (sql) => {
+    if (sql.startsWith("delete from judges")) return [{ id: "j1", panel_id: "p1" }];
+    if (sql.startsWith("select code from panels")) return [{ code: "CONF01" }];
+    if (sql.startsWith("update panels set code")) return [{ id: "p1" }];
+    return [];
+  };
+  assert.equal(await postgresStore.removeJudge("j1"), true);
+  const statements = calls.map((c) => c.sql);
+  assert.ok(statements.indexOf("begin") < statements.findIndex((sql) => sql.startsWith("delete from judges")));
+  assert.ok(statements.findIndex((sql) => sql.startsWith("delete from judges")) < statements.findIndex((sql) => sql.startsWith("update panels set code")));
+  assert.equal(statements.at(-1), "commit");
+  assert.equal(sent(/^update panels set code/)[0].params[0], "p1");
+
+  calls.length = 0;
+  answer = (sql) => {
+    if (sql.startsWith("select panel_id from judges")) return [{ panel_id: "p1" }];
+    if (sql.startsWith("update judges")) return [judgeRow({ panel_id: "p2" })];
+    if (sql.startsWith("select code from panels")) return [{ code: "CONF01" }];
+    if (sql.startsWith("update panels set code")) return [{ id: "p1" }];
+    return [];
+  };
+  await postgresStore.updateJudge("j1", { panel_id: "p2" });
+  assert.equal(sent(/^update panels set code/)[0].params[0], "p1");
+  assert.equal(calls.at(-1).sql, "commit");
+
+  calls.length = 0;
+  answer = (sql) => {
+    if (sql.startsWith("delete from judges")) return [{ id: "j1", panel_id: "p1" }];
+    if (sql.startsWith("select code from panels")) return [{ code: "CONF01" }];
+    if (sql.startsWith("update panels set code")) throw new Error("rotation failed");
+    return [];
+  };
+  await assert.rejects(() => postgresStore.removeJudge("j1"), /rotation failed/);
+  assert.equal(calls.at(-1).sql, "rollback", "judge deletion must roll back if revocation fails");
 });
 
 test("a conflict is inserted for a judge or for a panel, never both, and the judge's writes no label", async () => {
@@ -682,6 +762,52 @@ test("updatePanel treats judges as the roster's: no column is updated for them, 
   calls.length = 0;
   await postgresStore.updatePanel("p2", { name: "Panel Three" });
   assert.equal(sent(/judges set/).length, 0, "a save that does not mention judges leaves the roster alone");
+});
+
+test("a panel roster edit rotates the shared code if someone leaves", async () => {
+  calls.length = 0;
+  answer = (sql) => {
+    if (sql.startsWith("select name, panel_id from judges")) return [{ name: "Dana", panel_id: "p2" }];
+    if (sql.startsWith("select code from panels")) return [{ code: "CONF01" }];
+    if (sql.startsWith("update panels set code")) return [{ id: "p2" }];
+    if (sql.includes("from panels p")) return [{ id: "p2", code: "CONF01", judges: ["Sam"] }];
+    return [];
+  };
+  await postgresStore.updatePanel("p2", { judges: ["Sam"] });
+  assert.equal(sent(/^update panels set code/).length, 1);
+  assert.equal(sent(/^update panels set code/)[0].params[0], "p2");
+  assert.equal(calls.filter((c) => c.sql === "commit").length, 1);
+});
+
+test("updatePanel rolls back its division change when releasing teams fails", async () => {
+  calls.length = 0;
+  answer = (sql) => {
+    if (sql.startsWith("select division, code from panels")) return [{ division: "Elementary School", code: "CONF01" }];
+    if (sql.startsWith("select id, division from teams")) return [{ id: "t1", division: "Elementary School" }];
+    if (sql.startsWith("update panels")) return [{ id: "p2" }];
+    if (sql.startsWith("update teams set panel_id = null")) throw new Error("team update failed");
+    return [];
+  };
+  await assert.rejects(() => postgresStore.updatePanel("p2", { division: "Middle School" }), /team update failed/);
+  assert.ok(calls.some((c) => c.sql === "begin"));
+  assert.ok(calls.some((c) => c.sql === "rollback"));
+  assert.ok(!calls.some((c) => c.sql === "commit"));
+});
+
+test("updatePanel refuses a division change with an active request before writing", async () => {
+  calls.length = 0;
+  answer = (sql) => {
+    if (sql.startsWith("select division, code from panels")) return [{ division: "Elementary School", code: "CONF01" }];
+    if (sql.startsWith("select id, division from teams")) return [{ id: "t1", division: "Elementary School" }];
+    if (sql.startsWith("select 1 from requests")) return [{ exists: 1 }];
+    return [];
+  };
+  await assert.rejects(
+    () => postgresStore.updatePanel("p2", { division: "Middle School" }),
+    (e) => e.status === 409,
+  );
+  assert.ok(!calls.some((c) => c.sql.startsWith("update panels")));
+  assert.ok(calls.some((c) => c.sql === "rollback"));
 });
 
 test("seeding preset panels inserts no judges column, and puts each new panel's preset judges on the roster", async () => {

@@ -18,44 +18,52 @@ const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/
 
 /* ---- BUG-017: rapid taps on different criteria ----------------------- */
 
-const idle = { drained: true, burstFailed: false };
+const idle = { drained: true, burstFailed: false, burstOverlapped: false };
 
-test("an older answer is not applied over a newer tap", () => {
+test("an older answer is not applied while another overlapping save is pending", () => {
   // Two taps in flight (requests 1 and 2). Answer 1 lands first and
   // describes the sheet without tap 2: applying it would knock tap 2 out.
-  const first = settleSave({ mine: 1, newest: 2, ok: true, drained: false, burstFailed: false });
+  const first = settleSave({ mine: 1, newest: 2, ok: true, drained: false, burstFailed: false, burstOverlapped: true });
   assert.equal(first.apply, false);
   assert.equal(first.refetch, false);
 
-  const second = settleSave({ mine: 2, newest: 2, ok: true, ...idle });
+  const second = settleSave({ mine: 2, newest: 2, ok: true, drained: true, burstFailed: false, burstOverlapped: true });
   assert.equal(second.apply, true);
-  assert.equal(second.refetch, false);
+  assert.equal(second.refetch, true);
 });
 
-test("answers that arrive out of order still end on the newest", () => {
-  const newestFirst = settleSave({ mine: 2, newest: 2, ok: true, drained: false, burstFailed: false });
-  assert.equal(newestFirst.apply, true);
-  const olderLast = settleSave({ mine: 1, newest: 2, ok: true, ...idle });
-  assert.equal(olderLast.apply, false, "a stale answer must never overwrite the newest");
+test("a lone successful save uses its response without a reload", () => {
+  const result = settleSave({ mine: 1, newest: 1, ok: true, ...idle });
+  assert.deepEqual(result, { apply: true, refetch: false, burstFailed: false });
+});
+
+test("successful overlapping saves reload after the last answer, even when it is older", () => {
+  // Request 2 can save first and return only criterion B. Request 1 then
+  // saves A and B, but its response is older by tap number.
+  const newestFirst = settleSave({ mine: 2, newest: 2, ok: true, drained: false, burstFailed: false, burstOverlapped: true });
+  assert.equal(newestFirst.refetch, false);
+  const olderLast = settleSave({ mine: 1, newest: 2, ok: true, drained: true, burstFailed: false, burstOverlapped: true });
+  assert.equal(olderLast.apply, false);
+  assert.equal(olderLast.refetch, true, "the stored combined row must replace the incomplete response");
 });
 
 test("a failure mid-burst is reconciled with the server, not rolled back to the prop", () => {
   // Tap 1 fails while tap 2 is still out: nothing to do yet.
-  const failed = settleSave({ mine: 1, newest: 2, ok: false, drained: false, burstFailed: false });
+  const failed = settleSave({ mine: 1, newest: 2, ok: false, drained: false, burstFailed: false, burstOverlapped: false });
   assert.deepEqual(failed, { apply: false, refetch: false, burstFailed: true });
 
   // Tap 2 succeeds and is the last one out: show its row, then ask the
   // server what is stored, because tap 1 may or may not have landed.
-  const last = settleSave({ mine: 2, newest: 2, ok: true, drained: true, burstFailed: true });
+  const last = settleSave({ mine: 2, newest: 2, ok: true, drained: true, burstFailed: true, burstOverlapped: false });
   assert.deepEqual(last, { apply: true, refetch: true, burstFailed: false });
 });
 
 test("when the newest tap is the one that fails, the older answer is dropped and the server is asked", () => {
-  const newestFailed = settleSave({ mine: 2, newest: 2, ok: false, drained: false, burstFailed: false });
+  const newestFailed = settleSave({ mine: 2, newest: 2, ok: false, drained: false, burstFailed: false, burstOverlapped: false });
   assert.equal(newestFailed.apply, false);
   assert.equal(newestFailed.refetch, false);
 
-  const olderLast = settleSave({ mine: 1, newest: 2, ok: true, drained: true, burstFailed: true });
+  const olderLast = settleSave({ mine: 1, newest: 2, ok: true, drained: true, burstFailed: true, burstOverlapped: false });
   assert.equal(olderLast.apply, false);
   assert.equal(olderLast.refetch, true);
 });

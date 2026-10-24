@@ -229,9 +229,10 @@ test("the take-off words match the mock, with the judge's name where the mock sa
 /* ---- remove from roster ------------------------------------------------------ */
 
 test("Remove from roster asks first, and says how many conflicts go with the judge", async () => {
-  assert.equal(removeJudgeQuestion("Alex Wong", 0), "Remove Alex Wong from the roster?");
-  assert.equal(removeJudgeQuestion("Jordan Kim", 1), "Remove Jordan Kim from the roster?\n\nRemoving Jordan Kim also withdraws 1 conflict.");
-  assert.match(removeJudgeQuestion("Priya Nair", 2), /Removing Priya Nair also withdraws 2 conflicts\.$/);
+  assert.match(removeJudgeQuestion("Alex Wong", 0), /^Remove Alex Wong from the roster\?/);
+  assert.match(removeJudgeQuestion("Jordan Kim", 1), /Removing Jordan Kim also withdraws 1 conflict\./);
+  assert.match(removeJudgeQuestion("Priya Nair", 2), /Removing Priya Nair also withdraws 2 conflicts\./);
+  assert.match(removeJudgeQuestion("Priya Nair", 2), /shared code will change and everyone there will need to sign in again\.$/);
 
   const api = server();
   const asked = [];

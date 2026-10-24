@@ -59,11 +59,10 @@ export async function loadState(session: Session | null): Promise<AppState> {
   const judgePanel = isJudge ? panels.find((p) => p.id === session.panelId) : undefined;
 
   // A judge's session names one specific panel. If that panel cannot be
-  // resolved -- deleted mid-event, or a token that simply outlived a
-  // panel code that got rotated -- there is no division to scope by.
+  // resolved -- for example, deleted mid-event -- there is no division to scope by.
   // Falling through to the same `division === null` a non-judge caller
   // gets would silently hand a stale judge session global visibility for
-  // up to its 16-hour lifetime. Fail closed instead: still authenticated
+  // until the next session check. Fail closed instead: still authenticated
   // as a judge, but sees nothing, until they sign in again with a panel
   // that actually exists.
   const judgeSessionValid = !isJudge || Boolean(judgePanel);

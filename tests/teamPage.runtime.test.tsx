@@ -320,23 +320,19 @@ test("a number that is not on the list says so, and offers another go", () => {
 
 const page = noComments(read("src/app/team/[number]/page.tsx"));
 
-test("the page keeps its number handling, polling, loading and offline copy, and its writes", () => {
+test("the public page keeps status polling and offers no request or booking actions", () => {
   assert.match(page, /normalizeTeamNumber\(decodeURIComponent\(number\)\)/);
   assert.match(page, /useAppState\(4000\)/);
   assert.match(page, /online \? "Loading…" : "Can't reach the server — retrying…"/);
   assert.match(page, /if \(!team\) return <TeamNotFound number=\{teamNumber\} \/>/);
-  assert.match(page, /\{ method: "PATCH", body: \{ action: "ready-now", \.\.\.body \} \}/);
-  assert.match(page, /call\("\/api\/requests", \{ body \}\)/);
-  assert.match(page, /kind: "queue", language, message \}, booking\?\.id/);
-  assert.match(page, /kind: "slot",\s*language,\s*slotStart: slot\.start,\s*slotEnd: slot\.end,/);
-  assert.match(page, /\{ method: "PATCH", body: \{ action: "cancel" \} \}/);
+  assert.match(page, /STATUS_META\[current\.status\]\.teamLabel/);
+  assert.match(page, /trackSteps\(current\)/);
+  assert.match(page, /Please ask the queue desk/);
+  assert.doesNotMatch(page, /\/api\/requests|onReady|onBook|onCancel/);
 });
 
-test("Cancel asks first through the in-page dialog, never window.confirm", () => {
-  assert.match(page, /const \{ ask, dialog \} = useConfirm\(\)/);
-  assert.match(page, /await cancelAfterAsking\(ask, current, async \(\) => \{/);
-  assert.ok(page.indexOf("cancelAfterAsking(ask") < page.indexOf('action: "cancel"'), "the PATCH is inside the send that follows the question");
-  assert.match(page, /\{dialog\}/);
+test("the public page does not ask for confirmation or make writes", () => {
+  assert.doesNotMatch(page, /useConfirm|cancelAfterAsking|\bcall\(/);
   for (const file of ["src/app/team/[number]/page.tsx", "src/components/team/TeamView.tsx", "src/components/team/teamLogic.ts"]) {
     const src = noComments(read(file));
     assert.ok(!/(?:^|[^\w$.])confirm\s*\(|\bwindow\.confirm/.test(src), `${file} calls the native confirm()`);

@@ -504,6 +504,11 @@ function findPanelByCode(code: string): Panel | null {
   return panel ? withJudges(panel) : null;
 }
 
+function findPanelById(id: string): Panel | null {
+  const panel = state().panels.find((p) => p.id === id);
+  return panel ? withJudges(panel) : null;
+}
+
 function findTeamByNumber(number: string): Team | null {
   const wanted = normalizeTeamNumber(number);
   return state().teams.find((t) => t.number === wanted) ?? null;
@@ -627,6 +632,25 @@ function updateRequest(
   Object.assign(row, patch, { updated_at: new Date().toISOString() });
   save();
   return row;
+}
+
+function reassignRequest(
+  id: string,
+  fromPanelId: string | null,
+  toPanelId: string,
+  ifStatus: RequestRow["status"],
+): RequestRow {
+  const row = state().requests.find((r) => r.id === id);
+  if (!row) throw new StoreError("That request no longer exists.", 404);
+  if (row.status !== ifStatus || row.panel_id !== fromPanelId) {
+    throw new StoreError(STALE_STATUS_MESSAGE, 409);
+  }
+  const team = state().teams.find((t) => t.id === row.team_id);
+  if (!team) throw new StoreError("That team no longer exists.", 404);
+  const updated = updateRequest(id, { panel_id: toPanelId }, ifStatus);
+  team.panel_id = toPanelId;
+  save();
+  return updated;
 }
 
 /* ------------------------------------------------------------------ *
@@ -787,14 +811,18 @@ function createPanel(input: Omit<Panel, "id" | "created_at">): Panel {
  * off whichever panel they were on -- and any other judge on it is taken
  * off. Nobody leaves the roster; their conflicts stay with them.
  */
-function syncPanelJudges(panelId: string, names: string[]): void {
+function syncPanelJudges(panelId: string, names: string[], keepCodeFor?: string): void {
   const wanted = new Set<string>();
+  const left = new Set<string>();
   for (const raw of names) {
     const name = raw.trim();
     if (!name || wanted.has(judgeKey(name))) continue;
     wanted.add(judgeKey(name));
     const found = state().judges.find((j) => judgeKey(j.name) === judgeKey(name));
-    if (found) found.panel_id = panelId;
+    if (found) {
+      if (found.panel_id && found.panel_id !== panelId) left.add(found.panel_id);
+      found.panel_id = panelId;
+    }
     else {
       state().judges.push({
         id: randomUUID(),
@@ -806,8 +834,17 @@ function syncPanelJudges(panelId: string, names: string[]): void {
     }
   }
   for (const j of state().judges) {
-    if (j.panel_id === panelId && !wanted.has(judgeKey(j.name))) j.panel_id = null;
+    if (j.panel_id === panelId && !wanted.has(judgeKey(j.name))) {
+      left.add(panelId);
+      j.panel_id = null;
+    }
   }
+  for (const id of left) if (id !== keepCodeFor) rotatePanelCode(id);
+}
+
+function rotatePanelCode(id: string): void {
+  const panel = state().panels.find((p) => p.id === id);
+  if (panel) panel.code = generatePanelCode();
 }
 
 function updatePanel(id: string, patch: Partial<Panel>): Panel {
@@ -826,17 +863,18 @@ function updatePanel(id: string, patch: Partial<Panel>): Panel {
   // refused.
   if (patch.division && patch.division !== panel.division) {
     const moved = patch.division;
-    for (const t of state().teams) {
-      // A team the panel may still judge after the move stays with it: a
-      // blended team belongs on either side of the wall, so releasing it
-      // would be busywork for the Judge Advisor to undo by hand.
-      if (t.panel_id === id && !divisionsCompatible(t.division, moved)) t.panel_id = null;
+    const release = state().teams.filter((t) => t.panel_id === id && !divisionsCompatible(t.division, moved));
+    const ids = new Set(release.map((t) => t.id));
+    if (state().requests.some((r) => ids.has(r.team_id) && LIVE.includes(r.status))) {
+      throw new StoreError("Reassign or cancel this panel's active requests before changing its division.", 409);
     }
+    for (const team of release) team.panel_id = null;
   }
 
   const { judges, ...rest } = patch;
+  const changingCode = Boolean(patch.code && patch.code.toUpperCase() !== panel.code.toUpperCase());
   Object.assign(panel, rest);
-  if (judges) syncPanelJudges(id, judges);
+  if (judges) syncPanelJudges(id, judges, changingCode ? id : undefined);
   save();
   return withJudges(panel);
 }
@@ -1000,20 +1038,24 @@ function updateJudge(id: string, patch: JudgePatch): JudgeRow {
     throw new StoreError("That panel no longer exists.", 404);
   }
 
+  const oldPanelId = judge.panel_id;
   judge.name = name;
   if (patch.note !== undefined) judge.note = patch.note;
   if (patch.panel_id !== undefined) judge.panel_id = patch.panel_id;
+  if (oldPanelId && judge.panel_id !== oldPanelId) rotatePanelCode(oldPanelId);
   save();
   return { ...judge };
 }
 
 /** A judge's conflicts leave with them: they would point at nobody. */
 function removeJudge(id: string): boolean {
+  const oldPanelId = state().judges.find((j) => j.id === id)?.panel_id;
   const before = state().judges.length;
   state().judges = state().judges.filter((j) => j.id !== id);
   const removed = state().judges.length < before;
   if (removed) {
     state().conflicts = state().conflicts.filter((c) => c.judge_id !== id);
+    if (oldPanelId) rotatePanelCode(oldPanelId);
     save();
   }
   return removed;
@@ -1372,11 +1414,14 @@ export const fileStore: Store = {
   listActivity: async (limit) => listActivity(limit),
 
   findPanelByCode: async (code) => findPanelByCode(code),
+  findPanelById: async (id) => findPanelById(id),
   findTeamByNumber: async (number) => findTeamByNumber(number),
   findRequest: async (id) => findRequest(id),
 
   createRequest: async (input) => createRequest(input),
   updateRequest: async (id, patch, ifStatus) => updateRequest(id, patch, ifStatus),
+  reassignRequest: async (id, fromPanelId, toPanelId, ifStatus) =>
+    reassignRequest(id, fromPanelId, toPanelId, ifStatus),
 
   upsertTeams: async (rows) => upsertTeams(rows),
   updateTeam: async (id, patch) => updateTeam(id, patch),

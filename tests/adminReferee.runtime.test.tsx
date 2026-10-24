@@ -261,7 +261,7 @@ function sheet(over: { flag?: FlagRow | null; fieldCount?: number; admin?: strin
       team={titans}
       kinds={kinds}
       fieldCount={over.fieldCount ?? 3}
-      adminName={over.admin === undefined ? "Alex Morgan" : over.admin}
+      correctorName={over.admin === undefined ? "Alex Morgan" : over.admin}
       onSave={async () => {}}
       onClose={noop}
     />,

@@ -3,7 +3,7 @@ import test from "node:test";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SignJWT } from "jose";
+import { decodeJwt, SignJWT } from "jose";
 
 import type { Session } from "../src/lib/auth";
 
@@ -134,12 +134,18 @@ async function inRequestScope<T>(
 }
 
 /** createSession, then getSession on the cookie it set: the whole round trip. */
-async function roundTrip(session: Session): Promise<Session | null> {
-  const { createSession, getSession } = await auth();
+async function tokenFor(session: Session, code?: string): Promise<string> {
+  const { createSession } = await auth();
   const set: string[] = [];
-  await inRequestScope(null, () => createSession(session), (c) => set.push(...c));
+  await inRequestScope(null, () => createSession(session, code), (c) => set.push(...c));
   const token = /jq_session=([^;]+)/.exec(set.join(";"))?.[1];
   assert.ok(token, "createSession set the cookie");
+  return token;
+}
+
+async function roundTrip(session: Session): Promise<Session | null> {
+  const { getSession } = await auth();
+  const token = await tokenFor(session);
   return inRequestScope(`jq_session=${token}`, () => getSession());
 }
 
@@ -168,6 +174,51 @@ test("the head flag survives the cookie, and a referee without it comes back wit
   assert.deepEqual(await roundTrip({ role: "queuer", name: "Sam" }), { role: "queuer", name: "Sam" });
 });
 
+test("a panel code change and a judge removal end existing judge sessions", async () => {
+  const { fileStore } = await import("../src/lib/db/file");
+  const { resolveCode, getSession } = await auth();
+  await fileStore.resetAll();
+  const panel = await fileStore.createPanel({
+    name: "Panel A", code: "JUDGE9", division: "Elementary School", judges: ["Dana", "Sam"],
+    languages: [], sort_order: 1, slot_start_at: null, slot_minutes: 20, slot_count: 0,
+  });
+  const first = await resolveCode(panel.code, "Dana");
+  assert.ok(first?.role === "judge");
+  const oldToken = await tokenFor(first, panel.code);
+  assert.deepEqual(await inRequestScope(`jq_session=${oldToken}`, () => getSession()), first);
+
+  await fileStore.updatePanel(panel.id, { code: "JUDGEN" });
+  assert.equal(await inRequestScope(`jq_session=${oldToken}`, () => getSession()), null);
+  assert.equal(await resolveCode(panel.code, "Dana"), null);
+
+  const second = await resolveCode("JUDGEN", "Sam");
+  assert.ok(second?.role === "judge");
+  const nextToken = await tokenFor(second, "JUDGEN");
+  const dana = (await fileStore.listJudges()).find((judge) => judge.name === "Dana")!;
+  await fileStore.removeJudge(dana.id);
+  assert.equal(await inRequestScope(`jq_session=${nextToken}`, () => getSession()), null);
+  assert.equal(await resolveCode("JUDGEN", "Sam"), null);
+});
+
+test("a judge session from a previous Bangkok calendar day is rejected", async () => {
+  const { fileStore } = await import("../src/lib/db/file");
+  const { resolveCode, getSession } = await auth();
+  await fileStore.resetAll();
+  await fileStore.createPanel({
+    name: "Panel A", code: "JUDGED", division: "Elementary School", judges: ["Dana"],
+    languages: [], sort_order: 1, slot_start_at: null, slot_minutes: 20, slot_count: 0,
+  });
+  const session = await resolveCode("JUDGED", "Dana");
+  assert.ok(session?.role === "judge");
+  const token = await tokenFor(session, "JUDGED");
+  const claims = decodeJwt(token);
+  assert.equal(typeof claims.judgeDay, "string");
+  const stale = await new SignJWT({ ...claims, judgeDay: "2000-01-01" })
+    .setProtectedHeader({ alg: "HS256" })
+    .sign(new TextEncoder().encode(process.env.SESSION_SECRET!));
+  assert.equal(await inRequestScope(`jq_session=${stale}`, () => getSession()), null);
+});
+
 test("a token with no head claim is a normal referee", async () => {
   assert.deepEqual(await sessionOf({ role: "referee", name: "Kim" }), { role: "referee", name: "Kim" });
 });
@@ -182,9 +233,10 @@ test("only a literal true grants head: a garbled claim, or one on another role, 
   }
   assert.deepEqual(await sessionOf({ role: "admin", name: "Alex", head: true }), { role: "admin", name: "Alex" });
   assert.deepEqual(await sessionOf({ role: "queuer", name: "Sam", head: true }), { role: "queuer", name: "Sam" });
-  assert.deepEqual(
+  assert.equal(
     await sessionOf({ role: "judge", name: "Sam", panelId: "p1", panelName: "Panel A", head: true }),
-    { role: "judge", name: "Sam", panelId: "p1", panelName: "Panel A" },
+    null,
+    "a judge token without a current panel-code claim no longer authenticates",
   );
 });
 
