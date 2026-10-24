@@ -1,5 +1,50 @@
 # Full Application Bug Audit
 
+## Status as of 2026-10-24
+
+The audit below is kept as written (2026-09-09). This table records what happened to each finding since. Status comes from the fixing commits and the code as it stands; findings were not re-audited from scratch. The Postgres code paths have unit and SQL-shape tests but have never run against a real database. The latest pass is detailed in `AUDIT_STATUS.md`.
+
+**Summary:** 25 fixed, 3 partly fixed, 1 superseded, 1 reversed by decision, 1 not a bug by decision, 1 open (deferred).
+
+| Finding | Status | Where |
+|---|---|---|
+| BUG-001 Supabase tables anonymously readable | Fixed in code: the migration enables RLS on every table. The live Supabase project still needs a manual RLS check and new panel codes. | `63b51d8` |
+| BUG-002 Next.js RCE advisories | Fixed: next 15.5.28. The postcss advisory nested in next needs next 16. | `63b51d8`, `f63bc11` |
+| BUG-003 Destructive schema called safe to rerun | Fixed: schema.sql documented as empty-database only; `migrate()` is the additive path. | `63b51d8` |
+| BUG-004 Guessable, unthrottled role codes | Fixed: production fallbacks, sign-in throttle, placeholder secret refused. | `63b51d8`, `98f278e` |
+| BUG-005 Teams cannot cancel their own requests | Superseded: teams are read-only by the agreed workflow; the queue desk or Judge Advisor cancels. | `3903243` |
+| BUG-006 Reassign splits team and request panel | Fixed: one store operation moves both, checked against the panel and status read. | `63b51d8`, `b52474a`, `3903243` |
+| BUG-007 One team holds several slots | Fixed: one live request or booking per team, both stores. | `63b51d8` |
+| BUG-008 Deleted panel leaves global judge sessions | Fixed: fails closed; judge sessions are also bound to the panel's current code and the Bangkok day. | `63b51d8`, `3903243` |
+| BUG-009 Failed panel edit unassigns teams | Fixed: Postgres saves panel, team releases and roster in one transaction; a division change refuses to release teams with live requests. | `63b51d8`, `3903243` |
+| BUG-010 Admin assignment bypasses division wall | Fixed. | `63b51d8` |
+| BUG-011 No status state machine | Fixed: transition table and compare-and-set updates (409 on a stale screen); only the Judge Advisor reopens. | `63b51d8`, `b52474a`, `3903243` |
+| BUG-012 Concurrent Postgres score saves | Fixed: merge and total in one transaction. | `63b51d8` |
+| BUG-013 Any referee rewrites another's report | Partly fixed: only the head referee or Judge Advisor corrects a flag. Open: referees share one code and type their names, so authorship is unverified (individual referee codes deferred). | `63b51d8`, `98f278e`, `3903243` |
+| BUG-014 Desk cancels requests it did not create | Reversed by decision (2026-10-16): the desk may cancel, reschedule or ready-now any early booking. | `b52474a` |
+| BUG-015 Failed import leaves partial records | Fixed: panels checked before anything is written. | `1ce087e` |
+| BUG-016 "Ready now" destroys a valid booking | Fixed: converts the booking in place. | `b52474a` |
+| BUG-017 Rapid score taps leave stale totals | Fixed: newest answer only, and a readback after failed or overlapping saves. | `dfca298`, `3903243` |
+| BUG-018 Expired or obsolete slots | Partly fixed: bookings for slots that already ended are refused (018a). Open: retiming a panel's grid does not reconcile existing bookings (018b, deferred). | `b52474a` |
+| BUG-019 Judges read the admin activity log | Fixed: the activity route requires the Judge Advisor. | `d9c24ed` |
+| BUG-020 State responses expose extra metadata | Fixed: anonymous state drops messages and staff fields. Open question: the public state still carries public team and panel data for the board. | `98f278e` |
+| BUG-021 "Flagged Today" not limited to today | Fixed. | `c240843` |
+| BUG-022 Tournament Special shown last | Not a bug by decision (2026-10-16): it stays last. | — |
+| BUG-023 File-store team delete leaves orphans | Fixed. | `1ce087e` |
+| BUG-024 Pit-map collisions and filter | Fixed. | `c240843` |
+| BUG-025 Polling errors leave misleading UI | Fixed. | `dfca298` |
+| BUG-026 Doctor reports healthy when it is not | Fixed. | `98f278e` |
+| BUG-027 Postgres TLS does not verify the server | Open, deferred: turning verification on without Supabase's CA would take production down. | — |
+| BUG-028 Second file-store process keeps writing | Fixed: a second process is refused. | `1ce087e` |
+| BUG-029 Flag correction accepts malformed fields | Fixed: same pickers as creation, server-validated. | `c240843` |
+| BUG-030 Demo divisions do not match config | Fixed. | `1ce087e` |
+| BUG-031 "All taken" when slots are only past | Fixed. | `c240843` |
+| BUG-032 Lint debt and unused dependencies | Partly fixed: lint is at 0 warnings. Unused dependencies not rechecked. | `c240843`, `dfca298` |
+
+Before an event: run the Postgres conformance tests against a real database (`TEST_DATABASE_URL=… npm test`), check RLS on the live Supabase project, and confirm the deployed `SESSION_SECRET` is not the `.env.example` placeholder.
+
+---
+
 ## 1. Executive Summary
 
 Overall: **FAIL**
