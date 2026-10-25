@@ -3077,6 +3077,15 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-tm-ff { display: flex; flex-direction: column; gap: 8px; }
 .ja-tm-ff .jg-quiet { align-self: center; }
 
+/* The Interview row's controls: Request now and Book a time, the queue desk's slot grid (it reads the desk's two field tokens, so they are the console's here), and the Times boxes */
+.ja-tm-rq { display: flex; flex-wrap: wrap; gap: 8px; }
+.ja-tm-rq .ja-tm-ghost { flex: 1 1 130px; }
+.ja-tm-bt { flex: none; width: 100%; }
+.ja-tm-slots { --dk-field: var(--jg-field); --dk-field-line: var(--jg-field-line); display: flex; flex-direction: column; gap: 10px; }
+.ja-tm-tt { display: flex; flex-direction: column; gap: 6px; }
+.ja-tm-tr { display: grid; grid-template-columns: minmax(0, 1fr) 132px; align-items: center; gap: 12px; }
+.ja-tm-tr .ja-in { padding: 0 8px; text-align: center; font-variant-numeric: tabular-nums; }
+
 /* @ja-block eventdata */
 /* Event data: closed until opened; danger-coloured and saying so when storage is not reachable */
 .ja-ev { flex: none; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }

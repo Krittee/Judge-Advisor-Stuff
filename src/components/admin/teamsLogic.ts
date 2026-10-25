@@ -1,12 +1,15 @@
+import { cancelBookingAfterAsking } from "@/components/desk/deskLogic";
 import { kindCounts, type FlagKind } from "@/components/Flags";
 import type { Ask } from "@/components/judge/logic";
+import { historyTime, sameEventDay } from "@/components/team/teamLogic";
 import { liveRequestFor } from "@/lib/data";
 import { normalizePit } from "@/lib/pit";
 import { divisionsCompatible } from "@/lib/presets";
 import { isPanelBlocked, panelBlocks } from "@/lib/roster";
 import { canTransition, STATUS_META, type Status } from "@/lib/status";
+import type { formTimes } from "@/lib/stepTimes";
 import { normalizeTeamNumber } from "@/lib/teamNumber";
-import type { ConflictRow, FlagRow, JudgeRow, PublicPanel, RequestRow, Team } from "@/lib/types";
+import type { ConflictRow, FlagRow, JudgeRow, PublicPanel, RequestRow, Slot, Team } from "@/lib/types";
 import { strandedTeams } from "./conflictsLogic";
 import { allowedPanels } from "./floorLogic";
 
@@ -225,6 +228,60 @@ export async function resetStatusAfterAsking(ask: Ask, call: Call, team: Pick<Te
   });
   return true;
 }
+
+/* ---- request, book, move, cancel, correct times ------------------------------ */
+
+/**
+ * What the drawer's interview controls do. Each applies at once (not with Save
+ * changes) and resolves true when it went through: false when the Judge Advisor
+ * said no to the question, or the server refused (its words land above Save changes).
+ */
+export type InterviewActions = {
+  request: (team: Team, language: string) => Promise<boolean>;
+  book: (team: Team, slot: Slot, language: string) => Promise<boolean>;
+  move: (booking: RequestRow, slot: Slot) => Promise<boolean>;
+  cancel: (team: Team, booking: RequestRow) => Promise<boolean>;
+  times: (request: RequestRow, times: ReturnType<typeof formTimes>) => Promise<boolean>;
+};
+
+/** Why Request now and Book a time are off, or null. They go to the panel the team holds, saved. */
+export function requestBlocker(team: Team, draft: TeamDraft, panel: PublicPanel | null): string | null {
+  if (draft.panelId !== (team.panel_id ?? "")) return "Save the panel change first. Requests go to the panel the team holds.";
+  return panel ? null : "No judge panel yet. Pick one above and save, then request or book.";
+}
+
+/** The request whose step times the drawer shows: the live one, else the team's latest from today (finished, cancelled or still just asked for). */
+export function timesRequestOf(teamId: string, requests: RequestRow[], now: number): RequestRow | null {
+  return (
+    liveRequestFor(teamId, requests) ??
+    requests
+      .filter((r) => r.team_id === teamId && sameEventDay(historyTime(r), now))
+      .sort((a, b) => historyTime(b).localeCompare(historyTime(a)))[0] ??
+    null
+  );
+}
+
+/** Queue the team now, in this language: the desk's walk-up request. */
+export const requestNow = (call: Call, team: Pick<Team, "number">, language: string) =>
+  call("/api/requests", { method: "POST", body: { teamNumber: team.number, kind: "queue", language } });
+
+/** Book the team onto one of its panel's slots, as the desk's Book does. */
+export const bookSlot = (call: Call, team: Pick<Team, "number">, slot: Pick<Slot, "start" | "end">, language: string) =>
+  call("/api/requests", { method: "POST", body: { teamNumber: team.number, kind: "slot", language, slotStart: slot.start, slotEnd: slot.end } });
+
+/** Move a booking to another slot (the server keeps the 20-minute gap and refuses a past slot). `from` is the status the drawer is showing. */
+export const moveBooking = (call: Call, booking: Pick<RequestRow, "id" | "status">, slot: Pick<Slot, "start" | "end">) =>
+  call(`/api/requests/${booking.id}`, { method: "PATCH", body: { action: "reschedule", from: booking.status, slotStart: slot.start, slotEnd: slot.end } });
+
+/** Cancel booking, asked first as the desk asks. Returns whether it cancelled. */
+export const cancelBookingNow = (ask: Ask, call: Call, team: Pick<Team, "number">, booking: Pick<RequestRow, "id" | "status" | "slot_start">) =>
+  cancelBookingAfterAsking(ask, team.number, booking, async () => {
+    await call(`/api/requests/${booking.id}`, { method: "PATCH", body: { action: "cancel", from: booking.status } });
+  });
+
+/** Save times: the changed step times of a request, which only the Judge Advisor may correct. */
+export const saveTimes = (call: Call, request: Pick<RequestRow, "id" | "status">, times: ReturnType<typeof formTimes>) =>
+  call(`/api/requests/${request.id}`, { method: "PATCH", body: { action: "set-times", from: request.status, times } });
 
 /* ---- Remove team ----------------------------------------------------------- */
 

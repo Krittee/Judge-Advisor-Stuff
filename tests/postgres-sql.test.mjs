@@ -226,6 +226,19 @@ test("updateRequest without ifStatus stays unconditional", async () => {
   assert.deepEqual(update.params, ["r1", "acknowledged"]);
 });
 
+test("a step-time correction (the Judge Advisor's set-times) is an ordinary patch: the time columns, then the status guard, status untouched", async () => {
+  const { sent } = await run(
+    (sql) => (sql.startsWith("update requests") ? [{ ...ROW, status: "completed" }] : []),
+    () => postgresStore.updateRequest("r1", { started_at: "2026-10-20T03:12:00.000Z", finished_at: "2026-10-20T03:32:00.000Z" }, "completed"),
+  );
+  const update = sent.find((c) => c.sql.startsWith("update requests"));
+  assert.equal(
+    update.sql,
+    "update requests set started_at = $2, finished_at = $3, updated_at = now() where id = $1 and status = $4 returning *",
+  );
+  assert.deepEqual(update.params, ["r1", "2026-10-20T03:12:00.000Z", "2026-10-20T03:32:00.000Z", "completed"]);
+});
+
 test("zero rows with ifStatus: a request that still exists is a 409, one that is gone is a 404", async () => {
   // The predicate missed. A second look at the row says which kind of miss it was.
   const moved = await run(

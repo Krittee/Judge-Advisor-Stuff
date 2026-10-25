@@ -6,6 +6,7 @@ import { isRealSlot } from "@/lib/data";
 import { canTransition, NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
 import { CONFLICT_MESSAGE, isConflicted, isPanelBlocked, loadBlocks } from "@/lib/conflicts";
 import { divisionsCompatible, resolveLanguage } from "@/lib/presets";
+import { readTimes, timesLogLine } from "@/lib/stepTimes";
 import type { RequestRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,8 @@ type Action =
   | "set-status"
   | "reassign"
   | "reschedule"
-  | "ready-now";
+  | "ready-now"
+  | "set-times";
 
 /**
  * Move a request along, cancel it, or hand it to a different panel.
@@ -66,6 +68,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
   } else if (action === "reopen" && session?.role !== "admin") {
     return NextResponse.json({ error: "Only the Judge Advisor can reopen a request." }, { status: 403 });
+  } else if (action === "set-times" && session?.role !== "admin") {
+    return NextResponse.json({ error: "Only the Judge Advisor can correct a request's times." }, { status: 403 });
   } else if (!canAdvance(session)) {
     return NextResponse.json(
       { error: "Only judges and the Judge Advisor can update interview status." },
@@ -176,6 +180,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const message = String(body.message ?? "").trim().slice(0, 280);
     if (message) patch.message = message;
     logLine = "ready now";
+  } else if (action === "set-times") {
+    // A correction of the clock, never of the status: only the step times
+    // move, and only ones the request has reached (see lib/stepTimes.ts).
+    const read = readTimes(current, body.times);
+    if ("error" in read) return NextResponse.json({ error: read.error }, { status: 400 });
+    Object.assign(patch, read.times);
+    logLine = timesLogLine(current, read.times);
   } else if (action === "reopen") {
     patch.status = "requested";
     patch.requested_at = now;

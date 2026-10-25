@@ -530,7 +530,7 @@ const titans = team("9882K", "Torque Titans", { pit: "B4" });
 function renderTeams(t: Team, f: FlagRow[], wide = true) {
   const m = renderToStaticMarkup(
     <TeamsBoard
-      state={{ teams: [t], panels: [], requests: [], conflicts: [], judges: [], flags: f, flagKinds, divisions: ["Middle School"], categories: categoryViews } as never}
+      state={{ teams: [t], panels: [], requests: [], conflicts: [], judges: [], flags: f, flagKinds, languages: [], divisions: ["Middle School"], categories: categoryViews } as never}
       wide={wide}
       filters={{ q: "", division: "", category: "" }}
       onFilters={noop}
@@ -545,6 +545,7 @@ function renderTeams(t: Team, f: FlagRow[], wide = true) {
       onSave={noop}
       onClose={noop}
       onResetStatus={noop}
+      interview={{} as never}
       onRemove={noop}
       onOpenFlags={noop}
       onOpenSheet={noop}

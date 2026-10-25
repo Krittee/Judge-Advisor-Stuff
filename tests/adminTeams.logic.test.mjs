@@ -3,12 +3,15 @@ import test from "node:test";
 
 import {
   activeFilters,
+  bookSlot,
+  cancelBookingNow,
   discardQuestion,
   filterTeams,
   flagPills,
   interviewOf,
   isDirty,
   leaveAfterAsking,
+  moveBooking,
   moveQuestion,
   notebookCounts,
   openInRefereeAfterAsking,
@@ -18,15 +21,20 @@ import {
   panelOptions,
   removeQuestion,
   removeTeamAfterAsking,
+  requestBlocker,
+  requestNow,
   RESETS,
   resetAfterAsking,
   resetQuestion,
   resetStatusAfterAsking,
   saveTeamAfterAsking,
+  saveTimes,
   startDraft,
   strandedIds,
   teamPatch,
+  timesRequestOf,
 } from "../src/components/admin/teamsLogic";
+import { formTimes, reachedSteps, readTimes, startTimes, timesLogLine } from "../src/lib/stepTimes";
 
 /* The Judge Advisor Teams tab's decisions, run for real against
    src/components/admin/teamsLogic.ts. How they are drawn is in
@@ -417,4 +425,131 @@ test("flag pills count a team's flags by severity, worst first, from the Referee
   const flags = [flag(titans, "warning"), flag(titans, "minor"), flag(titans, "warning"), flag(team("7700B", "Byte Me"), "good")];
   assert.deepEqual(flagPills(titans.id, flags, kinds).map(({ kind, count }) => [kind.short, count]), [["Minor", 1], ["Warning", 2]]);
   assert.deepEqual(flagPills("nobody", flags, kinds), []);
+});
+
+/* ---- asking for an interview, booking a time, moving or cancelling a booking ------------- */
+
+test("Request now is the desk's walk-up request: one POST by team number, in the language chosen", async () => {
+  const { calls, call } = caller();
+  await requestNow(call, titans, "th");
+  assert.deepEqual(calls, [{ url: "/api/requests", method: "POST", body: { teamNumber: "9882K", kind: "queue", language: "th" } }]);
+});
+
+test("Book a time is the desk's booking: the slot's own start and end, the team and the language", async () => {
+  const { calls, call } = caller();
+  await bookSlot(call, titans, { start: "2026-10-20T04:00:00.000Z", end: "2026-10-20T04:20:00.000Z" }, "en");
+  assert.deepEqual(calls, [
+    { url: "/api/requests", method: "POST", body: { teamNumber: "9882K", kind: "slot", language: "en", slotStart: "2026-10-20T04:00:00.000Z", slotEnd: "2026-10-20T04:20:00.000Z" } },
+  ]);
+});
+
+test("Change time is the existing reschedule, saying which status the drawer was showing", async () => {
+  const { calls, call } = caller();
+  await moveBooking(call, { id: "r1", status: "scheduled" }, { start: "2026-10-20T04:20:00.000Z", end: "2026-10-20T04:40:00.000Z" });
+  assert.deepEqual(calls, [
+    { url: "/api/requests/r1", method: "PATCH", body: { action: "reschedule", from: "scheduled", slotStart: "2026-10-20T04:20:00.000Z", slotEnd: "2026-10-20T04:40:00.000Z" } },
+  ]);
+});
+
+test("Cancel booking asks first with the desk's words, and a no sends nothing", async () => {
+  const booking = { id: "r1", status: "scheduled", slot_start: "2026-10-20T04:00:00.000Z" };
+  const no = asker(false);
+  const idle = caller();
+  assert.equal(await cancelBookingNow(no.ask, idle.call, titans, booking), false);
+  assert.equal(idle.calls.length, 0);
+  assert.match(no.asked[0].question, /^Cancel 9882K's .+ booking\?$/);
+  assert.deepEqual(no.asked[0].options, { confirmLabel: "Cancel booking", cancelLabel: "Keep it", danger: true });
+
+  const yes = asker(true);
+  const sent = caller();
+  assert.equal(await cancelBookingNow(yes.ask, sent.call, titans, booking), true);
+  assert.deepEqual(sent.calls, [{ url: "/api/requests/r1", method: "PATCH", body: { action: "cancel", from: "scheduled" } }]);
+  // The server's refusal is thrown, for the drawer to show above Save changes.
+  await assert.rejects(cancelBookingNow(yes.ask, caller("That request is gone.").call, titans, booking), /That request is gone\./);
+});
+
+test("Request and Book are off without a panel the team holds, or while a panel change is unsaved, and say why", () => {
+  const bare = team("7700B", "Byte Me");
+  assert.match(requestBlocker(bare, startDraft(bare), null), /No judge panel yet/);
+  assert.equal(requestBlocker(titans, startDraft(titans), panels[1]), null);
+  assert.match(requestBlocker(titans, { ...startDraft(titans), panelId: "p3" }, panels[1]), /Save the panel change first/);
+  assert.match(requestBlocker(bare, { ...startDraft(bare), panelId: "p2" }, null), /Save the panel change first/);
+  // A panel the team holds that has since been deleted is no panel.
+  assert.match(requestBlocker(titans, startDraft(titans), null), /No judge panel yet/);
+});
+
+/* ---- Times: step times of the team's current request -------------------------------------- */
+
+// 2026-10-20 in Bangkok (UTC+7): asked 10:00, on the way 10:05, started 10:10, finished 10:40.
+const DAY = { requested_at: "2026-10-20T03:00:00.000Z", acknowledged_at: "2026-10-20T03:05:00.000Z", started_at: "2026-10-20T03:10:00.000Z", finished_at: "2026-10-20T03:40:00.000Z" };
+const timed = (status, over = {}) => ({
+  ...request(titans, status), requested_at: DAY.requested_at, acknowledged_at: null, started_at: null, finished_at: null, cancelled_at: null, slot_end: null, ...over,
+});
+const NOON = new Date("2026-10-20T05:00:00.000Z").getTime();
+
+test("Times shows a box for each step the request has reached, and reads them in Bangkok time", () => {
+  assert.deepEqual(reachedSteps(timed("requested")), ["requested_at"]);
+  assert.deepEqual(reachedSteps(timed("acknowledged", { acknowledged_at: DAY.acknowledged_at })), ["requested_at", "acknowledged_at"]);
+  assert.deepEqual(reachedSteps(timed("completed", DAY)), ["requested_at", "acknowledged_at", "started_at", "finished_at"]);
+  assert.deepEqual(startTimes(timed("completed", DAY)), { requested_at: "10:00", acknowledged_at: "10:05", started_at: "10:10", finished_at: "10:40" });
+  // Cancelled after being acknowledged: the steps it reached, then when it was cancelled.
+  assert.deepEqual(reachedSteps(timed("cancelled", { acknowledged_at: DAY.acknowledged_at, cancelled_at: "2026-10-20T03:20:00.000Z" })), ["requested_at", "acknowledged_at", "cancelled_at"]);
+  // A booking has reached none: its requested_at is when it was booked, which is no step.
+  const booked = timed("scheduled", { kind: "slot", slot_start: "2026-10-20T07:00:00.000Z" });
+  assert.deepEqual(reachedSteps(booked), []);
+  assert.deepEqual(reachedSteps({ ...booked, status: "acknowledged", acknowledged_at: DAY.acknowledged_at }), ["acknowledged_at"], "taken on early: still no Requested");
+});
+
+test("the Times request is the live one, else the team's latest from today, and nothing from another day", () => {
+  const done = timed("completed", { ...DAY, id: "done" });
+  const later = timed("cancelled", { id: "later", requested_at: "2026-10-20T04:00:00.000Z", cancelled_at: "2026-10-20T04:10:00.000Z" });
+  const yesterday = timed("completed", { id: "old", requested_at: "2026-10-19T03:00:00.000Z", finished_at: "2026-10-19T03:40:00.000Z" });
+  assert.equal(timesRequestOf(titans.id, [done, later, yesterday], NOON).id, "later", "the most recent of today, cancelled or not");
+  assert.equal(timesRequestOf(titans.id, [yesterday], NOON), null);
+  assert.equal(timesRequestOf(titans.id, [timed("requested", { id: "live" }), done], NOON).id, "live");
+  assert.equal(timesRequestOf(titans.id, [{ ...later, team_id: "other" }], NOON), null, "another team's");
+  // Today is Bangkok's: 00:30 on the 21st there is still the 20th in UTC.
+  const lateNight = new Date("2026-10-20T17:30:00.000Z").getTime();
+  assert.equal(timesRequestOf(titans.id, [done], lateNight), null);
+});
+
+test("an edited box becomes an ISO time on the request's own Bangkok day; unedited boxes are not sent", () => {
+  const r = timed("completed", DAY);
+  const start = startTimes(r);
+  assert.deepEqual(formTimes(r, start), {}, "nothing edited, nothing to save");
+  assert.deepEqual(formTimes(r, { ...start, finished_at: "10:32" }), { finished_at: "2026-10-20T03:32:00.000Z" });
+  assert.deepEqual(formTimes(r, { ...start, requested_at: "00:30" }), { requested_at: "2026-10-19T17:30:00.000Z" }, "00:30 in Bangkok is the evening before in UTC, still the request's day");
+  // A cleared or half-typed box is sent as null, so the reason can be given.
+  assert.deepEqual(formTimes(r, { ...start, started_at: "" }), { started_at: null });
+  // A booking that was taken on belongs to its slot's day, not the day it was made.
+  const booked = timed("acknowledged", { kind: "slot", slot_start: "2026-10-22T03:00:00.000Z", requested_at: "2026-10-18T03:00:00.000Z", acknowledged_at: "2026-10-22T03:01:00.000Z" });
+  assert.deepEqual(formTimes(booked, { acknowledged_at: "10:02" }), { acknowledged_at: "2026-10-22T03:02:00.000Z" });
+});
+
+test("what Save times would send is checked by the server's own rule, with a reason in words", () => {
+  const r = timed("completed", DAY);
+  const start = startTimes(r);
+  const read = (over) => readTimes(r, formTimes(r, { ...start, ...over }));
+  assert.deepEqual(read({ finished_at: "10:32" }), { times: { finished_at: "2026-10-20T03:32:00.000Z" } });
+  assert.equal(read({ finished_at: "10:10" }).times?.finished_at, "2026-10-20T03:10:00.000Z", "equal to Started is in order");
+  assert.equal(read({ finished_at: "10:05" }).error, "Finished (10:05) can't be before Started (10:10).");
+  assert.equal(read({ requested_at: "10:07" }).error, "On the way (10:05) can't be before Requested (10:07).");
+  assert.equal(read({ started_at: "" }).error, "Enter a time for Started.");
+  assert.equal(readTimes(r, {}).error, "Change at least one time.");
+  assert.match(readTimes(timed("requested"), { finished_at: DAY.finished_at }).error, /has not reached "Finished"/);
+  assert.match(readTimes(r, { finished_at: "2026-10-21T03:40:00.000Z" }).error, /own day \(2026-10-20, Bangkok time\)/);
+});
+
+test("the Activity line says each step and the clock it moved from and to", () => {
+  const r = timed("completed", DAY);
+  assert.equal(timesLogLine(r, { finished_at: "2026-10-20T03:32:00.000Z" }), "corrected times: finished 10:40 → 10:32");
+  assert.equal(timesLogLine(r, { acknowledged_at: "2026-10-20T03:06:00.000Z", started_at: "2026-10-20T03:12:00.000Z" }), "corrected times: on the way 10:05 → 10:06, started 10:10 → 10:12");
+});
+
+test("Save times is the set-times action on that request, from the status the drawer showed", async () => {
+  const { calls, call } = caller();
+  await saveTimes(call, { id: "r9", status: "completed" }, { finished_at: "2026-10-20T03:32:00.000Z" });
+  assert.deepEqual(calls, [
+    { url: "/api/requests/r9", method: "PATCH", body: { action: "set-times", from: "completed", times: { finished_at: "2026-10-20T03:32:00.000Z" } } },
+  ]);
 });

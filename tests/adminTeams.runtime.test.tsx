@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { EventDataPanel } from "../src/components/admin/EventData";
+import { SlotChooser } from "../src/components/admin/InterviewControls";
 import { pillClass } from "../src/components/admin/refereeLogic";
 import { TeamsBoard, TeamsTab } from "../src/components/admin/TeamsTab";
 import { startDraft, type TeamDraft } from "../src/components/admin/teamsLogic";
@@ -15,6 +16,7 @@ import type { AppState, ConflictRow, FlagRow, JudgeRow, PublicPanel, RequestRow,
    adminTeams.logic.test.mjs and the wiring is read from source at the foot. */
 
 const noop = () => {};
+const noInterview = { request: async () => false, book: async () => false, move: async () => false, cancel: async () => false, times: async () => false };
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const text = (markup: string) => markup.replace(/<[^>]+>/g, "");
 
@@ -73,6 +75,10 @@ const slice = {
   flags,
   flagKinds,
   divisions: ["High School", "Middle School", "Elementary School"],
+  languages: [
+    { id: "en", label: "English", short: "EN" },
+    { id: "th", label: "Thai", short: "TH" },
+  ],
   categories: [
     { id: "developing", label: "Developing", color: "sky" },
     { id: "fully-developed", label: "Fully Developed", color: "emerald" },
@@ -113,6 +119,7 @@ function board(
       onSave={noop}
       onClose={noop}
       onResetStatus={noop}
+      interview={noInterview}
       onRemove={noop}
       onOpenFlags={noop}
       onOpenSheet={noop}
@@ -521,4 +528,138 @@ test("the Teams styles are page-scoped, use tokens for both themes, and have no 
   assert.match(block, /@media \(min-width: 1024px\) and \(max-width: 1279\.98px\) \{\s*\.ja-tm\[data-open="true"\] \.ja-tm-lo \{ display: none; \}/);
   // Closed by default means the body is not in the page (it is not merely hidden).
   assert.ok(read("src/components/admin/EventData.tsx").includes("{open ? ("));
+});
+
+/* ---- the Interview row: request, book, change time, cancel, and Times ------------------------ */
+
+const languages = slice.languages;
+const buttonsOf = (markup: string) => [...markup.matchAll(/<button type="button"([^>]*)>([\s\S]*?)<\/button>/g)].map((m) => ({ attrs: m[1], label: text(m[2]) }));
+const buttonNamed = (markup: string, label: string) => buttonsOf(markup).find((b) => b.label === label);
+const NOW = new Date().toISOString();
+// Every step at one instant: always the same Bangkok day as "today", whenever the suite runs.
+const stamped = (t: Team, status: RequestRow["status"], over: Partial<RequestRow> = {}): RequestRow =>
+  ({ ...request(t, status), requested_at: NOW, acknowledged_at: null, started_at: null, finished_at: null, cancelled_at: null, updated_at: NOW, ...over }) as RequestRow;
+const timesOf = (markup: string) => markup.match(/<h3 class="ja-lab">Times<\/h3>[\s\S]*?<\/div><\/div>/)?.[0] ?? "";
+const timeBoxes = (block: string) => [...block.matchAll(/<label class="ja-lab" for="[^"]*-t-(\w+)">([^<]*)<\/label><input[^>]* type="time" value="(\d\d:\d\d)"/g)].map((m) => [m[1], m[2], m[3]]);
+
+test("a team with no live request, on a panel: 'No interview requested yet', Request · <language> for each language, and Book a time", () => {
+  const d = drawer(board({ picked: pi }));
+  assert.match(d, /No interview requested yet\./);
+  assert.match(d, /<div class="ja-tm-rq" role="group" aria-label="Request an interview now, by language">/);
+  const request = (label: string) => buttonNamed(d, label);
+  assert.deepEqual(buttonsOf(d).map((b) => b.label).filter((l) => /^Request/.test(l)), ["Request · English", "Request · Thai"]);
+  assert.ok(request("Request · English") && !/disabled/.test(request("Request · English")!.attrs), "enabled with a panel");
+  assert.match(request("Request · Thai")!.attrs, /class="ja-tm-ghost"/);
+  assert.match(buttonNamed(d, "Book a time")!.attrs, /class="ja-tm-ghost ja-tm-bt" aria-expanded="false"/);
+  assert.doesNotMatch(d, /Change time|Cancel booking|dk-slot/, "the grid opens on Book a time");
+  assert.doesNotMatch(d, /ja-hint">(No judge panel yet|Save the panel change first)/);
+  // The same on a phone's sheet.
+  const phone = sheet(board({ wide: false, picked: pi }));
+  assert.ok(buttonNamed(phone, "Request · Thai") && buttonNamed(phone, "Book a time"));
+});
+
+test("with no panel, or a panel change not yet saved, both are off and the drawer says why", () => {
+  const none = drawer(board({ picked: byteMe }));
+  assert.match(none, /<p class="ja-hint">No judge panel yet\. Pick one above and save, then request or book\.<\/p>/);
+  for (const label of ["Request · English", "Request · Thai", "Book a time"]) assert.match(buttonNamed(none, label)!.attrs, /disabled=""/, label);
+  const unsaved = drawer(board({ picked: pi, draft: { panelId: "" } }));
+  assert.match(unsaved, /Save the panel change first\. Requests go to the panel the team holds\./);
+  assert.match(buttonNamed(unsaved, "Request · English")!.attrs, /disabled=""/);
+});
+
+test("a booking: its time with Change time under it, Cancel booking (asks first) in the Interview row, and no Request or Book", () => {
+  const d = drawer(board({ picked: rangers }));
+  assert.match(d, /<span class="ja-lab">Booked<\/span><span class="ja-tm-bk">\d{1,2}:\d{2}[^<]*<\/span><button type="button" class="ja-tm-od ja-tm-ts" aria-expanded="false">Change time<\/button>/);
+  assert.match(d, /<button type="button" class="ja-tm-rmb">Cancel booking<\/button><p class="ja-hint">Asks first\. Frees the \d{1,2}:\d{2}[^<]*slot\.<\/p>/);
+  assert.match(d, /jg-s-scheduled">Booked/);
+  assert.match(d, /Reset to…/, "the override stays as it was");
+  assert.doesNotMatch(d, /Request ·|Book a time|dk-slot|>Times</, "a booking has reached no step yet");
+  // A team with no booking has no Change time.
+  assert.doesNotMatch(drawer(board({ picked: titans })), /Change time|Cancel booking/);
+});
+
+test("Change time and Book a time open the desk's slot grid; a move shows the booking as current and keeps its language", () => {
+  const start = new Date(Date.now() + 2 * 3_600_000);
+  start.setMinutes(0, 0, 0);
+  const grid = { ...panels[1], slot_start_at: start.toISOString(), slot_minutes: 20, slot_count: 6 };
+  const slot = (k: number) => ({ slot_start: new Date(start.getTime() + k * 20 * 60_000).toISOString(), slot_end: new Date(start.getTime() + (k + 1) * 20 * 60_000).toISOString() });
+  const booking = { ...request(rangers, "scheduled", { kind: "slot" }), ...slot(1) } as RequestRow;
+  const other = { ...request(gremlins, "scheduled", { kind: "slot", id: "r-other" }), ...slot(4) } as RequestRow;
+  const props = { team: rangers, panel: grid, requests: [booking, other], teams, languages, busy: false, onConfirm: async () => true, onClose: noop };
+
+  const move = renderToStaticMarkup(<SlotChooser {...props} move={booking} />);
+  assert.match(move, /^<div class="ja-tm-slots">/);
+  assert.equal(move.match(/<button type="button" class="dk-slot"/g)?.length, 4, "four open slots, the other two held");
+  assert.match(move, /<button type="button" class="dk-slot dk-slot--current" style="[^"]*" disabled="" aria-current="true"/, "the booking being moved");
+  assert.match(move, /class="dk-slot dk-slot--taken"[^>]*aria-label="[^"]*, taken by 2011A"/, "another team's slot");
+  assert.match(move, /Panel 2 · 20 min slots/);
+  assert.match(move, /Language and note stay as booked\./);
+  assert.doesNotMatch(move, /<select/, "the language is the booking's");
+  assert.match(move, /<button type="button" class="ja-prim" disabled="">Move · pick a time<\/button>/);
+  assert.match(move, /<button type="button" class="ja-tm-od ja-tm-ts">Close<\/button>/);
+
+  const book = renderToStaticMarkup(<SlotChooser {...props} team={pi} move={null} />);
+  assert.deepEqual(optionsOf(book.match(/<select[\s\S]*?<\/select>/)?.[0] ?? ""), [["en", "English"], ["th", "Thai"]]);
+  assert.match(book, /Panel 2 interviews in English/, "the desk's language cover line");
+  assert.doesNotMatch(book, /dk-slot--current|stay as booked/);
+  assert.match(book, /<button type="button" class="ja-prim" disabled="">Book · pick a time<\/button>/);
+  assert.equal(book.match(/class="dk-slot"/g)?.length, 4);
+  assert.equal(book.match(/class="dk-slot[ "]/g)?.length, 6, "the two held slots are still drawn, off");
+
+  // A panel with no times says so, and points at Request now.
+  const empty = renderToStaticMarkup(<SlotChooser {...props} move={null} panel={{ ...grid, slot_count: 0 }} />);
+  assert.match(empty, /has no bookable times set up yet\./);
+});
+
+test("Times: one time box per step the request has reached, in Bangkok time, Save times off until something changes", () => {
+  const at = (iso: string) => ({ requested_at: iso, acknowledged_at: iso, started_at: iso, finished_at: iso });
+  const base = new Date(NOW);
+  const d = drawer(board({ picked: titans, state: { requests: [stamped(titans, "interviewing", { acknowledged_at: NOW, started_at: NOW })] } }));
+  const block = timesOf(d);
+  assert.match(block, /^<h3 class="ja-lab">Times<\/h3>/);
+  const clock = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(base);
+  assert.deepEqual(timeBoxes(block), [["requested_at", "Requested", clock], ["acknowledged_at", "On the way", clock], ["started_at", "Started", clock]]);
+  assert.doesNotMatch(block, /Finished|Cancelled/);
+  assert.match(buttonNamed(d, "Save times")!.attrs, /class="ja-tm-ghost" disabled=""/);
+  assert.match(d, /Interview in progress · Bangkok time, on the request&#x27;s own day\./);
+  assert.doesNotMatch(d, /Request ·|Book a time/, "a live request is not asked for again");
+
+  // Finished today: all four. Cancelled today (no live request): Requested, then Cancelled, and the team can be asked for again.
+  const done = drawer(board({ picked: titans, state: { requests: [stamped(titans, "completed", at(NOW))] } }));
+  assert.deepEqual(timeBoxes(timesOf(done)).map((b) => b[1]), ["Requested", "On the way", "Started", "Finished"]);
+  const dropped = drawer(board({ picked: pi, state: { requests: [stamped(pi, "cancelled", { cancelled_at: NOW })] } }));
+  assert.deepEqual(timeBoxes(timesOf(dropped)).map((b) => b[1]), ["Requested", "Cancelled"]);
+  assert.ok(buttonNamed(dropped, "Request · English"), "a cancelled request leaves the team free to be asked for");
+
+  // Another day's request has no Times; neither has a team with none.
+  const old = stamped(pi, "completed", { ...at("2026-01-05T03:00:00.000Z") });
+  assert.doesNotMatch(drawer(board({ picked: pi, state: { requests: [old] } })), />Times</);
+  assert.doesNotMatch(drawer(board({ picked: byteMe })), />Times</);
+  // The phone's sheet has it too, under unique ids.
+  const phone = board({ wide: false, picked: titans, state: { requests: [stamped(titans, "interviewing", { acknowledged_at: NOW, started_at: NOW })] } });
+  assert.ok(buttonNamed(sheet(phone), "Save times"));
+  const ids = [...phone.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(ids.filter((id, i) => ids.indexOf(id) !== i), []);
+});
+
+test("the Interview controls write only through the logic functions, at once, and never through window.confirm", () => {
+  const controls = read("src/components/admin/InterviewControls.tsx");
+  for (const call of ["requestNow(call, t, language)", "bookSlot(call, t, slot, language)", "moveBooking(call, booking, slot)", "cancelBookingNow(ask, call, t, booking)", "saveTimes(call, request, times)"]) {
+    assert.ok(tab.includes(call), call);
+  }
+  assert.ok(tab.includes("interview={interview}") && tab.includes("busy={writing}"));
+  assert.ok(!/\bcall[<(]/.test(controls) && !/\bconfirm\(/.test(controls) && !controls.includes("window.confirm"), "the markup sends nothing itself");
+  assert.ok(controls.includes("<DeskSlots") && controls.includes("buildSlots(") && controls.includes("slotKind("), "the desk's grid and slot rules, not a copy");
+  assert.ok(controls.includes("readTimes(request, changes)"), "Save times is held to the rule the server enforces");
+});
+
+test("the Interview controls' styles live in the Teams block, use tokens, and give the desk's grid the console's field colours", () => {
+  const css = read("src/app/globals.css");
+  const teams = css.slice(css.indexOf("/* The Interview row's controls"), css.indexOf("/* @ja-block eventdata */"));
+  assert.ok(teams.length > 300);
+  for (const rule of [/\.ja-tm-rq \{[^}]*flex-wrap: wrap/, /\.ja-tm-bt \{[^}]*width: 100%/, /\.ja-tm-tr \{[^}]*grid-template-columns/, /\.ja-tm-tt \{/]) assert.match(teams, rule);
+  assert.match(teams, /\.ja-tm-slots \{ --dk-field: var\(--jg-field\); --dk-field-line: var\(--jg-field-line\)/);
+  assert.doesNotMatch(teams, /oklch\(|#[0-9a-f]{3,6}\b|\brgb\(|transition|animation/i);
+  // The desk's tile classes are defined once, bare, for both screens.
+  assert.match(css, /\.dk-slot \{[^}]*height: 48px/);
 });

@@ -5,30 +5,41 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { ChevronDown, ChevronRight, CloseIcon, StatusPill, WarnIcon } from "@/components/judge/parts";
 import { call } from "@/components/useAppState";
 import { formatClock } from "@/components/ui";
+import { liveRequestFor } from "@/lib/data";
 import { STATUS_META, type Status } from "@/lib/status";
+import { reachedSteps } from "@/lib/stepTimes";
 import type { AppState, RequestRow, Team } from "@/lib/types";
 import { EventData } from "./EventData";
 import { divisionTag, teamCount } from "./floorLogic";
+import { RequestControls, SlotChooser, TimesBlock } from "./InterviewControls";
 import { Pill } from "./RefereeTab";
 import {
   activeFilters,
+  bookSlot,
+  cancelBookingNow,
   filterTeams,
   flagPills,
   interviewOf,
   isDirty,
   leaveAfterAsking,
+  moveBooking,
   notebookCounts,
   openInRefereeAfterAsking,
   panelCell,
   panelLoad,
   panelOptions,
   removeTeamAfterAsking,
+  requestBlocker,
+  requestNow,
   RESETTABLE_STATUSES,
   resetStatusAfterAsking,
   saveTeamAfterAsking,
+  saveTimes,
   startDraft,
   strandedIds,
+  timesRequestOf,
   type Filters,
+  type InterviewActions,
   type TeamDraft,
 } from "./teamsLogic";
 
@@ -74,13 +85,15 @@ const isWide = () => window.matchMedia(WIDE).matches;
 /** From 1024px the editor is a drawer beside a table; below it, a sheet over a list. */
 const useWide = (): boolean => useSyncExternalStore(watchWide, isWide, () => false);
 
-type Slice = Pick<AppState, "teams" | "panels" | "requests" | "categories" | "divisions" | "conflicts" | "judges" | "flags" | "flagKinds">;
+type Slice = Pick<AppState, "teams" | "panels" | "requests" | "categories" | "divisions" | "conflicts" | "judges" | "flags" | "flagKinds" | "languages">;
 
 /**
  * The Teams section: the roster and who judges whom. Select a team to edit it
  * in a drawer (a sheet on a phone); "Save changes" sends number, name, pit,
  * division, notebook and panel together in one PATCH. The interview status override,
  * Remove team and the two resets each ask first, through the in-page confirm.
+ * Asking for an interview, booking a time, moving or cancelling a booking and
+ * correcting step times apply at once (`run`), not with Save changes.
  */
 export function TeamsTab({
   state,
@@ -107,6 +120,7 @@ export function TeamsTab({
   // What is typed into the editor, for the team it was typed for. Until something is, the editor follows the team.
   const [edit, setEdit] = useState<{ teamId: string; draft: TeamDraft } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [writing, setWriting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const team = pickedId ? (state.teams.find((t) => t.id === pickedId) ?? null) : null;
@@ -169,6 +183,30 @@ export function TeamsTab({
       setError((e as Error).message);
     }
   }
+
+  /** A write that applies at once: refresh once it went, or show the server's refusal. True when it went (false is a no to the question or a refusal). */
+  async function run(write: () => Promise<unknown>): Promise<boolean> {
+    setWriting(true);
+    setError(null);
+    try {
+      if ((await write()) === false) return false;
+      await refresh();
+      return true;
+    } catch (e) {
+      setError((e as Error).message);
+      return false;
+    } finally {
+      setWriting(false);
+    }
+  }
+
+  const interview: InterviewActions = {
+    request: (t, language) => run(() => requestNow(call, t, language)),
+    book: (t, slot, language) => run(() => bookSlot(call, t, slot, language)),
+    move: (booking, slot) => run(() => moveBooking(call, booking, slot)),
+    cancel: (t, booking) => run(() => cancelBookingNow(ask, call, t, booking)),
+    times: (request, times) => run(() => saveTimes(call, request, times)),
+  };
 
   async function remove() {
     if (!team) return;
@@ -244,6 +282,8 @@ export function TeamsTab({
         onSave={save}
         onClose={close}
         onResetStatus={resetStatus}
+        interview={interview}
+        busy={writing}
         onRemove={remove}
         onOpenFlags={openFlags}
         onOpenSheet={() => team && onOpenSheet(team.id)}
@@ -281,6 +321,8 @@ export function TeamsBoard({
   onSave,
   onClose,
   onResetStatus,
+  interview,
+  busy = false,
   onRemove,
   onOpenFlags,
   onOpenSheet,
@@ -308,6 +350,10 @@ export function TeamsBoard({
   onSave: () => void;
   onClose: () => void;
   onResetStatus: (request: RequestRow, status: Status) => void;
+  /** Request, book, move, cancel and correct times: each applies at once. */
+  interview: InterviewActions;
+  /** One of those is on its way. */
+  busy?: boolean;
   onRemove: () => void;
   onOpenFlags: () => void;
   onOpenSheet: () => void;
@@ -332,6 +378,8 @@ export function TeamsBoard({
     onSave,
     onClose,
     onResetStatus,
+    interview,
+    busy,
     onRemove,
     onOpenFlags,
     onOpenSheet,
@@ -777,6 +825,8 @@ type EditorProps = {
   onSave: () => void;
   onClose: () => void;
   onResetStatus: (request: RequestRow, status: Status) => void;
+  interview: InterviewActions;
+  busy: boolean;
   onRemove: () => void;
   onOpenFlags: () => void;
   onOpenSheet: () => void;
@@ -830,7 +880,7 @@ function Drawer(p: EditorProps) {
       </header>
       <form className="ja-tm-form" onSubmit={submitter(p)}>
         <div className="ja-tm-drb">
-          <Fields {...p} />
+          <Fields key={team.id} {...p} />
         </div>
         <div className="ja-tm-drf">
           <EditorFoot {...p} />
@@ -856,7 +906,7 @@ function SheetBody(p: EditorProps & { titleId: string }) {
         </button>
       </div>
       <div className="ja-cf-scroll">
-        <Fields {...p} />
+        <Fields key={team.id} {...p} />
       </div>
       <div className="ja-cf-foot ja-tm-ff">
         <EditorFoot {...p} />
@@ -865,9 +915,16 @@ function SheetBody(p: EditorProps & { titleId: string }) {
   );
 }
 
-function Fields({ uid, team, draft, onDraft, state, onResetStatus, onRemove, onOpenFlags, onOpenSheet }: EditorProps) {
+function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, busy, onRemove, onOpenFlags, onOpenSheet }: EditorProps) {
   const set = (patch: Partial<TeamDraft>) => onDraft({ ...draft, ...patch });
+  const [changing, setChanging] = useState(false);
   const { request, bookedAt } = interviewOf(team.id, state.requests);
+  // A booking is the live request when nothing is in the queue yet; with no live request at all the team can be asked for or booked.
+  const live = liveRequestFor(team.id, state.requests);
+  const booking = live?.status === "scheduled" ? live : null;
+  const panel = state.panels.find((p) => p.id === team.panel_id) ?? null;
+  const bookingPanel = booking ? (state.panels.find((p) => p.id === booking.panel_id) ?? panel) : null;
+  const timed = timesRequestOf(team.id, state.requests, Date.now());
   const pills = flagPills(team.id, state.flags, state.flagKinds);
   const options = panelOptions(team, state.panels, state.conflicts, state.judges, draft.division);
   // A panel the new division cannot use is no longer in the list: the select reads "— none —", which is what Save will do (after asking).
@@ -917,8 +974,26 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, onRemove, onO
         <div className="ja-fl">
           <span className="ja-lab">Booked</span>
           <span className={bookedAt ? "ja-tm-bk" : "ja-tm-bk ja-tm-none"}>{formatClock(bookedAt)}</span>
+          {booking && bookingPanel ? (
+            <button type="button" className="ja-tm-od ja-tm-ts" aria-expanded={changing} disabled={busy} onClick={() => setChanging(!changing)}>
+              Change time
+            </button>
+          ) : null}
         </div>
       </div>
+      {changing && booking && bookingPanel ? (
+        <SlotChooser
+          team={team}
+          panel={bookingPanel}
+          requests={state.requests}
+          teams={state.teams}
+          languages={state.languages}
+          move={booking}
+          busy={busy}
+          onConfirm={(slot) => interview.move(booking, slot)}
+          onClose={() => setChanging(false)}
+        />
+      ) : null}
 
       <div className="ja-fl">
         <label className="ja-lab" htmlFor={`${uid}-category`}>
@@ -995,7 +1070,39 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, onRemove, onO
         ) : (
           <p className="ja-hint">No interview requested yet.</p>
         )}
+        {booking ? (
+          <div className="ja-fl ja-tm-rm">
+            <button
+              type="button"
+              className="ja-tm-rmb"
+              disabled={busy}
+              onClick={() => {
+                setChanging(false);
+                void interview.cancel(team, booking);
+              }}
+            >
+              Cancel booking
+            </button>
+            <p className="ja-hint">Asks first. Frees the {formatClock(booking.slot_start)} slot.</p>
+          </div>
+        ) : null}
+        {!live ? (
+          <RequestControls
+            team={team}
+            panel={panel}
+            blocker={requestBlocker(team, draft, panel)}
+            requests={state.requests}
+            teams={state.teams}
+            languages={state.languages}
+            busy={busy}
+            interview={interview}
+          />
+        ) : null}
       </div>
+
+      {timed && reachedSteps(timed).length ? (
+        <TimesBlock key={`${timed.id}:${timed.updated_at}`} uid={uid} request={timed} busy={busy} onSave={interview.times} />
+      ) : null}
 
       <div className="ja-fl">
         <h3 className="ja-lab">Flags</h3>
