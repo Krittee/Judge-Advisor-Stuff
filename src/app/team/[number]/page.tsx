@@ -5,7 +5,7 @@ import { liveRequestFor } from "@/lib/data";
 import { useAppState } from "@/components/useAppState";
 import { normalizeTeamNumber } from "@/lib/teamNumber";
 import { CenteredNote, TeamNotFound, TeamView } from "@/components/team/TeamView";
-import { earlierToday } from "@/components/team/teamLogic";
+import { earlierToday, sameEventDay } from "@/components/team/teamLogic";
 
 /**
  * A team's own page: where it stands. Read-only -- requests and bookings are
@@ -43,12 +43,15 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
 
   const panel = state.panels.find((p) => p.id === team.panel_id);
   const requests = state.requests.filter((r) => r.team_id === team.id);
-  // Its live request or booking; with none, the latest one, so a team that
-  // has finished reads "Interview complete" rather than "No request yet".
-  // `history` leaves `current` out, so the same request is never shown twice.
+  // Its live request or booking; with none, the latest one from today, so a
+  // team that has finished today reads "Interview complete" rather than "No
+  // request yet". Yesterday's requests are not today's. `history` leaves
+  // `current` out, so the same request is never shown twice.
   const current =
     liveRequestFor(team.id, requests) ??
-    [...requests].sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ??
+    [...requests]
+      .filter((r) => sameEventDay(r.updated_at, now))
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ??
     null;
 
   return (
@@ -56,7 +59,7 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
       team={team}
       panel={panel}
       current={current}
-      history={earlierToday(state.requests, team.id, current?.id)}
+      history={earlierToday(state.requests, team.id, current?.id, now)}
       languages={state.languages}
       categories={state.categories}
       requests={state.requests}

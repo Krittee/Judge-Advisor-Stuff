@@ -9,6 +9,7 @@ import {
   clockParts,
   earlierToday,
   historyTime,
+  sameEventDay,
   stepTime,
   toneOf,
   trackSteps,
@@ -138,15 +139,27 @@ test("a clock time splits into big digits and a small AM/PM, and puts back the s
 
 /* ---- earlier today ---------------------------------------------------------------- */
 
-test("earlier today is the team's other requests, at most five, in the order given", () => {
+test("the event's day is the Bangkok calendar day, so the boundary is 17:00 UTC", () => {
+  assert.equal(sameEventDay("2026-10-24T16:59:00.000Z", Date.parse("2026-10-24T17:01:00.000Z")), false, "23:59 and 00:01 Bangkok");
+  assert.equal(sameEventDay("2026-10-24T16:59:00.000Z", Date.parse("2026-10-24T16:58:00.000Z")), true);
+  assert.equal(sameEventDay("2026-10-24T18:00:00.000Z", Date.parse("2026-10-25T01:00:00.000Z")), true, "both 25 Oct in Bangkok, two UTC days");
+});
+
+test("earlier today is the team's other requests from today, at most five, in the order given", () => {
   const rows = [
     ...Array.from({ length: 7 }, (_, i) => request({ id: `a${i}`, team_id: "t1", status: "completed" })),
     request({ id: "other", team_id: "t2" }),
     request({ id: "live", team_id: "t1" }),
   ];
-  assert.deepEqual(earlierToday(rows, "t1", "live").map((r) => r.id), ["a0", "a1", "a2", "a3", "a4"]);
-  assert.deepEqual(earlierToday([rows[7], rows[8]], "t1", "live"), [], "nothing of this team's but the live one, and nobody else's");
-  assert.deepEqual(earlierToday([rows[8], rows[0]], "t1").map((r) => r.id), ["live", "a0"], "with no live request nothing is left out");
+  assert.deepEqual(earlierToday(rows, "t1", "live", NOW).map((r) => r.id), ["a0", "a1", "a2", "a3", "a4"]);
+  assert.deepEqual(earlierToday([rows[7], rows[8]], "t1", "live", NOW), [], "nothing of this team's but the live one, and nobody else's");
+  assert.deepEqual(earlierToday([rows[8], rows[0]], "t1", undefined, NOW).map((r) => r.id), ["live", "a0"], "with no live request nothing is left out");
+});
+
+test("earlier today drops the team's requests from other days", () => {
+  const yesterday = request({ id: "yday", team_id: "t1", status: "completed", finished_at: "2026-10-19T12:00:00.000Z" });
+  const today = request({ id: "today", team_id: "t1", status: "completed", finished_at: ago(30) });
+  assert.deepEqual(earlierToday([yesterday, today], "t1", undefined, NOW).map((r) => r.id), ["today"]);
 });
 
 test("a row is timed by when it finished, else when it was cancelled, else when it was asked for", () => {

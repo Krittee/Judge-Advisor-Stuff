@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { mock } from "node:test";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -18,7 +18,10 @@ const read = (path: string) => readFileSync(new URL(path, root), "utf8");
 const noComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
 const text = (markup: string) => markup.replace(/<[^>]+>/g, "");
 
-const NOW = Date.now();
+// Midday in Bangkok, so every `ago()` stays on that day whatever the real clock says.
+const NOW = Date.parse("2026-10-20T05:00:00.000Z");
+// The view reads the clock itself (ui.tsx), so the clock is pinned to NOW for the whole file.
+mock.timers.enable({ apis: ["Date"], now: NOW });
 const ago = (mins: number) => new Date(NOW - mins * 60_000 - 5_000).toISOString();
 // Far enough ahead that no slot has passed, so the booked times do not depend on the clock.
 const SLOT_BASE = Date.parse("2099-01-01T10:00:00.000Z");
@@ -69,7 +72,7 @@ function view(over: Partial<TeamViewProps> = {}) {
       team={team}
       panel={team.panel_id ? panel2 : undefined}
       current={current}
-      history={earlierToday(requests, team.id, current?.id)}
+      history={earlierToday(requests, team.id, current?.id, NOW)}
       languages={languages}
       categories={categories}
       requests={requests}
@@ -321,9 +324,9 @@ test("the public page renders TeamView and keeps only polling and the lookup", (
   assert.match(page, /useAppState\(4000\)/);
   assert.match(page, /online \? "Loading…" : "Can't reach the server — retrying…"/);
   assert.match(page, /if \(!team\) return <TeamNotFound number=\{teamNumber\} \/>/);
-  // The live request, else the latest, and history leaves that one out.
-  assert.match(page, /liveRequestFor\(team\.id, requests\) \?\?\s*\[\.\.\.requests\]\.sort\(\(a, b\) => b\.updated_at\.localeCompare\(a\.updated_at\)\)\[0\]/);
-  assert.match(page, /history=\{earlierToday\(state\.requests, team\.id, current\?\.id\)\}/);
+  // The live request, else the latest from today, and history leaves that one out.
+  assert.match(page, /liveRequestFor\(team\.id, requests\) \?\?\s*\[\.\.\.requests\]\s*\.filter\(\(r\) => sameEventDay\(r\.updated_at, now\)\)\s*\.sort\(\(a, b\) => b\.updated_at\.localeCompare\(a\.updated_at\)\)\[0\]/);
+  assert.match(page, /history=\{earlierToday\(state\.requests, team\.id, current\?\.id, now\)\}/);
   assert.match(page, /categories=\{state\.categories\}/);
   // Not a second copy of the view's markup.
   assert.doesNotMatch(page, /tp-pan|tp-track|tp-acts|<main|<header|<section|trackSteps|STATUS_META/);
