@@ -971,6 +971,22 @@ test("migrate() keys a nomination on the judge as the roster compares a name, an
   assert.match(cleanup, /ranked\.rn > 1/);
 });
 
+test("migrate() gives nominations a role and the Judge Advisor's rows an index of their own, after the judges' index, and schema.sql agrees", () => {
+  // Added the way every later column is: idempotent, in the block that follows the tables, so an existing database gets it and every row stays a judge's.
+  const column = after(migrateBody, "alter table nominations add column if not exists role text not null default 'judge' check (role in ('judge', 'admin'));");
+  const admin = migrateBody.search(/create unique index if not exists nominations_one_per_admin\s+on nominations \(award_id, team_id, lower\(btrim\(judge\)\)\) where role = 'admin';/);
+  assert.ok(admin > column, "the index needs the column");
+  assert.ok(column > after(migrateBody, "create table if not exists nominations ("));
+  assert.ok(migrateBody.search(/create unique index if not exists nominations_one_per_judge/) < column, "the judges' index and its cleanup are untouched and run first");
+  // The judges' index sees a NULL panel as distinct, which is why the Judge Advisor's rows (no panel) need a partial one of their own, without the panel.
+  assert.ok(!/nominations_one_per_admin[^;]*panel_id/.test(migrateBody), "the Judge Advisor's key has no panel in it");
+  assert.match(
+    schemaSql,
+    /create unique index nominations_one_per_admin\s+on nominations \(award_id, team_id, lower\(btrim\(judge\)\)\) where role = 'admin';/,
+  );
+  assert.match(schemaSql, /create unique index nominations_one_per_judge\s+on nominations \(award_id, team_id, panel_id, lower\(btrim\(judge\)\)\);/, "and the judges' index is as it was");
+});
+
 test("migrate() creates award_winners with one row per (award, division), cascading with the team", () => {
   assert.match(
     migrateBody,
@@ -987,7 +1003,7 @@ test("both award tables are locked down like every other, and supabase/schema.sq
   }
   assert.match(
     schemaSql,
-    /create table nominations \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*award_id\s+text not null,[^\n]*\n\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*panel_id\s+uuid references panels\(id\) on delete set null,\s*judge\s+text not null,[^\n]*\n\s*reason\s+text,\s*created_at timestamptz not null default now\(\),\s*updated_at timestamptz not null default now\(\)\s*\);/,
+    /create table nominations \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*award_id\s+text not null,[^\n]*\n\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*panel_id\s+uuid references panels\(id\) on delete set null,\s*judge\s+text not null,[^\n]*\n\s*role\s+text not null default 'judge' check \(role in \('judge', 'admin'\)\),\s*reason\s+text,\s*created_at timestamptz not null default now\(\),\s*updated_at timestamptz not null default now\(\)\s*\);/,
   );
   assert.match(
     schemaSql,
@@ -1025,6 +1041,58 @@ test("nominate is one upsert on the full non-null key, the judge as lower(btrim(
   calls.length = 0;
   await postgresStore.nominate({ awardId: "excellence", teamId: "t1", panelId: "p1", judge: "Amy", reason: null });
   assert.deepEqual(sent(/^insert into nominations/)[0].params, ["excellence", "t1", "p1", "Amy", null, true], "null clears it, which is not the same as leaving it out");
+});
+
+test("the Judge Advisor's nomination is one upsert on the partial index, with no panel and role 'admin': no reason keeps the stored one, a reason (or null) sets it", async () => {
+  calls.length = 0;
+  answer = () => [{ ...NOMINATION, panel_id: null, judge: "Alex", role: "admin" }];
+  const made = await postgresStore.nominateAsAdmin({ awardId: "excellence", teamId: "t1", judge: "Alex" });
+  const [upsert] = sent(/^insert into nominations/);
+  assert.equal(
+    upsert.sql.replace(/\s+/g, " "),
+    "insert into nominations (award_id, team_id, panel_id, judge, role, reason) values ($1, $2, null, $3, 'admin', $4) on conflict (award_id, team_id, lower(btrim(judge))) where role = 'admin' do update set reason = case when $5::boolean then excluded.reason else nominations.reason end, updated_at = case when $5::boolean and excluded.reason is distinct from nominations.reason then now() else nominations.updated_at end returning *",
+    "the conflict is the partial index's own expression and predicate, so Postgres can infer it",
+  );
+  assert.deepEqual(upsert.params, ["excellence", "t1", "Alex", null, false], "no reason given: $5 says leave the stored one");
+  assert.equal(made.role, "admin");
+  assert.equal(made.panel_id, null);
+  assert.equal(sent(/for update/).length, 0, "one statement, so there is nothing to lock");
+
+  calls.length = 0;
+  await postgresStore.nominateAsAdmin({ awardId: "excellence", teamId: "t1", judge: "Alex", reason: "Worth a look" });
+  assert.deepEqual(sent(/^insert into nominations/)[0].params, ["excellence", "t1", "Alex", "Worth a look", true]);
+  calls.length = 0;
+  await postgresStore.nominateAsAdmin({ awardId: "excellence", teamId: "t1", judge: "Alex", reason: null });
+  assert.deepEqual(sent(/^insert into nominations/)[0].params, ["excellence", "t1", "Alex", null, true], "null clears it, which is not the same as leaving it out");
+
+  // The judges' upsert is not the Judge Advisor's: it still names the panel and writes no role (the column's default is 'judge').
+  calls.length = 0;
+  answer = () => [NOMINATION];
+  await postgresStore.nominate({ awardId: "excellence", teamId: "t1", panelId: "p1", judge: "Amy" });
+  assert.doesNotMatch(sent(/^insert into nominations/)[0].sql, /role|admin/);
+});
+
+test("the Judge Advisor's nomination of a vanished team is a 404, and any other error goes through", async () => {
+  const input = { awardId: "excellence", teamId: "t1", judge: "Alex" };
+  answer = () => {
+    throw pgError("23503", "nominations_team_id_fkey");
+  };
+  await assert.rejects(() => postgresStore.nominateAsAdmin(input), (e) => e.status === 404 && /team no longer exists/.test(e.message));
+  answer = () => {
+    throw pgError("40001");
+  };
+  await assert.rejects(() => postgresStore.nominateAsAdmin(input), (e) => e.code === "40001");
+});
+
+test("removing a nomination deletes by id alone, whoever made it, and says whether anything went", async () => {
+  calls.length = 0;
+  answer = () => [{ id: "n1" }];
+  assert.equal(await postgresStore.removeNomination("n1"), true);
+  const [del] = sent(/^delete from nominations/);
+  assert.equal(del.sql, "delete from nominations where id = $1 returning id", "no role and no panel in it: a judge's row or the Judge Advisor's");
+  assert.deepEqual(del.params, ["n1"]);
+  answer = () => [];
+  assert.equal(await postgresStore.removeNomination("n1"), false);
 });
 
 test("nominate turns a vanished team or panel into a 404, and lets any other error through", async () => {

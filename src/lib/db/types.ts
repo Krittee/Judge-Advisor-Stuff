@@ -142,6 +142,14 @@ export type NewNomination = NominationKey & {
   reason?: string | null;
 };
 
+/**
+ * The Judge Advisor's nomination has no panel: the key is (awardId, teamId,
+ * judge), where `judge` is the Judge Advisor's session name.
+ */
+export type AdminNominationKey = Omit<NominationKey, "panelId">;
+
+export type NewAdminNomination = AdminNominationKey & { reason?: string | null };
+
 export type NewWinner = {
   awardId: string;
   division: string;
@@ -278,8 +286,16 @@ export type Store = {
    * same row, and only a changed `reason` writes. 404 if the team or panel is gone.
    */
   nominate(input: NewNomination): Promise<NominationRow>;
-  /** Returns whether it existed. */
+  /** Returns whether it existed. A judge's own; never touches the Judge Advisor's. */
   withdrawNomination(key: NominationKey): Promise<boolean>;
+  /**
+   * The Judge Advisor's nomination (role "admin", no panel): idempotent on
+   * (awardId, teamId, judge) among the Judge Advisor's own rows, so it sits
+   * beside a judge's nomination of the same team. 404 if the team is gone.
+   */
+  nominateAsAdmin(input: NewAdminNomination): Promise<NominationRow>;
+  /** Remove any nomination by id, whoever made it. Returns whether it existed. */
+  removeNomination(id: string): Promise<boolean>;
   /** Who won what, per division. Secret until the ceremony: never part of the shared state. */
   listWinners(): Promise<WinnerRow[]>;
   /** One winner per (awardId, division): setting another replaces it. 404 if the team is gone. */

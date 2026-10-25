@@ -18,7 +18,10 @@ import type { Call } from "./teamsLogic";
    Referees do not nominate, but Good conduct flagged twice or more counts as a
    nomination for Sportsmanship (src/lib/awards.ts): such a team is drawn in
    green and has no judge to count. It belongs to no panel, so a panel's own
-   view leaves it out. */
+   view leaves it out.
+   The Judge Advisor can nominate too (role "admin", no panel, "JA" on screen):
+   it counts like a judge's nomination, and like the Good conduct one it belongs
+   to no panel, so it shows under All panels only. */
 
 /* ---- what is on screen ------------------------------------------------------ */
 
@@ -89,6 +92,9 @@ export function alreadyHas(awards: AwardView[], decided: Map<string, WinnerRow>,
 
 const byNumber = (a: string, b: string): number => a.localeCompare(b, undefined, { numeric: true });
 
+/** Teams by number, 1234A before 7700B: the Add team picker's order. */
+export const teamsByNumber = (teams: Team[]): Team[] => [...teams].sort((a, b) => byNumber(a.number, b.number));
+
 /** "Panel 2" is "P2"; a panel named anything else keeps its name. */
 export function panelShort(name: string): string {
   const m = /^panel\s+(\S+)$/i.exec(name.trim());
@@ -106,6 +112,12 @@ export function panelTagText(panelIds: (string | null)[], panels: Pick<PublicPan
 
 export const judgesText = (n: number): string => (n === 0 ? "Withdrawn" : n === 1 ? "1 judge" : `${n} judges`);
 
+/** The Judge Advisor, by the name the side panel's heading and the confirm question use. */
+export const JA_NAME = "the Judge Advisor";
+
+/** The key of the side panel's section for the Judge Advisor's own nomination: no panel to name it by. */
+export const JA_KEY = "ja";
+
 export const nominationsText = (nominations: number, teams: number): string => `${nominations} ${nominations === 1 ? "nomination" : "nominations"} for ${teamCount(teams)}`;
 
 const list = (words: string[]): string => (words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`);
@@ -119,7 +131,7 @@ export function hiddenNote(hidden: Pick<AwardView, "label">[], panelName: string
 
 /* ---- the nominations in view ---------------------------------------------------- */
 
-/** The nominations of teams in this division, and when a panel is chosen only that panel's. */
+/** The nominations of teams in this division, and when a panel is chosen only that panel's (the Judge Advisor's have no panel, so a panel's view leaves them out). */
 export function nominationsIn(nominations: NominationRow[], teams: Pick<Team, "id" | "division">[], division: string, panelId = ALL_PANELS): NominationRow[] {
   const here = new Set(teams.filter((t) => t.division === division).map((t) => t.id));
   return nominations.filter((n) => here.has(n.team_id) && (!panelId || n.panel_id === panelId));
@@ -142,12 +154,18 @@ export const conductText = (n: number): string => `Good conduct ×${n}`;
 /** "Good conduct ×2+": the matrix key's words for the green dot. */
 export const conductKeyText = `${conductText(GOOD_CONDUCT_MIN)}+`;
 
-/** What backs a nominee: its judges and, for Sportsmanship, its Good conduct flags. A team with flags alone has no judges to count, and says nothing of them. */
-export function backing(judges: number, conduct: number): { judges: string | null; conduct: string | null } {
-  return { judges: judges || !conduct ? judgesText(judges) : null, conduct: conduct ? conductText(conduct) : null };
+/**
+ * What backs a nominee: its judges, the Judge Advisor ("1 judge · JA", or "JA" alone) and, for
+ * Sportsmanship, its Good conduct flags. A team with flags alone has no judges to count, and says
+ * nothing of them. `jaWord` is what the Judge Advisor is called: short on the screen, in full for a screen reader.
+ */
+export function backing(judges: number, conduct: number, ja = 0, jaWord = "JA"): { judges: string | null; conduct: string | null } {
+  const who = [judges || (!conduct && !ja) ? judgesText(judges) : null, ja ? jaWord : null].filter(Boolean).join(" · ");
+  return { judges: who || null, conduct: conduct ? conductText(conduct) : null };
 }
 
-export const backingText = (judges: number, conduct: number): string => Object.values(backing(judges, conduct)).filter(Boolean).join(", ");
+/** The same in full words, for a label. */
+export const backingText = (judges: number, conduct: number, ja = 0): string => Object.values(backing(judges, conduct, ja, "Judge Advisor")).filter(Boolean).join(", ");
 
 /** One Good conduct flag in the side panel: who saw it and at which match. */
 export const conductLine = (f: Pick<FlagRow, "author" | "match_type" | "match_number">): string =>
@@ -171,7 +189,7 @@ export function panelChips(panels: Pick<PublicPanel, "id" | "name">[], inDivisio
 function onePerJudge(nominations: NominationRow[]): NominationRow[] {
   const seen = new Set<string>();
   return nominations.filter((n) => {
-    const key = [n.award_id, n.team_id, n.panel_id, judgeKey(n.judge)].join("|");
+    const key = [n.award_id, n.team_id, n.role, n.panel_id, judgeKey(n.judge)].join("|");
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -185,8 +203,20 @@ function byTeam(nominations: NominationRow[]): Map<string, NominationRow[]> {
   return out;
 }
 
-/** The panels that nominated, each once, in the order they first appear. */
-const panelIdsOf = (nominations: NominationRow[]): (string | null)[] => [...new Set(nominations.map((n) => n.panel_id))];
+/** The panels that nominated, each once, in the order they first appear. The Judge Advisor is no panel. */
+const panelIdsOf = (nominations: NominationRow[]): (string | null)[] => [...new Set(nominations.filter((n) => n.role === "judge").map((n) => n.panel_id))];
+
+/** How many of these nominations are judges', and how many the Judge Advisor's. */
+const whoMade = (nominations: NominationRow[]): { judges: number; ja: number } => {
+  const ja = nominations.filter((n) => n.role === "admin").length;
+  return { judges: nominations.length - ja, ja };
+};
+
+/** The tag a team's row wears: the panels that nominated it, or when only the Judge Advisor (or referees) did, its own panel. */
+const tagOf = (own: NominationRow[], team: Pick<Team, "panel_id">, panels: Pick<PublicPanel, "id" | "name">[]): string => {
+  const ids = panelIdsOf(own);
+  return panelTagText(ids.length ? ids : [team.panel_id], panels);
+};
 
 /* ---- the matrix ------------------------------------------------------------------- */
 
@@ -195,7 +225,7 @@ export type CellState = "none" | "nominated" | "conduct" | "winner";
 
 export type MatrixRow = {
   team: Team;
-  /** Nomination rows, one per judge per award, and one for Good conduct when no judge nominated for Sportsmanship: what the rows are sorted on. */
+  /** Nomination rows, one per judge (or Judge Advisor) per award, and one for Good conduct when nobody else nominated for Sportsmanship: what the rows are sorted on. */
   count: number;
   /** Good conduct flags, when they put the team up for Sportsmanship. */
   conduct: number;
@@ -241,7 +271,7 @@ export function buildMatrix(
         team,
         count: own.length + (flagged && !byJudge(SPORTSMANSHIP) ? 1 : 0),
         conduct: flagged,
-        tag: panelTagText(own.length ? panelIdsOf(own) : [team.panel_id], panels),
+        tag: tagOf(own, team, panels),
         has: alreadyHas(awards, decided, team.id),
         cells: columns.map(({ award }) =>
           decided.get(award.id)?.team_id === team.id ? "winner" : byJudge(award.id) ? "nominated" : award.id === SPORTSMANSHIP && flagged ? "conduct" : "none",
@@ -256,10 +286,11 @@ export function buildMatrix(
 
 /* ---- by award ---------------------------------------------------------------------- */
 
-export type Nominee = { team: Team; judges: number; /** Good conduct flags, on Sportsmanship only. */ conduct: number; tag: string; winner: boolean; has: AwardView[] };
-export type AwardPanel = { award: AwardView; decided: boolean; status: string; nominees: Nominee[] };
+export type Nominee = { team: Team; judges: number; /** The Judge Advisor's nominations of it: 0 or 1. */ ja: number; /** Good conduct flags, on Sportsmanship only. */ conduct: number; tag: string; winner: boolean; has: AwardView[] };
+/** `ja` is the teams (by id) the Judge Advisor has put up for this award, which the Add team picker marks as added. */
+export type AwardPanel = { award: AwardView; decided: boolean; status: string; nominees: Nominee[]; ja: Set<string> };
 
-/** Every award, in the config's order, with its nominees: the winner first, then the most judges, then team number. */
+/** Every award, in the config's order, with its nominees: the winner first, then the most nominations (judges and the Judge Advisor), then team number. */
 export function buildAwardPanels(
   awards: AwardView[],
   nominations: NominationRow[],
@@ -283,17 +314,18 @@ export function buildAwardPanels(
         const own = mine.get(team.id) ?? [];
         return {
           team,
-          judges: own.length,
+          ...whoMade(own),
           conduct: flagged.get(team.id) ?? 0,
-          tag: panelTagText(own.length ? panelIdsOf(own) : [team.panel_id], panels),
+          tag: tagOf(own, team, panels),
           winner: team.id === winnerId,
           has: alreadyHas(awards, decided, team.id, award.id),
         };
       })
-      .sort((a, b) => Number(b.winner) - Number(a.winner) || b.judges - a.judges || byNumber(a.team.number, b.team.number));
+      .sort((a, b) => Number(b.winner) - Number(a.winner) || b.judges + b.ja - (a.judges + a.ja) || byNumber(a.team.number, b.team.number));
 
     const k = nominees.length;
-    return { award, decided: winnerId !== null, status: winnerId ? "Decided" : k ? `${k} ${k === 1 ? "nominee" : "nominees"}` : "Open", nominees };
+    const ja = new Set(nominations.filter((n) => n.award_id === award.id && n.role === "admin").map((n) => n.team_id));
+    return { award, decided: winnerId !== null, status: winnerId ? "Decided" : k ? `${k} ${k === 1 ? "nominee" : "nominees"}` : "Open", nominees, ja };
   });
 }
 
@@ -302,16 +334,20 @@ export function buildAwardPanels(
 export type Detail = {
   award: AwardView;
   team: Team;
-  /** Why each panel nominated the team, a panel at a time. */
-  reasons: { key: string; panel: string; judges: { judge: string; reason: string | null }[] }[];
+  /** Why each panel nominated the team, a panel at a time, and last (key JA_KEY) the Judge Advisor's own. `id` is the nomination, for Remove. */
+  reasons: { key: string; panel: string; judges: { id: string; judge: string; reason: string | null }[] }[];
   /** The Good conduct flags that put the team up for Sportsmanship; empty for any other award, or short of enough of them. */
   conduct: FlagRow[];
   /** Other awards the team is nominated for. */
   alsoFor: AwardView[];
+  /** Whether anyone still nominates the team for this award: a judge, the Judge Advisor, or (Sportsmanship) enough Good conduct flags. The server refuses a winner who is not, so the panel offers no Give when it is false. */
+  nominated: boolean;
+  /** Awards the Judge Advisor has not yet nominated the team for: what "Also nominate for…" offers. */
+  addable: AwardView[];
   /** Other awards the team already holds: a caution, never a block. */
   has: AwardView[];
   /** The other teams in the running for this award in this division, and who holds it. */
-  others: { team: Team; judges: number; conduct: number; winner: boolean; has: AwardView[] }[];
+  others: { team: Team; judges: number; ja: number; conduct: number; winner: boolean; has: AwardView[] }[];
   isWinner: boolean;
   /** Who holds the award now, when it is not this team. */
   current: Team | null;
@@ -342,13 +378,17 @@ export function detailFor(sel: Sel, all: Everything): Detail | null {
     const i = all.panels.findIndex((p) => p.id === id);
     return i < 0 ? Number.MAX_SAFE_INTEGER : i;
   };
+  const line = (n: NominationRow) => ({ id: n.id, judge: n.judge, reason: n.reason });
+  const byName = (a: { judge: string }, b: { judge: string }) => a.judge.localeCompare(b.judge);
   const reasons = panelIdsOf(forThis)
     .sort((a, b) => place(a) - place(b))
     .map((id) => ({
       key: id ?? "gone",
       panel: all.panels.find((p) => p.id === id)?.name ?? "a removed panel",
-      judges: forThis.filter((n) => n.panel_id === id).map((n) => ({ judge: n.judge, reason: n.reason })).sort((a, b) => a.judge.localeCompare(b.judge)),
+      judges: forThis.filter((n) => n.role === "judge" && n.panel_id === id).map(line).sort(byName),
     }));
+  const byJa = forThis.filter((n) => n.role === "admin");
+  if (byJa.length) reasons.push({ key: JA_KEY, panel: JA_NAME, judges: byJa.map(line).sort(byName) });
 
   const flagsAll = all.flags ?? [];
   const conductAll = conductIn(flagsAll, all.teams, team.division);
@@ -360,15 +400,18 @@ export function detailFor(sel: Sel, all: Everything): Detail | null {
   for (const id of flagged.keys()) if (id !== team.id && !rivals.has(id)) rivals.set(id, []);
   const others = all.teams
     .filter((t) => rivals.has(t.id))
-    .map((t) => ({ team: t, judges: rivals.get(t.id)!.length, conduct: flagged.get(t.id) ?? 0, winner: t.id === holder, has: alreadyHas(all.awards, decided, t.id, award.id) }))
-    .sort((a, b) => Number(b.winner) - Number(a.winner) || b.judges - a.judges || byNumber(a.team.number, b.team.number));
+    .map((t) => ({ team: t, ...whoMade(rivals.get(t.id)!), conduct: flagged.get(t.id) ?? 0, winner: t.id === holder, has: alreadyHas(all.awards, decided, t.id, award.id) }))
+    .sort((a, b) => Number(b.winner) - Number(a.winner) || b.judges + b.ja - (a.judges + a.ja) || byNumber(a.team.number, b.team.number));
 
+  const conduct = flagged.has(team.id) ? flagsAll.filter((f) => f.team_id === team.id && f.kind === GOOD_CONDUCT) : [];
   return {
     award,
     team,
     reasons,
-    conduct: flagged.has(team.id) ? flagsAll.filter((f) => f.team_id === team.id && f.kind === GOOD_CONDUCT) : [],
+    conduct,
+    nominated: reasons.length > 0 || conduct.length > 0,
     alsoFor: all.awards.filter((a) => a.id !== award.id && (mine.some((n) => n.award_id === a.id) || (a.id === SPORTSMANSHIP && conductAll.has(team.id)))),
+    addable: all.awards.filter((a) => !mine.some((n) => n.award_id === a.id && n.role === "admin")),
     has: alreadyHas(all.awards, decided, team.id, award.id),
     others,
     isWinner: holder === team.id,
@@ -413,6 +456,22 @@ export async function giveAfterAsking(ask: Ask, call: Call, pick: { award: Award
   const { award, team, current } = pick;
   if (current && !(await ask(giveQuestion(award, team, current), { confirmLabel: "Replace winner" }))) return false;
   await call("/api/awards/winners", { method: "PUT", body: { awardId: award.id, division: team.division, teamId: team.id } });
+  return true;
+}
+
+/** The Judge Advisor nominates a team for an award: no question, since Remove undoes it. Returns whether it sent. */
+export async function nominateAsAdmin(call: Call, pick: { awardId: string; teamId: string }): Promise<boolean> {
+  await call("/api/awards", { method: "POST", body: { awardId: pick.awardId, teamId: pick.teamId } });
+  return true;
+}
+
+/** "Remove Priya Nair's Excellence nomination for 7700B?" `by` is the nominator's name, or JA_NAME. */
+export const removeQuestion = (by: string, award: Pick<AwardView, "label">, team: Pick<Team, "number">): string => `Remove ${by}'s ${award.label} nomination for ${team.number}?`;
+
+/** Take one nomination away, a judge's or the Judge Advisor's own, asked first. Returns whether it sent. */
+export async function removeAfterAsking(ask: Ask, call: Call, pick: { id: string; by: string; award: AwardView; team: Team }): Promise<boolean> {
+  if (!(await ask(removeQuestion(pick.by, pick.award, pick.team), { confirmLabel: "Remove nomination", danger: true }))) return false;
+  await call("/api/awards", { method: "DELETE", body: { id: pick.id } });
   return true;
 }
 

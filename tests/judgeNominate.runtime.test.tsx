@@ -68,6 +68,7 @@ const nomination = (t: Team, award: string, judge = "Sam Rivera", over: Partial<
   team_id: t.id,
   panel_id: "p2",
   judge,
+  role: "judge",
   reason: null,
   created_at: ago(2),
   updated_at: ago(2),

@@ -35,7 +35,12 @@ export const teams = [gearGrinders, byteMe, roboraptors, fortyTwo, torque, momen
 
 let n = 0;
 export const nom = (t: Team, awardId: string, panelId: string | null, judge: string, reason: string | null = null): NominationRow => ({
-  id: `n${++n}`, award_id: awardId, team_id: t.id, panel_id: panelId, judge, reason, created_at: "2026-10-20T10:00:00Z", updated_at: "2026-10-20T10:00:00Z",
+  id: `n${++n}`, award_id: awardId, team_id: t.id, panel_id: panelId, judge, role: "judge", reason, created_at: "2026-10-20T10:00:00Z", updated_at: "2026-10-20T10:00:00Z",
+});
+
+/** The Judge Advisor's own nomination: no panel, and the name is the Judge Advisor's session name. */
+export const adminNom = (t: Team, awardId: string, reason: string | null = null, judge = "Alex Morgan"): NominationRow => ({
+  ...nom(t, awardId, null, judge, reason), role: "admin",
 });
 
 export const nominations: NominationRow[] = [

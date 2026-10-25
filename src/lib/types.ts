@@ -184,20 +184,26 @@ export type AwardView = {
   blurb: string;
 };
 
+/** Whose nomination a row is: a judge's, or the Judge Advisor's own. */
+export type NominationRole = "judge" | "admin";
+
 /**
  * One judge's nomination of one team for one award. The key is
  * (award_id, team_id, panel_id, judge): two judges on a panel nominating the
- * same team are two rows, which is what "2 judges" counts.
+ * same team are two rows, which is what "2 judges" counts. The Judge Advisor
+ * can nominate too, for any team: that row has role "admin" and no panel, and
+ * its `judge` is the Judge Advisor's session name.
  */
 export type NominationRow = {
   id: string;
   /** One of config/event.json's awards ids. */
   award_id: string;
   team_id: string;
-  /** The nominating judge's panel; null once that panel has been deleted. */
+  /** The nominating judge's panel; null once that panel has been deleted, and always null for the Judge Advisor's. */
   panel_id: string | null;
-  /** The judge's session name, like a note's author. */
+  /** The nominator's session name, like a note's author. */
   judge: string;
+  role: NominationRole;
   reason: string | null;
   created_at: string;
   updated_at: string;
@@ -221,9 +227,9 @@ export type AwardsAdminView = { awards: AwardView[]; nominations: NominationRow[
 /** GET /api/awards for a judge: their own panel's nominations only, and never a winner. */
 export type AwardsJudgeView = { awards: AwardView[]; nominations: NominationRow[] };
 
-/** POST /api/awards (nominate, or change the reason). */
+/** POST /api/awards (a judge or the Judge Advisor nominates, or changes the reason). */
 export type NominateReply = { nomination: NominationRow };
-/** DELETE /api/awards (withdraw your own) and DELETE /api/awards/winners (clear). `removed` is false when there was nothing to remove. */
+/** DELETE /api/awards (a judge withdraws their own; the Judge Advisor removes any, by id) and DELETE /api/awards/winners (clear). `removed` is false when there was nothing to remove. */
 export type RemoveReply = { ok: true; removed: boolean };
 /** PUT /api/awards/winners. */
 export type WinnerReply = { winner: WinnerRow };

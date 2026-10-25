@@ -24,8 +24,10 @@ import {
   hasText,
   hiddenNote,
   holdsText,
+  JA_KEY,
   judgesText,
   loadView,
+  nominateAsAdmin,
   nominationsIn,
   nominationsText,
   panelChips,
@@ -33,8 +35,11 @@ import {
   panelTagText,
   pickDivision,
   refereeLine,
+  removeAfterAsking,
+  removeQuestion,
   saveView,
   scoreParts,
+  teamsByNumber,
   VIEW_KEY,
   winnersOf,
 } from "../src/components/admin/awardsLogic";
@@ -42,7 +47,7 @@ import { withRanks } from "../src/components/admin/scoresLogic";
 import { rankTeams } from "../src/lib/ranking";
 import { rubrics } from "../src/lib/rubrics";
 import {
-  awards, byteMe, divisions, gearGrinders, HS, labRats, MS, momentum, monitors, nom, nominations, panels, quiet, roboraptors, teams, torque, win, winners,
+  adminNom, awards, byteMe, divisions, gearGrinders, HS, labRats, MS, momentum, monitors, nom, nominations, panels, quiet, roboraptors, teams, torque, win, winners,
 } from "./adminAwards.fixtures";
 
 /* The Judge Advisor Awards board's decisions, run for real against
@@ -229,12 +234,13 @@ const everything = { awards, nominations, winners, teams, panels };
 test("the side panel gathers why each panel nominated the team, judge by judge", () => {
   const d = detailFor({ awardId: "excellence", teamId: byteMe.id }, everything);
   assert.equal(d.award.label, "Excellence");
+  const idOf = (t, awardId, judge) => nominations.find((x) => x.team_id === t.id && x.award_id === awardId && x.judge === judge).id;
   assert.deepEqual(d.reasons, [{
     key: "p2",
     panel: "Panel 2",
     judges: [
-      { judge: "Priya Nair", reason: "Every entry names who did the work." },
-      { judge: "Sam Rivera", reason: "Top notebook, and strong in every match." },
+      { id: idOf(byteMe, "excellence", "Priya Nair"), judge: "Priya Nair", reason: "Every entry names who did the work." },
+      { id: idOf(byteMe, "excellence", "Sam Rivera"), judge: "Sam Rivera", reason: "Top notebook, and strong in every match." },
     ],
   }]);
   assert.deepEqual(d.alsoFor.map((a) => a.label), ["Design"]);
@@ -243,7 +249,7 @@ test("the side panel gathers why each panel nominated the team, judge by judge",
   assert.equal(d.current, null);
   // A judge who gave no reason is still listed.
   const none = detailFor({ awardId: "design", teamId: byteMe.id }, everything);
-  assert.deepEqual(none.reasons[0].judges, [{ judge: "Sam Rivera", reason: null }]);
+  assert.deepEqual(none.reasons[0].judges, [{ id: idOf(byteMe, "design", "Sam Rivera"), judge: "Sam Rivera", reason: null }]);
 });
 
 test("the other nominees are those of this division for this award, with the caution each carries", () => {
@@ -264,6 +270,22 @@ test("opening the winner says so, and opening a rival says who holds the award n
   // Someone else's nomination for the same team in another award is a caution, not a block.
   const holds = detailFor({ awardId: "excellence", teamId: gearGrinders.id }, everything);
   assert.deepEqual(holds.has.map((a) => a.label), ["Amaze"]);
+});
+
+test("a nominee is nominated while a judge, the Judge Advisor or enough Good conduct flags still back it, and not once the last is gone", () => {
+  const sel = { awardId: "design", teamId: byteMe.id };
+  assert.equal(detailFor(sel, everything).nominated, true, "Sam's");
+  const left = nominations.filter((x) => !(x.team_id === byteMe.id && x.award_id === "design"));
+  const none = detailFor(sel, { ...everything, nominations: left, winners: [] });
+  assert.deepEqual([none.nominated, none.isWinner, none.reasons], [false, false, []], "the server would refuse to give it");
+  assert.equal(detailFor(sel, { ...everything, nominations: [...left, adminNom(byteMe, "design")] }).nominated, true, "the Judge Advisor's alone is enough");
+  // Referees' Good conduct nominates for Sportsmanship only.
+  const conduct = [1, 2].map((i) => ({ id: `f${i}`, team_id: quiet.id, kind: "good", body: "", author: "Ref", match_type: "Q", match_number: String(i) }));
+  assert.equal(detailFor({ awardId: "sportsmanship", teamId: quiet.id }, { ...everything, flags: conduct }).nominated, true);
+  assert.equal(detailFor({ awardId: "design", teamId: quiet.id }, { ...everything, flags: conduct }).nominated, false, "not for any other award");
+  // A winner nobody nominates is still the winner, whatever `nominated` says.
+  const withdrawn = detailFor({ awardId: "design", teamId: labRats.id }, { ...everything, nominations: nominations.filter((x) => x.team_id !== labRats.id) });
+  assert.deepEqual([withdrawn.nominated, withdrawn.isWinner], [false, true]);
 });
 
 test("the panel opens on a winner nobody nominates any more, with nothing to quote", () => {
@@ -304,7 +326,7 @@ test("judges who differ only by case or spacing are one judge: old rows written 
   assert.deepEqual(m.rows.map((r) => [r.team.number, r.count]), [["6060R", 2], ["7700B", 2]], "Excellence and Design once each, not three");
 
   const d = detailFor({ awardId: "excellence", teamId: byteMe.id }, { ...everything, nominations: dupes });
-  assert.deepEqual(d.reasons[0].judges, [{ judge: "Sam Rivera", reason: "First reason" }], "one line for the judge");
+  assert.deepEqual(d.reasons[0].judges, [{ id: dupes[0].id, judge: "Sam Rivera", reason: "First reason" }], "one line for the judge");
   assert.deepEqual(d.others.map((o) => [o.team.number, o.judges]), [["6060R", 2]]);
 
   // Different people with different names, and the same name on different panels, stay apart.
@@ -407,6 +429,103 @@ test("clearing a winner asks first and sends nothing on a no", async () => {
   const sent = caller();
   assert.equal(await clearAfterAsking(asker(true).ask, sent.call, { award: design, team: labRats }), true);
   assert.deepEqual(sent.calls, [{ url: "/api/awards/winners", method: "DELETE", body: { awardId: "design", division: MS } }]);
+});
+
+/* ---- the Judge Advisor's own nominations ------------------------------------------------------------------------------ */
+
+// Quiet Ones: nobody nominated them. Byte Me has two judges for Excellence. Alex puts both up.
+const jaQuiet = adminNom(quiet, "excellence", "A team that deserves a look.");
+const jaByte = adminNom(byteMe, "excellence");
+const withJa = [...nominations, jaQuiet, jaByte];
+
+test("a Judge Advisor nomination counts like a judge's: the matrix row, the cell, the nominee, the sort and the header count", () => {
+  const m = buildMatrix(awards, nominationsIn(withJa, teams, MS), decided, msTeams, panels);
+  const row = (n) => m.rows.find((r) => r.team.number === n);
+  assert.equal(row("1111Q").count, 1, "a team only the Judge Advisor put up has a row");
+  assert.equal(row("1111Q").cells[m.columns.findIndex((c) => c.award.id === "excellence")], "nominated");
+  assert.equal(row("7700B").count, 4, "Excellence x2 and Design from judges, and the Judge Advisor's Excellence");
+  assert.equal(row("1111Q").tag, "P2", "with no panel of its own to name, the row wears the team's panel");
+  assert.equal(nominationsIn(withJa, teams, MS).length, 20, "two more for the header's N nominations");
+
+  const excellence = buildAwardPanels(awards, nominationsIn(withJa, teams, MS), decided, msTeams, panels).find((l) => l.award.id === "excellence");
+  assert.deepEqual(excellence.nominees.map((n) => [n.team.number, n.judges, n.ja]), [["7700B", 2, 1], ["1111Q", 0, 1], ["5150Z", 1, 0]], "most nominations first (the Judge Advisor's is one, level with a single judge's), then team number");
+  assert.deepEqual([...excellence.ja].sort(), [byteMe.id, quiet.id].sort(), "the teams the Add team picker marks as added");
+  assert.equal(excellence.status, "3 nominees");
+});
+
+test("a Judge Advisor nomination reads \"1 judge · JA\" or \"JA\" on screen and in full words for a screen reader", () => {
+  assert.deepEqual(backing(1, 0, 1), { judges: "1 judge · JA", conduct: null });
+  assert.deepEqual(backing(2, 0, 1), { judges: "2 judges · JA", conduct: null });
+  assert.deepEqual(backing(0, 0, 1), { judges: "JA", conduct: null }, "nobody else: not 'Withdrawn'");
+  assert.deepEqual(backing(0, 3, 1), { judges: "JA", conduct: "Good conduct ×3" });
+  assert.deepEqual(backing(0, 0, 0), { judges: "Withdrawn", conduct: null }, "unchanged without it");
+  assert.equal(backingText(1, 0, 1), "1 judge · Judge Advisor");
+  assert.equal(backingText(0, 0, 1), "Judge Advisor");
+  assert.equal(backingText(1, 2), "1 judge, Good conduct ×2");
+});
+
+test("a panel's view leaves the Judge Advisor's nominations out: they belong to All panels", () => {
+  assert.equal(nominationsIn(withJa, teams, MS, "p2").some((n) => n.role === "admin"), false);
+  assert.equal(nominationsIn(withJa, teams, MS, "p3").some((n) => n.role === "admin"), false);
+  assert.equal(nominationsIn(withJa, teams, MS).filter((n) => n.role === "admin").length, 2);
+  const chips = panelChips(panels.filter((p) => p.division === MS), nominationsIn(withJa, teams, MS));
+  assert.deepEqual(chips.map((c) => [c.label, c.count]), [["All panels", 10], ["Panel 2", 5], ["Panel 3", 4]], "All panels gains Quiet Ones; Byte Me was already counted");
+});
+
+test("the side panel lists the Judge Advisor's nomination last, as its own section, and every line carries the nomination's id", () => {
+  const d = detailFor({ awardId: "excellence", teamId: byteMe.id }, { ...everything, nominations: withJa });
+  assert.deepEqual(d.reasons.map((r) => [r.key, r.panel]), [["p2", "Panel 2"], [JA_KEY, "the Judge Advisor"]]);
+  assert.deepEqual(d.reasons[1].judges, [{ id: jaByte.id, judge: "Alex Morgan", reason: null }]);
+  assert.deepEqual(d.reasons[0].judges.map((j) => j.id), nominations.filter((x) => x.team_id === byteMe.id && x.award_id === "excellence").map((x) => x.id).reverse(), "Priya, then Sam");
+
+  const only = detailFor({ awardId: "excellence", teamId: quiet.id }, { ...everything, nominations: withJa });
+  assert.deepEqual(only.reasons.map((r) => r.key), [JA_KEY], "no panel section for a team no judge nominated");
+  assert.deepEqual(only.reasons[0].judges[0].reason, "A team that deserves a look.");
+
+  // The other nominees count the Judge Advisor too.
+  assert.deepEqual(d.others.map((o) => [o.team.number, o.judges, o.ja]), [["1111Q", 0, 1], ["5150Z", 1, 0]]);
+});
+
+test("\"Also nominate for…\" offers every award the Judge Advisor has not nominated the team for, this one included when only judges did", () => {
+  const open = detailFor({ awardId: "excellence", teamId: byteMe.id }, everything);
+  assert.equal(open.addable.length, awards.length, "judges' nominations do not use up the Judge Advisor's");
+  const d = detailFor({ awardId: "excellence", teamId: byteMe.id }, { ...everything, nominations: withJa });
+  assert.deepEqual(d.addable.map((a) => a.id), awards.map((a) => a.id).filter((id) => id !== "excellence"));
+  assert.equal(d.alsoFor.some((a) => a.id === "excellence"), false);
+  assert.deepEqual(d.alsoFor.map((a) => a.id), ["design"]);
+});
+
+test("two Judge Advisor rows for the same name are one, as two judges' rows are; the Judge Advisor and a judge of the same name are two", () => {
+  const dupes = [adminNom(byteMe, "design", null, "Alex Morgan"), adminNom(byteMe, "design", null, " alex morgan"), nom(byteMe, "design", null, "Alex Morgan")];
+  const list = buildAwardPanels(awards, dupes, new Map(), msTeams, panels).find((l) => l.award.id === "design");
+  assert.deepEqual(list.nominees.map((n) => [n.judges, n.ja]), [[1, 1]]);
+});
+
+test("the Add team picker lists the division's teams by number", () => {
+  assert.deepEqual(teamsByNumber([torque, byteMe, quiet, labRats]).map((t) => t.number), ["1111Q", "2088C", "7700B", "9882K"]);
+  assert.deepEqual(teamsByNumber(msTeams).length, msTeams.length);
+});
+
+test("the Judge Advisor nominates through POST /api/awards with just the award and the team, and no question is asked", async () => {
+  const sent = caller();
+  assert.equal(await nominateAsAdmin(sent.call, { awardId: "design", teamId: quiet.id, extra: "ignored" }), true);
+  assert.deepEqual(sent.calls, [{ url: "/api/awards", method: "POST", body: { awardId: "design", teamId: quiet.id } }]);
+});
+
+test("removing a nomination asks first, by name, and sends only the id; nothing is sent on a no", async () => {
+  const excellence = awards.find((a) => a.id === "excellence");
+  assert.equal(removeQuestion("Priya Nair", excellence, byteMe), "Remove Priya Nair's Excellence nomination for 7700B?");
+  assert.equal(removeQuestion("the Judge Advisor", excellence, byteMe), "Remove the Judge Advisor's Excellence nomination for 7700B?");
+
+  const no = asker(false);
+  const declined = caller();
+  assert.equal(await removeAfterAsking(no.ask, declined.call, { id: "n6", by: "Priya Nair", award: excellence, team: byteMe }), false);
+  assert.deepEqual(no.asked, [{ question: "Remove Priya Nair's Excellence nomination for 7700B?", options: { confirmLabel: "Remove nomination", danger: true } }]);
+  assert.deepEqual(declined.calls, []);
+
+  const sent = caller();
+  assert.equal(await removeAfterAsking(asker(true).ask, sent.call, { id: "n6", by: "Priya Nair", award: excellence, team: byteMe }), true);
+  assert.deepEqual(sent.calls, [{ url: "/api/awards", method: "DELETE", body: { id: "n6" } }]);
 });
 
 /* ---- the view that is remembered ---------------------------------------------------------------------------------- */

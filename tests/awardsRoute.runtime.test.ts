@@ -274,14 +274,15 @@ test("a judge cannot nominate a team on another panel, one not yet interviewed, 
   assert.deepEqual(await logged(w), []);
 });
 
-test("only a judge nominates or withdraws: the Judge Advisor, the desk, a referee and a visitor are all refused", async () => {
+test("only a judge or the Judge Advisor nominates or removes: the desk, a referee and a visitor are all refused", async () => {
   const w = await world();
-  await nominate(amy(w), "excellence", w.hawks);
+  const amys = await nominate(amy(w), "excellence", w.hawks);
 
-  for (const session of [ADMIN, QUEUER, REFEREE, null]) {
+  for (const session of [QUEUER, REFEREE, null]) {
     const who = session?.role ?? "nobody";
     assert.equal((await nominate(session, "design", w.hawks)).status, 403, `${who} must not nominate`);
     assert.equal((await awardsApi(session, "DELETE", { awardId: "excellence", teamId: w.hawks.id })).status, 403, `${who} must not withdraw`);
+    assert.equal((await awardsApi(session, "DELETE", { id: amys.body.nomination.id })).status, 403, `${who} must not remove by id`);
   }
   assert.deepEqual(
     (await w.db.listNominations()).map((n) => [n.award_id, n.judge]),
@@ -329,6 +330,174 @@ test("withdrawing removes only your own nomination, and says whether there was o
     "withdrew 9882K from Excellence",
     "withdrew 9882K from Excellence",
   ]), "only a real withdrawal is logged");
+});
+
+/* ===== the Judge Advisor nominates and removes =========================== */
+
+const alex = (name = "Alex"): Session => ({ role: "admin", name });
+const nominationsOf = async (w: World) => (await w.db.listNominations()).map((n) => [n.role, n.award_id, n.team_id, n.judge, n.panel_id]);
+
+test("the Judge Advisor nominates any team for any award: no interview, no panel, any division; asking again is harmless; the reason is added, changed and cleared", async () => {
+  const w = await world();
+
+  // Not interviewed, an interview under way, on no panel, on another judge's panel, in another division: all fine.
+  for (const team of [w.rookie, w.busy, w.drift, w.comets, w.storm]) {
+    const reply = await nominate(ADMIN, "design", team);
+    assert.equal(reply.status, 200, `${team.number}: the Judge Advisor needs no interview and no panel`);
+    assert.deepEqual(
+      [reply.body.nomination.role, reply.body.nomination.team_id, reply.body.nomination.panel_id, reply.body.nomination.judge, reply.body.nomination.reason],
+      ["admin", team.id, null, "Alex", null],
+      "the Judge Advisor is the session's name, with no panel, not anything the request says",
+    );
+  }
+  assert.equal((await w.db.listNominations()).length, 5);
+
+  const first = await nominate(ADMIN, "excellence", w.hawks);
+  const again = await nominate(ADMIN, "excellence", w.hawks);
+  assert.equal(again.body.nomination.id, first.body.nomination.id, "the same nomination");
+  assert.equal((await nominate(alex(" ALEX "), "excellence", w.hawks)).body.nomination.id, first.body.nomination.id, "and the same Judge Advisor however the name is typed");
+  assert.equal((await nominate(ADMIN, "excellence", w.hawks, "  Brilliant notebook  ")).body.nomination.reason, "Brilliant notebook", "trimmed");
+  assert.equal((await nominate(ADMIN, "excellence", w.hawks)).body.nomination.reason, "Brilliant notebook", "a tap with no reason leaves it");
+  assert.equal((await nominate(ADMIN, "excellence", w.hawks, "x".repeat(600))).body.nomination.reason.length, 500, "cut at 500, as a judge's is");
+  assert.equal((await nominate(ADMIN, "excellence", w.hawks, "   ")).body.nomination.reason, null, "an empty reason clears it");
+  assert.equal((await w.db.listNominations()).length, 6, "all of that was one more nomination");
+
+  // Another Judge Advisor is another nomination, and a judge's of the same team and award is beside it, not the same.
+  await nominate(alex("Blair"), "excellence", w.hawks);
+  await nominate(amy(w), "excellence", w.hawks);
+  assert.deepEqual(
+    (await w.db.listNominations()).filter((n) => n.team_id === w.hawks.id).map((n) => [n.role, n.judge, n.panel_id]),
+    [["admin", "Alex", null], ["admin", "Blair", null], ["judge", "Amy", w.p1.id]],
+  );
+
+  assert.deepEqual(
+    (await logged(w)).filter((l) => l.includes("9882K")),
+    sameLines([
+      "nominated 9882K for Excellence (Judge Advisor)",
+      "changed the reason for 9882K's Excellence nomination (Judge Advisor)",
+      "changed the reason for 9882K's Excellence nomination (Judge Advisor)",
+      "changed the reason for 9882K's Excellence nomination (Judge Advisor)",
+      "nominated 9882K for Excellence (Judge Advisor)",
+      "nominated 9882K for Excellence",
+    ]),
+    "a repeat writes nothing and logs nothing; the Judge Advisor's lines say so, a judge's do not",
+  );
+  const [entry] = (await w.db.listActivity()).filter((a) => a.action === "nominated 6666 for Design (Judge Advisor)");
+  assert.deepEqual([entry.kind, entry.actor, entry.actor_role, entry.team_id, entry.team_number], ["award", "Alex", "Judge Advisor", w.rookie.id, "6666"]);
+});
+
+test("the Judge Advisor cannot nominate for an award or a team that does not exist, or with a field missing", async () => {
+  const w = await world();
+  const unknown = await nominate(ADMIN, "pizza", w.hawks);
+  assert.equal(unknown.status, 400);
+  assert.match(unknown.body.error, /award does not exist/);
+  assert.equal((await awardsApi(ADMIN, "POST", { awardId: "excellence", teamId: "no-such-team" })).status, 404);
+  assert.equal((await awardsApi(ADMIN, "POST", { awardId: "excellence" })).status, 400);
+  assert.equal((await awardsApi(ADMIN, "POST", { teamId: w.hawks.id })).status, 400);
+  assert.deepEqual(await w.db.listNominations(), [], "none of those wrote anything");
+  assert.deepEqual(await logged(w), []);
+});
+
+test("the Judge Advisor removes any nomination by id, a judge's included, and it leaves that judge's next read; each removal is logged by whose it was", async () => {
+  const w = await world();
+  const amys = (await nominate(amy(w), "excellence", w.hawks)).body.nomination;
+  await nominate(ben(w), "excellence", w.hawks);
+  const alexs = (await nominate(ADMIN, "excellence", w.hawks)).body.nomination;
+  const read = async (s: Session) => (await awardsApi(s, "GET")).body.nominations.map((n: { judge: string }) => n.judge).sort();
+  assert.deepEqual(await read(amy(w)), ["Amy", "Ben"], "before: Amy sees her colleague's too, and nothing of the Judge Advisor's");
+
+  const gone = await awardsApi(ADMIN, "DELETE", { id: amys.id });
+  assert.deepEqual([gone.status, gone.body], [200, { ok: true, removed: true }]);
+  assert.deepEqual(await read(amy(w)), ["Ben"], "Amy's chip lets go on her next fetch");
+  assert.deepEqual(await read(ben(w)), ["Ben"], "and Ben's nomination of the same team and award is untouched");
+
+  // The query string works too, and the Judge Advisor's own can be removed the same way.
+  assert.deepEqual((await awardsApi(ADMIN, "DELETE", undefined, `?id=${alexs.id}`)).body, { ok: true, removed: true });
+  assert.deepEqual(await nominationsOf(w), [["judge", "excellence", w.hawks.id, "Ben", w.p1.id]]);
+
+  // Gone is gone: a second remove, or an id that never was, is a 404 (not a database error), and no id is a 400.
+  for (const id of [amys.id, "not-a-uuid", "00000000-0000-0000-0000-000000000000"]) {
+    const missing = await awardsApi(ADMIN, "DELETE", { id });
+    assert.equal(missing.status, 404, id);
+    assert.match(missing.body.error, /already gone/);
+  }
+  assert.equal((await awardsApi(ADMIN, "DELETE", {})).status, 400);
+  assert.equal((await awardsApi(ADMIN, "DELETE", { awardId: "excellence", teamId: w.hawks.id })).status, 400, "the Judge Advisor names a nomination by id, not by award and team");
+  assert.deepEqual(await nominationsOf(w), [["judge", "excellence", w.hawks.id, "Ben", w.p1.id]], "nothing else went");
+
+  assert.deepEqual(
+    (await w.db.listActivity()).filter((a) => a.action.startsWith("removed")).map((a) => [a.action, a.actor, a.actor_role, a.team_number]).sort(),
+    [
+      ["removed Amy's Excellence nomination for 9882K", "Alex", "Judge Advisor", "9882K"],
+      ["removed the Judge Advisor's Excellence nomination for 9882K", "Alex", "Judge Advisor", "9882K"],
+    ],
+    "a removal that found nothing logs nothing",
+  );
+});
+
+test("a judge cannot remove by id or reach the Judge Advisor's nomination: the award and team name only their own, even for a Judge Advisor of the same name", async () => {
+  const w = await world();
+  const bens = (await nominate(ben(w), "excellence", w.hawks)).body.nomination;
+  const sameName = alex("Amy");
+  const ja = (await nominate(sameName, "excellence", w.hawks)).body.nomination;
+  const amys = (await nominate(amy(w), "excellence", w.hawks)).body.nomination;
+  assert.notEqual(ja.id, amys.id, "a Judge Advisor called Amy and the judge Amy are two nominations");
+
+  // An id alone is not a judge's way to name anything.
+  assert.equal((await awardsApi(amy(w), "DELETE", { id: bens.id })).status, 400);
+  assert.equal((await awardsApi(amy(w), "DELETE", { id: ja.id })).status, 400);
+  assert.equal((await w.db.listNominations()).length, 3);
+
+  // With an award and team, only Amy's own goes, whatever id rides along; a judge from another panel removes nothing.
+  assert.deepEqual((await awardsApi(cleo(w), "DELETE", { id: amys.id, awardId: "excellence", teamId: w.hawks.id })).body, { ok: true, removed: false });
+  assert.deepEqual((await awardsApi(amy(w), "DELETE", { id: bens.id, awardId: "excellence", teamId: w.hawks.id })).body, { ok: true, removed: true });
+  assert.deepEqual(
+    (await w.db.listNominations()).map((n) => n.id).sort(),
+    [bens.id, ja.id].sort(),
+    "Ben's and the Judge Advisor's stay; only Amy's went",
+  );
+  // Her own is gone, and the Judge Advisor's, though it carries her name, is not hers to withdraw.
+  assert.deepEqual((await awardsApi(amy(w), "DELETE", { awardId: "excellence", teamId: w.hawks.id })).body, { ok: true, removed: false });
+  assert.ok((await w.db.listNominations()).some((n) => n.id === ja.id));
+});
+
+test("a judge never reads the Judge Advisor's nominations, on their own panel's teams or any other; the Judge Advisor reads them all", async () => {
+  const w = await world();
+  await nominate(ADMIN, "excellence", w.hawks, "ADMIN-SECRET");
+  await nominate(ADMIN, "design", w.comets);
+  await nominate(ADMIN, "design", w.rookie);
+  await nominate(amy(w), "innovate", w.bolts);
+
+  for (const session of [amy(w), ben(w), cleo(w)]) {
+    const reply = await awardsApi(session, "GET");
+    assert.equal(reply.status, 200);
+    assert.ok(reply.body.nominations.every((n: { role: string }) => n.role === "judge"), `${session.role === "judge" ? session.name : ""}: only judges' rows`);
+    assert.doesNotMatch(JSON.stringify(reply.body), /ADMIN-SECRET|Alex|"admin"/, "nothing of the Judge Advisor's");
+  }
+  assert.deepEqual(
+    (await awardsApi(amy(w), "GET")).body.nominations.map((n: { judge: string; award_id: string }) => [n.judge, n.award_id]),
+    [["Amy", "innovate"]],
+    "Amy's panel has the Judge Advisor's Excellence nomination of its own team, and she does not see it",
+  );
+  assert.deepEqual((await awardsApi(cleo(w), "GET")).body.nominations, [], "nor does the panel whose team the Judge Advisor put up for Design");
+
+  const all = await awardsApi(ADMIN, "GET");
+  assert.deepEqual(all.body.nominations.map((n: { role: string }) => n.role).sort(), ["admin", "admin", "admin", "judge"]);
+  assert.deepEqual(all.body.nominations.find((n: { reason: string | null }) => n.reason === "ADMIN-SECRET").panel_id, null);
+});
+
+test("a nomination by the Judge Advisor is nominated enough to win: the winners route accepts it, and not once it is removed", async () => {
+  const w = await world();
+  const put = (team: Team) => winnersApi(ADMIN, "PUT", { awardId: "design", division: ES, teamId: team.id });
+
+  assert.equal((await put(w.rookie)).status, 409, "nobody has nominated it");
+  const made = await nominate(ADMIN, "design", w.rookie);
+  assert.equal((await put(w.rookie)).status, 200, "the Judge Advisor's own nomination counts, with no judge behind it");
+  assert.deepEqual((await w.db.listWinners()).map((x) => [x.award_id, x.team_id]), [["design", w.rookie.id]]);
+
+  await awardsApi(ADMIN, "DELETE", { id: made.body.nomination.id });
+  assert.equal((await put(w.busy)).status, 409, "and with it gone nobody else is one");
+  assert.equal((await winnersApi(ADMIN, "PUT", { awardId: "excellence", division: ES, teamId: w.rookie.id })).status, 409, "it was for Design only");
 });
 
 /* ===== reading =========================================================== */

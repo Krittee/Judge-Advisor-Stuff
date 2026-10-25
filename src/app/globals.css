@@ -3757,6 +3757,9 @@ body:has(.admin) > .theme-toggle:hover {
   font-weight: 500; font-size: 12.5px; white-space: nowrap;
 }
 .ja-aw-nr .ja-aw-win { height: 24px; padding: 0 8px; }
+/* Add team: the Judge Advisor's picker at the foot of an award's list, the console's own select */
+.ja-aw-add { padding: 8px 12px 12px; border-top: 1px solid var(--line); }
+.ja-aw-add .ja-in, .ja-aw-dr .ja-selw .ja-in { height: 44px; }
 
 /* The side panel: the same in both views */
 .ja-aw-dr { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
@@ -3772,6 +3775,10 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-aw-qs li { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--jg-field); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-line; }
 .ja-aw-qs li b { display: block; color: var(--ink-subtle); font-weight: 500; font-size: 12.5px; }
 .ja-aw-q0 { color: var(--ink-subtle); }
+/* A line the Judge Advisor can remove: the text, and a quiet Remove beside it */
+.ja-aw-qs .ja-aw-ql { display: flex; align-items: center; gap: 8px; white-space: normal; }
+.ja-aw-qt { min-width: 0; flex: 1; white-space: pre-line; }
+.ja-aw-rm { flex: none; margin: -8px -4px -8px 0; }
 .ja-aw-gc li { border-color: color-mix(in srgb, var(--done) 55%, transparent); background: color-mix(in srgb, var(--done) 10%, transparent); }
 .ja-aw-also { margin: 0; color: var(--ink-subtle); font-size: 13px; }
 .ja-aw-good { color: var(--done-quiet); }

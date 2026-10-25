@@ -2,12 +2,12 @@
 
 import { Fragment, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useConfirm } from "@/components/ConfirmDialog";
-import { BandPill, CloseIcon } from "@/components/judge/parts";
+import { BandPill, ChevronDown, CloseIcon } from "@/components/judge/parts";
 import { Banner } from "@/components/ui";
 import { call, useScores } from "@/components/useAppState";
 import { rankTeams } from "@/lib/ranking";
 import type { Rubric } from "@/lib/rubrics";
-import type { AppState, AwardsAdminView } from "@/lib/types";
+import type { AppState, AwardsAdminView, Team } from "@/lib/types";
 import {
   ALL_PANELS,
   backing,
@@ -27,13 +27,17 @@ import {
   hasText,
   hiddenNote,
   holdsText,
+  JA_KEY,
   loadView,
+  nominateAsAdmin,
   nominationsIn,
   nominationsText,
   panelChips,
   refereeLine,
+  removeAfterAsking,
   saveView,
   scoreParts,
+  teamsByNumber,
   winnersOf,
   type AwardPanel,
   type Detail,
@@ -92,6 +96,10 @@ function useWide(): boolean {
  * `data` is the page's /api/awards fetch (the rail counts the decided awards
  * from it too), so winners never travel in /api/state. Replacing or clearing
  * a winner asks first, through `useConfirm`.
+ *
+ * The Judge Advisor can also nominate any team of the division for any award
+ * (Add team, in By award; Also nominate for…, in the side panel) and remove
+ * any nomination, a judge's included (Remove, asked first the same way).
  */
 export function AwardsTab({
   state,
@@ -173,6 +181,8 @@ export function AwardsTab({
         busy={busy}
         onGive={(d) => write(() => giveAfterAsking(ask, call, { award: d.award, team: d.team, current: d.current }))}
         onClear={(d) => write(() => clearAfterAsking(ask, call, { award: d.award, team: d.team }))}
+        onNominate={(awardId, teamId) => write(() => nominateAsAdmin(call, { awardId, teamId }))}
+        onRemove={(d, line) => write(() => removeAfterAsking(ask, call, { ...line, award: d.award, team: d.team }))}
       />
       {dialog}
     </>
@@ -204,6 +214,8 @@ export function AwardsBoard({
   busy = false,
   onGive,
   onClear,
+  onNominate,
+  onRemove,
 }: {
   data: AwardsAdminView;
   state: Slice;
@@ -224,6 +236,10 @@ export function AwardsBoard({
   busy?: boolean;
   onGive: (detail: Detail) => void;
   onClear: (detail: Detail) => void;
+  /** The Judge Advisor nominates a team for an award. */
+  onNominate: (awardId: string, teamId: string) => void;
+  /** The Judge Advisor removes one nomination, a judge's or their own: its id, and whose it is for the question. */
+  onRemove: (detail: Detail, line: { id: string; by: string }) => void;
 }) {
   const uid = useId();
   const { awards, nominations, winners } = data;
@@ -254,6 +270,8 @@ export function AwardsBoard({
       busy={busy}
       onGive={onGive}
       onClear={onClear}
+      onNominate={onNominate}
+      onRemove={onRemove}
     />
   ) : null;
 
@@ -320,7 +338,13 @@ export function AwardsBoard({
               onSelect={onSelect}
             />
           ) : (
-            <AwardLists lists={buildAwardPanels(awards, scoped, decided, teamsHere, panels, panel?.id, conduct)} sel={sel} onSelect={onSelect} />
+            <AwardLists
+              lists={buildAwardPanels(awards, scoped, decided, teamsHere, panels, panel?.id, conduct)}
+              sel={sel}
+              onSelect={onSelect}
+              // The Judge Advisor's nominations belong to no panel, so one added under a panel's filter would not show: Add team is for All panels.
+              add={panel ? undefined : { teams: teamsByNumber(teamsHere), busy, onAdd: onNominate }}
+            />
           )}
         </div>
         {wide ? (
@@ -470,9 +494,9 @@ export function MatrixView({
 
 /* ---- by award ------------------------------------------------------------------ */
 
-/** "2 judges", or "Good conduct ×3" in green for a team only referees put up, or both. */
-function Backing({ judges, conduct }: { judges: number; conduct: number }) {
-  const b = backing(judges, conduct);
+/** "2 judges", "1 judge · JA" when the Judge Advisor nominated too, or "Good conduct ×3" in green for a team only referees put up, or both. */
+function Backing({ judges, ja = 0, conduct }: { judges: number; ja?: number; conduct: number }) {
+  const b = backing(judges, conduct, ja);
   return (
     <>
       {b.judges}
@@ -482,11 +506,25 @@ function Backing({ judges, conduct }: { judges: number; conduct: number }) {
   );
 }
 
-/** Every award in the config's order, nominated or not, each with its nominees as rows. */
-export function AwardLists({ lists, sel, onSelect }: { lists: AwardPanel[]; sel: Sel | null; onSelect: (sel: Sel | null) => void }) {
+/**
+ * Every award in the config's order, nominated or not, each with its nominees as rows
+ * and, when `add` is given, an Add team picker under them: the Judge Advisor's way
+ * to put any team of the division up for the award. A team already added is listed but off.
+ */
+export function AwardLists({
+  lists,
+  sel,
+  onSelect,
+  add,
+}: {
+  lists: AwardPanel[];
+  sel: Sel | null;
+  onSelect: (sel: Sel | null) => void;
+  add?: { teams: Team[]; busy: boolean; onAdd: (awardId: string, teamId: string) => void };
+}) {
   return (
     <div className="ja-aw-aps">
-      {lists.map(({ award, decided, status, nominees }) => (
+      {lists.map(({ award, decided, status, nominees, ja }) => (
         <section key={award.id} className={decided ? "ja-aw-ap ja-aw-dec" : "ja-aw-ap"} aria-label={`${award.label} Award`}>
           <header className="ja-aw-aph">
             <h2 title={award.blurb}>{award.label}</h2>
@@ -502,7 +540,7 @@ export function AwardLists({ lists, sel, onSelect }: { lists: AwardPanel[]; sel:
                       type="button"
                       className={n.winner ? "ja-aw-nr ja-aw-won" : "ja-aw-nr"}
                       aria-pressed={on}
-                      aria-label={`${n.team.number} ${n.team.name}, ${award.label}, ${n.winner ? "winner" : backingText(n.judges, n.conduct)}${n.has.length ? `, ${hasText(n.has)}` : ""}`}
+                      aria-label={`${n.team.number} ${n.team.name}, ${award.label}, ${n.winner ? "winner" : backingText(n.judges, n.conduct, n.ja)}${n.has.length ? `, ${hasText(n.has)}` : ""}`}
                       onClick={() => onSelect(on ? null : { awardId: award.id, teamId: n.team.id })}
                     >
                       <b>{n.team.number}</b>
@@ -514,7 +552,7 @@ export function AwardLists({ lists, sel, onSelect }: { lists: AwardPanel[]; sel:
                       ) : null}
                       <span className="ja-aw-ptag">{n.tag}</span>
                       <span className="ja-aw-jc">
-                        <Backing judges={n.judges} conduct={n.conduct} />
+                        <Backing judges={n.judges} ja={n.ja} conduct={n.conduct} />
                       </span>
                       {n.winner ? (
                         <span className="ja-aw-win">
@@ -530,6 +568,27 @@ export function AwardLists({ lists, sel, onSelect }: { lists: AwardPanel[]; sel:
           ) : (
             <p className="ja-aw-cnone">No nominations yet</p>
           )}
+          {add ? (
+            <div className="ja-aw-add">
+              <div className="ja-selw">
+                <select
+                  className="ja-in ja-sel"
+                  aria-label={`Add team to ${award.label}`}
+                  value=""
+                  disabled={add.busy}
+                  onChange={(e) => e.target.value && add.onAdd(award.id, e.target.value)}
+                >
+                  <option value="">Add team…</option>
+                  {add.teams.map((t) => (
+                    <option key={t.id} value={t.id} disabled={ja.has(t.id)}>
+                      {`${t.number} ${t.name}${ja.has(t.id) ? " · added" : ""}`}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown />
+              </div>
+            </div>
+          ) : null}
         </section>
       ))}
     </div>
@@ -543,6 +602,9 @@ export function AwardLists({ lists, sel, onSelect }: { lists: AwardPanel[]; sel:
  * for Sportsmanship, the referees' Good conduct flags), who else is in the
  * running, and the button that gives the award. "Already has"
  * is only ever a line of amber text here; the button is never off for it.
+ * Each judge's and Judge Advisor line has a quiet Remove, and "Also nominate
+ * for…" adds the Judge Advisor's own nomination for another award. The Good
+ * conduct lines have no Remove: they come from flags, not from a nomination.
  */
 export function NomineePanel({
   detail,
@@ -554,6 +616,8 @@ export function NomineePanel({
   busy,
   onGive,
   onClear,
+  onNominate,
+  onRemove,
 }: {
   detail: Detail;
   row: RankedRow | undefined;
@@ -565,6 +629,8 @@ export function NomineePanel({
   busy: boolean;
   onGive: (detail: Detail) => void;
   onClear: (detail: Detail) => void;
+  onNominate: (awardId: string, teamId: string) => void;
+  onRemove: (detail: Detail, line: { id: string; by: string }) => void;
 }) {
   const { award, team } = detail;
   const score = scoreParts(row, rubricList);
@@ -606,9 +672,14 @@ export function NomineePanel({
             <h3 className="ja-aw-sec">Why {r.panel} nominated them</h3>
             <ul className="ja-aw-qs">
               {r.judges.map((j) => (
-                <li key={j.judge}>
-                  <b>{j.judge}</b>
-                  {j.reason ? `“${j.reason}”` : <span className="ja-aw-q0">No reason given</span>}
+                <li key={j.id} className="ja-aw-ql">
+                  <div className="ja-aw-qt">
+                    <b>{j.judge}</b>
+                    {j.reason ? `“${j.reason}”` : <span className="ja-aw-q0">No reason given</span>}
+                  </div>
+                  <button type="button" className="ja-aw-lnk ja-aw-rm" disabled={busy} aria-label={`Remove ${r.key === JA_KEY ? "the Judge Advisor" : j.judge}'s nomination`} onClick={() => onRemove(detail, { id: j.id, by: r.key === JA_KEY ? r.panel : j.judge })}>
+                    Remove
+                  </button>
                 </li>
               ))}
             </ul>
@@ -642,6 +713,25 @@ export function NomineePanel({
           "No referee flags"
         )}
       </p>
+      {detail.addable.length ? (
+        <div className="ja-selw">
+          <select
+            className="ja-in ja-sel"
+            aria-label={`Also nominate ${team.number} for`}
+            value=""
+            disabled={busy}
+            onChange={(e) => e.target.value && onNominate(e.target.value, team.id)}
+          >
+            <option value="">Also nominate for…</option>
+            {detail.addable.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown />
+        </div>
+      ) : null}
 
       {detail.others.length ? (
         <>
@@ -652,7 +742,7 @@ export function NomineePanel({
             <div key={o.team.id} className="ja-aw-oth">
               <div>
                 <p>
-                  <b>{o.team.number}</b> {o.team.name} · <Backing judges={o.judges} conduct={o.conduct} />
+                  <b>{o.team.number}</b> {o.team.name} · <Backing judges={o.judges} ja={o.ja} conduct={o.conduct} />
                 </p>
                 {o.has.length ? (
                   <p className="ja-aw-warnl">
@@ -682,13 +772,18 @@ export function NomineePanel({
             Clear winner
           </button>
         </div>
-      ) : (
+      ) : detail.nominated ? (
         <>
           <button type="button" className="ja-aw-prim" disabled={busy} onClick={() => onGive(detail)}>
             {busy ? "Saving…" : `Give ${award.label} to ${team.number}`}
           </button>
           <p className="ja-aw-note">You can change it until the ceremony.</p>
         </>
+      ) : (
+        // Nobody nominates it any more (a judge withdrew, or the Judge Advisor removed the last one): the server would refuse the award, so offer the way back instead.
+        <button type="button" className="ja-aw-lnk" disabled={busy} onClick={() => onNominate(award.id, team.id)}>
+          Nominate for {award.label}
+        </button>
       )}
     </>
   );

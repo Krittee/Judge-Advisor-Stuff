@@ -62,6 +62,21 @@ test("the pressed chips are my awards for that team, and nobody else's", () => {
   assert.deepEqual([...myAwards(list, "t9", me)], []);
 });
 
+test("the Judge Advisor's nominations are nobody's chips: not mine, not in the Done row's summary, whatever panel they carry", () => {
+  // The API never sends one to a judge (it has no panel); this is what the screen does if one ever arrived, even carrying this judge's name and panel.
+  const ja = row("excellence", "t1", "Sam Rivera", { role: "admin", reason: "Judge Advisor's pick" });
+  const jaOther = row("design", "t1", "Alex Morgan", { role: "admin", panel_id: null });
+  const list = [ja, jaOther, row("design", "t1", "Priya Nair", { role: "judge" })];
+  assert.equal(isMine(ja, me), false);
+  assert.deepEqual([...myAwards(list, "t1", me)], [], "no pressed chip");
+  assert.equal(myReason(list, "excellence", "t1", me), "", "and no reason to show in the box");
+  assert.equal(nominationSummary(list, awards, "t1", me), "Design", "only Priya's, a judge's");
+  assert.equal(nominationSummary([ja, jaOther], awards, "t1", me), "", "nothing to list");
+  // A tap on a chip is a new nomination of the judge's own, beside the Judge Advisor's row, which a withdrawal leaves.
+  assert.equal(applyPending([ja], [{ awardId: "excellence", teamId: "t1", on: true }], me).length, 2);
+  assert.deepEqual(withoutMine([ja], "excellence", "t1", me), [ja]);
+});
+
 test("my reason is the one on my own row, and empty when there is none", () => {
   const list = [row("design", "t1", "Sam Rivera", { reason: "Tidy notebook" }), row("design", "t1", "Priya Nair", { reason: "Hers" })];
   assert.equal(myReason(list, "design", "t1", me), "Tidy notebook");

@@ -16,8 +16,11 @@ export type PendingTap = { awardId: string; teamId: string; on: boolean };
 /** What one judge's nomination of one team for one award is called, for guards and maps. */
 export const nominationKey = (awardId: string, teamId: string) => `${awardId}|${teamId}`;
 
-/** Is the row the signed-in judge's own? The name as the roster compares it (trimmed, any case) and the panel, as the API matches it. */
-export const isMine = (n: NominationRow, me: Me) => judgeKey(n.judge) === judgeKey(me.judge) && n.panel_id === me.panelId;
+/**
+ * Is the row the signed-in judge's own? The name as the roster compares it (trimmed, any case) and the panel, as the API matches it.
+ * The Judge Advisor's nominations are never a judge's (the API does not send them; this keeps them out whatever arrives).
+ */
+export const isMine = (n: NominationRow, me: Me) => n.role !== "admin" && judgeKey(n.judge) === judgeKey(me.judge) && n.panel_id === me.panelId;
 
 const sameSlot = (n: NominationRow, awardId: string, teamId: string) =>
   n.award_id === awardId && n.team_id === teamId;
@@ -45,7 +48,7 @@ export function nominationSummary(
   teamId: string,
   me: Me,
 ): string {
-  const mine = nominations.filter((n) => n.team_id === teamId && n.panel_id === me.panelId);
+  const mine = nominations.filter((n) => n.role !== "admin" && n.team_id === teamId && n.panel_id === me.panelId);
   return awards
     .map((a) => {
       const judges = new Set(mine.filter((n) => n.award_id === a.id).map((n) => judgeKey(n.judge))).size;
@@ -73,6 +76,7 @@ export function applyPending(list: NominationRow[], taps: PendingTap[], me: Me):
         team_id: t.teamId,
         panel_id: me.panelId,
         judge: me.judge,
+        role: "judge" as const,
         reason: null,
         created_at: "",
         updated_at: "",

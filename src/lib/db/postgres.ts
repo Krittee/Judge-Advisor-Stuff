@@ -28,6 +28,7 @@ import {
   type NewConflict,
   type NewFlag,
   type NewJudge,
+  type NewAdminNomination,
   type NewNomination,
   type NewRefereeSetup,
   type NewRequest,
@@ -313,9 +314,10 @@ async function migrate(): Promise<void> {
     -- A judge's nomination of a team for an award: one row per judge per award
     -- per team. panel_id is the panel the judge nominated from, nulled when it
     -- is deleted (as scores do), never cascaded. The unique index below treats
-    -- NULLs as distinct, which is harmless here because a nomination is only
-    -- ever written with a panel (see nominate): the upsert always matches on a
-    -- full, non-null key, and only an orphaned row has a NULL.
+    -- NULLs as distinct, which is harmless here because a judge's nomination is
+    -- only ever written with a panel (see nominate): the upsert always matches
+    -- on a full, non-null key, and only an orphaned row has a NULL. The Judge
+    -- Advisor's nominations have no panel by design: see role, further down.
     create table if not exists nominations (
       id         uuid primary key default gen_random_uuid(),
       award_id   text not null,
@@ -512,6 +514,15 @@ async function migrate(): Promise<void> {
         alter table conflicts add constraint conflicts_one_owner
           check ((panel_id is null) <> (judge_id is null));
       end if;
+
+      -- The Judge Advisor can nominate too. Whose row it is lives in role; an
+      -- 'admin' row has no panel, and nominations_one_per_judge (which reads
+      -- NULLs as distinct) never sees it, so it gets an index of its own: one
+      -- per Judge Advisor per award per team, however the name was typed.
+      -- Every existing row is a judge's, which the default says.
+      alter table nominations add column if not exists role text not null default 'judge' check (role in ('judge', 'admin'));
+      create unique index if not exists nominations_one_per_admin
+        on nominations (award_id, team_id, lower(btrim(judge))) where role = 'admin';
     end $$;
   `);
 }
@@ -1512,6 +1523,40 @@ export const postgresStore: Store = {
       }
       throw e;
     }
+  },
+
+  /**
+   * The Judge Advisor's nomination: the same upsert with no panel, conflicting
+   * on the partial index nominations_one_per_admin (its predicate is repeated
+   * so Postgres can infer it). A judge's nomination of the same team and award
+   * is another row, in the other index.
+   */
+  async nominateAsAdmin(input: NewAdminNomination) {
+    try {
+      return one(
+        await query<NominationRow>(
+          `insert into nominations (award_id, team_id, panel_id, judge, role, reason)
+           values ($1, $2, null, $3, 'admin', $4)
+           on conflict (award_id, team_id, lower(btrim(judge))) where role = 'admin' do update set
+             reason = case when $5::boolean then excluded.reason else nominations.reason end,
+             updated_at = case
+               when $5::boolean and excluded.reason is distinct from nominations.reason then now()
+               else nominations.updated_at
+             end
+           returning *`,
+          [input.awardId, input.teamId, input.judge, input.reason ?? null, input.reason !== undefined],
+        ),
+      )!;
+    } catch (e) {
+      // The team was deleted since the caller looked.
+      if ((e as { code?: string })?.code === "23503") throw new StoreError("That team no longer exists.", 404);
+      throw e;
+    }
+  },
+
+  async removeNomination(id: string) {
+    const gone = await query<{ id: string }>("delete from nominations where id = $1 returning id", [id]);
+    return gone.length > 0;
   },
 
   async withdrawNomination(key: NominationKey) {

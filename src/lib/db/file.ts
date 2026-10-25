@@ -47,6 +47,8 @@ import {
   type NewConflict,
   type NewFlag,
   type NewJudge,
+  type AdminNominationKey,
+  type NewAdminNomination,
   type NewNomination,
   type NewWinner,
   type NominationKey,
@@ -250,6 +252,8 @@ function load(): Data {
 function migrate(data: Data): Data {
   data.scores ??= [];
   data.nominations ??= [];
+  // Nominations gained a role when the Judge Advisor could nominate; an older one is a judge's.
+  for (const n of data.nominations) n.role ??= "judge";
   data.winners ??= [];
   data.conflicts ??= [];
   data.judges ??= [];
@@ -1228,11 +1232,16 @@ function listNominations(): NominationRow[] {
 }
 
 // The judge is compared as the roster compares a name, so "Dana" and " dana " are one judge.
+// A judge's key has a panel, which the Judge Advisor's rows never do: the two never match.
 const sameNomination = (n: NominationRow, k: NominationKey) =>
+  n.role === "judge" &&
   n.award_id === k.awardId &&
   n.team_id === k.teamId &&
   n.panel_id === k.panelId &&
   judgeKey(n.judge) === judgeKey(k.judge);
+
+const sameAdminNomination = (n: NominationRow, k: AdminNominationKey) =>
+  n.role === "admin" && n.award_id === k.awardId && n.team_id === k.teamId && judgeKey(n.judge) === judgeKey(k.judge);
 
 /**
  * One row per judge per award per team, so asking twice is asking once. The
@@ -1253,6 +1262,7 @@ function nominate(input: NewNomination): NominationRow {
       team_id: input.teamId,
       panel_id: input.panelId,
       judge: input.judge,
+      role: "judge",
       reason: input.reason ?? null,
       created_at: now,
       updated_at: now,
@@ -1265,6 +1275,42 @@ function nominate(input: NewNomination): NominationRow {
 
   save();
   return { ...row };
+}
+
+/** The same idempotent write for the Judge Advisor: no panel, and a row of its own beside any judge's. */
+function nominateAsAdmin(input: NewAdminNomination): NominationRow {
+  if (!state().teams.some((t) => t.id === input.teamId)) throw new StoreError("That team no longer exists.", 404);
+
+  const now = new Date().toISOString();
+  let row = state().nominations.find((n) => sameAdminNomination(n, input));
+  if (!row) {
+    row = {
+      id: randomUUID(),
+      award_id: input.awardId,
+      team_id: input.teamId,
+      panel_id: null,
+      judge: input.judge,
+      role: "admin",
+      reason: input.reason ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+    state().nominations.push(row);
+  } else if (input.reason !== undefined && input.reason !== row.reason) {
+    row.reason = input.reason;
+    row.updated_at = now;
+  }
+
+  save();
+  return { ...row };
+}
+
+function removeNomination(id: string): boolean {
+  const before = state().nominations.length;
+  state().nominations = state().nominations.filter((n) => n.id !== id);
+  const removed = state().nominations.length < before;
+  if (removed) save();
+  return removed;
 }
 
 function withdrawNomination(key: NominationKey): boolean {
@@ -1575,6 +1621,8 @@ export const fileStore: Store = {
   listNominations: async () => listNominations(),
   nominate: async (input) => nominate(input),
   withdrawNomination: async (key) => withdrawNomination(key),
+  nominateAsAdmin: async (input) => nominateAsAdmin(input),
+  removeNomination: async (id) => removeNomination(id),
   listWinners: async () => listWinners(),
   setWinner: async (input) => setWinner(input),
   clearWinner: async (awardId, division) => clearWinner(awardId, division),
