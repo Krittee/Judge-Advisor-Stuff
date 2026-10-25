@@ -61,6 +61,12 @@ export function interviewOf(teamId: string, requests: RequestRow[]): { request: 
   return { request, bookedAt: request?.kind === "slot" ? request.slot_start : null };
 }
 
+/** The drawer's time for that request: a walk-up reads "Requested" with when it was asked for, a slot reads "Booked" with its time, none reads "Booked" with nothing. */
+export function interviewTime(request: RequestRow | null): { label: "Booked" | "Requested"; at: string | null } {
+  if (request?.kind === "queue") return { label: "Requested", at: request.requested_at };
+  return { label: "Booked", at: request?.kind === "slot" ? request.slot_start : null };
+}
+
 /** What the Panel column shows: a panel, "Unassigned", or "no panel left" when every panel that may judge the team is blocked from it. */
 export type PanelCell = { kind: "panel"; name: string } | { kind: "unassigned" } | { kind: "none-left" };
 

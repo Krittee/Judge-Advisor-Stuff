@@ -9,6 +9,7 @@ import {
   filterTeams,
   flagPills,
   interviewOf,
+  interviewTime,
   isDirty,
   leaveAfterAsking,
   moveBooking,
@@ -413,6 +414,14 @@ test("a team's interview is its live request, else a finished one; the booked ti
   assert.deepEqual(interviewOf(titans.id, [done, booked]), { request: booked, bookedAt: "2026-10-20T11:00:00.000Z" });
   assert.equal(interviewOf(titans.id, [request(titans, "cancelled")]).request, null, "a cancelled request is nothing to show");
   assert.equal(interviewOf(titans.id, [request(titans, "requested")]).bookedAt, null, "a walk-up has no booked time");
+});
+
+test("the drawer's time: a walk-up is Requested at its asking time, a slot is Booked at its slot, none is Booked with nothing", () => {
+  const walkUp = request(titans, "requested", { requested_at: "2026-10-20T09:00:00.000Z" });
+  assert.deepEqual(interviewTime(walkUp), { label: "Requested", at: "2026-10-20T09:00:00.000Z" });
+  const slot = request(titans, "scheduled", { kind: "slot", slot_start: "2026-10-20T11:00:00.000Z" });
+  assert.deepEqual(interviewTime(slot), { label: "Booked", at: "2026-10-20T11:00:00.000Z" });
+  assert.deepEqual(interviewTime(null), { label: "Booked", at: null });
 });
 
 test("flag pills count a team's flags by severity, worst first, from the Referee tab's own helper", () => {

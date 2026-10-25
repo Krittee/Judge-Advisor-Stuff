@@ -578,6 +578,15 @@ test("a booking: its time with Change time under it, Cancel booking (asks first)
   assert.doesNotMatch(drawer(board({ picked: titans })), /Change time|Cancel booking/);
 });
 
+test("a walk-up request reads Requested with the clock it was asked for, and has no Change time", () => {
+  const asked = "2026-10-20T09:00:00.000Z";
+  const clock = new Date(asked).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const d = drawer(board({ picked: titans, state: { requests: [request(titans, "requested", { requested_at: asked })] } }));
+  assert.ok(d.includes(`<span class="ja-lab">Requested</span><span class="ja-tm-bk">${clock}</span>`), `Requested ${clock} in the drawer`);
+  assert.doesNotMatch(d, /ja-lab">Booked</);
+  assert.doesNotMatch(d, /Change time/);
+});
+
 test("Change time and Book a time open the desk's slot grid; a move shows the booking as current and keeps its language", () => {
   const start = new Date(Date.now() + 2 * 3_600_000);
   start.setMinutes(0, 0, 0);

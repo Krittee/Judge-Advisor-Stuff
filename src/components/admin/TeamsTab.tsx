@@ -20,6 +20,7 @@ import {
   filterTeams,
   flagPills,
   interviewOf,
+  interviewTime,
   isDirty,
   leaveAfterAsking,
   moveBooking,
@@ -918,7 +919,8 @@ function SheetBody(p: EditorProps & { titleId: string }) {
 function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, busy, onRemove, onOpenFlags, onOpenSheet }: EditorProps) {
   const set = (patch: Partial<TeamDraft>) => onDraft({ ...draft, ...patch });
   const [changing, setChanging] = useState(false);
-  const { request, bookedAt } = interviewOf(team.id, state.requests);
+  const { request } = interviewOf(team.id, state.requests);
+  const time = interviewTime(request);
   // A booking is the live request when nothing is in the queue yet; with no live request at all the team can be asked for or booked.
   const live = liveRequestFor(team.id, state.requests);
   const booking = live?.status === "scheduled" ? live : null;
@@ -972,8 +974,8 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, bu
           </div>
         </div>
         <div className="ja-fl">
-          <span className="ja-lab">Booked</span>
-          <span className={bookedAt ? "ja-tm-bk" : "ja-tm-bk ja-tm-none"}>{formatClock(bookedAt)}</span>
+          <span className="ja-lab">{time.label}</span>
+          <span className={time.at ? "ja-tm-bk" : "ja-tm-bk ja-tm-none"}>{formatClock(time.at)}</span>
           {booking && bookingPanel ? (
             <button type="button" className="ja-tm-od ja-tm-ts" aria-expanded={changing} disabled={busy} onClick={() => setChanging(!changing)}>
               Change time
