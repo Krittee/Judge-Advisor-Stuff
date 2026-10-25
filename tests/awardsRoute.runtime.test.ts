@@ -215,6 +215,33 @@ test("two judges on a panel nominating the same team are two nominations", async
   );
 });
 
+test("a judge is one judge however the name is typed: \"Dana\" then \"dana\" is one nomination, and either can change or withdraw it", async () => {
+  const w = await world();
+  const first = await nominate(judgeOf(w.p1, "Dana"), "excellence", w.hawks);
+  const again = await nominate(judgeOf(w.p1, "dana"), "excellence", w.hawks);
+  assert.deepEqual([first.status, again.status], [200, 200]);
+  assert.equal(again.body.nomination.id, first.body.nomination.id, "the same nomination, not a second one");
+  assert.equal(again.body.nomination.judge, "Dana", "it keeps the spelling it was made with");
+
+  const read = await awardsApi(judgeOf(w.p1, "DANA"), "GET");
+  assert.deepEqual(read.body.nominations.map((n: { judge: string }) => n.judge), ["Dana"], "one nomination, not two");
+
+  const reason = await nominate(judgeOf(w.p1, " dana "), "excellence", w.hawks, "Lovely notebook");
+  assert.equal(reason.body.nomination.id, first.body.nomination.id, "a reason from the variant name changes the one row");
+  assert.deepEqual((await w.db.listNominations()).map((n) => [n.judge, n.reason]), [["Dana", "Lovely notebook"]]);
+  assert.deepEqual(
+    await logged(w),
+    sameLines(["nominated 9882K for Excellence", "changed the reason for 9882K's Excellence nomination"]),
+    "the second tap was a repeat, not a second nomination",
+  );
+
+  // Another judge is still another judge, and the variant name withdraws only Dana's.
+  await nominate(ben(w), "excellence", w.hawks);
+  const gone = await awardsApi(judgeOf(w.p1, "dana"), "DELETE", { awardId: "excellence", teamId: w.hawks.id });
+  assert.deepEqual([gone.status, gone.body], [200, { ok: true, removed: true }]);
+  assert.deepEqual((await w.db.listNominations()).map((n) => n.judge), ["Ben"]);
+});
+
 test("a judge cannot nominate a team on another panel, one not yet interviewed, a conflicted one, or for an award that does not exist", async () => {
   const w = await world();
   const priya = await w.db.addJudge({ name: "Priya Nair" });

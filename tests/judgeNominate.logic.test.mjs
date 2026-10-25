@@ -39,10 +39,13 @@ const row = (award, team, judge = "Sam Rivera", over = {}) => ({
 
 /* ---- whose it is ---------------------------------------------------------- */
 
-test("a nomination is mine only on the exact name and panel", () => {
+test("a nomination is mine on the name as the roster compares it, and the panel", () => {
   assert.equal(isMine(row("design", "t1"), me), true);
   assert.equal(isMine(row("design", "t1", "Priya Nair"), me), false, "a co-judge's");
-  assert.equal(isMine(row("design", "t1", "sam rivera"), me), false, "the API matches the name exactly");
+  assert.equal(isMine(row("design", "t1", "sam rivera"), me), true, "the API matches the name in any case");
+  assert.equal(isMine(row("design", "t1", " Sam Rivera "), me), true, "and trimmed");
+  assert.equal(isMine(row("design", "t1"), { ...me, judge: "SAM RIVERA" }), true, "whichever way the sign-in typed it");
+  assert.equal(isMine(row("design", "t1", "Sam Rivers"), me), false, "a different name is a different judge");
   assert.equal(isMine(row("design", "t1", "Sam Rivera", { panel_id: "p3" }), me), false, "another panel's Sam");
   assert.equal(isMine(row("design", "t1", "Sam Rivera", { panel_id: null }), me), false, "a deleted panel's");
 });
@@ -86,9 +89,22 @@ test("the summary ignores other panels and awards the config no longer lists", (
   assert.equal(nominationSummary([row("gone", "t1")], awards, "t1", me), "");
 });
 
-test("a judge who nominates twice still counts once", () => {
+test("a judge who nominates twice still counts once, however the name is cased or spaced", () => {
   const dup = [row("design", "t1"), row("design", "t1", "Sam Rivera", { id: "again" })];
   assert.equal(nominationSummary(dup, awards, "t1", me), "Design");
+  const variants = [row("design", "t1"), row("design", "t1", "sam rivera "), row("design", "t1", " SAM RIVERA")];
+  assert.equal(nominationSummary(variants, awards, "t1", me), "Design", "one judge, not ×3");
+  assert.equal(nominationSummary([...variants, row("design", "t1", "Priya Nair")], awards, "t1", me), "Design ×2", "×2 only for two different judges");
+});
+
+test("my chip, reason and withdrawal follow the name across case, for a row made under another spelling", () => {
+  const theirs = [row("design", "t1", "sam rivera", { reason: "Tidy notebook" })];
+  assert.deepEqual([...myAwards(theirs, "t1", me)], ["design"], "pressed");
+  assert.equal(myReason(theirs, "design", "t1", me), "Tidy notebook");
+  assert.deepEqual(withoutMine(theirs, "design", "t1", me), [], "and mine to withdraw");
+  assert.deepEqual(applyPending(theirs, [{ awardId: "design", teamId: "t1", on: false }], me), [], "unpressed at once");
+  const saved = row("design", "t1", "Sam Rivera", { reason: "Neat" });
+  assert.deepEqual(withSaved(theirs, saved), [saved], "the server's row replaces it, not joins it");
 });
 
 /* ---- a tap answers at once, and a failed one puts the chip back ----------- */

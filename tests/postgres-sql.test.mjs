@@ -931,16 +931,31 @@ test("listActivity joins the team's number in one query, and reads an old row (n
    against the recording stand-in. What this cannot show is that Postgres
    accepts the SQL -- the conformance suite does that under TEST_DATABASE_URL. */
 
-test("migrate() creates nominations keyed on (award, team, panel, judge), cascading with the team and nulling with the panel", () => {
+test("migrate() creates nominations, cascading with the team and nulling with the panel", () => {
   assert.match(
     migrateBody,
-    /create table if not exists nominations \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*award_id\s+text not null,\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*panel_id\s+uuid references panels\(id\) on delete set null,\s*judge\s+text not null,\s*reason\s+text,\s*created_at timestamptz not null default now\(\),\s*updated_at timestamptz not null default now\(\),\s*unique \(award_id, team_id, panel_id, judge\)\s*\);/,
+    /create table if not exists nominations \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*award_id\s+text not null,\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*panel_id\s+uuid references panels\(id\) on delete set null,\s*judge\s+text not null,\s*reason\s+text,\s*created_at timestamptz not null default now\(\),\s*updated_at timestamptz not null default now\(\)\s*\);/,
   );
   assert.ok(migrateBody.includes("create index if not exists nominations_team_idx on nominations (team_id);"));
   assert.ok(
     after(migrateBody, "create table if not exists teams (") < after(migrateBody, "create table if not exists nominations ("),
     "nominations reference teams and panels, so they come after both",
   );
+});
+
+test("migrate() keys a nomination on the judge as the roster compares a name, and rebuilds an older database's key", () => {
+  // A plain unique constraint on the typed name let "Dana" and "dana" in as two judges.
+  assert.ok(!/unique \(award_id, team_id, panel_id, judge\)/.test(migrateBody), "no constraint on the raw name");
+  const drop = after(migrateBody, "alter table nominations drop constraint if exists nominations_award_id_team_id_panel_id_judge_key;");
+  const dedupe = after(migrateBody, "delete from nominations", drop);
+  const index = migrateBody.search(/create unique index if not exists nominations_one_per_judge\s+on nominations \(award_id, team_id, panel_id, lower\(btrim\(judge\)\)\);/);
+  assert.ok(index > dedupe, "old constraint out, duplicates out, then the index (which cannot be built over duplicates)");
+  assert.ok(after(migrateBody, "create table if not exists nominations (") < drop);
+
+  const cleanup = migrateBody.slice(dedupe, index);
+  assert.match(cleanup, /partition by award_id, team_id, panel_id, lower\(btrim\(judge\)\)\s*order by updated_at desc, created_at desc, id/, "keeps the latest of each judge");
+  assert.match(cleanup, /where panel_id is not null/, "an orphaned row (no panel) is its own and is left alone");
+  assert.match(cleanup, /ranked\.rn > 1/);
 });
 
 test("migrate() creates award_winners with one row per (award, division), cascading with the team", () => {
@@ -959,26 +974,32 @@ test("both award tables are locked down like every other, and supabase/schema.sq
   }
   assert.match(
     schemaSql,
-    /create table nominations \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*award_id\s+text not null,[^\n]*\n\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*panel_id\s+uuid references panels\(id\) on delete set null,\s*judge\s+text not null,[^\n]*\n\s*reason\s+text,\s*created_at timestamptz not null default now\(\),\s*updated_at timestamptz not null default now\(\),\s*unique \(award_id, team_id, panel_id, judge\)\s*\);/,
+    /create table nominations \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*award_id\s+text not null,[^\n]*\n\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*panel_id\s+uuid references panels\(id\) on delete set null,\s*judge\s+text not null,[^\n]*\n\s*reason\s+text,\s*created_at timestamptz not null default now\(\),\s*updated_at timestamptz not null default now\(\)\s*\);/,
   );
   assert.match(
     schemaSql,
     /create table award_winners \(\s*award_id\s+text not null,\s*division\s+text not null,\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*decided_by text not null,\s*decided_at timestamptz not null default now\(\),\s*primary key \(award_id, division\)\s*\);/,
   );
+  assert.match(
+    schemaSql,
+    /create unique index nominations_one_per_judge\s+on nominations \(award_id, team_id, panel_id, lower\(btrim\(judge\)\)\);/,
+    "schema.sql keys a nomination on the same expression migrate() does",
+  );
+  assert.ok(!/unique \(award_id, team_id, panel_id, judge\)/.test(schemaSql));
   assert.ok(schemaSql.includes("create index nominations_team_idx on nominations (team_id);"));
   assert.ok(schemaSql.includes("create index award_winners_team_idx on award_winners (team_id);"));
 });
 
 const NOMINATION = { id: "n1", award_id: "excellence", team_id: "t1", panel_id: "p1", judge: "Amy", reason: null, created_at: new Date("2026-10-24T08:00:00.000Z"), updated_at: new Date("2026-10-24T08:00:00.000Z") };
 
-test("nominate is one upsert on the full non-null key: no reason keeps the stored one, a reason (or null) sets it", async () => {
+test("nominate is one upsert on the full non-null key, the judge as lower(btrim(name)): no reason keeps the stored one, a reason (or null) sets it", async () => {
   calls.length = 0;
   answer = () => [NOMINATION];
   const made = await postgresStore.nominate({ awardId: "excellence", teamId: "t1", panelId: "p1", judge: "Amy" });
   const [upsert] = sent(/^insert into nominations/);
   assert.match(
     upsert.sql,
-    /^insert into nominations \(award_id, team_id, panel_id, judge, reason\) values \(\$1, \$2, \$3, \$4, \$5\) on conflict \(award_id, team_id, panel_id, judge\) do update set reason = case when \$6::boolean then excluded\.reason else nominations\.reason end, updated_at = case when \$6::boolean and excluded\.reason is distinct from nominations\.reason then now\(\) else nominations\.updated_at end returning \*$/,
+    /^insert into nominations \(award_id, team_id, panel_id, judge, reason\) values \(\$1, \$2, \$3, \$4, \$5\) on conflict \(award_id, team_id, panel_id, lower\(btrim\(judge\)\)\) do update set reason = case when \$6::boolean then excluded\.reason else nominations\.reason end, updated_at = case when \$6::boolean and excluded\.reason is distinct from nominations\.reason then now\(\) else nominations\.updated_at end returning \*$/,
   );
   assert.deepEqual(upsert.params, ["excellence", "t1", "p1", "Amy", null, false], "no reason given: $6 says leave the stored one");
   assert.deepEqual(made, { ...NOMINATION, created_at: "2026-10-24T08:00:00.000Z", updated_at: "2026-10-24T08:00:00.000Z" });
@@ -1007,12 +1028,16 @@ test("nominate turns a vanished team or panel into a 404, and lets any other err
   await assert.rejects(() => postgresStore.nominate(input), (e) => e.code === "40001");
 });
 
-test("withdrawing deletes by the whole key and says whether anything went", async () => {
+test("withdrawing deletes by the whole key, the judge as lower(btrim(name)), and says whether anything went", async () => {
   calls.length = 0;
   answer = () => [{ id: "n1" }];
   assert.equal(await postgresStore.withdrawNomination({ awardId: "excellence", teamId: "t1", panelId: "p1", judge: "Amy" }), true);
   const [del] = sent(/^delete from nominations/);
-  assert.equal(del.sql, "delete from nominations where award_id = $1 and team_id = $2 and panel_id = $3 and judge = $4 returning id");
+  assert.equal(
+    del.sql.replace(/\s+/g, " "),
+    "delete from nominations where award_id = $1 and team_id = $2 and panel_id = $3 and lower(btrim(judge)) = lower(btrim($4)) returning id",
+    "the same expression as the unique index, so a variant spelling withdraws the row it would have updated",
+  );
   assert.deepEqual(del.params, ["excellence", "t1", "p1", "Amy"]);
 
   answer = () => [];

@@ -235,9 +235,10 @@ create index scores_team_idx on scores (team_id);
 -- ---------------------------------------------------------------------
 -- Awards — a judge's nomination of a team, and the Judge Advisor's winner.
 -- One nomination per judge per award per team. panel_id is the panel the
--- judge nominated from, nulled when it is deleted (as scores do). A plain
--- unique constraint treats NULLs as distinct, which is harmless: the app only
--- ever writes a nomination with a panel, so its upsert matches a full key.
+-- judge nominated from, nulled when it is deleted (as scores do). A unique
+-- index treats NULLs as distinct, which is harmless: the app only ever writes
+-- a nomination with a panel, so its upsert matches a full key. A judge is one
+-- judge however the name was typed ("Dana", "dana"), as the roster has it.
 -- ---------------------------------------------------------------------
 create table nominations (
   id         uuid primary key default gen_random_uuid(),
@@ -247,10 +248,11 @@ create table nominations (
   judge      text not null,                   -- the judge's session name
   reason     text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (award_id, team_id, panel_id, judge)
+  updated_at timestamptz not null default now()
 );
 
+create unique index nominations_one_per_judge
+  on nominations (award_id, team_id, panel_id, lower(btrim(judge)));
 create index nominations_team_idx on nominations (team_id);
 
 -- One winner per award per division. Secret until the ceremony.

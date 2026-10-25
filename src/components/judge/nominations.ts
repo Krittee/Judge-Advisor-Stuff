@@ -1,5 +1,6 @@
 import type { call } from "@/components/useAppState";
 import type { QueueCard } from "@/lib/judgeQueue";
+import { judgeKey } from "@/lib/roster";
 import type { AwardView, NominateReply, NominationRow, RequestRow } from "@/lib/types";
 
 /* The judge's award nominations, kept out of the markup so they run as plain
@@ -15,8 +16,8 @@ export type PendingTap = { awardId: string; teamId: string; on: boolean };
 /** What one judge's nomination of one team for one award is called, for guards and maps. */
 export const nominationKey = (awardId: string, teamId: string) => `${awardId}|${teamId}`;
 
-/** Is the row the signed-in judge's own? The exact name and the panel, as the API matches it. */
-export const isMine = (n: NominationRow, me: Me) => n.judge === me.judge && n.panel_id === me.panelId;
+/** Is the row the signed-in judge's own? The name as the roster compares it (trimmed, any case) and the panel, as the API matches it. */
+export const isMine = (n: NominationRow, me: Me) => judgeKey(n.judge) === judgeKey(me.judge) && n.panel_id === me.panelId;
 
 const sameSlot = (n: NominationRow, awardId: string, teamId: string) =>
   n.award_id === awardId && n.team_id === teamId;
@@ -47,7 +48,7 @@ export function nominationSummary(
   const mine = nominations.filter((n) => n.team_id === teamId && n.panel_id === me.panelId);
   return awards
     .map((a) => {
-      const judges = new Set(mine.filter((n) => n.award_id === a.id).map((n) => n.judge)).size;
+      const judges = new Set(mine.filter((n) => n.award_id === a.id).map((n) => judgeKey(n.judge))).size;
       return judges > 1 ? `${a.label} ×${judges}` : judges === 1 ? a.label : "";
     })
     .filter(Boolean)
@@ -83,7 +84,7 @@ export function applyPending(list: NominationRow[], taps: PendingTap[], me: Me):
 /** The list with the server's saved row in place of this judge's earlier one, or added. */
 export function withSaved(list: NominationRow[], saved: NominationRow): NominationRow[] {
   const same = (n: NominationRow) =>
-    sameSlot(n, saved.award_id, saved.team_id) && n.panel_id === saved.panel_id && n.judge === saved.judge;
+    sameSlot(n, saved.award_id, saved.team_id) && n.panel_id === saved.panel_id && judgeKey(n.judge) === judgeKey(saved.judge);
   return list.some(same) ? list.map((n) => (same(n) ? saved : n)) : [...list, saved];
 }
 

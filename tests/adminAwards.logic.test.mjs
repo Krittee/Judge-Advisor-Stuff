@@ -288,6 +288,30 @@ test("two panels that nominated the same team are two sections, in the roster's 
   assert.deepEqual(d.reasons.map((r) => r.panel), ["Panel 2", "Panel 3", "a removed panel"]);
 });
 
+test("judges who differ only by case or spacing are one judge: old rows written before the store matched names count once", () => {
+  const dupes = [
+    nom(byteMe, "excellence", "p2", "Sam Rivera", "First reason"),
+    nom(byteMe, "excellence", "p2", " sam rivera", "Second reason"),
+    nom(byteMe, "design", "p2", "Sam Rivera"),
+    nom(roboraptors, "excellence", "p2", "Sam Rivera"),
+    nom(roboraptors, "excellence", "p2", "Priya Nair"),
+    nom(roboraptors, "excellence", "p2", "PRIYA NAIR"),
+  ];
+  const nominees = (id) => buildAwardPanels(awards, dupes, new Map(), msTeams, panels).find((l) => l.award.id === id).nominees;
+  assert.deepEqual(nominees("excellence").map((x) => [x.team.number, x.judges]), [["6060R", 2], ["7700B", 1]], "1 judge, and 2 judges");
+
+  const m = buildMatrix(awards, dupes, new Map(), msTeams, panels);
+  assert.deepEqual(m.rows.map((r) => [r.team.number, r.count]), [["6060R", 2], ["7700B", 2]], "Excellence and Design once each, not three");
+
+  const d = detailFor({ awardId: "excellence", teamId: byteMe.id }, { ...everything, nominations: dupes });
+  assert.deepEqual(d.reasons[0].judges, [{ judge: "Sam Rivera", reason: "First reason" }], "one line for the judge");
+  assert.deepEqual(d.others.map((o) => [o.team.number, o.judges]), [["6060R", 2]]);
+
+  // Different people with different names, and the same name on different panels, stay apart.
+  const apart = [nom(byteMe, "excellence", "p2", "Sam"), nom(byteMe, "excellence", "p2", "Sam Rivera"), nom(byteMe, "excellence", "p3", "sam")];
+  assert.equal(buildAwardPanels(awards, apart, new Map(), msTeams, panels).find((l) => l.award.id === "excellence").nominees[0].judges, 3);
+});
+
 test("referee flags: Good conduct and the worst of the rest, or none", () => {
   const kinds = [
     { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },

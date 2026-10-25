@@ -5,6 +5,7 @@ import { store, StoreError } from "@/lib/db";
 import { blockedTeams, CONFLICT_MESSAGE, isConflicted, loadBlocks } from "@/lib/conflicts";
 import { completedTeamIds } from "@/lib/judgeQueue";
 import { awards } from "@/lib/presets";
+import { judgeKey } from "@/lib/roster";
 import type { NominationRow } from "@/lib/types";
 import { awardLabel, fields, REASON_MAX } from "./shared";
 
@@ -150,5 +151,10 @@ export async function DELETE(request: Request) {
   return NextResponse.json({ ok: true, removed });
 }
 
+// The judge is matched as the roster matches a name (trimmed, any case), so
+// signing in as "dana" is the same judge as "Dana". The row keeps the spelling it was made with.
 const isMine = (n: NominationRow, k: { awardId: string; teamId: string; panelId: string; judge: string }) =>
-  n.award_id === k.awardId && n.team_id === k.teamId && n.panel_id === k.panelId && n.judge === k.judge;
+  n.award_id === k.awardId &&
+  n.team_id === k.teamId &&
+  n.panel_id === k.panelId &&
+  judgeKey(n.judge) === judgeKey(k.judge);

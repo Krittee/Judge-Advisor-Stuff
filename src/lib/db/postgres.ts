@@ -312,10 +312,10 @@ async function migrate(): Promise<void> {
 
     -- A judge's nomination of a team for an award: one row per judge per award
     -- per team. panel_id is the panel the judge nominated from, nulled when it
-    -- is deleted (as scores do), never cascaded. A plain unique constraint
-    -- treats NULLs as distinct, which is harmless here because a nomination is
-    -- only ever written with a panel (see nominate): the upsert below always
-    -- matches on a full, non-null key, and only an orphaned row has a NULL.
+    -- is deleted (as scores do), never cascaded. The unique index below treats
+    -- NULLs as distinct, which is harmless here because a nomination is only
+    -- ever written with a panel (see nominate): the upsert always matches on a
+    -- full, non-null key, and only an orphaned row has a NULL.
     create table if not exists nominations (
       id         uuid primary key default gen_random_uuid(),
       award_id   text not null,
@@ -324,9 +324,37 @@ async function migrate(): Promise<void> {
       judge      text not null,
       reason     text,
       created_at timestamptz not null default now(),
-      updated_at timestamptz not null default now(),
-      unique (award_id, team_id, panel_id, judge)
+      updated_at timestamptz not null default now()
     );
+
+    -- A judge is one judge however the name was typed ("Dana", "dana", " Dana "),
+    -- as the roster's judges_name_unique has it; the row keeps the spelling it
+    -- was made with. btrim/lower stand in for the app's judgeKey (trim,
+    -- toLowerCase): they agree on any ordinary name, and differ only on exotic
+    -- whitespace or case folding, where the worst case is the old behaviour (two
+    -- rows). The first version of this table had a plain unique constraint on
+    -- (award_id, team_id, panel_id, judge): drop it, since it is what let the
+    -- variants in. The index cannot be created while two rows share a key, which
+    -- a database that ran the constraint can hold, so first delete every row
+    -- beyond the latest one (an orphaned row, with no panel, is its own and is
+    -- left alone). With no duplicates this touches nothing.
+    alter table nominations drop constraint if exists nominations_award_id_team_id_panel_id_judge_key;
+
+    delete from nominations
+     where id in (
+       select id from (
+         select id, row_number() over (
+           partition by award_id, team_id, panel_id, lower(btrim(judge))
+           order by updated_at desc, created_at desc, id
+         ) as rn
+         from nominations
+         where panel_id is not null
+       ) ranked
+       where ranked.rn > 1
+     );
+
+    create unique index if not exists nominations_one_per_judge
+      on nominations (award_id, team_id, panel_id, lower(btrim(judge)));
 
     -- The Judge Advisor's pick: one winner per award per division, so setting
     -- another replaces it. Never part of the shared state.
@@ -1454,6 +1482,8 @@ export const postgresStore: Store = {
 
   /**
    * One statement, so two judges tapping at once cannot both insert. The
+   * conflict is on the same expression as the nominations_one_per_judge index,
+   * so "dana" lands on "Dana"'s row and leaves its spelling alone. The
    * reason is three-way: left out (`$6` false) keeps the stored one, a string
    * or null sets it. `updated_at` moves only when the reason really changes.
    */
@@ -1463,7 +1493,7 @@ export const postgresStore: Store = {
         await query<NominationRow>(
           `insert into nominations (award_id, team_id, panel_id, judge, reason)
            values ($1, $2, $3, $4, $5)
-           on conflict (award_id, team_id, panel_id, judge) do update set
+           on conflict (award_id, team_id, panel_id, lower(btrim(judge))) do update set
              reason = case when $6::boolean then excluded.reason else nominations.reason end,
              updated_at = case
                when $6::boolean and excluded.reason is distinct from nominations.reason then now()
@@ -1487,7 +1517,8 @@ export const postgresStore: Store = {
   async withdrawNomination(key: NominationKey) {
     const gone = await query<{ id: string }>(
       `delete from nominations
-        where award_id = $1 and team_id = $2 and panel_id = $3 and judge = $4
+        where award_id = $1 and team_id = $2 and panel_id = $3
+          and lower(btrim(judge)) = lower(btrim($4))
         returning id`,
       [key.awardId, key.teamId, key.panelId, key.judge],
     );

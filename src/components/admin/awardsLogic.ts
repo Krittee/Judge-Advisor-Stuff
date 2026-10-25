@@ -2,6 +2,7 @@ import { kindCounts, type FlagKind } from "@/components/Flags";
 import type { Ask } from "@/components/judge/logic";
 import { goodConductTeams, GOOD_CONDUCT, GOOD_CONDUCT_MIN, SPORTSMANSHIP } from "@/lib/awards";
 import { matchReference } from "@/lib/match";
+import { judgeKey } from "@/lib/roster";
 import type { Rubric } from "@/lib/rubrics";
 import type { AwardView, FlagRow, NominationRow, PublicPanel, Team, WinnerRow } from "@/lib/types";
 import { teamCount } from "./floorLogic";
@@ -162,10 +163,25 @@ export function panelChips(panels: Pick<PublicPanel, "id" | "name">[], inDivisio
   ];
 }
 
-/** Nominations of one award grouped by team, the judges of each. */
+/**
+ * One row per judge per award per team per panel. A judge's name is compared as
+ * the roster compares it, so "Dana" and "dana" are one judge, not two: the store
+ * keeps them to one row now, and this is for rows written before it did.
+ */
+function onePerJudge(nominations: NominationRow[]): NominationRow[] {
+  const seen = new Set<string>();
+  return nominations.filter((n) => {
+    const key = [n.award_id, n.team_id, n.panel_id, judgeKey(n.judge)].join("|");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** Nominations grouped by team, the judges of each. */
 function byTeam(nominations: NominationRow[]): Map<string, NominationRow[]> {
   const out = new Map<string, NominationRow[]>();
-  for (const n of nominations) out.set(n.team_id, [...(out.get(n.team_id) ?? []), n]);
+  for (const n of onePerJudge(nominations)) out.set(n.team_id, [...(out.get(n.team_id) ?? []), n]);
   return out;
 }
 
@@ -319,7 +335,7 @@ export function detailFor(sel: Sel, all: Everything): Detail | null {
 
   const decided = winnersOf(all.winners, team.division);
   const here = nominationsIn(all.nominations, all.teams, team.division);
-  const mine = here.filter((n) => n.team_id === team.id);
+  const mine = onePerJudge(here.filter((n) => n.team_id === team.id));
 
   const forThis = mine.filter((n) => n.award_id === award.id);
   const place = (id: string | null) => {

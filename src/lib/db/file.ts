@@ -1227,11 +1227,16 @@ function listNominations(): NominationRow[] {
   return state().nominations.map((n) => ({ ...n }));
 }
 
+// The judge is compared as the roster compares a name, so "Dana" and " dana " are one judge.
 const sameNomination = (n: NominationRow, k: NominationKey) =>
-  n.award_id === k.awardId && n.team_id === k.teamId && n.panel_id === k.panelId && n.judge === k.judge;
+  n.award_id === k.awardId &&
+  n.team_id === k.teamId &&
+  n.panel_id === k.panelId &&
+  judgeKey(n.judge) === judgeKey(k.judge);
 
 /**
- * One row per judge per award per team, so asking twice is asking once.
+ * One row per judge per award per team, so asking twice is asking once. The
+ * row keeps the spelling of the judge's name it was first made with.
  * Only a changed reason writes: a repeat tap must not look like an edit.
  */
 function nominate(input: NewNomination): NominationRow {

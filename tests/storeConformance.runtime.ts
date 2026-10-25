@@ -1228,6 +1228,42 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     assert.equal((await store.listNominations()).length, 4);
   });
 
+  it("a judge is one judge however the name is typed: trimmed, any case", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+
+    const first = await store.nominate(nominationInput(team.id, panel.id, { judge: "Dana" }));
+    const again = await store.nominate(nominationInput(team.id, panel.id, { judge: "dana" }));
+    assert.equal(again.id, first.id, "the same nomination, not a second one");
+    assert.equal(again.judge, "Dana", "it keeps the spelling it was made with");
+    assert.equal(again.updated_at, first.updated_at, "a repeat tap writes nothing");
+    assert.equal((await store.listNominations()).length, 1);
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const why = await store.nominate(nominationInput(team.id, panel.id, { judge: "DANA ", reason: "Lovely notebook" }));
+    assert.equal(why.id, first.id, "a reason sent under a variant name updates the one row");
+    assert.deepEqual([why.judge, why.reason], ["Dana", "Lovely notebook"]);
+    assert.ok(why.updated_at > first.updated_at);
+    assert.equal((await store.listNominations()).length, 1);
+
+    // Another judge is another nomination, and so is the same name on another panel.
+    const other = await store.createPanel(panelInput({ name: "Panel B", code: "CONF02" }));
+    await store.nominate(nominationInput(team.id, panel.id, { judge: "Danae" }));
+    await store.nominate(nominationInput(team.id, other.id, { judge: "dana" }));
+    assert.equal((await store.listNominations()).length, 3);
+
+    const key = (judge: string, panelId = panel.id) => ({ awardId: "excellence", teamId: team.id, panelId, judge });
+    assert.equal(await store.withdrawNomination(key(" dana ")), true, "withdrawn under a variant name");
+    assert.equal(await store.withdrawNomination(key("Dana")), false, "and it is gone");
+    assert.deepEqual(
+      (await store.listNominations()).map((n) => [n.judge, n.panel_id]).sort(),
+      [["Danae", panel.id], ["dana", other.id]].sort(),
+      "Danae and the other panel's dana are untouched",
+    );
+  });
+
   it("a nomination for a team or panel that is gone is a 404, not a stored orphan", async (store) => {
     const panel = await store.createPanel(panelInput());
     await store.upsertTeams([teamInput("1001")]);
