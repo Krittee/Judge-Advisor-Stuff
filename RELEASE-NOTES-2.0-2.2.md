@@ -286,13 +286,14 @@ store everywhere, and against Postgres only with `TEST_DATABASE_URL`.
 ## 7. Known limits and open items
 
 **Before any release:**
-- **Postgres has never run against a real database.** Run
-  `TEST_DATABASE_URL=… npm test` once. This covers the new award tables,
-  indexes and migrations.
+- **Postgres ran against a real database on 2026-10-26** (a Neon test
+  project, at `3068de7`): 1642 tests, all pass, none skipped. Run
+  `TEST_DATABASE_URL=… npm test` again after any change to
+  `src/lib/db/postgres.ts`.
 - Check row-level security on the live Supabase project, and that the
   deployed `SESSION_SECRET` isn't the placeholder.
-- Releasing means merging `version-2.0` (then `version-2.2`) into the default
-  branch. Ask first, including before bumping `package.json` or tagging.
+- Released as **Version 2.0** (`package.json` 2.0.0): `version-2.2` holds all
+  of `version-2.0` and is merged into the default branch.
 
 **Known and accepted:**
 - **Referee names are typed, not verified.** Referees share one code, which
