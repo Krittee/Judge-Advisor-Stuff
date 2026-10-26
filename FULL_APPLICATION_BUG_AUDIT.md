@@ -2,7 +2,7 @@
 
 ## Status as of 2026-10-24
 
-The audit below is kept as written (2026-09-09). This table records what happened to each finding since. Status comes from the fixing commits and the code as it stands; findings were not re-audited from scratch. The Postgres code paths have unit and SQL-shape tests but have never run against a real database. The latest pass is detailed in `AUDIT_STATUS.md`.
+The audit below is kept as written (2026-09-09). This table records what happened to each finding since. Status comes from the fixing commits and the code as it stands; findings were not re-audited from scratch. The Postgres code paths have unit and SQL-shape tests but have never run against a real database. The latest pass is summarised in `RELEASE-NOTES-2.0-2.2.md` (§2).
 
 **Summary:** 25 fixed, 3 partly fixed, 1 superseded, 1 reversed by decision, 1 not a bug by decision, 1 open (deferred).
 

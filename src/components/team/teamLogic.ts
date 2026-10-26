@@ -1,5 +1,6 @@
 import { formatClock, formatMinutes } from "@/components/ui";
 import { STATUS_META, type Status } from "@/lib/status";
+import { bangkokDay } from "@/lib/stepTimes";
 import type { RequestRow } from "@/lib/types";
 
 /* The team page's decisions, kept apart from how they are drawn
@@ -154,14 +155,9 @@ export function stepTime(at: StepAt, now: number): string {
 export const historyTime = (r: Pick<RequestRow, "finished_at" | "cancelled_at" | "requested_at">): string =>
   r.finished_at ?? r.cancelled_at ?? r.requested_at;
 
-/* The event's day is Bangkok's calendar day, as in judgeDay() in src/lib/auth.ts. */
-const eventDayFormat = new Intl.DateTimeFormat("sv-SE", {
-  timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit",
-});
-
 /** Whether an ISO time falls on the same Bangkok calendar day as `now` (ms). */
 export const sameEventDay = (iso: string, now: number): boolean =>
-  eventDayFormat.format(new Date(iso)) === eventDayFormat.format(new Date(now));
+  bangkokDay(iso) === bangkokDay(new Date(now).toISOString());
 
 /** Up to five of the team's other requests from today, in the order the server sent them. */
 export function earlierToday(requests: RequestRow[], teamId: string, currentId: string | undefined, now: number): RequestRow[] {

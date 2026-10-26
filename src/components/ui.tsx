@@ -2,49 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { STATUS_META, type Status } from "@/lib/status";
+import type { Status } from "@/lib/status";
 import { bookingUrgency, type BookingUrgency } from "@/lib/data";
 import { ConsoleLinks } from "./nav";
 import type { Role } from "@/lib/auth";
-
-export function StatusChip({
-  status,
-  size = "md",
-  short = false,
-}: {
-  status: Status;
-  size?: "sm" | "md" | "lg";
-  /** Drop the "Interview" prefix where a column heading already says it. */
-  short?: boolean;
-}) {
-  const meta = STATUS_META[status];
-  const pad =
-    size === "lg" ? "px-4 py-2 text-base" : size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm";
-
-  return (
-    <span
-      className={`inline-flex items-center gap-2 whitespace-nowrap rounded-full ${pad} ${
-        meta.chip
-      } ${status === "requested" ? "pulse-waiting" : ""}`}
-    >
-      {short ? meta.short : meta.label}
-    </span>
-  );
-}
-
-export function StatusLegend({ className = "" }: { className?: string }) {
-  const shown: Status[] = ["scheduled", "requested", "acknowledged", "interviewing", "completed"];
-  return (
-    <div className={`flex flex-wrap items-center gap-x-5 gap-y-2 ${className}`}>
-      {shown.map((s) => (
-        <span key={s} className="flex items-center gap-2 text-sm text-ink-subtle">
-          <span className={`h-3 w-3 rounded-full ${STATUS_META[s].dot}`} />
-          {STATUS_META[s].label}
-        </span>
-      ))}
-    </div>
-  );
-}
 
 /** Live "4m ago" text that ticks without a re-render of the whole tree. */
 export function Elapsed({ since, prefix = "" }: { since: string | null; prefix?: string }) {
@@ -255,9 +216,6 @@ export function Field({
     </label>
   );
 }
-
-export const inputClass =
-  "w-full rounded-xl bg-surface px-4 py-3 text-ink ring-1 ring-inset ring-line outline-none placeholder:text-ink-faint focus:ring-2 focus:ring-accent";
 
 export function Banner({
   kind,

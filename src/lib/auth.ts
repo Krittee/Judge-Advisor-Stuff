@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createHmac } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { store } from "./db";
+import { bangkokDay } from "./stepTimes";
 
 export const ROLES = ["admin", "judge", "queuer", "referee"] as const;
 export type Role = (typeof ROLES)[number];
@@ -16,11 +17,8 @@ export type Session =
 const COOKIE = "jq_session";
 const MAX_AGE = 60 * 60 * 16; // upper bound; judges also stop at the next Bangkok day
 
-// shortcut: the event is in Bangkok; add an event timezone setting if this app runs elsewhere.
-const judgeDayFormat = new Intl.DateTimeFormat("sv-SE", {
-  timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit",
-});
-const judgeDay = () => judgeDayFormat.format(new Date());
+// The event's day is Bangkok's calendar day; the timezone lives in bangkokDay().
+const judgeDay = () => bangkokDay(new Date().toISOString());
 const panelAuth = (id: string, code: string) =>
   createHmac("sha256", secret()).update(id).update("\0").update(code.trim().toUpperCase()).digest("hex");
 

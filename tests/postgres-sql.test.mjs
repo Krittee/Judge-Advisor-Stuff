@@ -418,7 +418,7 @@ test("a migration that fails rolls back, gives the connection back, and is retri
    Nothing below runs against Postgres. The recording stand-in shows the
    statements and parameters the store sends -- the placeholders line up with
    their values, the flag fields go in the columns they are named for -- and the
-   source checks show migrate() and supabase/schema.sql agree. What they
+   source checks show what migrate() creates. What they
    cannot show is that Postgres accepts the SQL. */
 
 const sent = (match) => calls.filter((c) => match.test(c.sql));
@@ -430,20 +430,12 @@ test("migrate() creates the single-row referee_setup table, and locks it down", 
     /create table if not exists referee_setup \(\s*id\s+int primary key default 1 check \(id = 1\),\s*ruleset\s+text not null,\s*field_count int not null check \(field_count between 1 and 20\),\s*set_by\s+text not null,\s*set_on\s+text not null,\s*updated_at\s+timestamptz not null default now\(\)\s*\);/,
   );
   assert.ok(body.includes("alter table referee_setup enable row level security;"), "RLS must cover the new table");
-
-  const schema = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
-  assert.match(schema, /create table referee_setup \(\s*id\s+int primary key default 1 check \(id = 1\),/);
-  assert.match(schema, /field_count int not null check \(field_count between 1 and 20\)/);
-  assert.ok(schema.includes("alter table referee_setup enable row level security;"));
-  assert.ok(schema.includes("drop table if exists referee_setup cascade;"));
 });
 
-test("no alliance anywhere in the Postgres store or its schema", () => {
+test("no alliance anywhere in the Postgres store", () => {
   /* An alliance (red/blue) was briefly a flag column. The match API it needed
      is not there, so it was removed outright; nothing may bring it back. */
-  const schema = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
   assert.doesNotMatch(src, /alliance/i, "src/lib/db/postgres.ts mentions an alliance");
-  assert.doesNotMatch(schema, /alliance/i, "supabase/schema.sql mentions an alliance");
 });
 
 test("createFlag and updateFlag send every flag field in the column it is named for", async () => {
@@ -526,7 +518,6 @@ test("a full wipe truncates the referee setup with the event; a day reset leaves
    every statement the roster methods send, with its parameters, run against
    the recording stand-in for the driver. */
 
-const schemaSql = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
 const migrateBody = src.slice(
   src.indexOf("async function migrate()"),
   src.indexOf("/** Turn a unique-violation"),
@@ -566,7 +557,6 @@ test("migrate() creates the judge roster once, copying the old judge lists with 
 
 test("migrate() locks the judges table down like every other table", () => {
   assert.match(migrateBody, /alter table judges\s+enable row level security;/);
-  assert.match(schemaSql, /alter table judges\s+enable row level security;/);
 });
 
 test("conflicts: a judge's or a panel's, exactly one; old rows keep their panel; both unique", () => {
@@ -588,22 +578,6 @@ test("conflicts: a judge's or a panel's, exactly one; old rows keep their panel;
     /^if not exists \(select 1 from pg_constraint where conname = 'conflicts_one_owner'\) then\s*alter table conflicts add constraint conflicts_one_owner\s+check \(\(panel_id is null\) <> \(judge_id is null\)\);\s*end if;/,
   );
   assert.ok(!/delete from conflicts|update conflicts|truncate conflicts/i.test(migrateBody), "no conflict row is touched by the migration");
-});
-
-test("supabase/schema.sql agrees with migrate() on the roster and the conflict shape", () => {
-  assert.ok(schemaSql.includes("drop table if exists judges    cascade;"));
-  assert.match(
-    schemaSql,
-    /create table judges \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*seq\s+bigint generated always as identity,\s*name\s+text not null,\s*note\s+text,\s*panel_id\s+uuid references panels\(id\) on delete set null,\s*created_at timestamptz not null default now\(\)\s*\);/,
-  );
-  assert.ok(schemaSql.includes("create unique index judges_name_unique on judges (lower(name));"));
-  assert.match(
-    schemaSql,
-    /create table conflicts \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*panel_id\s+uuid references panels\(id\) on delete cascade,\s*judge_id\s+uuid references judges\(id\) on delete cascade,/,
-  );
-  assert.match(schemaSql, /constraint conflicts_one_owner check \(\(panel_id is null\) <> \(judge_id is null\)\)/);
-  assert.ok(schemaSql.includes("create unique index conflicts_judge_team_unique on conflicts (judge_id, team_id);"));
-  assert.ok(after(schemaSql, "create table judges (") < after(schemaSql, "create table conflicts ("));
 });
 
 const JUDGE_COLUMNS = "id, name, note, panel_id, created_at";
@@ -954,11 +928,10 @@ test("a blank name, pit, division or notebook type on a re-import keeps the stor
 
 /* ---- Activity: kind, the actor's role, and the team number (no database here either) ---- */
 
-test("migrate() adds the activity kind and role as idempotent nullable columns, and schema.sql creates them", () => {
+test("migrate() adds the activity kind and role as idempotent nullable columns", () => {
   assert.ok(migrateBody.includes("alter table activity add column if not exists kind text;"));
   assert.ok(migrateBody.includes("alter table activity add column if not exists actor_role text;"));
   assert.ok(!/alter table activity add column if not exists (kind|actor_role) text not null/.test(migrateBody), "an older row has neither, so both stay nullable");
-  assert.match(schemaSql, /create table activity \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*request_id\s+uuid references requests\(id\) on delete cascade,\s*team_id\s+uuid references teams\(id\) on delete set null,\s*kind\s+text,[^\n]*\n\s*actor\s+text not null,[^\n]*\n\s*actor_role\s+text,/);
 });
 
 test("logActivity stores the kind and the actor's role in their own columns", async () => {
@@ -1027,7 +1000,7 @@ test("migrate() keys a nomination on the judge as the roster compares a name, an
   assert.match(cleanup, /ranked\.rn > 1/);
 });
 
-test("migrate() gives nominations a role and the Judge Advisor's rows an index of their own, after the judges' index, and schema.sql agrees", () => {
+test("migrate() gives nominations a role and the Judge Advisor's rows an index of their own, after the judges' index", () => {
   // Added the way every later column is: idempotent, in the block that follows the tables, so an existing database gets it and every row stays a judge's.
   const column = after(migrateBody, "alter table nominations add column if not exists role text not null default 'judge' check (role in ('judge', 'admin'));");
   const admin = migrateBody.search(/create unique index if not exists nominations_one_per_admin\s+on nominations \(award_id, team_id, lower\(btrim\(judge\)\)\) where role = 'admin';/);
@@ -1036,11 +1009,6 @@ test("migrate() gives nominations a role and the Judge Advisor's rows an index o
   assert.ok(migrateBody.search(/create unique index if not exists nominations_one_per_judge/) < column, "the judges' index and its cleanup are untouched and run first");
   // The judges' index sees a NULL panel as distinct, which is why the Judge Advisor's rows (no panel) need a partial one of their own, without the panel.
   assert.ok(!/nominations_one_per_admin[^;]*panel_id/.test(migrateBody), "the Judge Advisor's key has no panel in it");
-  assert.match(
-    schemaSql,
-    /create unique index nominations_one_per_admin\s+on nominations \(award_id, team_id, lower\(btrim\(judge\)\)\) where role = 'admin';/,
-  );
-  assert.match(schemaSql, /create unique index nominations_one_per_judge\s+on nominations \(award_id, team_id, panel_id, lower\(btrim\(judge\)\)\);/, "and the judges' index is as it was");
 });
 
 test("migrate() creates award_winners with one row per (award, division), cascading with the team", () => {
@@ -1051,28 +1019,10 @@ test("migrate() creates award_winners with one row per (award, division), cascad
   assert.ok(migrateBody.includes("create index if not exists award_winners_team_idx on award_winners (team_id);"));
 });
 
-test("both award tables are locked down like every other, and supabase/schema.sql agrees with migrate()", () => {
+test("both award tables are locked down like every other", () => {
   for (const table of ["nominations", "award_winners"]) {
     assert.ok(migrateBody.includes(`alter table ${table} enable row level security;`), `${table}: RLS in migrate()`);
-    assert.ok(schemaSql.includes(`alter table ${table} enable row level security;`), `${table}: RLS in schema.sql`);
-    assert.ok(schemaSql.includes(`drop table if exists ${table} cascade;`), `${table}: dropped before it is recreated`);
   }
-  assert.match(
-    schemaSql,
-    /create table nominations \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*award_id\s+text not null,[^\n]*\n\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*panel_id\s+uuid references panels\(id\) on delete set null,\s*judge\s+text not null,[^\n]*\n\s*role\s+text not null default 'judge' check \(role in \('judge', 'admin'\)\),\s*reason\s+text,\s*created_at timestamptz not null default now\(\),\s*updated_at timestamptz not null default now\(\)\s*\);/,
-  );
-  assert.match(
-    schemaSql,
-    /create table award_winners \(\s*award_id\s+text not null,\s*division\s+text not null,\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*decided_by text not null,\s*decided_at timestamptz not null default now\(\),\s*primary key \(award_id, division\)\s*\);/,
-  );
-  assert.match(
-    schemaSql,
-    /create unique index nominations_one_per_judge\s+on nominations \(award_id, team_id, panel_id, lower\(btrim\(judge\)\)\);/,
-    "schema.sql keys a nomination on the same expression migrate() does",
-  );
-  assert.ok(!/unique \(award_id, team_id, panel_id, judge\)/.test(schemaSql));
-  assert.ok(schemaSql.includes("create index nominations_team_idx on nominations (team_id);"));
-  assert.ok(schemaSql.includes("create index award_winners_team_idx on award_winners (team_id);"));
 });
 
 const NOMINATION = { id: "n1", award_id: "excellence", team_id: "t1", panel_id: "p1", judge: "Amy", reason: null, created_at: new Date("2026-10-24T08:00:00.000Z"), updated_at: new Date("2026-10-24T08:00:00.000Z") };

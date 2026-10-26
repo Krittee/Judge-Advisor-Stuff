@@ -209,12 +209,6 @@ export function isBracketMatch(id: string | null | undefined, rulesetId?: string
   return findMatchType(id, rulesetId)?.bracket === true;
 }
 
-/** "Override Manual v2.1"; just the label when no version is recorded.
- *  The version comes from the data file, never from a component. */
-export function manualLabel(ruleset: Ruleset): string {
-  return ruleset.manualVersion ? `${ruleset.game} Manual v${ruleset.manualVersion}` : ruleset.label;
-}
-
 function findRule(id: string | null | undefined, rulesetId?: string | null): Rule | null {
   if (!id) return null;
   return INDEX.get(getRuleset(rulesetId).id)?.get(String(id).trim().toUpperCase()) ?? null;

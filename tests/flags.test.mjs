@@ -94,30 +94,6 @@ test("the source really does fall back on severity, not position", () => {
   );
 });
 
-/* ---- the worst flag on a team ---------------------------------------- */
-
-function worstFlag(flags) {
-  let worst = null;
-  for (const f of flags) {
-    const kind = kinds.find((k) => k.id === f.kind);
-    if (kind && (!worst || kind.severity > worst.severity)) worst = kind;
-  }
-  return worst;
-}
-
-test("a team's worst flag is what shows at a glance", () => {
-  assert.equal(worstFlag([{ kind: "good" }, { kind: "minor" }, { kind: "warning" }]).id, "minor");
-  assert.equal(worstFlag([{ kind: "good" }]).id, "good");
-  assert.equal(worstFlag([{ kind: "major" }, { kind: "good" }]).id, "major");
-  assert.equal(worstFlag([]), null);
-});
-
-test("praise does not cancel out a violation", () => {
-  /* Five good flags and one major is still a major. */
-  const flags = [...Array(5).fill({ kind: "good" }), { kind: "major" }];
-  assert.equal(worstFlag(flags).id, "major");
-});
-
 /* ---- who may do what -------------------------------------------------- */
 
 const canFlag = (role) => role === "referee";

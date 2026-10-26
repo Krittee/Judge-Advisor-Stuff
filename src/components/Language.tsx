@@ -1,8 +1,9 @@
 "use client";
 
+import type { Language } from "@/lib/presets";
 import type { PublicPanel } from "@/lib/types";
 
-export type Language = { id: string; label: string; short: string };
+export type { Language };
 
 /** The language an interview will run in, as a small tag. */
 export function LanguageTag({

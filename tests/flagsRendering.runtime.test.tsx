@@ -7,7 +7,6 @@ import {
   FlagList,
   flagsOnDay,
   FlagSummary,
-  MatchAffectingCheck,
   type FlagKind,
 } from "../src/components/Flags";
 import {
@@ -232,12 +231,4 @@ test("groupRulesByCategory follows the manual's order and keeps an unknown categ
   // Search narrows the groups to the categories that still have a hit.
   const holding = groupRulesByCategory(searchRules("holding", "v5rc"));
   assert.deepEqual(holding.map((g) => g.category), ["General Game Rules"]);
-});
-
-test("the match-affecting checkbox is a real, labelled checkbox with a 44px row", () => {
-  const markup = renderToStaticMarkup(<MatchAffectingCheck checked onChange={() => {}} />);
-  assert.match(markup, /type="checkbox"/);
-  assert.match(markup, /checked/);
-  assert.match(markup, /Match affecting/);
-  assert.match(markup, /min-h-11/);
 });

@@ -2,33 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 
-/* Mirrors src/lib/teamNumber.ts. Team numbers are text — plenty of
+import {
+  compareTeamNumbers,
+  danglingSuffixes,
+  filterTeamNumberInput,
+  isValidTeamNumber,
+  normalizeTeamNumber,
+  parseTeamNumberList,
+} from "../src/lib/teamNumber";
+
+/* src/lib/teamNumber.ts, run as it is. Team numbers are text — plenty of
    programmes use a letter suffix, like 9882K — but people still expect
    them ordered as if they were numbers. */
-
-const MAX_LENGTH = 12;
-const VALID = /^[A-Z0-9][A-Z0-9-]*$/;
-
-function normalizeTeamNumber(input) {
-  return String(input ?? "").replace(/\s+/g, "").toUpperCase().slice(0, MAX_LENGTH);
-}
-
-function isValidTeamNumber(value) {
-  return value.length > 0 && value.length <= MAX_LENGTH && VALID.test(value);
-}
-
-function filterTeamNumberInput(input) {
-  return input.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, MAX_LENGTH);
-}
-
-function compareTeamNumbers(a, b) {
-  const [, digitsA = "", restA = ""] = /^(\d*)(.*)$/.exec(a ?? "") ?? [];
-  const [, digitsB = "", restB = ""] = /^(\d*)(.*)$/.exec(b ?? "") ?? [];
-  const numA = digitsA === "" ? Number.POSITIVE_INFINITY : Number(digitsA);
-  const numB = digitsB === "" ? Number.POSITIVE_INFINITY : Number(digitsB);
-  if (numA !== numB) return numA < numB ? -1 : 1;
-  return restA.localeCompare(restB);
-}
 
 test("letter-suffixed team numbers are valid", () => {
   for (const n of ["9882K", "1234", "1234A", "12A", "7", "9882-K", "ABC"]) {
@@ -89,31 +74,6 @@ test("sorting is a valid total order (no NaN comparisons)", () => {
    three. Every number has to come back out, because one silently dropped
    is a conflict that never gets recorded. */
 
-const SEPARATORS = /[\s,;]+/;
-
-function parseTeamNumberList(input) {
-  const seen = new Set();
-  for (const raw of String(input ?? "").split(SEPARATORS)) {
-    const number = normalizeTeamNumber(raw);
-    if (number) seen.add(number);
-  }
-  return [...seen];
-}
-
-test("the mirror above still matches the real separators", () => {
-  /* This file re-implements src/lib/teamNumber.ts rather than importing it,
-     so pin the one part most likely to be edited there and not here. */
-  const src = readFileSync(new URL("../src/lib/teamNumber.ts", import.meta.url), "utf8");
-  assert.ok(
-    src.includes("export function parseTeamNumberList"),
-    "parseTeamNumberList was renamed or removed",
-  );
-  assert.ok(
-    src.includes(String(SEPARATORS)),
-    `the source no longer splits on ${SEPARATORS}; update this mirror`,
-  );
-});
-
 test("separators can be mixed however they were written down", () => {
   const expected = ["1234", "5678", "9882K"];
   for (const written of [
@@ -135,10 +95,6 @@ test("a number repeated in the list is recorded once", () => {
 });
 
 /* ---- a suffix split off its number ----------------------------------- */
-
-function danglingSuffixes(input) {
-  return parseTeamNumberList(input).filter((n) => n.length <= 2 && !/\d/.test(n));
-}
 
 test("a space inside a team number splits it, which must not pass silently", () => {
   /* "9882 K" cannot read as one team in a space-separated list, and the

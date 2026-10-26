@@ -26,45 +26,6 @@ export function flagsOnDay(flags: FlagRow[], day: Date): FlagRow[] {
   });
 }
 
-/** Only Minor and Major can be match affecting (the server stores false for
- *  anything else), but a severity button saves the report the moment it is
- *  tapped, so there is no chosen severity to key off. Callers show this once
- *  a rule is picked -- every kind that can use it requires one. */
-export function MatchAffectingCheck({
-  checked,
-  onChange,
-  disabled,
-}: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <label className="flex min-h-11 items-center gap-3 text-sm text-ink">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        disabled={disabled}
-        className="h-5 w-5 shrink-0 accent-[var(--accent)]"
-      />
-      <span>
-        Match affecting <span className="text-ink-faint">(Minor / Major)</span>
-      </span>
-    </label>
-  );
-}
-
-/** The worst thing said about a team, for a one-glance summary. */
-export function worstFlag(flags: FlagRow[], kinds: FlagKind[]): FlagKind | null {
-  let worst: FlagKind | null = null;
-  for (const flag of flags) {
-    const kind = kindOf(flag.kind, kinds);
-    if (kind && (!worst || kind.severity > worst.severity)) worst = kind;
-  }
-  return worst;
-}
-
 function FlagChip({
   kind,
   kinds,

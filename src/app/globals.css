@@ -282,10 +282,6 @@ h3,
   background: var(--header);
 }
 
-.dialog-surface {
-  background: var(--surface);
-}
-
 /* A hairline that survives both themes. Borders at 1px on a dark canvas
    want more contrast than the same border on a light one, and a single
    opacity cannot serve both -- that is what --line is for. */
@@ -751,9 +747,8 @@ textarea {
 /* ------------------------------------------------------------------ *
  * Motion
  *
- * Two animations in the whole app, and both mean something. If a team is
- * orange it should be the thing your eye lands on from across the room;
- * if a list just arrived it should say so once and then sit still.
+ * One shared animation, and it means something. If a team is orange it
+ * should be the thing your eye lands on from across the room.
  * ------------------------------------------------------------------ */
 
 @keyframes waiting-pulse {
@@ -770,28 +765,8 @@ textarea {
   animation: waiting-pulse 1.8s ease-in-out infinite;
 }
 
-@keyframes rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(0.5rem);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* Staggered only far enough to read as one movement rather than a queue
-   of separate ones; past ~8 rows the delay is capped so a long roster
-   does not take a second and a half to finish arriving. */
-.rise-in {
-  animation: rise-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(min(var(--i, 0), 8) * 40ms);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .pulse-waiting,
-  .rise-in,
   .theme-toggle {
     animation: none;
     transition: none;

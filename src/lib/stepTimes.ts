@@ -23,8 +23,9 @@ type TimedRequest = Pick<RequestRow, "kind" | "slot_start" | TimeField>;
 
 const labelOf = (field: TimeField): string => TIME_STEPS.find((s) => s.field === field)!.label;
 
-// The event is in Bangkok (UTC+7, no daylight saving), as judgeDay() in auth.ts
-// and sameEventDay() in team/teamLogic.ts. Add an event timezone setting if this app runs elsewhere.
+// The event is in Bangkok (UTC+7, no daylight saving). bangkokDay() is the one place the
+// timezone lives: judgeDay() in auth.ts and sameEventDay() in team/teamLogic.ts call it.
+// Add an event timezone setting if this app runs elsewhere.
 const OFFSET = "+07:00";
 const dayFormat = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" });
 const clockFormat = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });

@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { PanelBusyLine, panelLoad, type PanelLoad } from "@/components/SlotPicker";
 import { formatClock } from "@/components/ui";
+import type { Language } from "@/lib/presets";
 import { STATUS_META } from "@/lib/status";
-import type { AppState, PublicPanel, RequestRow, Team, TeamCategoryView } from "@/lib/types";
+import type { PublicPanel, RequestRow, Team, TeamCategoryView } from "@/lib/types";
 import {
   agoParts,
   bigTimeOf,
@@ -26,8 +27,6 @@ import {
  * it shows comes in as props; the page keeps the polling. Styles are under
  * `.teampage` in globals.css; the top bar is the landing page's.
  */
-
-type Language = AppState["languages"][number];
 
 export type TeamViewProps = {
   team: Team;

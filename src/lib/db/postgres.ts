@@ -456,10 +456,8 @@ async function migrate(): Promise<void> {
     -- enabling it with zero policies costs the app nothing while it
     -- stops the anon/publishable key (e.g. Supabase's Data API) from
     -- reading or writing anything, even panel login codes, even if that
-    -- key leaks. supabase/schema.sql already does this for a manual
-    -- setup; a deployment that never opens that file in the SQL editor
-    -- must not be left unprotected just because it relied on this
-    -- runtime migration instead.
+    -- key leaks. This migration is the only thing that creates the
+    -- tables, so it is also the only thing that can protect them.
     alter table panels    enable row level security;
     alter table teams     enable row level security;
     alter table requests  enable row level security;

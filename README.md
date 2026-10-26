@@ -884,7 +884,7 @@ rather than demo data, so a real event never finds itself with invented teams.
 
 ## Known limitations
 
-The recent audit fixes, agreed role permissions, verification, and remaining decisions are tracked in [Audit status and change log](AUDIT_STATUS.md).
+What happened to each audit finding, and what is still open, is in the status table at the top of the [Full application bug audit](FULL_APPLICATION_BUG_AUDIT.md).
 
 - **Team status is public.** Anyone who knows a team number can view its queue
   and booking status. Request creation and booking changes require a queue desk

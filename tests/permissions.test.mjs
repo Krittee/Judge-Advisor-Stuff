@@ -2,31 +2,21 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 
-import { canCancel } from "../src/lib/auth";
+import { canAdminister, canAdvance, canCancel, canReadNotes, mayActOnPanel } from "../src/lib/auth";
 import { ACTION_FROM, STATUSES, TERMINAL_STATUSES, canTransition } from "../src/lib/status";
 
-/* Mirrors the scope rules in src/lib/auth.ts and the division wall in the
-   stores. These are the rules that decide who can see and touch what, so
-   they are worth pinning down separately from the UI that displays them.
-   (canCancel is the exception: it is the real function, imported, because
-   its rule has been changed on purpose and a copy would just agree with
-   itself.) */
+/* The scope rules in src/lib/auth.ts, run as they are, and a model of the
+   division wall in the stores. These are the rules that decide who can see
+   and touch what, so they are worth pinning down separately from the UI that
+   displays them. (The division wall and conflict sections below are models:
+   that logic lives in store methods and the state payload, not in an
+   exported function.) */
 
 const JA = { role: "admin", name: "Krittee" };
 const JUDGE_A = { role: "judge", name: "Dana", panelId: "panel-a", panelName: "Panel A" };
 const JUDGE_C = { role: "judge", name: "Alex", panelId: "panel-c", panelName: "Panel C" };
 const QUEUER = { role: "queuer", name: "Desk" };
 const TEAM = null;
-
-const canAdvance = (s) => s?.role === "admin" || s?.role === "judge";
-const canReadNotes = (s) => s?.role === "admin" || s?.role === "judge";
-const canAdminister = (s) => s?.role === "admin";
-
-function mayActOnPanel(s, panelId) {
-  if (s?.role === "admin") return true;
-  if (s?.role === "judge") return panelId !== null && panelId === s.panelId;
-  return false;
-}
 
 test("only the Judge Advisor administers", () => {
   assert.ok(canAdminister(JA));

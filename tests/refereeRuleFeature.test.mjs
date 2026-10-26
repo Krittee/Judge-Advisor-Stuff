@@ -14,7 +14,6 @@ const allRulesSrc = readFileSync(new URL("../src/components/AllRulesPicker.tsx",
 const matchFieldsSrc = readFileSync(new URL("../src/components/MatchFields.tsx", import.meta.url), "utf8");
 const fileStoreSrc = readFileSync(new URL("../src/lib/db/file.ts", import.meta.url), "utf8");
 const postgresSrc = readFileSync(new URL("../src/lib/db/postgres.ts", import.meta.url), "utf8");
-const schemaSql = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
 
 test("only Minor, Major and Disqualified are configured to require a rule", () => {
   const byId = Object.fromEntries(event.refereeFlags.map((kind) => [kind.id, kind]));
@@ -65,16 +64,6 @@ test("both stores add the ruleset columns additively, and a flag from before the
     assert.ok(postgresSrc.includes(ddl), `migrate() lost: ${ddl}`);
   }
   assert.ok(!/drop column[^;]*(ruleset|manual_version|match_affecting)/i.test(postgresSrc));
-
-  // The hand-run schema stays in step with migrate().
-  const flagsTable = schemaSql.slice(schemaSql.indexOf("create table flags"), schemaSql.indexOf(");", schemaSql.indexOf("create table flags")));
-  for (const column of [
-    /\bruleset\s+text/,
-    /\bmanual_version\s+text/,
-    /\bmatch_affecting\s+boolean not null default false/,
-  ]) {
-    assert.match(flagsTable, column, `supabase/schema.sql flags table lost ${column}`);
-  }
 
   // File store: an old state file gets the new fields on load.
   const migrate = fileStoreSrc.slice(fileStoreSrc.indexOf("function migrate("), fileStoreSrc.indexOf("data.requests", fileStoreSrc.indexOf("function migrate(")));
