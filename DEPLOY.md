@@ -2,7 +2,9 @@
 
 Everything below happens in your browser. You will not type a single command.
 
-**Time:** about 15 minutes. **Cost:** free.
+**Time:** about 15 minutes. **Cost:** free to set up and try. For a real
+event, read [Free tier limits](#free-tier-limits-honestly) first — the database
+plan matters on the day.
 
 At the end you will have a permanent web address like
 `judge-queue.vercel.app` that anyone can open from any phone, anywhere — no
@@ -64,7 +66,7 @@ Still on that import page:
 Vercel connects it and quietly sets `DATABASE_URL` for you. That is the only
 database setting the app needs, and you never have to look at it.
 
-> If you cannot find Storage on the import screen, deploy first (Step 5), then
+> If you cannot find Storage on the import screen, deploy first (Step 6), then
 > open your project → **Storage** tab → **Create Database** → Neon. Then
 > **Deployments** → the ⋯ menu on the newest one → **Redeploy**.
 
@@ -73,6 +75,15 @@ dashboard open **Connect → Transaction pooler** (port 6543), copy the
 `postgresql://…pooler.supabase.com:6543/postgres` string, fill in your
 database password, and add it as `DATABASE_URL` in **Environment Variables**
 (Step 4). The app creates its own tables on first connect.
+
+**Keep previews off your live database.** Vercel builds a *preview* of every
+pull request, and a preview uses whatever `DATABASE_URL` is set for the
+**Preview** environment. If that is your live database, opening a preview
+changes it and everything you click there shows up on the real board. In
+**Settings → Environment Variables**, give `DATABASE_URL` one row for
+**Production** (your live database) and a separate row for **Preview** pointing
+at a spare one (a second free Neon or Supabase project). The values are hidden
+once saved, so when in doubt, overwrite the Preview row.
 
 ---
 
@@ -98,13 +109,33 @@ as well:
 not need to be memorable and you will never type it again. Something like
 `k3j4h5g6f7d8s9a0q1w2e3r4t5y6u7i8o9p0zxcvb` is fine.
 
-Give each Judge Advisor a different code, and do **not** use `JA2026` or
-`DESK01` — those are printed in this guide, so everyone can read them. The app
-refuses to accept them once deployed anyway.
+Give each Judge Advisor a different code, and do **not** use `JA2026`,
+`DESK01`, `REF001` or `HREF01` — those are printed in this repository, so
+everyone can read them. Once deployed the app refuses them, and that role simply
+cannot sign in. Keep `HEAD_REFEREE_CODE` different from `REFEREE_CODE`.
+
+Tick **Production** and **Preview** for each code and for `SESSION_SECRET`: a
+setting saved for Production only never reaches a preview, and nobody can sign
+in there.
 
 ---
 
-## Step 5 — Deploy
+## Step 5 — Put the app next to its database
+
+Vercel runs the app in Washington, D.C. unless told otherwise. If your database
+is somewhere else, every tap crosses an ocean: with the database in Singapore
+that is about a second per request instead of about 0.2.
+
+1. Find your database's region: Supabase → **Project Settings → General →
+   Region** (Neon shows it on the project dashboard).
+2. In Vercel: **Settings → Functions → Function Region** → pick the same place.
+   For Supabase or Neon in Southeast Asia (Singapore, `ap-southeast-1`) that is
+   **Singapore – `sin1`**. Only one region on the free plan.
+3. **Save.** It applies from the next deployment.
+
+---
+
+## Step 6 — Deploy
 
 Click **Deploy**.
 
@@ -116,11 +147,11 @@ from any phone, on any network, anywhere in the world.
 
 ---
 
-## Step 6 — Check the database really connected
+## Step 7 — Check the database really connected
 
 This is worth thirty seconds now rather than a surprise on the day.
 
-1. Go to `your-address.vercel.app/login`
+1. Go to `your-address.vercel.app/admin/login`
 2. Sign in with any Judge Advisor code you configured in Step 4
 3. Open the **Teams** tab and scroll to the bottom
 
@@ -132,28 +163,39 @@ If instead it says *"This is running on a local file"* with an orange warning,
 the database did not connect. Go back to Step 3, then redeploy: **Deployments**
 → ⋯ on the newest → **Redeploy**.
 
+While signed in, `your-address.vercel.app/api/health` shows the same thing in
+one line: which database it is storing into, and how many teams and panels it
+holds.
+
 ---
 
-## Step 7 — Set up your event
+## Step 8 — Set up your event
 
 All in the browser, at `your-address.vercel.app/admin`:
 
-1. **Panels tab** — click **Add preset panels**, then fill in each group's
-   judge names. Each panel has a **code** and a **division**; write the codes
-   down and hand each one to that group. Removing or moving a judge off a
+1. **Panels tab** — add judges with **New judge**, then put each on a panel.
+   **Add preset panels** creates the panels listed in `config/event.json`, or
+   add them one by one. Each panel has a **code** and a **division**; write the
+   codes down and hand each one to that group. Removing or moving a judge off a
    panel rotates that panel's code; give its remaining judges the new code.
-2. **Import tab** — paste your team list, one per line:
+   **Edit** next to *Booking slots* turns on bookable times for that panel.
+2. **Conflicts tab** — record each judge's conflicts *before* panels are
+   settled. A panel inherits its judges' conflicts.
+3. **Import tab** — paste your team list, one per line:
    ```
-   1234, Iron Hawks, Pit 12
-   9882K, Kilo Kestrels, Pit 13
+   1234, Iron Hawks, A1, Elementary School
+   9882K, Kilo Kestrels, A2, Middle School
    ```
+   That is number, name, pit, division. The pit is a letter and a number (it
+   places the team on the floor plan); a blank division means the first one.
    Or drop an Excel (`.xlsx`) or CSV file straight in — it is read on your own
-   computer and never uploaded. Pick which **division** it goes into above the
-   box. Running two divisions? Import each one separately.
-   Team numbers can include letters, like `9882K`.
-   Copy straight out of Excel or Google Sheets. Tick **spread across panels**
-   to share teams out evenly.
-3. **Teams tab** — check it, fix anything by hand.
+   computer and never uploaded. Team numbers can include letters, like `9882K`.
+   Tick **spread across panels evenly** to share teams out. Re-importing
+   updates teams and never duplicates them.
+4. **Teams tab** — check it, fix anything by hand.
+5. **On the day, the head referee signs in once** and chooses the program
+   (VIQRC or V5RC) and the number of fields. Until then ordinary referees see
+   a waiting screen.
 
 A deployed app starts empty — no demo teams to clear.
 
@@ -163,12 +205,16 @@ A deployed app starts empty — no demo teams to clear.
 
 | Who | Where to send them |
 |---|---|
-| Teams | `your-address.vercel.app` |
-| Judges | `your-address.vercel.app/login` + their panel code |
-| Queue desk | `your-address.vercel.app/login` + your `QUEUER_CODE` |
-| Referees | `your-address.vercel.app/login` + your `REFEREE_CODE` |
-| Head referee | `your-address.vercel.app/login` + your `HEAD_REFEREE_CODE` |
+| Teams | `your-address.vercel.app/team` (type the team number) |
+| Judges | `your-address.vercel.app/judge/login` + their panel code |
+| Queue desk | `your-address.vercel.app/queue/login` + your `QUEUER_CODE` |
+| Referees | `your-address.vercel.app/referee/login` + your `REFEREE_CODE` |
+| Head referee | `your-address.vercel.app/referee/login` + your `HEAD_REFEREE_CODE` |
+| Judge Advisors | `your-address.vercel.app/admin/login` + their `ADMIN_CODE…` |
 | The TV | `your-address.vercel.app/board`, then press Fullscreen |
+
+`your-address.vercel.app` itself is a "Who are you?" page with a door for each
+role, so the plain address works for everyone. The old `/login` still works.
 
 Make the team address short and readable — Vercel lets you rename the project
 under **Settings → Domains** so it can be something like
@@ -202,17 +248,46 @@ probably never set, or has a stray space. Check
 Open the failed deployment and read the red lines at the bottom. Nine times out
 of ten it is a missing environment variable from Step 4.
 
+**Every tap takes about a second**
+The app is running far from its database. Step 5, then redeploy.
+
 **Everything is slow on the very first visit of the day**
 Normal. Free servers idle when unused and take a few seconds to wake. Open the
 board a minute before you need it.
+
+**A preview shows your real teams**
+The Preview environment is using your live database. See *Keep previews off
+your live database* in Step 3.
 
 ---
 
 ## Free tier limits, honestly
 
-For a 120-team event over one or two days, you will not come close to any of
-them. Neon's free database and Vercel's free hosting are both far more generous
-than this app needs. There is no card required and nothing to cancel.
+**The data is tiny; the traffic is not.** A 130-team event is a few megabytes,
+far inside any free database. What adds up is *egress* — data the database
+sends out. Every open screen asks for the whole event every 4–6 seconds, and
+each ask reads every team, request and flag from the database, even when
+nothing changed (the `304` saves the phone a download, not the database a
+read).
+
+A rough guide, measured from real record sizes (130 teams, about 4 referee
+flags per team, 15 staff screens, 2 boards, 20 team phones on screen):
+
+| | Estimate |
+|---|---|
+| One full read, averaged over the event | about 210 KB |
+| Reads per second | about 9 |
+| Database egress | about 6–7 GB per hour, about 100 GB for a two-day event |
+| Supabase free plan | 5 GB per month — used up in the first hour |
+| Supabase Pro ($25/month) | 250 GB per month — covers it |
+
+So for a real event, **put the database on a paid plan for that month** (you
+can drop back afterwards). Supabase Pro also stops the project pausing after a
+week without visits — a free project left alone before the event can be asleep
+on the morning — and keeps daily backups. Supabase → **Usage** shows what a
+past event really used; trust that over this table.
+
+Vercel's free plan is fine for the app itself.
 
 ---
 

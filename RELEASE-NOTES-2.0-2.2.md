@@ -8,8 +8,12 @@ branch, `claude/event-judge-booking-app-kcprxn`, at `61cf67a`):
 | `version-2.0` | 68, `c7cb8fa` … `333b49d` | The v2.0 redesign of every page, the audit hardening, and the follow-ups. |
 | `version-2.2` | `version-2.0` + 9, … `6e96ace` | Awards, and new Judge Advisor tools in the Teams drawer. |
 
-Everything is **local only**. Nothing has been pushed, merged or released.
-Version 1 is still what's live.
+**Released as Version 2.0 on 2026-10-26** (`package.json` 2.0.0): PR
+[#9](https://github.com/Krittee/Judge-Advisor-Stuff/pull/9) merged `version-2.2`
+(which holds all of `version-2.0`) into the default branch as `dc84741`.
+Vercel deployed it to judge-advisor-stuff.vercel.app. Version 1 is kept as tag
+`v1.0.0` and the GitHub release "Version 1.0 (old version)". See §8 for the
+launch itself.
 
 ---
 
@@ -275,27 +279,45 @@ store everywhere, and against Postgres only with `TEST_DATABASE_URL`.
   - The re-review of `21cdf19`, `6184d08` and `333b49d`.
   - `fb3aae3` (Teams drawer) went to the reviewer, but its verdict isn't
     recorded here.
-- **Awaiting review:** `869f5da` (the Requested time) and `6e96ace` (JA nominations).
-- **Checks at `6e96ace`,** in a clean worktree: 1585 tests (1584 pass, 1
-  skipped, the Postgres one); typecheck, lint (0 warnings) and build clean.
+- **Not sent to the reviewer:** `869f5da` (the Requested time) and `6e96ace`
+  (JA nominations); both were covered by the pre-launch reviews below.
+- **Pre-launch reviews (2026-10-26):**
+  - Security review of the whole branch: no exploitable findings.
+  - Correctness review: 8 findings. The top three were fixed in `3e8fd0b`:
+    the Postgres migration now runs in one transaction behind an advisory
+    lock, the reschedule Activity line uses Bangkok time, and the team page's
+    "today" uses the same clock as its history. The other five are in §7.
+  - Over-engineering review: about 1,250 lines of dead code, the duplicate
+    `supabase/schema.sql` / `seed.sql` and overlapping docs removed in `3068de7`.
+- **Checks before release:** 1583 tests (1582 pass, 1 skipped); typecheck,
+  lint and build clean in a clean worktree. Against a real Postgres (Neon):
+  1642 tests, all pass, none skipped.
 - **Browser walk-throughs** on copies of the data, at 1280 and 375, in dark
-  and light, for every feature above.
+  and light, for every feature above; then on the Vercel preview of PR #9 (§8).
 
 ---
 
 ## 7. Known limits and open items
 
-**Before any release:**
-- **Postgres ran against a real database on 2026-10-26** (a Neon test
-  project, at `3068de7`): 1642 tests, all pass, none skipped. Run
-  `TEST_DATABASE_URL=… npm test` again after any change to
+**Before the next event:**
+- **Database plan.** Every open screen re-reads every team, request and flag
+  every 4–6 seconds. For 130 teams over two days that is roughly 6–7 GB of
+  database egress per hour, about 100 GB in all: far past Supabase's free
+  5 GB, inside Pro's 250 GB. Put Supabase on Pro for the event month (it also
+  stops free-tier pausing and adds daily backups). See DEPLOY.md, "Free tier
+  limits, honestly".
+- **Load the event** on the live site (it starts empty): teams, panels, judges
+  and conflicts. Have the head referee choose the program and fields once.
+- **Confirm the live database** first: signed in as Judge Advisor,
+  `/api/health` names the database host. Between the merge and a later redeploy
+  the live team count went from 20 (old test rows) to 0, and the cause wasn't
+  pinned down.
+- Run `TEST_DATABASE_URL=… npm test` again after any change to
   `src/lib/db/postgres.ts`.
-- Check row-level security on the live Supabase project, and that the
-  deployed `SESSION_SECRET` isn't the placeholder.
-- Released as **Version 2.0** (`package.json` 2.0.0): `version-2.2` holds all
-  of `version-2.0` and is merged into the default branch.
 
 **Known and accepted:**
+- **Team page wording.** After "Interview complete — thank you!" the page
+  still says "Please ask the queue desk to request a judge…".
 - **Referee names are typed, not verified.** Referees share one code, which
   affects flag authorship.
 - **A shared panel code** lets anyone who learns it in. Removing one judge
@@ -312,6 +334,23 @@ store everywhere, and against Postgres only with `TEST_DATABASE_URL`.
 - **Unlikely Postgres code collision.** Panel-code rotation doesn't check
   other panels' codes (1 in 32⁸).
 
+**Open from the correctness review** (real, not fixed before release):
+- A Judge Advisor reopen of a cancelled booking keeps its slot and skips the
+  20-minute gap; if the slot was re-booked, the error wrongly says the team
+  already has a live request.
+- A judge can nominate a team that a different panel interviewed (after a
+  reassignment).
+- Preset panels in `config/event.json` would get their slot times in the
+  server's timezone (UTC on Vercel). Latent while the list is empty.
+- `/api/state` returns the raw database error to anyone when the database is
+  down.
+
+(The fifth, the Bangkok-day formatter copied three times, went in the cleanup.)
+
+**After this event:**
+- Cache the full state on the server for a second or two, so many screens
+  share one database read: about 5–10× less egress.
+
 **Deferred:**
 - BUG-027 (Postgres TLS verification).
 - BUG-018b (retiming a panel's slot grid with bookings already on it).
@@ -324,3 +363,37 @@ store everywhere, and against Postgres only with `TEST_DATABASE_URL`.
   confirm step; the DQ chip colour in dark mode.
 - Judge console polish, only if wanted: the row "×" label, "0 / 76" for an
   unscored team, long category text at 320–375px.
+
+---
+
+## 8. The launch (2026-10-26)
+
+**Vercel settings made for 2.0:**
+- `HEAD_REFEREE_CODE` added for Production and Preview.
+- Preview's `DATABASE_URL` points at a separate Neon test database, so PR
+  previews never touch the live Supabase.
+- Function Region set to **Singapore (`sin1`)**, next to the Supabase database
+  (`ap-southeast-1`). Requests went from about 1 second (`sin1::iad1`) to
+  about 0.2 seconds (`sin1::sin1`).
+
+**Preview walk-through** (PR #9 preview, separate database, test team `TEST1`),
+all passed:
+- Door page, `/api/health`, Live board, team ticket and read-only team page.
+- Judge Advisor: import, roster judge, panel, booking slots, Awards (give
+  Design), Scores, Activity (all 11 events, Bangkok time).
+- Queue desk: book a slot, then ready-now into the queue.
+- Judge: on the way → interviewing → complete; two quick score taps saved
+  as 3/76; nominate for Design; the judge's award data has no winners.
+- Head referee: day setup (VIQRC, 3 fields), match Q1 field 1, Good conduct
+  flag, Edit rights on flags.
+- Phone width (375) in light and dark; nothing spills sideways. The shared
+  state carries no award data and no panel codes.
+
+**Merge and release:** PR #9 merged as `dc84741`; production deployed at
+14:20 UTC. Live checks: the 2.0 door page, `/api/health` OK (2.0's schema
+changes applied to Supabase), no award data or panel codes in the public
+state.
+
+**Rollback** if ever needed: Vercel → Deployments → the last Version 1
+production deployment → ⋯ → Instant Rollback. 2.0's database changes only
+add tables and columns, so Version 1 should keep running on them (not tested).

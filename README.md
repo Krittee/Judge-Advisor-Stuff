@@ -2,13 +2,19 @@
 
 A judging queue and interview tracker for a robotics-style event. Teams ask the
 queue desk for an interview and follow its status on their phones; judges work
-the queue; a colour-coded board shows the whole floor at a glance.
+the queue and score both rubrics; referees flag what they see on the field; the
+Judge Advisor runs it all and decides the awards; a colour-coded board shows the
+whole floor at a glance.
+
+**Version 2.0** (released 2026-10-26) redesigned every page and added awards.
+What changed and how it works: [RELEASE-NOTES-2.0-2.2.md](RELEASE-NOTES-2.0-2.2.md).
+Version 1 is tag `v1.0.0`.
 
 ## Two ways to run it
 
 | | What you do | Needs a terminal | Needs accounts |
 |---|---|:---:|:---:|
-| **[Put it on the web](DEPLOY.md)** | Click through Vercel + a free database | No | Two, both free |
+| **[Put it on the web](DEPLOY.md)** | Click through Vercel + a hosted database | No | Two, free to try |
 | **[Run it on a laptop](RUNNING.md)** | `npm install && npm run dev` | Yes | None |
 
 The web version gives you a permanent address any phone can reach from
@@ -839,13 +845,15 @@ tab.
 
 | URL | Who | What |
 |---|---|---|
-| `/` | teams | Enter team number |
-| `/team/1234` | teams | Read request and booking status |
+| `/` | everyone | "Who are you?" — a door for each role, plus the board |
+| `/team` | teams | Enter team number |
+| `/team/1234` | teams | Read-only status: the five-step track and earlier today |
 | `/board` | everyone | Big-screen board. Has a fullscreen button. |
-| `/login` | staff | One code box for all three staff roles |
-| `/judge` | judges | Your panel's queue, oldest orange first |
-| `/queue` | queue desk | Add a team to the queue, see who's waiting |
-| `/admin` | you | Floor · Teams · Panels · Import · Activity |
+| `/judge/login`, `/queue/login`, `/referee/login`, `/admin/login` | staff | One sign-in door per role (`/login` still takes any code) |
+| `/judge` | judges | Up next, team sheets with both rubrics, nominations |
+| `/queue` | queue desk | Now (request) or Book (slot grid); waiting, booked and all teams |
+| `/referee` | referees | Set the match, flag a team against a rule; the head referee sets up the day |
+| `/admin` | you | Floor · Referee · Teams · Panels · Conflicts · Import · Scores · Awards · Activity |
 
 Put `/board` on the TV in the judges' room and press Fullscreen.
 
@@ -859,7 +867,10 @@ you want it to feel like an app, teams can use **Add to Home Screen**.
 **Syncing.** Every screen polls `/api/state` — 4 seconds for consoles, 6 for the
 board — and an unchanged board returns a `304` with no payload. Tabs that are
 not visible stop polling entirely. Polling rather than websockets is deliberate:
-venue wifi drops and a poll reconnects by itself.
+venue wifi drops and a poll reconnects by itself. The `304` saves the phone a
+download, not the database a read: every poll still reads every team, request
+and flag. On a hosted database that is the main cost of an event (see
+[DEPLOY.md](DEPLOY.md#free-tier-limits-honestly)).
 
 **Two rules cannot be broken**, no matter what the UI does:
 
@@ -878,7 +889,8 @@ your data, and flushed on shutdown. If the file is ever unreadable, the app
 keeps the bad copy as `state.json.corrupt-<timestamp>` and starts empty — empty
 rather than demo data, so a real event never finds itself with invented teams.
 
-**Back it up** by copying `.data/state.json`. That is the entire database.
+**Back it up** by copying `.data/state.json`. That is the entire database on a
+laptop. On Postgres, use your host's backups (Supabase Pro keeps daily ones).
 
 ---
 
@@ -889,6 +901,12 @@ What happened to each audit finding, and what is still open, is in the status ta
 - **Team status is public.** Anyone who knows a team number can view its queue
   and booking status. Request creation and booking changes require a queue desk
   or Judge Advisor session.
+- **Referees share one code** and type their name, so flag authorship is not
+  verified. The head referee has its own code.
+- **Database traffic grows with open screens**, not with teams: plan the
+  database tier for the event (DEPLOY.md).
+- Open items after the 2.0 release are listed in §7 of the
+  [release notes](RELEASE-NOTES-2.0-2.2.md).
 
 ---
 
@@ -896,7 +914,7 @@ What happened to each audit finding, and what is still open, is in the status ta
 
 ```bash
 npm run check     # diagnose why it will not start, in plain language
-npm test          # 40 tests: permissions, division wall, store invariants
+npm test          # ~1,580 tests; set TEST_DATABASE_URL to a throwaway Postgres to add the Postgres suite
 npm run typecheck
 npm run build
 ```
