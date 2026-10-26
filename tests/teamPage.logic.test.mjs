@@ -9,6 +9,7 @@ import {
   clockParts,
   earlierToday,
   historyTime,
+  latestToday,
   sameEventDay,
   stepTime,
   toneOf,
@@ -160,6 +161,16 @@ test("earlier today drops the team's requests from other days", () => {
   const yesterday = request({ id: "yday", team_id: "t1", status: "completed", finished_at: "2026-10-19T12:00:00.000Z" });
   const today = request({ id: "today", team_id: "t1", status: "completed", finished_at: ago(30) });
   assert.deepEqual(earlierToday([yesterday, today], "t1", undefined, NOW).map((r) => r.id), ["today"]);
+});
+
+test("the status panel's fallback is timed like the history under it: yesterday's interview, touched today, is not today's", () => {
+  // The Judge Advisor correcting yesterday's step times bumps updated_at to now.
+  const touched = request({ id: "yday", team_id: "t1", status: "completed", finished_at: "2026-10-19T12:00:00.000Z", updated_at: ago(1) });
+  const today = request({ id: "today", team_id: "t1", status: "completed", finished_at: ago(30), updated_at: ago(30) });
+  const later = request({ id: "later", team_id: "t1", status: "completed", finished_at: ago(10), updated_at: ago(10) });
+  assert.equal(latestToday([touched], "t1", NOW), null);
+  assert.equal(latestToday([touched, today], "t1", NOW)?.id, "today");
+  assert.equal(latestToday([today, touched, later, request({ id: "other", team_id: "t2", finished_at: ago(1) })], "t1", NOW)?.id, "later", "the latest finish, and only this team's");
 });
 
 test("a row is timed by when it finished, else when it was cancelled, else when it was asked for", () => {

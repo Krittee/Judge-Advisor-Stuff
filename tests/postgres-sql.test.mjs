@@ -169,17 +169,21 @@ test("insert column lists match their value lists", () => {
 
 const ROW = { id: "r1", status: "requested", kind: "queue", panel_id: "p1", slot_start: null };
 const calls = [];
+const released = [];
 let answer = () => [];
+let clients = 0;
 
 class FakePool {
   on() {}
-  async query(sql, params) {
-    calls.push({ sql: sql.replace(/\s+/g, " ").trim(), params });
+  /* `client` says which connection sent it: "pool" for a bare pool.query(). */
+  async query(sql, params, client = "pool") {
+    calls.push({ sql: sql.replace(/\s+/g, " ").trim(), params, client });
     return { rows: answer(sql.replace(/\s+/g, " ").trim(), params) };
   }
   /* withClient runs a transaction on one connection; here that is the same recorder. */
   async connect() {
-    return { query: (sql, params) => this.query(sql, params), release() {} };
+    const client = `client${++clients}`;
+    return { query: (sql, params) => this.query(sql, params, client), release: () => released.push(client) };
   }
 }
 
@@ -355,6 +359,58 @@ test("migrate() cancels duplicate live requests before it creates the one-live-p
     /row_number\(\) over \(\s*partition by team_id/,
     "the extra rows are picked per team, keeping one",
   );
+});
+
+/* ---- the migration across serverless instances ---------------------------
+
+   Several instances cold-start together on Vercel and each runs the schema
+   DDL. Run as bare pool queries they interleave, and two `create ... if not
+   exists` can collide on the catalog. So the whole migration is one
+   transaction on one connection, behind an advisory lock that makes the
+   instances take turns. What Postgres does with the lock is not shown here;
+   this checks what is sent, in what order, and on which connection. */
+
+/** Forget that this instance has migrated, as a cold start does. */
+const coldStart = () => {
+  globalThis.__judgeQueuePostgres.migration = null;
+  released.length = 0;
+};
+
+test("a cold start migrates on one connection: begin, the advisory lock, then the DDL, then commit", async () => {
+  coldStart();
+  const { error } = await run(() => [], () => postgresStore.listPanels());
+  assert.equal(error, undefined);
+
+  const commit = calls.findIndex((c) => c.sql === "commit");
+  assert.ok(commit > 0, "the migration never commits");
+  const migration = calls.slice(0, commit + 1);
+  assert.equal(migration[0].sql, "begin");
+  assert.match(migration[1].sql, /^select pg_advisory_xact_lock\(\$1\)$/);
+  assert.ok(Number.isSafeInteger(migration[1].params[0]), "the lock key is a fixed number");
+  const ddl = migration.slice(2, -1);
+  assert.ok(ddl.length >= 2 && ddl.every((c) => /^(create table|do \$\$)/.test(c.sql)), "the schema blocks, nothing before the lock");
+  assert.equal(new Set(migration.map((c) => c.client)).size, 1, "the lock and the DDL share a connection");
+  assert.notEqual(migration[0].client, "pool");
+  assert.deepEqual(released, [migration[0].client], "the connection goes back to the pool");
+});
+
+test("a migration that fails rolls back, gives the connection back, and is retried by the next request", async () => {
+  coldStart();
+  const failing = await run(
+    (sql) => {
+      if (sql.startsWith("do $$")) throw new Error("catalog collision");
+      return [];
+    },
+    () => postgresStore.listPanels(),
+  );
+  assert.equal(failing.error?.message, "catalog collision");
+  assert.equal(calls.at(-1).sql, "rollback");
+  assert.ok(!calls.some((c) => c.sql === "commit"));
+  assert.equal(released.length, 1);
+
+  const retry = await run(() => [], () => postgresStore.listPanels());
+  assert.equal(retry.error, undefined);
+  assert.ok(calls.some((c) => c.sql === "commit"), "the next request migrates again");
 });
 
 /* ---- the referee setup and the flag columns (no database here either) -------

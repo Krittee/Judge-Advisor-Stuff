@@ -325,7 +325,7 @@ test("the public page renders TeamView and keeps only polling and the lookup", (
   assert.match(page, /online \? "Loading…" : "Can't reach the server — retrying…"/);
   assert.match(page, /if \(!team\) return <TeamNotFound number=\{teamNumber\} \/>/);
   // The live request, else the latest from today, and history leaves that one out.
-  assert.match(page, /liveRequestFor\(team\.id, requests\) \?\?\s*\[\.\.\.requests\]\s*\.filter\(\(r\) => sameEventDay\(r\.updated_at, now\)\)\s*\.sort\(\(a, b\) => b\.updated_at\.localeCompare\(a\.updated_at\)\)\[0\]/);
+  assert.match(page, /liveRequestFor\(team\.id, requests\) \?\? latestToday\(requests, team\.id, now\)/);
   assert.match(page, /history=\{earlierToday\(state\.requests, team\.id, current\?\.id, now\)\}/);
   assert.match(page, /categories=\{state\.categories\}/);
   // Not a second copy of the view's markup.

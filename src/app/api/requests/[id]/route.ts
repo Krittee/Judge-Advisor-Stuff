@@ -6,7 +6,7 @@ import { isRealSlot } from "@/lib/data";
 import { canTransition, NEXT_STATUS, STATUS_META, type Status } from "@/lib/status";
 import { CONFLICT_MESSAGE, isConflicted, isPanelBlocked, loadBlocks } from "@/lib/conflicts";
 import { divisionsCompatible, resolveLanguage } from "@/lib/presets";
-import { readTimes, timesLogLine } from "@/lib/stepTimes";
+import { bangkokClock, readTimes, timesLogLine } from "@/lib/stepTimes";
 import type { RequestRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -247,7 +247,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     // runs for a brand new booking.
     patch.slot_start = start.toISOString();
     patch.slot_end = end.toISOString();
-    logLine = `rescheduled to ${start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+    // The event's clock, not the server's: a host in UTC would log 3:20 AM for a 10:20 slot.
+    logLine = `rescheduled to ${bangkokClock(patch.slot_start)}`;
   } else {
     const target: Status | undefined =
       action === "set-status"

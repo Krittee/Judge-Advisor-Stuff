@@ -540,6 +540,44 @@ test("rescheduling onto a slot that has already ended is a 409 and leaves the bo
   assert.equal(future.status, 200, future.body.error);
 });
 
+test("rescheduling logs the new time on the Bangkok clock, wherever the server runs", async () => {
+  const w = await world();
+  // A grid starting 10:00 in Bangkok (03:00 UTC), so slot 1 is 10:20 there.
+  const panel = await w.db.createPanel({
+    name: "Panel C",
+    code: "WFC001",
+    division: ES,
+    judges: [],
+    languages: [],
+    sort_order: 1,
+    slot_start_at: "2099-01-01T03:00:00.000Z",
+    slot_minutes: 20,
+    slot_count: 6,
+  });
+  const held = await w.db.createRequest({
+    teamId: w.t1.id,
+    panelId: panel.id,
+    kind: "slot",
+    createdBy: "team",
+    language: "en",
+    ...slotOf(panel, 0),
+  });
+
+  // Vercel runs in UTC; any zone but Bangkok shows the old local-time line up.
+  const zone = process.env.TZ;
+  process.env.TZ = "America/Los_Angeles";
+  try {
+    const reply = await patch(ADMIN, held.id, { action: "reschedule", ...slotOf(panel, 1) });
+    assert.equal(reply.status, 200, reply.body.error);
+  } finally {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
+
+  const line = (await w.db.listActivity()).find((a) => a.request_id === held.id);
+  assert.equal(line?.action, "rescheduled to 10:20");
+});
+
 /* ===== the screens: what they send (source-checked, like the other pages) = */
 
 const root = new URL("..", import.meta.url).pathname;

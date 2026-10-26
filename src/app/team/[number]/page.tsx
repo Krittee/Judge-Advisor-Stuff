@@ -5,7 +5,7 @@ import { liveRequestFor } from "@/lib/data";
 import { useAppState } from "@/components/useAppState";
 import { normalizeTeamNumber } from "@/lib/teamNumber";
 import { CenteredNote, TeamNotFound, TeamView } from "@/components/team/TeamView";
-import { earlierToday, sameEventDay } from "@/components/team/teamLogic";
+import { earlierToday, latestToday } from "@/components/team/teamLogic";
 
 /**
  * A team's own page: where it stands. Read-only -- requests and bookings are
@@ -47,12 +47,7 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
   // team that has finished today reads "Interview complete" rather than "No
   // request yet". Yesterday's requests are not today's. `history` leaves
   // `current` out, so the same request is never shown twice.
-  const current =
-    liveRequestFor(team.id, requests) ??
-    [...requests]
-      .filter((r) => sameEventDay(r.updated_at, now))
-      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ??
-    null;
+  const current = liveRequestFor(team.id, requests) ?? latestToday(requests, team.id, now);
 
   return (
     <TeamView

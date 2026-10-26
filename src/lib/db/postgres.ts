@@ -154,8 +154,24 @@ function ready(): Promise<void> {
   return shared.migration;
 }
 
+/**
+ * Held for the length of a migration, so instances cold-starting together take
+ * turns. An arbitrary number; it only has to differ from any other advisory
+ * lock this database is used for.
+ */
+const MIGRATION_LOCK = 7_263_149_581;
+
 async function migrate(): Promise<void> {
-  await (await db()).query(`
+  // One connection, one transaction: the advisory lock below is released by
+  // the commit, so the schema blocks must run on this same connection (bare
+  // pool queries would each borrow another one and fall outside the lock).
+  // ponytail: every cold start still re-runs the idempotent DDL (brief table
+  // locks); a stored schema version could skip it if that ever matters.
+  const client: PoolClient = await (await db()).connect();
+  try {
+    await client.query("begin");
+    await client.query("select pg_advisory_xact_lock($1)", [MIGRATION_LOCK]);
+    await client.query(`
     create table if not exists panels (
       id            uuid primary key default gen_random_uuid(),
       name          text not null,
@@ -458,9 +474,9 @@ async function migrate(): Promise<void> {
     alter table referee_setup enable row level security;
   `);
 
-  // Schema changes that an already-deployed event may not have yet.
-  // Each is guarded so re-running is free and no roster is ever lost.
-  await (await db()).query(`
+    // Schema changes that an already-deployed event may not have yet.
+    // Each is guarded so re-running is free and no roster is ever lost.
+    await client.query(`
     do $$
     begin
       -- Team numbers were an int before identifiers like "9882K" had to work.
@@ -525,6 +541,13 @@ async function migrate(): Promise<void> {
         on nominations (award_id, team_id, lower(btrim(judge))) where role = 'admin';
     end $$;
   `);
+    await client.query("commit");
+  } catch (e) {
+    await client.query("rollback").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 /** Turn a unique-violation into the message the user should read. */

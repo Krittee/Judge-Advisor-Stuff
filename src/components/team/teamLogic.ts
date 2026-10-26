@@ -169,3 +169,17 @@ export function earlierToday(requests: RequestRow[], teamId: string, currentId: 
     .filter((r) => r.team_id === teamId && r.id !== currentId && sameEventDay(historyTime(r), now))
     .slice(0, 5);
 }
+
+/**
+ * The team's latest request from today, or null: what the status panel shows
+ * when nothing is live. It goes by historyTime, the clock "Earlier today" uses,
+ * not updated_at -- any write to an old request (the Judge Advisor correcting
+ * yesterday's step times) bumps updated_at and would make it look like today's.
+ */
+export function latestToday(requests: RequestRow[], teamId: string, now: number): RequestRow | null {
+  return (
+    requests
+      .filter((r) => r.team_id === teamId && sameEventDay(historyTime(r), now))
+      .sort((a, b) => historyTime(b).localeCompare(historyTime(a)))[0] ?? null
+  );
+}
