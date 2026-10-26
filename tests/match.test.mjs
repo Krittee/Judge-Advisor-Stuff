@@ -1,31 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync } from "node:fs";
+import {
+  fieldLabel,
+  filterMatchNumberInput,
+  isValidMatchNumber,
+  matchReference,
+  normalizeField,
+  normalizeMatchNumber,
+} from "../src/lib/match";
 
 /* Match number and field: what lets a head referee trace a flag back to
-   a moment on the field. Mirrors src/lib/match.ts, the way the other lib
-   tests do, since these run under plain node --test with no TS loader. */
+   a moment on the field. These run the real functions in src/lib/match.ts
+   (tests run under tsx), so a change to them fails here.
 
-const MAX_MATCH_NUMBER_LENGTH = 4;
-const MAX_FIELD_LENGTH = 40;
-
-function normalizeMatchNumber(input) {
-  const digits = String(input ?? "").replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-  return digits.slice(0, MAX_MATCH_NUMBER_LENGTH);
-}
-function isValidMatchNumber(value) {
-  return value.length > 0 && value.length <= MAX_MATCH_NUMBER_LENGTH && /^\d+$/.test(value);
-}
-function filterMatchNumberInput(input) {
-  return normalizeMatchNumber(input);
-}
-function normalizeField(input) {
-  return String(input ?? "").trim().replace(/\s+/g, " ").slice(0, MAX_FIELD_LENGTH);
-}
-function matchReference(matchType, matchNumber) {
-  if (!matchType || !matchNumber) return null;
-  return `${matchType}${matchNumber}`;
-}
+   A plain number (P, Q, Skills, VEX IQ's Final) is digits; a V5RC
+   elimination (R16, QF, SF, F) is a bracket and a match, "2-1". Whether a
+   type is a bracket depends on the program, so those calls name the ruleset. */
 
 test("a match number keeps only digits", () => {
   assert.equal(normalizeMatchNumber("23"), "23");
@@ -59,6 +49,72 @@ test("typing filter matches the normalizer, so what you see while typing is what
   }
 });
 
+test("plain types stay plain on both programs, Skills and VEX IQ's Final included", () => {
+  for (const [type, ruleset] of [
+    ["P", "v5rc"],
+    ["Q", "v5rc"],
+    ["SKD", "v5rc"],
+    ["SKA", "viqrc"],
+    ["F", "viqrc"],
+    ["SK", "viqrc"], // the legacy Skills type
+  ]) {
+    assert.equal(normalizeMatchNumber("2-1", type, ruleset), "21", `${type} on ${ruleset} is a plain number`);
+    assert.equal(isValidMatchNumber("21", type, ruleset), true);
+    assert.equal(isValidMatchNumber("2-1", type, ruleset), false, `${type} on ${ruleset} takes no bracket`);
+  }
+});
+
+test("a V5RC elimination number is a bracket and a match, whatever separates them", () => {
+  for (const type of ["R16", "QF", "SF", "F"]) {
+    assert.equal(normalizeMatchNumber("2-1", type, "v5rc"), "2-1", type);
+    assert.equal(isValidMatchNumber("2-1", type, "v5rc"), true, type);
+  }
+  assert.equal(normalizeMatchNumber("2 1", "QF", "v5rc"), "2-1");
+  assert.equal(normalizeMatchNumber("2/1", "QF", "v5rc"), "2-1");
+  assert.equal(normalizeMatchNumber("02-01", "QF", "v5rc"), "2-1", "leading zeros go, as for a plain number");
+  assert.equal(normalizeMatchNumber("12-3", "SF", "v5rc"), "12-3");
+  assert.equal(normalizeMatchNumber("", "QF", "v5rc"), "");
+  assert.equal(normalizeMatchNumber(null, "QF", "v5rc"), "");
+});
+
+test("a bracket number needs both halves, each at most two digits", () => {
+  for (const half of ["", "2", "2-", "-1", "21"]) {
+    assert.equal(
+      isValidMatchNumber(normalizeMatchNumber(half, "QF", "v5rc"), "QF", "v5rc"),
+      false,
+      `"${half}" is only half a bracket`,
+    );
+  }
+  // A third number is dropped, not folded in.
+  assert.equal(normalizeMatchNumber("2-1-3", "QF", "v5rc"), "2-1");
+  // Each half is capped at two digits, so "1-12" and "11-2" stay different matches.
+  assert.equal(normalizeMatchNumber("123-456", "QF", "v5rc"), "12-45");
+  assert.notEqual(normalizeMatchNumber("1-12", "QF", "v5rc"), normalizeMatchNumber("11-2", "QF", "v5rc"));
+  assert.equal(isValidMatchNumber("1-123", "QF", "v5rc"), false);
+  assert.equal(isValidMatchNumber("123-1", "QF", "v5rc"), false);
+});
+
+test("Final is plain on VEX IQ and a bracket on V5RC: the program decides, not the letter", () => {
+  assert.equal(normalizeMatchNumber("1-2", "F", "viqrc"), "12");
+  assert.equal(normalizeMatchNumber("1-2", "F", "v5rc"), "1-2");
+  assert.equal(isValidMatchNumber("3", "F", "viqrc"), true);
+  assert.equal(isValidMatchNumber("3", "F", "v5rc"), false);
+  // Left out, the ruleset is VEX IQ, the same as a flag recorded before rulesets.
+  assert.equal(normalizeMatchNumber("1-2", "F"), "12");
+});
+
+test("typing a bracket keeps the dash between the two keystrokes", () => {
+  assert.equal(filterMatchNumberInput("2", "QF", "v5rc"), "2");
+  assert.equal(filterMatchNumberInput("2-", "QF", "v5rc"), "2-");
+  assert.equal(filterMatchNumberInput("2 ", "QF", "v5rc"), "2");
+  assert.equal(filterMatchNumberInput("2-1", "QF", "v5rc"), "2-1");
+  assert.equal(filterMatchNumberInput("2--", "QF", "v5rc"), "2-");
+  assert.equal(filterMatchNumberInput("-", "QF", "v5rc"), "");
+  assert.equal(filterMatchNumberInput("2a-b1", "QF", "v5rc"), "2-1");
+  // A plain type has no dash to keep.
+  assert.equal(filterMatchNumberInput("2-", "Q", "v5rc"), "2");
+});
+
 test("a field is trimmed and its internal whitespace collapsed", () => {
   assert.equal(normalizeField("  Field   2  "), "Field 2");
   assert.equal(normalizeField("A"), "A");
@@ -67,8 +123,16 @@ test("a field is trimmed and its internal whitespace collapsed", () => {
 });
 
 test("a field longer than the cap is trimmed to it, not silently accepted whole", () => {
-  const long = "x".repeat(80);
-  assert.equal(normalizeField(long).length, MAX_FIELD_LENGTH);
+  assert.equal(normalizeField("x".repeat(80)).length, 40);
+});
+
+test("a picked field reads \"Field 2\"; a legacy one reads as it was recorded", () => {
+  assert.equal(fieldLabel("2"), "Field 2");
+  assert.equal(fieldLabel("12"), "Field 12");
+  assert.equal(fieldLabel("HS2"), "HS2", "a prefixed field from before is not rewritten");
+  assert.equal(fieldLabel("Field 2"), "Field 2", "and nor is old free text doubled up");
+  assert.equal(fieldLabel(""), null);
+  assert.equal(fieldLabel(null), null);
 });
 
 test("the match reference combines type and number, and only when both exist", () => {
@@ -79,15 +143,12 @@ test("the match reference combines type and number, and only when both exist", (
   assert.equal(matchReference(null, null), null);
 });
 
-test("the mirror above still matches the real limits in src/lib/match.ts", () => {
-  const src = readFileSync(new URL("../src/lib/match.ts", import.meta.url), "utf8");
-  assert.ok(
-    new RegExp(`MAX_MATCH_NUMBER_LENGTH\\s*=\\s*${MAX_MATCH_NUMBER_LENGTH}\\b`).test(src),
-    "match number length cap changed in the source; update this mirror",
-  );
-  assert.ok(
-    new RegExp(`MAX_FIELD_LENGTH\\s*=\\s*${MAX_FIELD_LENGTH}\\b`).test(src),
-    "field length cap changed in the source; update this mirror",
-  );
-  assert.ok(src.includes("export function matchReference"), "matchReference was renamed or removed");
+test("a longer type code gets a space, and a Skills run is named in words", () => {
+  assert.equal(matchReference("QF", "2-1"), "QF 2-1");
+  assert.equal(matchReference("R16", "3-1"), "R16 3-1");
+  assert.equal(matchReference("SF", "1-2"), "SF 1-2");
+  assert.equal(matchReference("SKD", "1"), "Driver 1");
+  assert.equal(matchReference("SKA", "2"), "Auto 2");
+  assert.equal(matchReference("SK", "3"), "Skills 3", "a flag from before Driver and Auto were told apart");
+  assert.equal(matchReference("P", "4"), "P4", "a single letter is unchanged");
 });

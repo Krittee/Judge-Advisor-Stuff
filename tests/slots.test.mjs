@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 
-/* Mirrors slotTimes/isRealSlot in src/lib/data.ts.
+import { isRealSlot, slotTimes } from "../src/lib/data";
+
+/* slotTimes/isRealSlot in src/lib/data.ts, run as they are.
 
    Bookings must tile the session: 1:00-1:20, 1:20-1:40, and so on, with
    no two teams ever holding overlapping time. The database only refuses
@@ -11,23 +13,6 @@ import { readFileSync } from "node:fs";
    panel's grid. These cover that. */
 
 const event = JSON.parse(readFileSync(new URL("../config/event.json", import.meta.url)));
-
-function slotTimes(panel) {
-  if (!panel.slot_start_at || panel.slot_count <= 0 || panel.slot_minutes <= 0) return [];
-  const startMs = new Date(panel.slot_start_at).getTime();
-  if (Number.isNaN(startMs)) return [];
-  const lengthMs = panel.slot_minutes * 60_000;
-  return Array.from({ length: panel.slot_count }, (_, i) => ({
-    start: new Date(startMs + i * lengthMs),
-    end: new Date(startMs + (i + 1) * lengthMs),
-  }));
-}
-
-function isRealSlot(panel, start, end) {
-  return slotTimes(panel).some(
-    (s) => s.start.getTime() === start.getTime() && s.end.getTime() === end.getTime(),
-  );
-}
 
 const panel = {
   slot_start_at: "2026-09-01T13:00:00.000Z",

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { canReadNotes, getSession, mayActOnPanel, type Session } from "@/lib/auth";
 import { store } from "@/lib/db";
-import { CONFLICT_MESSAGE, isConflicted } from "@/lib/conflicts";
+import { blockedTeams, CONFLICT_MESSAGE, isConflicted, loadBlocks } from "@/lib/conflicts";
 import { bandFor, grandTotalMax, isValidPoint, rubricById, rubrics } from "@/lib/rubrics";
 import type { ScoreRow, Team } from "@/lib/types";
 
@@ -39,11 +39,7 @@ export async function GET(request: Request) {
       ? scores
       : await (async () => {
           const judge = session as Extract<Session, { role: "judge" }>;
-          const barred = new Set(
-            (await db.listConflicts())
-              .filter((c) => c.panel_id === judge.panelId)
-              .map((c) => c.team_id),
-          );
+          const barred = blockedTeams(await loadBlocks(), judge.panelId);
           return scores.filter((s) => {
             if (barred.has(s.team_id)) return false;
             const team = teams.find((t) => t.id === s.team_id);

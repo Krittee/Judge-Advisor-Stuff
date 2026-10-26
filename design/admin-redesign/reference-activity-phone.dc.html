@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Judge Advisor activity · timeline by hour · phone · dark</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Fira+Sans:wght@400;500&amp;display=swap">
+<style>
+.jq{--canvas:oklch(0.165 0.012 265);--surface:oklch(0.205 0.014 265);--ink:oklch(0.955 0.005 265);--muted:oklch(0.670 0.013 265);--line:oklch(0.320 0.016 265);--accent:oklch(0.680 0.140 258);--on-accent:oklch(0.165 0.012 265);--ring:oklch(0.680 0.140 258 / 0.35);--field:oklch(0.180 0.013 265);--field-line:oklch(0.520 0.014 265);--waiting:oklch(0.735 0.185 58);--waiting-ink:oklch(0.240 0.060 58);--enroute:oklch(0.720 0.140 232);--enroute-ink:oklch(0.220 0.050 232);--active:oklch(0.680 0.170 300);--active-ink:oklch(0.220 0.060 300);--done:oklch(0.745 0.140 158);--done-ink:oklch(0.225 0.055 158);--booked:oklch(0.330 0.020 265);--booked-ink:oklch(0.860 0.012 265);--booked-line:oklch(0.440 0.020 265);--waiting-t:oklch(0.735 0.185 58 / 0.12);--waiting-r:oklch(0.735 0.185 58 / 0.45);--active-t:oklch(0.680 0.170 300 / 0.12);--active-r:oklch(0.680 0.170 300 / 0.45);--caution-bg:oklch(0.790 0.150 82 / 0.12);--caution-line:oklch(0.790 0.150 82 / 0.35);--caution-ink:oklch(0.840 0.100 82);--warn:oklch(0.790 0.150 82);--top-t:oklch(0.760 0.130 175 / 0.14);--top-l:oklch(0.760 0.130 175 / 0.40);--top-i:oklch(0.850 0.110 175);--strong-t:oklch(0.780 0.100 210 / 0.14);--strong-l:oklch(0.780 0.100 210 / 0.40);--strong-i:oklch(0.850 0.080 210);--middle-t:oklch(0.800 0.130 88 / 0.14);--middle-l:oklch(0.800 0.130 88 / 0.40);--middle-i:oklch(0.860 0.100 88);--emerging-t:oklch(0.700 0.010 265 / 0.16);--emerging-l:oklch(0.700 0.010 265 / 0.40);--emerging-i:oklch(0.820 0.008 265);--accent-t:oklch(0.680 0.140 258 / 0.14);--good:oklch(0.745 0.140 158);--minor:oklch(0.735 0.185 58);--major:oklch(0.640 0.200 18);--dq:oklch(0.300 0.010 265);--dq-line:oklch(0.440 0.020 265);--sev-ink:oklch(0.165 0.012 265);position:relative;box-sizing:border-box;width:375px;height:1172px;overflow:hidden;display:flex;flex-direction:column;background:var(--canvas);color:var(--ink);font-family:'Fira Sans',system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+.jq *,.jq *::before,.jq *::after{box-sizing:border-box}
+:where(.jq) :is(h1,h2,h3,p,ul,ol,li,table,blockquote){margin:0;padding:0}
+:where(.jq) :is(ul,ol){list-style:none}
+.jq :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rule{flex:none;height:1px;background:var(--line)}
+.av{flex:none;width:28px;height:28px;display:block}
+.av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:22%;box-shadow:0 0 0 2px var(--accent)}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.who-t{display:flex;flex-direction:column;line-height:1.15}
+.who-t b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.who-t span{font-size:12px;color:var(--muted)}
+.top-r{display:flex;align-items:center;gap:2px}
+.live{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--done)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--done)}
+.signout{padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:14px;text-decoration:underline;cursor:pointer}
+.jq{--hover:oklch(0.245 0.016 265);--lo:oklch(0.800 0.008 265)}
+.s-good{--c:var(--good);--ci:var(--sev-ink)}
+.s-warn{--c:var(--warn);--ci:var(--sev-ink)}
+.s-minor{--c:var(--minor);--ci:var(--sev-ink)}
+.s-major{--c:var(--major);--ci:var(--sev-ink)}
+.s-dq{--c:var(--dq);--ci:oklch(0.955 0.005 265);--cb:var(--dq-line)}
+.sp{display:inline-flex;align-items:center;flex:none;height:24px;padding:0 10px;border-radius:999px;background:var(--c);border:1px solid var(--cb,var(--c));color:var(--ci);font-size:12px;font-weight:500;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rb{flex:none;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--waiting);color:var(--waiting-ink);font-size:12px;font-weight:500;line-height:22px;text-align:center;font-variant-numeric:tabular-nums}
+.top{flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 6px 0 4px}
+.menu{flex:none;width:44px;height:44px;margin-right:2px;border:0;border-radius:12px;background:transparent;color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.signout{min-height:44px}
+.sbar{position:relative;flex:none;height:44px;display:flex;align-items:center;gap:10px;padding:0 16px 0 17px;background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.sbar::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.sbar svg{color:var(--accent)}
+.sbar b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.sbar .rc{margin-left:auto;font-size:13px;color:var(--muted)}
+.body{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:12px 16px 16px}
+.body>*{flex:none}
+.fbtn{position:relative;display:inline-flex;align-items:center;gap:8px;flex:none;height:44px;padding:0 14px;border:1.5px solid var(--field-line);border-radius:12px;background:transparent;color:var(--ink);font-weight:500;font-size:15px;cursor:pointer}
+.fbtn svg{color:var(--muted)}
+.fbtn.on{border-color:var(--accent);background:var(--accent-t)}
+.fbtn.on svg{color:var(--accent)}
+.fchips{display:flex;flex-wrap:wrap;gap:6px}
+.fchip{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--field-line);background:var(--field);color:var(--ink);font-family:Archivo,sans-serif;font-weight:600;font-size:14px;white-space:nowrap;cursor:pointer}
+.fchip .fn{font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
+.fchip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.fchip[aria-pressed="true"] .fn{color:var(--on-accent)}
+.input{display:block;width:100%;height:36px;margin:0;padding:0 12px;border:1.5px solid var(--field-line);border-radius:10px;background:var(--field);color:var(--ink);font-family:inherit;font-size:15px;text-overflow:ellipsis}
+.input::placeholder{color:var(--muted);opacity:1}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.srch{position:relative}
+.srch svg{position:absolute;left:12px;top:50%;margin-top:-8px;pointer-events:none;color:var(--muted)}
+.srch .input{padding-left:36px;-webkit-appearance:none;appearance:none}
+.selw{position:relative}
+.selw svg{position:absolute;right:12px;top:50%;margin-top:-7px;pointer-events:none;color:var(--muted)}
+.sel{appearance:none;-webkit-appearance:none;padding-right:34px;color-scheme:dark;cursor:pointer}
+.wl{position:absolute;left:12px;top:0;bottom:0;display:flex;align-items:center;font-size:11.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);pointer-events:none}
+.whow .sel{padding-left:54px}
+.upd{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.nw{white-space:nowrap}
+.an{font-weight:500;color:var(--ink)}
+.ar{color:var(--muted)}
+.arw{margin:0 2px;color:var(--muted)}
+.ki{flex:none;display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--field);border:1px solid var(--line);color:var(--muted)}
+.ki.k-con{color:var(--caution-ink)}
+.tc{flex:none;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--field-line);background:var(--field);color:var(--ink);font-family:Archivo,sans-serif;font-weight:600;font-size:13.5px;letter-spacing:.02em;font-variant-numeric:tabular-nums;cursor:pointer}
+.tc:hover,.tc.fc{border-color:var(--accent)}
+.tc.fc{outline:2px solid var(--accent);outline-offset:2px}
+.body{gap:10px;padding:12px 16px 20px}
+.kc{display:flex;gap:6px;margin:0 -16px;padding:0 16px;overflow-x:auto}
+.fchip{flex:none;height:44px;padding:0 16px;border-radius:12px;font-size:15px}
+.tbp{display:flex;align-items:center;gap:8px}
+.tbp .srch{flex:1;min-width:0}
+.input{height:44px;border-radius:12px}
+.srch .input{padding-left:38px}
+.sel{height:44px}
+.tc{min-width:56px;height:44px;margin:-8px -6px -8px 0;padding:0 6px;border:0;background:transparent}
+.tcv{display:inline-flex;align-items:center;height:28px;padding:0 9px;border:1px solid var(--field-line);border-radius:8px;background:var(--field)}
+.tc:hover .tcv,.tc.fc .tcv{border-color:var(--accent)}
+.l1{display:flex;align-items:center;gap:6px;min-height:20px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.l1 .tm{color:var(--lo)}
+.l1 .wh{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.l2{display:flex;align-items:center;gap:8px;min-height:28px;margin-top:2px}
+.l2 .tx{flex:1;min-width:0;font-size:15px;line-height:1.35}
+.l2 .dt{color:var(--muted);font-size:14px}
+.sp{height:22px;padding:0 9px;margin:0 2px}
+.sp:first-child{margin-left:0}
+.lf{display:flex;flex-direction:column;gap:2px;padding:12px 4px 0;font-size:13px;color:var(--muted)}
+.hh{display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.hh b{font-family:Archivo,sans-serif;font-weight:600;font-size:15px;color:var(--ink)}
+.tl{padding:0}
+.ev{display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:10px;padding:0 4px 0 6px}
+.rl2{position:relative;align-self:stretch}
+.rl2::before{content:"";position:absolute;left:50%;margin-left:-1px;width:2px;top:0;bottom:0;background:var(--line)}
+.ev:first-child .rl2::before{top:18px}
+.ev:last-child .rl2::before{bottom:calc(100% - 18px)}
+.dd{position:absolute;z-index:1;left:50%;top:18px;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;box-shadow:0 0 0 3px var(--canvas)}
+.d-req{background:var(--lo)}
+.d-minor{width:12px;height:12px;margin:-6px 0 0 -6px;background:var(--minor)}
+.d-major{width:12px;height:12px;margin:-6px 0 0 -6px;background:var(--major)}
+.d-con{width:12px;height:12px;margin:-6px 0 0 -6px;background:var(--warn)}
+.d-set{width:12px;height:12px;margin:-6px 0 0 -6px;background:var(--canvas);border:2px solid var(--accent)}
+.ev .bx{padding:8px 0}
+.ev .l2{margin-top:0}
+.ev .l1 .tm{font-weight:500}
+.key{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:4px 4px 0;font-size:13px;color:var(--muted)}
+.key span{display:inline-flex;align-items:center;gap:6px}
+.key .dd{position:static;margin:0;box-shadow:none;width:10px;height:10px}
+.key .d-minor,.key .d-con,.key .d-set{width:10px;height:10px;margin:0}
+
+</style>
+</helmet>
+<div class="jq" data-theme="dark">
+<header class="top">
+<div class="who"><button type="button" class="menu" aria-label="Sections"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></button><span class="av"><img src="/avatars/judge-advisor.jpg" alt="" width="28" height="28"></span><span class="who-t"><b>Judge Advisor</b><span>Alex Morgan</span></span></div>
+<div class="top-r"><span class="live"><i aria-hidden="true"></i>Live</span><button type="button" class="signout">Sign out</button></div>
+</header>
+<div class="rule" aria-hidden="true"></div>
+<div class="sbar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg><b>Activity</b><span class="rc">Updated 11:42 · refreshes every 10 s</span></div>
+<main class="body">
+<h1 class="sr">Activity</h1>
+<div class="kc" role="group" aria-label="Kind"><button type="button" class="fchip" aria-pressed="true">All<span class="fn">150</span></button><button type="button" class="fchip" aria-pressed="false">Requests<span class="fn">96</span></button><button type="button" class="fchip" aria-pressed="false">Referee<span class="fn">31</span></button><button type="button" class="fchip" aria-pressed="false">Conflicts<span class="fn">6</span></button><button type="button" class="fchip" aria-pressed="false">Setup<span class="fn">17</span></button></div><div class="tbp"><div class="srch"><label class="sr" for="f-team">Team number</label><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg><input id="f-team" class="input" type="text" placeholder="Team number" autocomplete="off"></div><button type="button" class="fbtn" aria-haspopup="dialog" aria-label="Who, everyone"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"></circle><path d="M4.5 20c0-3.8 3.4-6.2 7.5-6.2s7.5 2.4 7.5 6.2"></path></svg>Who<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button></div>
+<section aria-labelledby="h0">
+<h2 id="h0" class="hh"><b>11:00–11:59</b><span>· 7 events</span></h2>
+<ol class="tl">
+<li class="ev"><span class="rl2"><i class="dd d-req" aria-hidden="true"></i><span class="sr">Requests</span></span><div class="bx"><div class="l1"><b class="tm an">11:42</b><span aria-hidden="true">·</span><span class="wh"><b class="an">Priya Nair</b><span class="ar"> · Panel 2</span></span></div><div class="l2"><span class="tx"><span class="ac">started interview</span> <span class="dt">Gear Gremlins</span></span><button type="button" class="tc" aria-label="Open team sheet for 2011A Gear Gremlins"><span class="tcv">2011A</span></button></div></div></li>
+<li class="ev"><span class="rl2"><i class="dd d-req" aria-hidden="true"></i><span class="sr">Requests</span></span><div class="bx"><div class="l1"><b class="tm an">11:40</b><span aria-hidden="true">·</span><span class="wh"><b class="an">Front desk</b></span></div><div class="l2"><span class="tx"><span class="ac">joined queue</span> <span class="dt">Torque Titans · EN</span></span><button type="button" class="tc" aria-label="Open team sheet for 9882K Torque Titans"><span class="tcv">9882K</span></button></div></div></li>
+<li class="ev"><span class="rl2"><i class="dd d-minor" aria-hidden="true"></i><span class="sr">Referee</span></span><div class="bx"><div class="l1"><b class="tm an">11:38</b><span aria-hidden="true">·</span><span class="wh"><b class="an">Jordan Lee</b><span class="ar"> · Referee</span></span></div><div class="l2"><span class="tx"><span class="ac">flagged <span class="sp s-minor">Minor</span></span> <span class="dt">Q19 · GG17</span></span><button type="button" class="tc" aria-label="Open team sheet for 9882K Torque Titans"><span class="tcv">9882K</span></button></div></div></li>
+<li class="ev"><span class="rl2"><i class="dd d-req" aria-hidden="true"></i><span class="sr">Requests</span></span><div class="bx"><div class="l1"><b class="tm an">11:31</b><span aria-hidden="true">·</span><span class="wh"><b class="an">Alex Morgan</b><span class="ar"> · Judge Advisor</span></span></div><div class="l2"><span class="tx"><span class="ac">reassigned</span> <span class="dt">Panel 3 → Panel 2</span></span><button type="button" class="tc" aria-label="Open team sheet for 5150Z Sparky"><span class="tcv">5150Z</span></button></div></div></li>
+<li class="ev"><span class="rl2"><i class="dd d-major" aria-hidden="true"></i><span class="sr">Referee</span></span><div class="bx"><div class="l1"><b class="tm an">11:20</b><span aria-hidden="true">·</span><span class="wh"><b class="an">Sam Park</b><span class="ar"> · Referee</span></span></div><div class="l2"><span class="tx"><span class="ac">flagged <span class="sp s-major">Major</span></span> <span class="dt">Q31 · SG6</span></span><button type="button" class="tc" aria-label="Open team sheet for 1101R Rookies"><span class="tcv">1101R</span></button></div></div></li>
+<li class="ev"><span class="rl2"><i class="dd d-minor" aria-hidden="true"></i><span class="sr">Referee</span></span><div class="bx"><div class="l1"><b class="tm an">11:12</b><span aria-hidden="true">·</span><span class="wh"><b class="an">Alex Morgan</b><span class="ar"> · Judge Advisor</span></span></div><div class="l2"><span class="tx"><span class="ac">corrected a flag: <span class="nw"><span class="sp s-warn">Warning</span> <span class="arw" aria-hidden="true">→</span> <span class="sp s-minor">Minor</span></span></span> <span class="dt">Q22</span></span><button type="button" class="tc" aria-label="Open team sheet for 6036D Nuts &amp; Bolts"><span class="tcv">6036D</span></button></div></div></li>
+<li class="ev"><span class="rl2"><i class="dd d-req" aria-hidden="true"></i><span class="sr">Requests</span></span><div class="bx"><div class="l1"><b class="tm an">11:05</b><span aria-hidden="true">·</span><span class="wh"><b class="an">Front desk</b></span></div><div class="l2"><span class="tx"><span class="ac">booked slot</span> <span class="dt">11:00</span></span><button type="button" class="tc" aria-label="Open team sheet for 4410C Robo Rangers"><span class="tcv">4410C</span></button></div></div></li>
+</ol>
+</section>
+<section aria-labelledby="h1">
+<h2 id="h1" class="hh"><b>10:00–10:59</b><span>· 3 events</span></h2>
+<ol class="tl">
+<li class="ev"><span class="rl2"><i class="dd d-req" aria-hidden="true"></i><span class="sr">Requests</span></span><div class="bx"><div class="l1"><b class="tm an">10:58</b><span aria-hidden="true">·</span><span class="wh"><b class="an">Lee Chen</b><span class="ar"> · Panel 2</span></span></div><div class="l2"><span class="tx"><span class="ac">finished interview</span> <span class="dt">Velocity</span></span><button type="button" class="tc" aria-label="Open team sheet for 8080V Velocity"><span class="tcv">8080V</span></button></div></div></li>
+<li class="ev"><span class="rl2"><i class="dd d-con" aria-hidden="true"></i><span class="sr">Conflicts</span></span><div class="bx"><div class="l1"><b class="tm an">10:42</b><span aria-hidden="true">·</span><span class="wh"><b class="an">Alex Morgan</b><span class="ar"> · Judge Advisor</span></span></div><div class="l2"><span class="tx"><span class="ac">declared conflicts of interest</span> <span class="dt">Priya Nair: 9882K, 7700B</span></span></div></div></li>
+<li class="ev"><span class="rl2"><i class="dd d-set" aria-hidden="true"></i><span class="sr">Setup</span></span><div class="bx"><div class="l1"><b class="tm an">10:15</b><span aria-hidden="true">·</span><span class="wh"><b class="an">Alex Morgan</b><span class="ar"> · Judge Advisor</span></span></div><div class="l2"><span class="tx"><span class="ac">Referee setup</span> <span class="dt">V5RC · 3 fields</span></span></div></div></li>
+</ol>
+</section>
+<section aria-labelledby="h2">
+<h2 id="h2" class="hh"><b>09:00–09:59</b><span>· 1 event</span></h2>
+<ol class="tl">
+<li class="ev"><span class="rl2"><i class="dd d-set" aria-hidden="true"></i><span class="sr">Setup</span></span><div class="bx"><div class="l1"><b class="tm an">09:55</b><span aria-hidden="true">·</span><span class="wh"><b class="an">Alex Morgan</b><span class="ar"> · Judge Advisor</span></span></div><div class="l2"><span class="tx"><span class="ac">imported teams</span> <span class="dt">46 teams · 12 new</span></span></div></div></li>
+</ol>
+</section>
+<div class="lf"><p>Showing the latest 150 events</p></div>
+<div class="key" role="group" aria-label="Dot key"><span><i class="dd d-req" aria-hidden="true"></i>Request</span><span><i class="dd d-minor" aria-hidden="true"></i>Flag</span><span><i class="dd d-con" aria-hidden="true"></i>Conflict</span><span><i class="dd d-set" aria-hidden="true"></i>Setup</span></div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":375,"height":1172}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Judge Advisor floor · panel board · wide · dark</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Fira+Sans:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+button,input,select{font:inherit;color:inherit}
+.jq{--canvas:oklch(0.165 0.012 265);--surface:oklch(0.205 0.014 265);--ink:oklch(0.955 0.005 265);--muted:oklch(0.670 0.013 265);--line:oklch(0.320 0.016 265);--accent:oklch(0.680 0.140 258);--on-accent:oklch(0.165 0.012 265);--ring:oklch(0.680 0.140 258 / 0.35);--field:oklch(0.180 0.013 265);--field-line:oklch(0.520 0.014 265);--waiting:oklch(0.735 0.185 58);--waiting-ink:oklch(0.240 0.060 58);--enroute:oklch(0.720 0.140 232);--enroute-ink:oklch(0.220 0.050 232);--active:oklch(0.680 0.170 300);--active-ink:oklch(0.220 0.060 300);--done:oklch(0.745 0.140 158);--done-ink:oklch(0.225 0.055 158);--booked:oklch(0.330 0.020 265);--booked-ink:oklch(0.860 0.012 265);--booked-line:oklch(0.440 0.020 265);--waiting-t:oklch(0.735 0.185 58 / 0.12);--waiting-r:oklch(0.735 0.185 58 / 0.45);--active-t:oklch(0.680 0.170 300 / 0.12);--active-r:oklch(0.680 0.170 300 / 0.45);--caution-bg:oklch(0.790 0.150 82 / 0.12);--caution-line:oklch(0.790 0.150 82 / 0.35);--caution-ink:oklch(0.840 0.100 82);--warn:oklch(0.790 0.150 82);--top-t:oklch(0.760 0.130 175 / 0.14);--top-l:oklch(0.760 0.130 175 / 0.40);--top-i:oklch(0.850 0.110 175);--strong-t:oklch(0.780 0.100 210 / 0.14);--strong-l:oklch(0.780 0.100 210 / 0.40);--strong-i:oklch(0.850 0.080 210);--middle-t:oklch(0.800 0.130 88 / 0.14);--middle-l:oklch(0.800 0.130 88 / 0.40);--middle-i:oklch(0.860 0.100 88);--emerging-t:oklch(0.700 0.010 265 / 0.16);--emerging-l:oklch(0.700 0.010 265 / 0.40);--emerging-i:oklch(0.820 0.008 265);--accent-t:oklch(0.680 0.140 258 / 0.14);position:relative;box-sizing:border-box;width:1280px;height:800px;overflow:hidden;display:flex;flex-direction:column;background:var(--canvas);color:var(--ink);font-family:'Fira Sans',system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.jq *,.jq *::before,.jq *::after{box-sizing:border-box}
+:where(.jq) :is(h1,h2,h3,p,ul,li,table,blockquote){margin:0;padding:0}
+:where(.jq) ul{list-style:none}
+.jq :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rule{flex:none;height:1px;background:var(--line)}
+.av{flex:none;width:28px;height:28px;display:block}
+.av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:22%;box-shadow:0 0 0 2px var(--accent)}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.who-t{display:flex;flex-direction:column;line-height:1.15}
+.who-t b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.who-t span{font-size:12px;color:var(--muted)}
+.top-r{display:flex;align-items:center;gap:2px}
+.live{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--done)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--done)}
+.signout{padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:14px;text-decoration:underline;cursor:pointer}
+.sc{display:inline-flex;align-items:center;flex:none;height:24px;padding:0 10px;border-radius:999px;background:var(--c);border:1px solid var(--cb,var(--c));color:var(--ci);font-size:12px;font-weight:500;white-space:nowrap;font-variant-numeric:tabular-nums}
+.s-waiting{--c:var(--waiting);--ci:var(--waiting-ink)}
+.s-enroute{--c:var(--enroute);--ci:var(--enroute-ink)}
+.s-active{--c:var(--active);--ci:var(--active-ink)}
+.s-done{--c:var(--done);--ci:var(--done-ink)}
+.s-booked{--c:var(--booked);--ci:var(--booked-ink);--cb:var(--booked-line)}
+.dot{flex:none;display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c)}
+.dot.s-booked{background:var(--booked-line)}
+.ptag{display:inline-flex;align-items:center;flex:none;height:24px;padding:0 7px;border:1px solid var(--line);border-radius:6px;color:var(--muted);font-size:12px;font-weight:500;letter-spacing:.04em;white-space:nowrap}
+.ptag.warn{border-color:var(--caution-line);background:var(--caution-bg);color:var(--caution-ink)}
+.pill{display:inline-flex;align-items:center;gap:4px;flex:none;padding:2px 9px 2px 7px;border-radius:999px;font-size:12px;font-weight:500;line-height:1.5;white-space:nowrap}
+.pill svg{flex:none}
+.p-warn{background:var(--caution-bg);border:1px solid var(--caution-line);color:var(--caution-ink)}
+.p-minor{background:transparent;border:1px solid var(--caution-line);color:var(--caution-ink)}
+.wt{font-weight:500;color:var(--waiting)}
+.go{display:inline-flex;align-items:center;justify-content:center;flex:none;border:0;background:var(--c);color:var(--ci);font-family:Archivo,sans-serif;font-weight:700;white-space:nowrap;cursor:pointer}
+.ghost{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;border:1.5px solid var(--field-line);background:transparent;color:var(--ink);font-weight:500;white-space:nowrap;cursor:pointer}
+.quiet{flex:none;border:0;background:transparent;color:var(--muted);text-decoration:underline;white-space:nowrap;cursor:pointer}
+.more{flex:none;display:grid;place-items:center;border:1.5px solid var(--field-line);background:transparent;color:var(--ink);cursor:pointer}
+.more[aria-expanded="true"]{background:var(--surface);border-color:var(--accent)}
+.caution{display:flex;gap:10px;align-items:flex-start;padding:8px 12px;border-radius:12px;background:var(--caution-bg);border:1px solid var(--caution-line);color:var(--caution-ink);font-size:13px;line-height:1.4}
+.caution svg{flex:none;margin-top:2px}
+.sec{display:flex;align-items:center;gap:8px;min-height:24px;font-size:12px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.board{display:inline-flex;align-items:center;flex:none;border:1.5px solid var(--field-line);color:var(--accent);font-size:14px;font-weight:500;text-decoration:none;white-space:nowrap}
+.rb{flex:none;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--waiting);color:var(--waiting-ink);font-size:12px;font-weight:500;line-height:22px;text-align:center;font-variant-numeric:tabular-nums}
+.top{flex:none;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 12px 0 20px}
+.signout{min-height:36px}
+.shell{flex:1;min-height:0;display:flex}
+.rail{flex:none;width:224px;display:flex;flex-direction:column;gap:14px;padding:16px 0;background:var(--surface);border-right:1px solid var(--line)}
+.rl{padding:0 20px;margin-bottom:4px;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.ri{position:relative;display:flex;align-items:center;gap:12px;height:44px;margin-right:12px;padding:0 12px 0 20px;border-radius:0 10px 10px 0;color:var(--muted);text-decoration:none;font-size:15px;font-weight:500}
+.ri svg{flex:none}
+.ri[aria-current]{background:var(--accent-t);color:var(--ink)}
+.ri[aria-current]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.ri[aria-current] svg{color:var(--accent)}
+.rc{margin-left:auto;font-size:13px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
+.ri .rb{margin-left:auto}
+.main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;padding:12px 20px 16px}
+.cnt{display:flex;align-items:center;gap:10px}
+.cnt b{font-family:Archivo,sans-serif;font-weight:700;font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
+.cnt span{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.board{height:36px;padding:0 14px;border-radius:10px}
+.card{display:flex;flex-direction:column;gap:6px;padding:9px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.card.w{background:var(--waiting-t);border-color:var(--waiting-r)}
+.c1{display:flex;align-items:baseline;gap:8px;min-width:0}
+.c1 b{flex:none;font-family:Archivo,sans-serif;font-weight:700;font-size:20px;line-height:1.2}
+.cn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.c2{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px}
+.tm{font-size:13px;font-weight:500;font-variant-numeric:tabular-nums}
+.c4{display:flex;align-items:center;gap:8px}
+.c4 .go{flex:1;min-width:0;height:36px;border-radius:10px;font-size:14px}
+.more{width:36px;height:36px;border-radius:10px}
+.mw{position:relative;flex:none}
+.col{min-width:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;background:var(--field)}
+.ch{display:flex;flex-direction:column;gap:2px;padding:12px 12px 10px;border-bottom:1px solid var(--line)}
+.ch1{display:flex;align-items:center;gap:8px}
+.ch1 h2{font-family:Archivo,sans-serif;font-weight:700;font-size:20px;line-height:1.1}
+.tags{margin-left:auto;display:flex;gap:4px}
+.jn{font-size:13px}
+.ld{font-size:12.5px;color:var(--muted)}
+.ch4{display:flex;align-items:center;gap:4px;margin-top:6px}
+.ch4 .pill{margin-left:auto}
+.cl{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;padding:8px}
+.lw{font-size:12.5px;padding:7px 10px;gap:8px}
+.pop{position:absolute;z-index:5;left:calc(100% + 12px);top:6px;width:232px;padding:10px;border:1.5px solid var(--field-line);border-radius:12px;background:var(--surface);box-shadow:0 10px 28px oklch(0.100 0.010 265 / 0.7)}
+.pop::before{content:"";position:absolute;top:11px;left:-7px;width:12px;height:12px;background:var(--surface);border-left:1.5px solid var(--field-line);border-bottom:1.5px solid var(--field-line);transform:rotate(45deg)}
+.pop-h{margin-bottom:6px;font-family:Archivo,sans-serif;font-weight:600;font-size:14px}
+.opt{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;padding:0 10px;border:1.5px solid var(--accent);border-radius:10px;background:var(--field);box-shadow:0 0 0 3px var(--ring);text-align:left;cursor:pointer}
+.opt b{font-family:Archivo,sans-serif;font-weight:600;font-size:15px}
+.pop-c{margin-top:8px;font-size:12px;color:var(--muted)}
+.strip{flex:none;display:flex;align-items:center;gap:32px;height:48px;margin-bottom:10px}
+.board{margin-left:auto}
+.cols{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+</style>
+</helmet>
+<div class="jq" data-theme="dark">
+<header class="top">
+<div class="who"><span class="av"><img src="/avatars/judge-advisor.jpg" alt="" width="28" height="28"></span><span class="who-t"><b>Judge Advisor</b><span>Alex Morgan</span></span></div>
+<div class="top-r"><span class="live"><i aria-hidden="true"></i>Live</span><button type="button" class="signout">Sign out</button></div>
+</header>
+<div class="rule" aria-hidden="true"></div>
+<div class="shell">
+<nav class="rail" aria-label="Judge Advisor sections">
+<div class="rg"><h2 class="rl">Live</h2><ul>
+<li><a class="ri" href="#" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"></path></svg><span>Floor</span><b class="rb">3</b><span class="sr"> teams requesting</span></a></li>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M5.6 5.6l12.8 12.8"></path></svg><span>Conflicts</span><span class="rc">2</span></a></li>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4L17 12H5"></path></svg><span>Referee</span><span class="rc">14</span></a></li>
+</ul></div>
+<div class="rg"><h2 class="rl">Setup</h2><ul>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 5.2a3 3 0 0 1 0 5.6M18.5 14.8c1.7.8 2.7 2.4 2.7 4.2"></path></svg><span>Teams</span><span class="rc">48</span></a></li>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M9 4v16M15 4v16"></path></svg><span>Panels</span><span class="rc">4</span></a></li>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M4 19h16"></path></svg><span>Import</span></a></li>
+</ul></div>
+<div class="rg"><h2 class="rl">Results</h2><ul>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20v-7M12 20V5M19 20V10"></path></svg><span>Scores</span></a></li>
+<li><a class="ri" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg><span>Activity</span></a></li>
+</ul></div>
+</nav>
+<main class="main">
+<h1 class="sr">Floor</h1>
+<section class="strip" aria-label="Status counts">
+<div class="cnt"><b>3</b><span><i class="dot s-waiting"></i>Requesting</span></div>
+<div class="cnt"><b>1</b><span><i class="dot s-enroute"></i>On the way</span></div>
+<div class="cnt"><b>2</b><span><i class="dot s-active"></i>Interviewing</span></div>
+<div class="cnt"><b>17</b><span><i class="dot s-done"></i>Complete</span></div>
+<a class="board" href="/board" target="_blank" rel="noopener">Open big-screen board ↗</a>
+</section>
+<div class="cols">
+<section class="col" aria-labelledby="ph-1">
+<header class="ch">
+<div class="ch1"><h2 id="ph-1">Panel 1</h2><span class="ptag">HS</span></div>
+<p class="jn">Dana Ruiz, Sam Okafor</p>
+<p class="ld">none waiting · going to 3141P</p>
+<div class="ch4"><span class="ptag">EN only</span></div>
+</header>
+<div class="cl">
+<article class="card" aria-label="3141P Pi Squad">
+<div class="c1"><b>3141P</b><span class="cn">Pi Squad</span></div>
+<div class="c2"><span class="sc s-enroute">On the way</span><span class="tm">3 min</span><span class="ptag">EN</span></div>
+<div class="c4"><button type="button" class="go s-active">Start interview</button><span class="mw"><button type="button" class="more" aria-label="More actions for 3141P: move, notes, cancel" aria-haspopup="menu" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button></span></div>
+</article>
+</div>
+</section>
+<section class="col" aria-labelledby="ph-2">
+<header class="ch">
+<div class="ch1"><h2 id="ph-2">Panel 2</h2><span class="ptag">MS</span></div>
+<p class="jn">Priya Nair, Lee Chen</p>
+<p class="ld"><span class="wt">2 waiting</span> · with 2011A</p>
+<div class="ch4"><span class="ptag">EN</span><span class="ptag" lang="th">ไทย</span></div>
+</header>
+<div class="cl">
+<article class="card" aria-label="2011A Gear Gremlins">
+<div class="c1"><b>2011A</b><span class="cn">Gear Gremlins</span></div>
+<div class="c2"><span class="sc s-active">Interviewing</span><span class="tm">7 min</span><span class="ptag">EN</span></div>
+<div class="c4"><button type="button" class="go s-done">Finish</button><span class="mw"><button type="button" class="more" aria-label="More actions for 2011A: move, notes, cancel" aria-haspopup="menu" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button></span></div>
+</article>
+<article class="card w" aria-label="9882K Torque Titans">
+<div class="c1"><b>9882K</b><span class="cn">Torque Titans</span></div>
+<div class="c2"><span class="sc s-waiting">Requesting</span><span class="tm wt">8 min</span><span class="ptag">EN</span></div>
+<div class="c2"><span class="pill p-warn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01"></path></svg>Warning ×1</span></div><div class="c4"><button type="button" class="go s-enroute">On our way</button><span class="mw"><button type="button" class="more" aria-label="More actions for 9882K: move, notes, cancel" aria-haspopup="menu" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button></span></div>
+</article>
+<article class="card w" aria-label="7700B Byte Me">
+<div class="c1"><b>7700B</b><span class="cn">Byte Me</span></div>
+<div class="c2"><span class="sc s-waiting">Requesting</span><span class="tm wt">4 min</span><span class="ptag" lang="th">ไทย</span></div>
+<div class="c4"><button type="button" class="go s-enroute">On our way</button><span class="mw"><button type="button" class="more" aria-label="More actions for 7700B: move, notes, cancel" aria-haspopup="menu" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button></span></div>
+</article>
+<article class="card" aria-label="4410C Robo Rangers">
+<div class="c1"><b>4410C</b><span class="cn">Robo Rangers</span></div>
+<div class="c2"><span class="sc s-booked">Booked</span><span class="tm">11:00</span><span class="ptag">EN</span></div>
+<div class="c4"><button type="button" class="go s-enroute">On our way</button><span class="mw"><button type="button" class="more" aria-label="More actions for 4410C: move, notes, cancel" aria-haspopup="menu" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button></span></div>
+</article>
+</div>
+</section>
+<section class="col" aria-labelledby="ph-3">
+<header class="ch">
+<div class="ch1"><h2 id="ph-3">Panel 3</h2><span class="ptag">MS</span></div>
+<p class="jn">Tom Baker, Ana Silva</p>
+<p class="ld"><span class="wt">1 waiting</span> · panel free</p>
+<div class="ch4"><span class="ptag">EN only</span><span class="pill p-warn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01"></path></svg><span lang="th">ไทย</span> not covered</span></div>
+</header>
+<div class="cl">
+<article class="card w" aria-label="5150Z Sparky">
+<div class="c1"><b>5150Z</b><span class="cn">Sparky</span></div>
+<div class="c2"><span class="sc s-waiting">Requesting</span><span class="tm wt">2 min</span><span class="ptag warn" lang="th">ไทย</span></div>
+<div class="caution lw" role="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01"></path></svg><p>Panel 3 interviews in English only — this team asked for <span lang="th">ไทย</span>.</p></div>
+<div class="c4"><button type="button" class="go s-enroute">On our way</button><span class="mw"><button type="button" class="more" aria-label="More actions for 5150Z: move, notes, cancel" aria-haspopup="menu" aria-expanded="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button><div class="pop" role="dialog" aria-label="Move 5150Z to another panel">
+<p class="pop-h">Move to panel…</p>
+<button type="button" class="opt"><b>Panel 2</b><span class="ptag">MS</span><span class="tags"><span class="ptag">EN</span><span class="ptag" lang="th">ไทย</span></span></button>
+<p class="pop-c">Only MS panels without a conflict</p>
+</div></span></div>
+</article>
+<article class="card" aria-label="1234X Circuit Breakers">
+<div class="c1"><b>1234X</b><span class="cn">Circuit Breakers</span></div>
+<div class="c2"><span class="sc s-booked">Booked</span><span class="tm">11:20</span><span class="ptag">EN</span></div>
+<div class="c4"><button type="button" class="go s-enroute">On our way</button><span class="mw"><button type="button" class="more" aria-label="More actions for 1234X: move, notes, cancel" aria-haspopup="menu" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button></span></div>
+</article>
+</div>
+</section>
+<section class="col" aria-labelledby="ph-4">
+<header class="ch">
+<div class="ch1"><h2 id="ph-4">Panel 4</h2><span class="ptag">ES</span></div>
+<p class="jn">Mei Tan, Raj Patel</p>
+<p class="ld">none waiting · with 6036D</p>
+<div class="ch4"><span class="ptag">EN</span><span class="ptag" lang="th">ไทย</span></div>
+</header>
+<div class="cl">
+<article class="card" aria-label="6036D Nuts &amp; Bolts">
+<div class="c1"><b>6036D</b><span class="cn">Nuts &amp; Bolts</span></div>
+<div class="c2"><span class="sc s-active">Interviewing</span><span class="tm">12 min</span><span class="ptag" lang="th">ไทย</span></div>
+<div class="c2"><span class="pill p-minor"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01"></path></svg>Minor ×1</span></div><div class="c4"><button type="button" class="go s-done">Finish</button><span class="mw"><button type="button" class="more" aria-label="More actions for 6036D: move, notes, cancel" aria-haspopup="menu" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button></span></div>
+</article>
+</div>
+</section>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

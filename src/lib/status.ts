@@ -1,8 +1,7 @@
 /**
- * The interview lifecycle and its colours.
+ * The interview lifecycle and its wording.
  *
- * Orange means a team is waiting on you. That is the whole point of the
- * board, so it gets the loudest colour and it is the only one that pulses.
+ * "Requested" is the one that matters: a team is waiting on a judge.
  */
 export const STATUSES = [
   "scheduled",
@@ -23,93 +22,50 @@ export type StatusMeta = {
   short: string;
   /** What a team reads on their own screen. */
   teamLabel: string;
-  /** Tailwind classes for a filled badge / card. */
-  chip: string;
-  /** Tailwind classes for the big board tile, ring included. */
-  tile: string;
-  /**
-   * Background and text only, no ring.
-   *
-   * The pit floor puts a division-coloured ring around every tile, so it
-   * needs the fill without a competing one — a status ring would win the
-   * cascade and quietly strip the division colour off exactly the tiles
-   * that need it most.
-   */
-  fill: string;
-  /** Solid colour for the legend dot and board rail. */
-  dot: string;
+  /** Where the status sorts among the others; the judge queue's "with us" list reads it. */
   order: number;
 };
 
 export const STATUS_META: Record<Status, StatusMeta> = {
-  /* Booked, but nobody has to do anything yet. Deliberately the quietest
-     entry in the table -- it is the only status that is about the future,
-     and a board where every future booking shouts has nothing left to say
-     when one of them actually comes due. */
+  /* Booked, but nobody has to do anything yet: the only status that is
+     about the future. */
   scheduled: {
     label: "Scheduled",
     short: "Booked",
     teamLabel: "Your slot is booked",
-    chip: "bg-booked text-booked-ink ring-1 ring-inset ring-line-strong",
-    tile: "bg-booked text-booked-ink ring-1 ring-inset ring-line-strong",
-    fill: "bg-booked text-booked-ink",
-    dot: "bg-booked-quiet",
     order: 1,
   },
   /* The one that matters. A team is stood waiting and nobody has picked
-     them up: the loudest colour in the app, the only one that pulses, and
-     the reason every other status is held back from orange. */
+     them up. */
   requested: {
     label: "Requesting a judge",
     short: "Requesting",
     teamLabel: "Judges have been notified",
-    chip: "bg-waiting text-waiting-ink font-semibold",
-    tile: "bg-waiting text-waiting-ink ring-2 ring-inset ring-waiting-quiet",
-    fill: "bg-waiting text-waiting-ink",
-    dot: "bg-waiting",
     order: 0,
   },
   acknowledged: {
     label: "Judges on their way",
     short: "On the way",
     teamLabel: "Judges are on their way to you",
-    chip: "bg-enroute text-enroute-ink font-semibold",
-    tile: "bg-enroute text-enroute-ink ring-2 ring-inset ring-enroute-quiet",
-    fill: "bg-enroute text-enroute-ink",
-    dot: "bg-enroute",
     order: 2,
   },
   interviewing: {
     label: "Interview in progress",
     short: "Interviewing",
     teamLabel: "Interview in progress",
-    chip: "bg-active text-active-ink font-semibold",
-    tile: "bg-active text-active-ink ring-2 ring-inset ring-active-quiet",
-    fill: "bg-active text-active-ink",
-    dot: "bg-active",
     order: 3,
   },
   completed: {
     label: "Interview complete",
     short: "Complete",
     teamLabel: "Interview complete — thank you!",
-    chip: "bg-done text-done-ink font-semibold",
-    tile: "bg-done text-done-ink ring-1 ring-inset ring-done-quiet",
-    fill: "bg-done text-done-ink",
-    dot: "bg-done",
     order: 4,
   },
-  /* Nothing to act on and nothing to celebrate: the only status drawn
-     without a fill, so a cancelled row reads as absent rather than as one
-     more coloured thing competing for the eye. */
+  /* Nothing to act on and nothing to celebrate. */
   cancelled: {
     label: "Cancelled",
     short: "Cancelled",
     teamLabel: "Request cancelled",
-    chip: "bg-off text-off-ink ring-1 ring-inset ring-line",
-    tile: "bg-off text-off-ink ring-1 ring-inset ring-line",
-    fill: "bg-off text-off-ink",
-    dot: "bg-off-ink",
     order: 5,
   },
 };

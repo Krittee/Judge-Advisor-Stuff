@@ -57,7 +57,7 @@ test("Hide completed removes the completed team's tile and leaves an empty box i
   assert.match(hidden, /2222B/, "a team still waiting must not be hidden with it");
   assert.match(
     hidden,
-    /<div aria-hidden="true" class="h-\[3\.25rem\]"><\/div>/,
+    /<div aria-hidden="true" class="bd-pit bd-pit--gone"><\/div>/,
     "no placeholder: the grid would shift up to fill the gap",
   );
 });
@@ -70,7 +70,7 @@ test("with Hide completed off, a completed team is still shown", () => {
 test("a row draws only its own span, so no empty pits appear before its first team", () => {
   const markup = render(floor([team("1111A", "C5"), team("2222B", "C6"), team("3333C", "D1")]));
   assert.equal(
-    (markup.match(/border-dashed/g) ?? []).length,
+    (markup.match(/bd-pit--empty/g) ?? []).length,
     0,
     "C1 to C4 were drawn as free pits, although another division's team stands in C5",
   );
@@ -78,5 +78,5 @@ test("a row draws only its own span, so no empty pits appear before its first te
 
 test("a gap inside a row's span is still drawn as a real empty pit", () => {
   const markup = render(floor([team("1111A", "A1"), team("2222B", "A3")]));
-  assert.equal((markup.match(/border-dashed/g) ?? []).length, 1, "A2 is free and must read as free");
+  assert.equal((markup.match(/bd-pit--empty/g) ?? []).length, 1, "A2 is free and must read as free");
 });

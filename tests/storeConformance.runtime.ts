@@ -3,6 +3,7 @@ import test from "node:test";
 
 import type { Store } from "../src/lib/db/types";
 import { StoreError } from "../src/lib/db/types";
+import { defaultCategory, presetDivisions } from "../src/lib/presets";
 
 /**
  * One set of rules, run against every backend.
@@ -64,6 +65,11 @@ function requestInput(teamId: string, panelId: string, over: Record<string, unkn
     language: "en",
     ...over,
   } as Parameters<Store["createRequest"]>[0];
+}
+
+/** A nomination from Amy on `panelId` for Excellence, unless `over` says otherwise. */
+function nominationInput(teamId: string, panelId: string, over: Partial<Parameters<Store["nominate"]>[0]> = {}) {
+  return { awardId: "excellence", teamId, panelId, judge: "Amy", ...over };
 }
 
 /** A slot time far enough out that no other test collides with it. */
@@ -323,7 +329,7 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       author: "Referee",
       matchType: "Q",
       matchNumber: "3",
-      field: "Field 1",
+      field: "1",
       rule: "SG6",
       ruleset: "viqrc",
       manualVersion: null,
@@ -354,7 +360,7 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       author: "Referee",
       matchType: "Q",
       matchNumber: "4",
-      field: "Field 2",
+      field: "2",
       rule: null,
       ruleset: "viqrc",
       manualVersion: null,
@@ -489,6 +495,40 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     );
   });
 
+  for (const kind of ["queue", "slot"] as const) {
+    it(`changing a panel's division refuses to strand an active ${kind === "slot" ? "booking" : "request"}`, async (store) => {
+      const panel = await store.createPanel(panelInput({ division: ES }));
+      await store.upsertTeams([teamInput("1001", { division: ES })]);
+      const team = await store.findTeamByNumber("1001");
+      assert.ok(team);
+      await store.updateTeam(team.id, { panel_id: panel.id });
+      await store.createRequest(requestInput(team.id, panel.id, kind === "slot"
+        ? { kind, slotStart: SLOT_A, slotEnd: SLOT_B }
+        : { kind }));
+
+      await assert.rejects(
+        () => store.updatePanel(panel.id, { division: MS }),
+        (e: unknown) => e instanceof StoreError && e.status === 409,
+      );
+      assert.equal((await store.listPanels()).find((p) => p.id === panel.id)?.division, ES);
+      assert.equal((await store.findTeamByNumber("1001"))?.panel_id, panel.id);
+    });
+  }
+
+  it("a completed interview does not block a panel division change", async (store) => {
+    const panel = await store.createPanel(panelInput({ division: ES }));
+    await store.upsertTeams([teamInput("1001", { division: ES })]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+    await store.updateTeam(team.id, { panel_id: panel.id });
+    const request = await store.createRequest(requestInput(team.id, panel.id));
+    await store.updateRequest(request.id, { status: "completed" });
+
+    await store.updatePanel(panel.id, { division: MS });
+    assert.equal((await store.listPanels()).find((p) => p.id === panel.id)?.division, MS);
+    assert.equal((await store.findTeamByNumber("1001"))?.panel_id, null);
+  });
+
   /* ---- teams and identity -------------------------------------------- */
 
   it("a team number cannot be taken twice", async (store) => {
@@ -511,6 +551,82 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     const teams = await store.listTeams();
     assert.equal(teams.length, 1, "the same number must not appear twice");
     assert.equal(teams[0].name, "New Name");
+  });
+
+  /* A blank cell on a re-import is "not said", not "clear it": a stored team keeps its notebook type,
+     division and pit, a new one gets the defaults, and a value still changes the field. */
+
+  it("re-importing without a name keeps each team's name, calls a new team 'Team <number>', and a given name still renames it", async (store) => {
+    await store.upsertTeams([teamInput("1001", { name: "Iron Hawks" })]);
+
+    await store.upsertTeams([{ number: "1001", name: null, pit: "A1" }, { number: "1002", pit: null }]);
+    const [kept, created] = await store.listTeams();
+    assert.equal(kept.name, "Iron Hawks", "no name cell: the stored name stays");
+    assert.equal(kept.pit, "A1", "the rest of the line still updates");
+    assert.equal(created.name, "Team 1002", "a new team gets the fallback name");
+
+    await store.upsertTeams([{ number: "1001", name: "Kilo Kestrels", pit: null }]);
+    assert.equal((await store.findTeamByNumber("1001"))?.name, "Kilo Kestrels", "a name that is given wins");
+  });
+
+  it("re-importing without a notebook type keeps each team's, gives a new team the default, and a given type still changes it", async (store) => {
+    await store.upsertTeams([teamInput("1001", { category: "ungraded" })]);
+
+    await store.upsertTeams([{ number: "1001", name: "Re-imported", pit: null }, { number: "1002", name: "Brand new", pit: null }]);
+    const [kept, created] = await store.listTeams();
+    assert.equal(kept.name, "Re-imported", "the rest of the line still updates");
+    assert.equal(kept.category, "ungraded", "no fifth column: the stored type stays");
+    assert.equal(created.category, defaultCategory(), "a new team gets the default type");
+
+    await store.upsertTeams([{ number: "1001", name: "Re-imported", pit: null, category: "fully-developed" }]);
+    assert.equal((await store.findTeamByNumber("1001"))?.category, "fully-developed", "a type that is given wins");
+  });
+
+  it("re-importing without a division keeps each team's division and panel, gives a new team the first division, and a given division still moves it", async (store) => {
+    const panel = await store.createPanel(panelInput({ division: MS }));
+    await store.upsertTeams([teamInput("1001", { division: MS })]);
+    const held = await store.findTeamByNumber("1001");
+    assert.ok(held);
+    await store.updateTeam(held.id, { panel_id: panel.id });
+
+    await store.upsertTeams([{ number: "1001", name: "Re-imported", pit: null }, { number: "1002", name: "Brand new", pit: null }]);
+    const kept = await store.findTeamByNumber("1001");
+    assert.equal(kept?.division, MS, "no fourth column: the stored division stays");
+    assert.equal(kept?.panel_id, panel.id, "so the panel it holds is not taken away");
+    assert.equal((await store.findTeamByNumber("1002"))?.division, presetDivisions()[0], "a new team gets the first division");
+
+    await store.upsertTeams([{ number: "1001", name: "Re-imported", pit: null, division: ES }]);
+    const moved = await store.findTeamByNumber("1001");
+    assert.equal(moved?.division, ES, "a division that is given wins");
+    assert.equal(moved?.panel_id, null, "and the panel on the far side of the wall comes off");
+  });
+
+  it("re-importing a team into a division its panel can still judge keeps the panel; one it can't judge clears it", async (store) => {
+    const panel = await store.createPanel(panelInput({ division: MS }));
+    await store.upsertTeams([teamInput("1001", { division: MS }), teamInput("1002", { division: MS })]);
+    for (const t of await store.listTeams()) await store.updateTeam(t.id, { panel_id: panel.id });
+
+    // Blended may be judged by anyone, so the panel stays; the stored division still moves.
+    await store.upsertTeams([teamInput("1001", { division: BLEND })]);
+    const blended = await store.findTeamByNumber("1001");
+    assert.equal(blended?.division, BLEND);
+    assert.equal(blended?.panel_id, panel.id, "the MS panel can still judge a Blended team");
+
+    await store.upsertTeams([teamInput("1002", { division: ES })]);
+    const moved = await store.findTeamByNumber("1002");
+    assert.equal(moved?.division, ES);
+    assert.equal(moved?.panel_id, null, "the MS panel can't judge an ES team");
+  });
+
+  it("re-importing without a pit keeps each team's pit, a new team has none, and a given pit still changes it", async (store) => {
+    await store.upsertTeams([teamInput("1001", { pit: "A1" })]);
+
+    await store.upsertTeams([{ number: "1001", name: "Re-imported", pit: null }, { number: "1002", name: "Brand new", pit: null }]);
+    assert.equal((await store.findTeamByNumber("1001"))?.pit, "A1", "no pit column: the stored pit stays");
+    assert.equal((await store.findTeamByNumber("1002"))?.pit, null, "a new team has no pit");
+
+    await store.upsertTeams([{ number: "1001", name: "Re-imported", pit: "B2" }]);
+    assert.equal((await store.findTeamByNumber("1001"))?.pit, "B2", "a pit that is given wins");
   });
 
   it("a team is found whatever case its number is typed in", async (store) => {
@@ -610,9 +726,9 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       kind: "major",
       body: "Held a robot for a count of five.",
       author: "Referee",
-      matchType: "Q",
-      matchNumber: "3",
-      field: "ES1",
+      matchType: "QF",
+      matchNumber: "2-1",
+      field: "1",
       rule: "GG17,SG9",
       ruleset: "v5rc",
       manualVersion: "2.1",
@@ -623,12 +739,21 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       ruleset: f.ruleset,
       manual_version: f.manual_version,
       match_affecting: f.match_affecting,
+      match: `${f.match_type} ${f.match_number}`,
+      field: f.field,
     });
-    const v5 = { rule: "GG17,SG9", ruleset: "v5rc", manual_version: "2.1", match_affecting: true };
+    const v5 = {
+      rule: "GG17,SG9",
+      ruleset: "v5rc",
+      manual_version: "2.1",
+      match_affecting: true,
+      match: "QF 2-1",
+      field: "1",
+    };
     assert.deepEqual(view(created), v5, "createFlag returns what it stored");
     assert.deepEqual(view((await store.listFlags())[0]), v5, "listFlags reads it back");
 
-    // A flag recorded the old way: no ruleset, not match affecting.
+    // A flag recorded the old way: no ruleset, a prefixed field, not match affecting.
     await store.createFlag({
       teamId: team.id,
       kind: "warning",
@@ -644,20 +769,34 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     });
     const legacy = (await store.listFlags()).find((f) => f.match_number === "4");
     assert.ok(legacy);
-    assert.deepEqual(view(legacy), { rule: null, ruleset: null, manual_version: null, match_affecting: false });
+    assert.deepEqual(view(legacy), {
+      rule: null,
+      ruleset: null,
+      manual_version: null,
+      match_affecting: false,
+      match: "Q 4",
+      field: "ES1",
+    });
 
     const corrected = await store.updateFlag(created.id, {
       kind: "minor",
       body: "Held a robot for a count of five.",
-      matchType: "Q",
+      matchType: "SKD",
       matchNumber: "3",
-      field: "ES1",
+      field: "2",
       rule: "SG6",
       ruleset: "viqrc",
       manualVersion: null,
       matchAffecting: false,
     });
-    const iq = { rule: "SG6", ruleset: "viqrc", manual_version: null, match_affecting: false };
+    const iq = {
+      rule: "SG6",
+      ruleset: "viqrc",
+      manual_version: null,
+      match_affecting: false,
+      match: "SKD 3",
+      field: "2",
+    };
     assert.deepEqual(view(corrected), iq, "updateFlag returns the corrected values");
     assert.deepEqual(
       view((await store.listFlags()).find((f) => f.id === created.id)!),
@@ -679,11 +818,17 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       author: "Referee",
       matchType: "Q",
       matchNumber: "3",
-      field: "Field 1",
+      field: "1",
       rule: "SG6",
       ruleset: "viqrc",
       manualVersion: null,
       matchAffecting: false,
+    });
+    const setup = await store.saveRefereeSetup({
+      ruleset: "v5rc",
+      fieldCount: 4,
+      setBy: "Dana",
+      setOn: "2026-09-09",
     });
 
     await store.resetDay();
@@ -694,11 +839,51 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     );
     assert.equal((await store.listRequests()).length, 0, "the day's queue does not");
     assert.equal((await store.listTeams()).length, 1, "nor does the roster go");
+    assert.deepEqual(await store.getRefereeSetup(), setup, "the event's referee setup survives a day reset too");
 
     await store.resetAll();
     assert.deepEqual(await store.listFlags(), [], "a full wipe is the event boundary");
+    assert.equal(await store.getRefereeSetup(), null, "and takes the referee setup with it");
     assert.deepEqual(await store.listTeams(), []);
     assert.deepEqual(await store.listPanels(), []);
+  });
+
+  it("the referee setup is one record per event: absent, saved, read back, replaced", async (store) => {
+    assert.equal(await store.getRefereeSetup(), null, "nothing is set up on a fresh event");
+
+    const first = await store.saveRefereeSetup({
+      ruleset: "v5rc",
+      fieldCount: 3,
+      setBy: "Dana",
+      setOn: "2026-09-09",
+    });
+    assert.deepEqual(
+      { ...first, updated_at: undefined },
+      { ruleset: "v5rc", field_count: 3, set_by: "Dana", set_on: "2026-09-09", updated_at: undefined },
+    );
+    assert.equal(typeof first.field_count, "number", "a count, not the driver's text");
+    assert.equal(first.set_on, "2026-09-09", "the date is kept as the caller wrote it");
+    assert.ok(!Number.isNaN(Date.parse(first.updated_at)), "updated_at is a timestamp");
+    assert.deepEqual(await store.getRefereeSetup(), first, "and it reads back as saved");
+
+    const second = await store.saveRefereeSetup({
+      ruleset: "viqrc",
+      fieldCount: 20,
+      setBy: "Judge Advisor",
+      setOn: "2026-09-10",
+    });
+    assert.deepEqual(
+      { ...second, updated_at: undefined },
+      { ruleset: "viqrc", field_count: 20, set_by: "Judge Advisor", set_on: "2026-09-10", updated_at: undefined },
+      "a second save replaces the first rather than adding a second record",
+    );
+    assert.deepEqual(await store.getRefereeSetup(), second);
+    assert.ok(!("id" in second), "the single row's key is not part of the record");
+
+    await store.resetDay();
+    assert.deepEqual(await store.getRefereeSetup(), second, "a day reset keeps it");
+    await store.resetAll();
+    assert.equal(await store.getRefereeSetup(), null, "a full wipe clears it");
   });
 
   it("a conflict is declared once, however many times it is asked for", async (store) => {
@@ -728,11 +913,577 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     assert.equal(await store.removeConflict(first.id), false, "removing it twice is harmless");
   });
 
+  /* ---- the judge roster, and conflicts that belong to a judge ------------- */
+
+  /** A well-formed id nothing has: Postgres rejects a malformed uuid before it gets to "not found". */
+  const NO_SUCH = "00000000-0000-4000-8000-000000000000";
+  const statusOf = (status: number) => (e: unknown) => e instanceof StoreError && e.status === status;
+  const namesOn = async (store: Store, panelId: string) =>
+    (await store.listJudges()).filter((j) => j.panel_id === panelId).map((j) => j.name);
+
+  it("the roster keeps names trimmed, unique ignoring case, in the order they were added", async (store) => {
+    const dana = await store.addJudge({ name: "  Dana Ruiz ", note: "coaches 9882K" });
+    await store.addJudge({ name: "Sam Okafor" });
+
+    assert.equal(dana.name, "Dana Ruiz", "names are trimmed");
+    assert.equal(dana.note, "coaches 9882K");
+    assert.equal(dana.panel_id, null, "a new judge is on no panel");
+    assert.ok(!Number.isNaN(Date.parse(dana.created_at)), "created_at is a timestamp");
+    assert.deepEqual(
+      Object.keys(dana).sort(),
+      ["created_at", "id", "name", "note", "panel_id"],
+      "exactly a JudgeRow, nothing the table keeps for itself",
+    );
+
+    await assert.rejects(() => store.addJudge({ name: "dana RUIZ" }), statusOf(409));
+    await assert.rejects(() => store.addJudge({ name: "   " }), statusOf(400));
+    assert.deepEqual((await store.listJudges()).map((j) => j.name), ["Dana Ruiz", "Sam Okafor"]);
+  });
+
+  it("a roster judge can be renamed, noted and moved; a taken name or a missing panel is refused", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    const dana = await store.addJudge({ name: "Dana Ruiz" });
+    const sam = await store.addJudge({ name: "Sam Okafor" });
+
+    const moved = await store.updateJudge(dana.id, { panel_id: panel.id, note: "coaches 9882K" });
+    assert.equal(moved.panel_id, panel.id);
+    assert.equal(moved.note, "coaches 9882K");
+    assert.equal((await store.updateJudge(dana.id, { name: "Dana R." })).name, "Dana R.");
+    assert.equal((await store.updateJudge(dana.id, { name: "dana r." })).name, "dana r.", "a judge may re-case their own name");
+
+    await assert.rejects(() => store.updateJudge(sam.id, { name: "DANA R." }), statusOf(409));
+    await assert.rejects(() => store.updateJudge(dana.id, { name: " " }), statusOf(400));
+    await assert.rejects(() => store.updateJudge(sam.id, { panel_id: NO_SUCH }), statusOf(404));
+    await assert.rejects(() => store.updateJudge(NO_SUCH, { note: "x" }), statusOf(404));
+    assert.equal((await store.listJudges()).find((j) => j.id === sam.id)?.panel_id, null, "a refused move changes nothing");
+
+    assert.equal((await store.updateJudge(dana.id, { panel_id: null })).panel_id, null, "null takes them off the panel");
+    assert.equal(await store.removeJudge(sam.id), true);
+    assert.equal(await store.removeJudge(sam.id), false, "removing twice is harmless");
+  });
+
+  it("taking a judge off a panel rotates that panel's shared code", async (store) => {
+    const a = await store.createPanel(panelInput({ judges: ["Dana Ruiz", "Sam Okafor"] }));
+    const b = await store.createPanel(panelInput({ name: "Panel B", code: "CONF02" }));
+    const [dana, sam] = await store.listJudges();
+
+    await store.updateJudge(dana.id, { note: "new note" });
+    assert.equal((await store.findPanelById(a.id))?.code, a.code, "a note does not revoke access");
+
+    await store.updateJudge(dana.id, { panel_id: b.id });
+    const afterMove = (await store.findPanelById(a.id))!.code;
+    assert.notEqual(afterMove, a.code, "leaving Panel A revokes its old shared code");
+    assert.equal((await store.findPanelById(b.id))?.code, b.code, "joining Panel B does not revoke its judges");
+
+    assert.equal(await store.removeJudge(sam.id), true);
+    const afterRemoval = (await store.findPanelById(a.id))!.code;
+    assert.notEqual(afterRemoval, afterMove, "deleting a seated judge revokes the remaining judges' old code");
+    assert.equal(await store.removeJudge(sam.id), false);
+    assert.equal((await store.findPanelById(a.id))?.code, afterRemoval, "a missing judge changes nothing");
+  });
+
+  it("a panel roster edit rotates its code only when someone leaves", async (store) => {
+    const a = await store.createPanel(panelInput({ judges: ["Dana Ruiz", "Sam Okafor"] }));
+    await store.updatePanel(a.id, { judges: ["Dana Ruiz", "Sam Okafor"] });
+    assert.equal((await store.findPanelById(a.id))?.code, a.code);
+
+    await store.updatePanel(a.id, { code: a.code, judges: ["Dana Ruiz"] });
+    const rotated = (await store.findPanelById(a.id))!.code;
+    assert.notEqual(rotated, a.code, "resubmitting the old code must not undo revocation");
+    assert.equal(await store.findPanelByCode(a.code), null);
+
+    const b = await store.createPanel(panelInput({ name: "Panel B", code: "CONF02", judges: ["Dana Ruiz"] }));
+    assert.equal(b.code, "CONF02");
+    assert.notEqual((await store.findPanelById(a.id))?.code, rotated, "moving a judge while creating a panel also revokes the old code");
+  });
+
+  it("a panel's judges are the roster's: found or added by name ignoring case, and they move with the judge", async (store) => {
+    const one = await store.createPanel(panelInput({ judges: ["Dana Ruiz", "Sam Okafor"] }));
+    assert.deepEqual(one.judges, ["Dana Ruiz", "Sam Okafor"]);
+    assert.deepEqual(await namesOn(store, one.id), ["Dana Ruiz", "Sam Okafor"]);
+
+    // Sam is found despite the case, and keeps the roster's spelling; he leaves Panel A for B.
+    const two = await store.createPanel(
+      panelInput({ name: "Panel B", code: "CONF02", judges: ["sam okafor", "Priya Nair"] }),
+    );
+    assert.deepEqual(two.judges, ["Sam Okafor", "Priya Nair"], "in roster order, not the order typed");
+    assert.equal((await store.findPanelById(one.id))?.judges.join(), "Dana Ruiz");
+    assert.equal((await store.listJudges()).length, 3, "nobody was added twice");
+
+    // Saving the field again with fewer names takes the others off the panel, not off the roster.
+    assert.deepEqual((await store.updatePanel(two.id, { judges: ["Priya Nair"] })).judges, ["Priya Nair"]);
+    assert.equal((await store.listJudges()).find((j) => j.name === "Sam Okafor")?.panel_id, null);
+    assert.equal((await store.listJudges()).length, 3, "Sam is still on the roster");
+
+    // A patch that does not mention judges leaves them alone; an empty list clears them.
+    assert.deepEqual((await store.updatePanel(two.id, { name: "Panel Two" })).judges, ["Priya Nair"]);
+    assert.deepEqual((await store.listPanels()).map((p) => p.judges), [["Dana Ruiz"], ["Priya Nair"]]);
+    assert.deepEqual((await store.updatePanel(one.id, { judges: [] })).judges, []);
+    assert.equal((await store.listJudges()).length, 3);
+  });
+
+  it("preset panels put their judges on the roster", async (store) => {
+    await store.seedPresetPanels();
+    for (const panel of await store.listPanels()) {
+      assert.deepEqual(panel.judges, await namesOn(store, panel.id), `${panel.name}'s judges are the roster's`);
+    }
+  });
+
+  it("a conflict is a judge's or a panel's, never both and never neither", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = (await store.findTeamByNumber("1001"))!;
+    const dana = await store.addJudge({ name: "Dana Ruiz" });
+    const base = { teamId: team.id, note: null, declaredBy: "admin:JA" };
+
+    await assert.rejects(() => store.addConflict({ ...base }), statusOf(400));
+    await assert.rejects(() => store.addConflict({ ...base, panelId: panel.id, judgeId: dana.id }), statusOf(400));
+    await assert.rejects(() => store.addConflict({ ...base, judgeId: NO_SUCH }), statusOf(404));
+    assert.deepEqual(await store.listConflicts(), [], "none of those wrote anything");
+
+    const mine = await store.addConflict({ ...base, judgeId: dana.id, note: "coaches them", judgeName: "ignored" });
+    assert.equal(mine.judge_id, dana.id);
+    assert.equal(mine.panel_id, null);
+    assert.equal(mine.judge_name, null, "a judge's conflict names the judge by id and writes no label");
+    assert.equal(mine.note, "coaches them");
+
+    const legacy = await store.addConflict({ ...base, panelId: panel.id, judgeName: "Old Name" });
+    assert.equal(legacy.panel_id, panel.id);
+    assert.equal(legacy.judge_id, null);
+    assert.equal(legacy.judge_name, "Old Name", "an older whole-panel row still carries its label");
+  });
+
+  it("a judge's conflict is recorded once; removing the judge takes theirs and nobody else's", async (store) => {
+    await store.upsertTeams([teamInput("1001")]);
+    const team = (await store.findTeamByNumber("1001"))!;
+    const dana = await store.addJudge({ name: "Dana Ruiz" });
+    const sam = await store.addJudge({ name: "Sam Okafor" });
+    const base = { teamId: team.id, note: null, declaredBy: "admin:JA" };
+
+    const first = await store.addConflict({ ...base, judgeId: dana.id });
+    const again = await store.addConflict({ ...base, judgeId: dana.id });
+    assert.equal(again.id, first.id, "the same judge and team is one conflict");
+    const theirs = await store.addConflict({ ...base, judgeId: sam.id });
+    assert.notEqual(theirs.id, first.id, "another judge's conflict with the same team is its own");
+    assert.equal((await store.listConflicts()).length, 2);
+
+    assert.equal(await store.removeJudge(dana.id), true);
+    assert.deepEqual((await store.listConflicts()).map((c) => c.id), [theirs.id], "their conflicts go with them");
+    assert.equal(await store.removeConflict(theirs.id), true);
+  });
+
+  it("deleting a panel keeps its judges' conflicts and drops only the whole-panel ones", async (store) => {
+    const panel = await store.createPanel(panelInput({ judges: ["Dana Ruiz"] }));
+    await store.upsertTeams([teamInput("1001"), teamInput("1002")]);
+    const [t1, t2] = await store.listTeams();
+    const dana = (await store.listJudges())[0];
+    const base = { note: null, declaredBy: "admin:JA" };
+    const kept = await store.addConflict({ ...base, judgeId: dana.id, teamId: t1.id });
+    await store.addConflict({ ...base, panelId: panel.id, teamId: t2.id });
+
+    await store.deletePanel(panel.id);
+
+    assert.deepEqual((await store.listConflicts()).map((c) => c.id), [kept.id], "the legacy row went with its panel; the judge's stayed");
+    assert.equal((await store.listJudges())[0].panel_id, null, "the judge is on the roster, on no panel");
+  });
+
+  it("clearing every panel keeps the judges' conflicts too", async (store) => {
+    await store.createPanel(panelInput({ judges: ["Dana Ruiz"] }));
+    await store.createPanel(panelInput({ name: "Panel B", code: "CONF02", judges: ["Sam Okafor"] }));
+    await store.upsertTeams([teamInput("1001")]);
+    const team = (await store.findTeamByNumber("1001"))!;
+    for (const judge of await store.listJudges()) {
+      await store.addConflict({ judgeId: judge.id, teamId: team.id, note: null, declaredBy: "admin:JA" });
+    }
+    await store.addConflict({ panelId: (await store.listPanels())[0].id, teamId: team.id, judgeName: null, note: null, declaredBy: "admin:JA" });
+
+    await store.deleteAllPanels();
+
+    const left = await store.listConflicts();
+    assert.equal(left.length, 2, "only the whole-panel conflict went");
+    assert.ok(left.every((c) => c.judge_id !== null && c.panel_id === null));
+    assert.ok((await store.listJudges()).every((j) => j.panel_id === null));
+  });
+
+  it("deleting a team removes judges' conflicts with it", async (store) => {
+    await store.upsertTeams([teamInput("1001"), teamInput("1002")]);
+    const [gone, kept] = await store.listTeams();
+    const dana = await store.addJudge({ name: "Dana Ruiz" });
+    await store.addConflict({ judgeId: dana.id, teamId: gone.id, note: null, declaredBy: "admin:JA" });
+    const stays = await store.addConflict({ judgeId: dana.id, teamId: kept.id, note: null, declaredBy: "admin:JA" });
+
+    await store.deleteTeam(gone.id);
+
+    assert.deepEqual((await store.listConflicts()).map((c) => c.id), [stays.id]);
+  });
+
+  it("a day reset keeps the roster and its conflicts; a full wipe clears them", async (store) => {
+    await store.upsertTeams([teamInput("1001")]);
+    const team = (await store.findTeamByNumber("1001"))!;
+    const dana = await store.addJudge({ name: "Dana Ruiz" });
+    await store.addConflict({ judgeId: dana.id, teamId: team.id, note: null, declaredBy: "admin:JA" });
+
+    await store.resetDay();
+    assert.equal((await store.listJudges()).length, 1, "the roster is the event's, not the day's");
+    assert.equal((await store.listConflicts()).length, 1);
+
+    await store.resetAll();
+    assert.deepEqual(await store.listJudges(), []);
+    assert.deepEqual(await store.listConflicts(), []);
+  });
+
+  it("auto-assign respects a judge's conflict through the panel the judge sits on, and stops when they move", async (store) => {
+    const a = await store.createPanel(panelInput({ code: "CONFA1", judges: ["Dana Ruiz"] }));
+    const b = await store.createPanel(panelInput({ name: "Panel B", code: "CONFB2" }));
+    await store.upsertTeams([teamInput("1001")]);
+    const team = (await store.findTeamByNumber("1001"))!;
+    const dana = (await store.listJudges())[0];
+    await store.addConflict({ judgeId: dana.id, teamId: team.id, note: null, declaredBy: "admin:JA" });
+
+    await store.autoAssignTeams(10);
+    assert.equal((await store.findTeamByNumber("1001"))?.panel_id, b.id, "Dana is on Panel A, so the team goes to B");
+
+    // Dana moves to Panel B: the block follows her, and A is free of it.
+    await store.updateTeam(team.id, { panel_id: null });
+    await store.updateJudge(dana.id, { panel_id: b.id });
+    await store.autoAssignTeams(10);
+    assert.equal((await store.findTeamByNumber("1001"))?.panel_id, a.id);
+
+    // And with no panel at all she blocks nobody.
+    await store.updateTeam(team.id, { panel_id: null });
+    await store.updateJudge(dana.id, { panel_id: null });
+    await store.autoAssignTeams(10);
+    assert.ok((await store.findTeamByNumber("1001"))?.panel_id, "assignable again");
+  });
+
   it("a panel code is found case-insensitively, and only while it exists", async (store) => {
     const panel = await store.createPanel(panelInput({ code: "CONF01" }));
     assert.equal((await store.findPanelByCode("conf01"))?.id, panel.id);
     await store.deletePanel(panel.id);
     assert.equal(await store.findPanelByCode("CONF01"), null, "a deleted panel signs nobody in");
+  });
+
+  it("an activity entry keeps its kind, name and role, and reads back with the number of the team it names", async (store) => {
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+
+    await store.logActivity({ teamId: team.id, kind: "referee", actor: "Jordan", actorRole: "Referee", action: "flagged minor", detail: "Team 1001" });
+    await store.logActivity({ kind: "setup", actor: "Alex", actorRole: "Judge Advisor", action: "added a judge" });
+
+    const read = async (action: string) => (await store.listActivity()).find((a) => a.action === action);
+    const flagged = await read("flagged minor");
+    assert.deepEqual(
+      [flagged?.kind, flagged?.actor, flagged?.actor_role, flagged?.team_id, flagged?.team_number, flagged?.detail],
+      ["referee", "Jordan", "Referee", team.id, "1001", "Team 1001"],
+    );
+    const setup = await read("added a judge");
+    assert.deepEqual([setup?.kind, setup?.actor, setup?.actor_role, setup?.team_id, setup?.team_number], ["setup", "Alex", "Judge Advisor", null, null]);
+
+    await store.deleteTeam(team.id);
+    assert.equal((await read("flagged minor"))?.team_number, null, "a removed team leaves the entry with no number");
+
+    await store.resetDay();
+    assert.deepEqual(await store.listActivity(), [], "a day reset clears the log");
+  });
+
+  /* ---- awards: nominations and winners ------------------------------- */
+
+  it("a nomination is one row per judge, award and team: asking again is the same row, and only a changed reason writes", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+
+    const first = await store.nominate(nominationInput(team.id, panel.id));
+    assert.deepEqual(
+      [first.award_id, first.team_id, first.panel_id, first.judge, first.reason],
+      ["excellence", team.id, panel.id, "Amy", null],
+    );
+    assert.equal(first.created_at, first.updated_at);
+
+    const again = await store.nominate(nominationInput(team.id, panel.id));
+    assert.equal(again.id, first.id, "the same nomination, not a second one");
+    assert.equal(again.updated_at, first.updated_at, "a repeat tap writes nothing");
+    assert.equal((await store.listNominations()).length, 1);
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const why = await store.nominate(nominationInput(team.id, panel.id, { reason: "Best notebook in the hall" }));
+    assert.equal(why.id, first.id);
+    assert.equal(why.reason, "Best notebook in the hall");
+    assert.equal(why.created_at, first.created_at);
+    assert.ok(why.updated_at > first.updated_at, "a new reason moves updated_at");
+
+    const kept = await store.nominate(nominationInput(team.id, panel.id));
+    assert.equal(kept.reason, "Best notebook in the hall", "no reason given leaves the one there");
+    const cleared = await store.nominate(nominationInput(team.id, panel.id, { reason: null }));
+    assert.equal(cleared.reason, null, "null takes it back out");
+    assert.equal((await store.listNominations()).length, 1);
+
+    // Anything that differs in the key is another nomination.
+    const other = await store.createPanel(panelInput({ name: "Panel B", code: "CONF02" }));
+    await store.nominate(nominationInput(team.id, panel.id, { judge: "Ben" }));
+    await store.nominate(nominationInput(team.id, panel.id, { awardId: "design" }));
+    await store.nominate(nominationInput(team.id, other.id));
+    assert.equal((await store.listNominations()).length, 4);
+  });
+
+  it("a judge is one judge however the name is typed: trimmed, any case", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+
+    const first = await store.nominate(nominationInput(team.id, panel.id, { judge: "Dana" }));
+    const again = await store.nominate(nominationInput(team.id, panel.id, { judge: "dana" }));
+    assert.equal(again.id, first.id, "the same nomination, not a second one");
+    assert.equal(again.judge, "Dana", "it keeps the spelling it was made with");
+    assert.equal(again.updated_at, first.updated_at, "a repeat tap writes nothing");
+    assert.equal((await store.listNominations()).length, 1);
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const why = await store.nominate(nominationInput(team.id, panel.id, { judge: "DANA ", reason: "Lovely notebook" }));
+    assert.equal(why.id, first.id, "a reason sent under a variant name updates the one row");
+    assert.deepEqual([why.judge, why.reason], ["Dana", "Lovely notebook"]);
+    assert.ok(why.updated_at > first.updated_at);
+    assert.equal((await store.listNominations()).length, 1);
+
+    // Another judge is another nomination, and so is the same name on another panel.
+    const other = await store.createPanel(panelInput({ name: "Panel B", code: "CONF02" }));
+    await store.nominate(nominationInput(team.id, panel.id, { judge: "Danae" }));
+    await store.nominate(nominationInput(team.id, other.id, { judge: "dana" }));
+    assert.equal((await store.listNominations()).length, 3);
+
+    const key = (judge: string, panelId = panel.id) => ({ awardId: "excellence", teamId: team.id, panelId, judge });
+    assert.equal(await store.withdrawNomination(key(" dana ")), true, "withdrawn under a variant name");
+    assert.equal(await store.withdrawNomination(key("Dana")), false, "and it is gone");
+    assert.deepEqual(
+      (await store.listNominations()).map((n) => [n.judge, n.panel_id]).sort(),
+      [["Danae", panel.id], ["dana", other.id]].sort(),
+      "Danae and the other panel's dana are untouched",
+    );
+  });
+
+  it("a nomination for a team or panel that is gone is a 404, not a stored orphan", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+    const nobody = "00000000-0000-0000-0000-000000000000";
+
+    for (const input of [nominationInput(nobody, panel.id), nominationInput(team.id, nobody)]) {
+      await assert.rejects(
+        () => store.nominate(input),
+        (e: unknown) => e instanceof StoreError && e.status === 404,
+      );
+    }
+    await assert.rejects(
+      () => store.setWinner({ awardId: "design", division: ES, teamId: nobody, decidedBy: "JA" }),
+      (e: unknown) => e instanceof StoreError && e.status === 404,
+    );
+    assert.deepEqual(await store.listNominations(), []);
+    assert.deepEqual(await store.listWinners(), []);
+  });
+
+  it("withdrawing a nomination removes that judge's row and nobody else's", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+    await store.nominate(nominationInput(team.id, panel.id));
+    await store.nominate(nominationInput(team.id, panel.id, { judge: "Ben" }));
+
+    const key = (over: Partial<Parameters<Store["withdrawNomination"]>[0]> = {}) => ({
+      awardId: "excellence",
+      teamId: team.id,
+      panelId: panel.id,
+      judge: "Amy",
+      ...over,
+    });
+    assert.equal(await store.withdrawNomination(key({ judge: "Cleo" })), false, "someone who never nominated removes nothing");
+    assert.equal(await store.withdrawNomination(key({ awardId: "design" })), false);
+    assert.equal(await store.withdrawNomination(key()), true);
+    assert.equal(await store.withdrawNomination(key()), false, "and once it is gone it is gone");
+    assert.deepEqual(
+      (await store.listNominations()).map((n) => n.judge),
+      ["Ben"],
+    );
+  });
+
+  it("the Judge Advisor's nomination has no panel, is one row per name however it is typed, and sits beside a judge's nomination of the same team and award", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+    const ja = (over: Partial<Parameters<Store["nominateAsAdmin"]>[0]> = {}) => ({ awardId: "excellence", teamId: team.id, judge: "Alex", ...over });
+
+    const judges = await store.nominate(nominationInput(team.id, panel.id, { judge: "Alex" }));
+    const first = await store.nominateAsAdmin(ja());
+    assert.deepEqual(
+      [first.role, first.award_id, first.team_id, first.panel_id, first.judge, first.reason],
+      ["admin", "excellence", team.id, null, "Alex", null],
+    );
+    assert.equal(judges.role, "judge", "a judge's nomination says so");
+    assert.notEqual(first.id, judges.id, "a judge of the same name, team and award is another row");
+    assert.equal((await store.listNominations()).length, 2);
+
+    const again = await store.nominateAsAdmin(ja());
+    assert.equal(again.id, first.id, "the same nomination, not a second one, though it has no panel to make the key whole");
+    assert.equal(again.updated_at, first.updated_at, "a repeat writes nothing");
+    const variant = await store.nominateAsAdmin(ja({ judge: " ALEX " }));
+    assert.equal(variant.id, first.id, "trimmed, any case, as a judge's name is");
+    assert.equal(variant.judge, "Alex", "it keeps the spelling it was made with");
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const why = await store.nominateAsAdmin(ja({ reason: "Worth a second look" }));
+    assert.deepEqual([why.id, why.reason], [first.id, "Worth a second look"]);
+    assert.ok(why.updated_at > first.updated_at, "a new reason moves updated_at");
+    assert.equal((await store.nominateAsAdmin(ja())).reason, "Worth a second look", "no reason given leaves the one there");
+    assert.equal((await store.nominateAsAdmin(ja({ reason: null }))).reason, null, "null takes it back out");
+    assert.equal((await store.listNominations()).length, 2, "all of that was one nomination");
+
+    // Another Judge Advisor name, or another award, is another nomination.
+    await store.nominateAsAdmin(ja({ judge: "Alexa" }));
+    await store.nominateAsAdmin(ja({ awardId: "design" }));
+    assert.equal((await store.listNominations()).length, 4);
+
+    // A judge's withdrawal never reaches the Judge Advisor's row, whatever name or key it names.
+    assert.equal(await store.withdrawNomination({ awardId: "excellence", teamId: team.id, panelId: panel.id, judge: "Alex" }), true);
+    assert.equal(await store.withdrawNomination({ awardId: "excellence", teamId: team.id, panelId: panel.id, judge: "Alex" }), false);
+    assert.ok((await store.listNominations()).some((n) => n.id === first.id), "the Judge Advisor's nomination is still there");
+
+    // A deleted panel nulls the judges' rows only; an orphaned judge "Alex" and the Judge Advisor "Alex" are still two.
+    await store.nominate(nominationInput(team.id, panel.id, { judge: "Alex" }));
+    await store.deletePanel(panel.id);
+    const after = await store.listNominations();
+    assert.deepEqual(after.filter((n) => n.judge === "Alex" && n.award_id === "excellence").map((n) => [n.role, n.panel_id]).sort(), [["admin", null], ["judge", null]]);
+    assert.equal((await store.nominateAsAdmin(ja())).id, first.id, "and the Judge Advisor's is still found by its own key");
+  });
+
+  it("a nomination by the Judge Advisor for a team that is gone is a 404", async (store) => {
+    await assert.rejects(
+      () => store.nominateAsAdmin({ awardId: "excellence", teamId: "00000000-0000-0000-0000-000000000000", judge: "Alex" }),
+      (e: unknown) => e instanceof StoreError && e.status === 404,
+    );
+    assert.deepEqual(await store.listNominations(), []);
+  });
+
+  it("removing a nomination by id takes that row, whoever made it, and says whether there was one", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+    const amy = await store.nominate(nominationInput(team.id, panel.id));
+    const ben = await store.nominate(nominationInput(team.id, panel.id, { judge: "Ben" }));
+    const alex = await store.nominateAsAdmin({ awardId: "excellence", teamId: team.id, judge: "Alex" });
+
+    assert.equal(await store.removeNomination(amy.id), true, "a judge's, by the Judge Advisor");
+    assert.equal(await store.removeNomination(amy.id), false, "and once it is gone it is gone");
+    assert.equal(await store.removeNomination("00000000-0000-0000-0000-000000000000"), false, "an id nobody has");
+    assert.deepEqual((await store.listNominations()).map((n) => n.id).sort(), [ben.id, alex.id].sort(), "nobody else's went with it");
+    assert.equal(await store.removeNomination(alex.id), true, "the Judge Advisor's own");
+    assert.deepEqual((await store.listNominations()).map((n) => n.id), [ben.id]);
+  });
+
+  it("an award has one winner per division: setting another replaces it, and each division keeps its own", async (store) => {
+    await store.upsertTeams([teamInput("1001"), teamInput("1002"), teamInput("2001", { division: MS })]);
+    const [a, b, c] = await Promise.all(["1001", "1002", "2001"].map((n) => store.findTeamByNumber(n)));
+    assert.ok(a && b && c);
+
+    const first = await store.setWinner({ awardId: "design", division: ES, teamId: a.id, decidedBy: "Alex" });
+    assert.deepEqual(
+      [first.award_id, first.division, first.team_id, first.decided_by],
+      ["design", ES, a.id, "Alex"],
+    );
+    await store.setWinner({ awardId: "design", division: MS, teamId: c.id, decidedBy: "Alex" });
+    await store.setWinner({ awardId: "excellence", division: ES, teamId: a.id, decidedBy: "Alex" });
+    assert.equal((await store.listWinners()).length, 3, "another award, or another division, is another winner");
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const replaced = await store.setWinner({ awardId: "design", division: ES, teamId: b.id, decidedBy: "Sam" });
+    assert.equal(replaced.team_id, b.id);
+    assert.ok(replaced.decided_at > first.decided_at, "a replacement is decided again");
+    const winners = await store.listWinners();
+    assert.equal(winners.length, 3, "a replacement takes the place, it does not add one");
+    const design = winners.find((w) => w.award_id === "design" && w.division === ES);
+    assert.deepEqual([design?.team_id, design?.decided_by], [b.id, "Sam"]);
+
+    assert.equal(await store.clearWinner("design", ES), true);
+    assert.equal(await store.clearWinner("design", ES), false, "nothing left to clear");
+    assert.deepEqual(
+      (await store.listWinners()).map((w) => `${w.award_id}/${w.division}`).sort(),
+      [`design/${MS}`, `excellence/${ES}`],
+      "clearing one leaves the rest",
+    );
+  });
+
+  it("deleting a team takes its nominations and wins with it, and no other team's", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001"), teamInput("1002")]);
+    const doomed = await store.findTeamByNumber("1001");
+    const bystander = await store.findTeamByNumber("1002");
+    assert.ok(doomed && bystander);
+    for (const t of [doomed, bystander]) {
+      await store.nominate(nominationInput(t.id, panel.id));
+      await store.nominate(nominationInput(t.id, panel.id, { awardId: "design" }));
+    }
+    await store.setWinner({ awardId: "excellence", division: ES, teamId: doomed.id, decidedBy: "Alex" });
+    await store.setWinner({ awardId: "design", division: ES, teamId: bystander.id, decidedBy: "Alex" });
+
+    await store.deleteTeam(doomed.id);
+
+    assert.deepEqual(
+      (await store.listNominations()).map((n) => n.team_id),
+      [bystander.id, bystander.id],
+      "the nominations of the team are gone, the other team's stay",
+    );
+    assert.deepEqual(
+      (await store.listWinners()).map((w) => w.team_id),
+      [bystander.id],
+      "a deleted team does not stay the winner",
+    );
+  });
+
+  it("deleting a panel keeps its nominations with no panel, as a score keeps its", async (store) => {
+    const gone = await store.createPanel(panelInput());
+    const kept = await store.createPanel(panelInput({ name: "Panel B", code: "CONF02" }));
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+    await store.nominate(nominationInput(team.id, gone.id, { reason: "Lovely" }));
+    await store.nominate(nominationInput(team.id, kept.id, { judge: "Ben" }));
+
+    await store.deletePanel(gone.id);
+
+    const after = await store.listNominations();
+    assert.equal(after.length, 2, "the nomination survives its panel");
+    const orphan = after.find((n) => n.judge === "Amy");
+    assert.deepEqual([orphan?.panel_id, orphan?.reason], [null, "Lovely"]);
+    assert.equal(after.find((n) => n.judge === "Ben")?.panel_id, kept.id, "another panel's is untouched");
+
+    await store.deleteAllPanels();
+    assert.ok((await store.listNominations()).every((n) => n.panel_id === null), "clearing every panel does the same");
+    assert.equal((await store.listNominations()).length, 2);
+  });
+
+  it("a day reset clears the nominations and winners with the day's scores; the roster stays", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+    await store.nominate(nominationInput(team.id, panel.id));
+    await store.setWinner({ awardId: "excellence", division: ES, teamId: team.id, decidedBy: "Alex" });
+
+    await store.resetDay();
+    assert.deepEqual(await store.listNominations(), []);
+    assert.deepEqual(await store.listWinners(), []);
+    assert.equal((await store.listTeams()).length, 1);
+
+    await store.nominate(nominationInput(team.id, panel.id));
+    await store.setWinner({ awardId: "excellence", division: ES, teamId: team.id, decidedBy: "Alex" });
+    await store.resetAll();
+    assert.deepEqual(await store.listNominations(), []);
+    assert.deepEqual(await store.listWinners(), []);
   });
 
   it("the same panel code cannot be issued twice", async (store) => {

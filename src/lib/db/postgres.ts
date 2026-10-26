@@ -1,27 +1,39 @@
 import type { Pool, PoolClient } from "pg";
 import type {
-  ActivityRow,
   ConflictRow,
   FlagRow,
+  JudgeRow,
+  NominationRow,
   Note,
   Panel,
+  RefereeSetup,
   RequestRow,
   ScoreRow,
   Team,
+  WinnerRow,
 } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { randomPanelCode } from "../panelCode";
-import { divisionsCompatible, presetPanels } from "../presets";
+import { readActivity, type StoredActivity } from "../activity";
+import { blendedDivisions, defaultCategory, divisionsCompatible, presetDivisions, presetPanels } from "../presets";
 import { hasNearbyBooking } from "../data";
+import { isPanelBlocked, judgeKey, panelBlocks } from "../roster";
 import {
   StoreError,
   STALE_STATUS_MESSAGE,
   type ImportedTeam,
   type NewActivity,
   type NewNote,
+  type JudgePatch,
   type NewConflict,
   type NewFlag,
+  type NewJudge,
+  type NewAdminNomination,
+  type NewNomination,
+  type NewRefereeSetup,
   type NewRequest,
+  type NewWinner,
+  type NominationKey,
   type SaveScore,
   type Store,
 } from "./types";
@@ -39,8 +51,23 @@ import {
  * is exactly the situation serverless hosting creates.
  */
 
-let pool: Pool | null = null;
-let connecting: Promise<Pool> | null = null;
+/**
+ * The pool and the migration, kept on `globalThis` rather than in this module:
+ * `next dev` evaluates the server modules again each time it compiles a route
+ * for the first time, and module-level state would open a new pool (and run
+ * the migration again) on every one of those.
+ */
+const shared = ((globalThis as { __judgeQueuePostgres?: PostgresShared }).__judgeQueuePostgres ??= {
+  pool: null,
+  connecting: null,
+  migration: null,
+});
+
+type PostgresShared = {
+  pool: Pool | null;
+  connecting: Promise<Pool> | null;
+  migration: Promise<void> | null;
+};
 
 /**
  * Connect, loading the driver on demand.
@@ -52,12 +79,12 @@ let connecting: Promise<Pool> | null = null;
  * next.config.ts keeps the bundler from trying to resolve it too.
  */
 async function db(): Promise<Pool> {
-  if (pool) return pool;
-  connecting ??= connect().catch((e) => {
-    connecting = null; // let the next request try again
+  if (shared.pool) return shared.pool;
+  shared.connecting ??= connect().catch((e) => {
+    shared.connecting = null; // let the next request try again
     throw e;
   });
-  return connecting;
+  return shared.connecting;
 }
 
 async function connect(): Promise<Pool> {
@@ -74,7 +101,7 @@ async function connect(): Promise<Pool> {
     );
   }
 
-  pool = new Pool({
+  const pool = (shared.pool = new Pool({
     connectionString,
     // Serverless spins up many short-lived instances; a big pool per
     // instance would exhaust the server's connection limit.
@@ -82,7 +109,7 @@ async function connect(): Promise<Pool> {
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
     ssl: sslFor(connectionString),
-  });
+  }));
 
   pool.on("error", (e) => console.error("[postgres] idle client error:", e.message));
   return pool;
@@ -118,24 +145,41 @@ function sslFor(connectionString: string): { rejectUnauthorized: boolean } | und
  * Schema, created on demand
  * ------------------------------------------------------------------ */
 
-let migration: Promise<void> | null = null;
-
 /** Runs once per server instance; concurrent callers share the promise. */
 function ready(): Promise<void> {
-  migration ??= migrate().catch((e) => {
-    migration = null; // let the next request retry rather than wedging
+  shared.migration ??= migrate().catch((e) => {
+    shared.migration = null; // let the next request retry rather than wedging
     throw e;
   });
-  return migration;
+  return shared.migration;
 }
 
+/**
+ * Held for the length of a migration, so instances cold-starting together take
+ * turns. An arbitrary number; it only has to differ from any other advisory
+ * lock this database is used for.
+ */
+const MIGRATION_LOCK = 7_263_149_581;
+
 async function migrate(): Promise<void> {
-  await (await db()).query(`
+  // One connection, one transaction: the advisory lock below is released by
+  // the commit, so the schema blocks must run on this same connection (bare
+  // pool queries would each borrow another one and fall outside the lock).
+  // ponytail: every cold start still re-runs the idempotent DDL (brief table
+  // locks); a stored schema version could skip it if that ever matters.
+  const client: PoolClient = await (await db()).connect();
+  try {
+    await client.query("begin");
+    await client.query("select pg_advisory_xact_lock($1)", [MIGRATION_LOCK]);
+    await client.query(`
     create table if not exists panels (
       id            uuid primary key default gen_random_uuid(),
       name          text not null,
       code          text not null unique,
       division      text not null default 'Division 1',
+      -- Legacy: a panel's judges are the roster's (the judges table) now.
+      -- Kept so an older build sharing this database still runs; nothing
+      -- here reads or writes it.
       judges        text[] not null default '{}',
       languages     text[] not null default '{}',
       sort_order    int not null default 0,
@@ -144,6 +188,45 @@ async function migrate(): Promise<void> {
       slot_count    int not null default 0,
       created_at    timestamptz not null default now()
     );
+
+    -- The judge roster. A panel's judges are the roster judges sitting on it
+    -- (a judge sits on at most one panel). The names in panels.judges move
+    -- over exactly once, when this table is first created: deduped by name
+    -- ignoring case, in the panels' own order, each onto the first panel
+    -- that listed them. Re-running finds the table and touches nothing, so
+    -- a judge removed later is never brought back from the legacy column.
+    -- seq is only there to keep roster order: now() is the same for every
+    -- row of one statement.
+    do $$
+    begin
+      if to_regclass('public.judges') is null then
+        create table judges (
+          id         uuid primary key default gen_random_uuid(),
+          seq        bigint generated always as identity,
+          name       text not null,
+          note       text,
+          panel_id   uuid references panels(id) on delete set null,
+          created_at timestamptz not null default now()
+        );
+
+        insert into judges (name, panel_id)
+        select d.name, d.panel_id
+          from (
+            select distinct on (lower(l.name)) l.name, l.panel_id, l.sort_order, l.panel_name, l.ord
+              from (
+                select trim(n.name) as name, p.id as panel_id, p.sort_order,
+                       p.name as panel_name, n.ord
+                  from panels p, unnest(p.judges) with ordinality as n(name, ord)
+              ) l
+             where l.name <> ''
+             order by lower(l.name), l.sort_order, l.panel_name, l.ord
+          ) d
+         order by d.sort_order, d.panel_name, d.ord;
+      end if;
+    end $$;
+
+    create unique index if not exists judges_name_unique on judges (lower(name));
+    create index if not exists judges_panel_idx on judges (panel_id);
 
     create table if not exists teams (
       id         uuid primary key default gen_random_uuid(),
@@ -188,15 +271,22 @@ async function migrate(): Promise<void> {
       created_at timestamptz not null default now()
     );
 
+    -- Exactly one of judge_id (a judge's conflict: the panel they are on is
+    -- blocked from the team) and panel_id (a whole-panel conflict, from
+    -- before there was a roster). Removing a panel removes its whole-panel
+    -- conflicts, never a judge's. (judge_id, team_id) is unique too: see
+    -- conflicts_judge_team_unique below.
     create table if not exists conflicts (
       id          uuid primary key default gen_random_uuid(),
-      panel_id    uuid not null references panels(id) on delete cascade,
+      panel_id    uuid references panels(id) on delete cascade,
+      judge_id    uuid references judges(id) on delete cascade,
       team_id     uuid not null references teams(id) on delete cascade,
       judge_name  text,
       note        text,
       declared_by text not null,
       created_at  timestamptz not null default now(),
-      unique (panel_id, team_id)
+      unique (panel_id, team_id),
+      constraint conflicts_one_owner check ((panel_id is null) <> (judge_id is null))
     );
 
     create table if not exists flags (
@@ -211,6 +301,20 @@ async function migrate(): Promise<void> {
       created_at   timestamptz not null default now()
     );
 
+    -- The program and number of fields for this event. One row, ever: the
+    -- check on id is what stops a second one. set_on is text on purpose: it
+    -- is a calendar date from the referee device, and a date column would
+    -- come back through the driver as a Date and shift with the server
+    -- timezone.
+    create table if not exists referee_setup (
+      id          int primary key default 1 check (id = 1),
+      ruleset     text not null,
+      field_count int not null check (field_count between 1 and 20),
+      set_by      text not null,
+      set_on      text not null,
+      updated_at  timestamptz not null default now()
+    );
+
     create table if not exists scores (
       id         uuid primary key default gen_random_uuid(),
       team_id    uuid not null references teams(id) on delete cascade,
@@ -221,6 +325,64 @@ async function migrate(): Promise<void> {
       panel_id   uuid references panels(id) on delete set null,
       updated_at timestamptz not null default now(),
       unique (team_id, rubric_id)
+    );
+
+    -- A judge's nomination of a team for an award: one row per judge per award
+    -- per team. panel_id is the panel the judge nominated from, nulled when it
+    -- is deleted (as scores do), never cascaded. The unique index below treats
+    -- NULLs as distinct, which is harmless here because a judge's nomination is
+    -- only ever written with a panel (see nominate): the upsert always matches
+    -- on a full, non-null key, and only an orphaned row has a NULL. The Judge
+    -- Advisor's nominations have no panel by design: see role, further down.
+    create table if not exists nominations (
+      id         uuid primary key default gen_random_uuid(),
+      award_id   text not null,
+      team_id    uuid not null references teams(id) on delete cascade,
+      panel_id   uuid references panels(id) on delete set null,
+      judge      text not null,
+      reason     text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    -- A judge is one judge however the name was typed ("Dana", "dana", " Dana "),
+    -- as the roster's judges_name_unique has it; the row keeps the spelling it
+    -- was made with. btrim/lower stand in for the app's judgeKey (trim,
+    -- toLowerCase): they agree on any ordinary name, and differ only on exotic
+    -- whitespace or case folding, where the worst case is the old behaviour (two
+    -- rows). The first version of this table had a plain unique constraint on
+    -- (award_id, team_id, panel_id, judge): drop it, since it is what let the
+    -- variants in. The index cannot be created while two rows share a key, which
+    -- a database that ran the constraint can hold, so first delete every row
+    -- beyond the latest one (an orphaned row, with no panel, is its own and is
+    -- left alone). With no duplicates this touches nothing.
+    alter table nominations drop constraint if exists nominations_award_id_team_id_panel_id_judge_key;
+
+    delete from nominations
+     where id in (
+       select id from (
+         select id, row_number() over (
+           partition by award_id, team_id, panel_id, lower(btrim(judge))
+           order by updated_at desc, created_at desc, id
+         ) as rn
+         from nominations
+         where panel_id is not null
+       ) ranked
+       where ranked.rn > 1
+     );
+
+    create unique index if not exists nominations_one_per_judge
+      on nominations (award_id, team_id, panel_id, lower(btrim(judge)));
+
+    -- The Judge Advisor's pick: one winner per award per division, so setting
+    -- another replaces it. Never part of the shared state.
+    create table if not exists award_winners (
+      award_id   text not null,
+      division   text not null,
+      team_id    uuid not null references teams(id) on delete cascade,
+      decided_by text not null,
+      decided_at timestamptz not null default now(),
+      primary key (award_id, division)
     );
 
     create table if not exists activity (
@@ -238,6 +400,8 @@ async function migrate(): Promise<void> {
     create index if not exists requests_panel_idx on requests (panel_id);
     create index if not exists notes_team_idx     on notes (team_id);
     create index if not exists scores_team_idx    on scores (team_id);
+    create index if not exists nominations_team_idx on nominations (team_id);
+    create index if not exists award_winners_team_idx on award_winners (team_id);
     create index if not exists conflicts_panel_idx on conflicts (panel_id);
     create index if not exists conflicts_team_idx  on conflicts (team_id);
     create index if not exists activity_created_idx on activity (created_at desc);
@@ -292,23 +456,25 @@ async function migrate(): Promise<void> {
     -- enabling it with zero policies costs the app nothing while it
     -- stops the anon/publishable key (e.g. Supabase's Data API) from
     -- reading or writing anything, even panel login codes, even if that
-    -- key leaks. supabase/schema.sql already does this for a manual
-    -- setup; a deployment that never opens that file in the SQL editor
-    -- must not be left unprotected just because it relied on this
-    -- runtime migration instead.
+    -- key leaks. This migration is the only thing that creates the
+    -- tables, so it is also the only thing that can protect them.
     alter table panels    enable row level security;
     alter table teams     enable row level security;
     alter table requests  enable row level security;
     alter table notes     enable row level security;
     alter table conflicts enable row level security;
+    alter table judges    enable row level security;
     alter table flags     enable row level security;
     alter table scores    enable row level security;
+    alter table nominations enable row level security;
+    alter table award_winners enable row level security;
     alter table activity  enable row level security;
+    alter table referee_setup enable row level security;
   `);
 
-  // Schema changes that an already-deployed event may not have yet.
-  // Each is guarded so re-running is free and no roster is ever lost.
-  await (await db()).query(`
+    // Schema changes that an already-deployed event may not have yet.
+    // Each is guarded so re-running is free and no roster is ever lost.
+    await client.query(`
     do $$
     begin
       -- Team numbers were an int before identifiers like "9882K" had to work.
@@ -346,8 +512,40 @@ async function migrate(): Promise<void> {
       alter table flags add column if not exists ruleset text;
       alter table flags add column if not exists manual_version text;
       alter table flags add column if not exists match_affecting boolean not null default false;
+
+      -- Activity entries gained a kind and the actor's role. An older row has
+      -- neither (null) and is read as what its action and actor imply.
+      alter table activity add column if not exists kind text;
+      alter table activity add column if not exists actor_role text;
+
+      -- Conflicts used to belong to a panel alone. Now a judge's (judge_id)
+      -- or a whole panel's (panel_id), one of the two; every existing row
+      -- keeps its panel and so keeps its meaning.
+      alter table conflicts add column if not exists judge_id uuid references judges(id) on delete cascade;
+      alter table conflicts alter column panel_id drop not null;
+      create unique index if not exists conflicts_judge_team_unique on conflicts (judge_id, team_id);
+      if not exists (select 1 from pg_constraint where conname = 'conflicts_one_owner') then
+        alter table conflicts add constraint conflicts_one_owner
+          check ((panel_id is null) <> (judge_id is null));
+      end if;
+
+      -- The Judge Advisor can nominate too. Whose row it is lives in role; an
+      -- 'admin' row has no panel, and nominations_one_per_judge (which reads
+      -- NULLs as distinct) never sees it, so it gets an index of its own: one
+      -- per Judge Advisor per award per team, however the name was typed.
+      -- Every existing row is a judge's, which the default says.
+      alter table nominations add column if not exists role text not null default 'judge' check (role in ('judge', 'admin'));
+      create unique index if not exists nominations_one_per_admin
+        on nominations (award_id, team_id, lower(btrim(judge))) where role = 'admin';
     end $$;
   `);
+    await client.query("commit");
+  } catch (e) {
+    await client.query("rollback").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 /** Turn a unique-violation into the message the user should read. */
@@ -361,8 +559,24 @@ function translate(e: unknown, context: "queue" | "slot" | "panel"): never {
       throw new StoreError("Someone just took that slot. Pick another one.", 409);
     }
     if (context === "panel") {
+      // Saving a panel's judges can also trip the roster's unique name.
+      if (err.constraint === "judges_name_unique") {
+        throw new StoreError("A judge with that name was just added. Try again.", 409);
+      }
       throw new StoreError("That panel code is already in use.", 409);
     }
+  }
+  throw e;
+}
+
+/** The roster's two refusals, in words: a taken name (409) and a panel that is gone (404). */
+function translateJudge(e: unknown, name?: string): never {
+  const err = e as { code?: string; constraint?: string };
+  if (err?.code === "23505" && err.constraint === "judges_name_unique") {
+    throw new StoreError(`${name ?? "That name"} is already on the roster.`, 409);
+  }
+  if (err?.code === "23503" && err.constraint === "judges_panel_id_fkey") {
+    throw new StoreError("That panel no longer exists.", 404);
   }
   throw e;
 }
@@ -406,6 +620,86 @@ async function withClient<T>(
   }
 }
 
+type Run = <R>(sql: string, params?: unknown[]) => Promise<R[]>;
+
+/**
+ * A panel as the app sees it: its judges are the roster judges sitting on
+ * it, in roster order. Every panel read goes through this, so the legacy
+ * panels.judges column can never be mistaken for the source of truth.
+ */
+const PANEL_SELECT = `select p.id, p.name, p.code, p.division, p.languages, p.sort_order,
+  p.slot_start_at, p.slot_minutes, p.slot_count, p.created_at,
+  array(select j.name from judges j where j.panel_id = p.id order by j.seq) as judges
+  from panels p`;
+
+async function panelById(id: string): Promise<Panel | null> {
+  return one(await query<Panel>(`${PANEL_SELECT} where p.id = $1`, [id]));
+}
+
+/**
+ * Make the roster say that exactly these names sit on this panel: each is
+ * found (ignoring case) or added, and put on the panel -- off whichever
+ * panel it was on -- and any other judge on the panel is taken off. Nobody
+ * leaves the roster; their conflicts stay with them. Run it inside the
+ * caller's transaction.
+ */
+async function rotatePanelCode(run: Run, panelId: string): Promise<void> {
+  const panel = one(await run<{ code: string }>("select code from panels where id = $1 for update", [panelId]));
+  if (!panel) return; // a deleted panel already invalidates its sessions
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const code = randomPanelCode(8);
+    if (code.toUpperCase() === panel.code.toUpperCase()) continue;
+    await run("update panels set code = $2 where id = $1", [panelId, code]);
+    return;
+  }
+  throw new Error("Could not generate a new panel code.");
+}
+
+async function syncPanelJudges(run: Run, panelId: string, names: string[], keepCodeFor?: string): Promise<void> {
+  const seen = new Set<string>();
+  const wanted: string[] = [];
+  for (const raw of names) {
+    const name = raw.trim();
+    if (!name || seen.has(judgeKey(name))) continue;
+    seen.add(judgeKey(name));
+    wanted.push(name);
+  }
+
+  const before = await run<{ name: string; panel_id: string | null }>(
+    `select name, panel_id from judges
+      where panel_id = $1::uuid
+         or lower(name) in (select lower(n) from unnest($2::text[]) as t(n))
+      for update`,
+    [panelId, wanted],
+  );
+  const wantedKeys = new Set(wanted.map(judgeKey));
+  const left = new Set(
+    before
+      .filter((j) => j.panel_id && (j.panel_id === panelId ? !wantedKeys.has(judgeKey(j.name)) : wantedKeys.has(judgeKey(j.name))))
+      .map((j) => j.panel_id!),
+  );
+
+  await run(
+    `update judges set panel_id = $1::uuid
+      where lower(name) in (select lower(n) from unnest($2::text[]) as t(n))`,
+    [panelId, wanted],
+  );
+  await run(
+    `insert into judges (name, panel_id)
+     select t.n, $1::uuid from unnest($2::text[]) with ordinality as t(n, ord)
+      where not exists (select 1 from judges j where lower(j.name) = lower(t.n))
+      order by t.ord`,
+    [panelId, wanted],
+  );
+  await run(
+    `update judges set panel_id = null
+      where panel_id = $1::uuid
+        and lower(name) not in (select lower(n) from unnest($2::text[]) as t(n))`,
+    [panelId, wanted],
+  );
+  for (const id of left) if (id !== keepCodeFor) await rotatePanelCode(run, id);
+}
+
 /** Postgres hands back Date objects; the app speaks ISO strings. */
 function isoise<T extends Record<string, unknown>>(row: T): T {
   const out: Record<string, unknown> = { ...row };
@@ -433,9 +727,7 @@ export const postgresStore: Store = {
   },
 
   async listPanels() {
-    return rows(
-      await query<Panel>("select * from panels order by sort_order, name"),
-    );
+    return rows(await query<Panel>(`${PANEL_SELECT} order by p.sort_order, p.name`));
   },
 
   async listTeams() {
@@ -467,17 +759,23 @@ export const postgresStore: Store = {
 
   async listActivity(limit = 150) {
     return rows(
-      await query<ActivityRow>(
-        "select * from activity order by created_at desc limit $1",
+      await query<StoredActivity & { team_number: string | null }>(
+        `select a.*, t.number as team_number from activity a
+         left join teams t on t.id = a.team_id
+         order by a.created_at desc limit $1`,
         [limit],
       ),
-    );
+    ).map((a) => readActivity(a, a.team_number));
   },
 
   async findPanelByCode(code) {
     return one(
-      await query<Panel>("select * from panels where upper(code) = upper($1)", [code.trim()]),
+      await query<Panel>(`${PANEL_SELECT} where upper(p.code) = upper($1)`, [code.trim()]),
     );
+  },
+
+  async findPanelById(id) {
+    return panelById(id);
   },
 
   async seedPresetPanels() {
@@ -485,17 +783,16 @@ export const postgresStore: Store = {
     let created = 0;
     for (const preset of presetPanels()) {
       if (existing.has(preset.code)) continue;
-      await query(
+      const made = await query<{ id: string }>(
         `insert into panels
-           (name, code, division, judges, sort_order, slot_start_at, slot_minutes, slot_count,
-            languages)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         on conflict (code) do nothing`,
+           (name, code, division, sort_order, slot_start_at, slot_minutes, slot_count, languages)
+         values ($1, $2, $3, $4, $5, $6, $7, $8)
+         on conflict (code) do nothing
+         returning id`,
         [
           preset.name,
           preset.code,
           preset.division,
-          preset.judges,
           ++created,
           preset.slotStartAt,
           preset.slotMinutes,
@@ -503,6 +800,7 @@ export const postgresStore: Store = {
           [],
         ],
       );
+      if (made[0]) await withClient((run) => syncPanelJudges(run, made[0].id, preset.judges));
     }
     return created;
   },
@@ -625,28 +923,86 @@ export const postgresStore: Store = {
     }
   },
 
+  async reassignRequest(id, fromPanelId, toPanelId, ifStatus) {
+    try {
+      return await withClient(async (run) => {
+        const current = one(await run<RequestRow>("select * from requests where id = $1 for update", [id]));
+        if (!current) throw new StoreError("That request no longer exists.", 404);
+        if (current.status !== ifStatus || current.panel_id !== fromPanelId) {
+          throw new StoreError(STALE_STATUS_MESSAGE, 409);
+        }
+
+        if (current.kind === "slot" && current.status !== "cancelled" && current.slot_start) {
+          const nearby = await run<RequestRow>(
+            `select * from requests where panel_id = $1 and kind = 'slot' and status <> 'cancelled' and id <> $2`,
+            [toPanelId, id],
+          );
+          if (hasNearbyBooking(nearby, toPanelId, new Date(current.slot_start).getTime())) {
+            throw new StoreError("Someone already has a booking within 20 minutes of that time on this panel.", 409);
+          }
+        }
+
+        const updated = one(await run<RequestRow>(
+          "update requests set panel_id = $2, updated_at = now() where id = $1 returning *",
+          [id, toPanelId],
+        ));
+        if (!updated) throw new StoreError("That request no longer exists.", 404);
+        const team = one(await run<Team>(
+          "update teams set panel_id = $2 where id = $1 returning *",
+          [current.team_id, toPanelId],
+        ));
+        if (!team) throw new StoreError("That team no longer exists.", 404);
+        return updated;
+      });
+    } catch (e) {
+      if ((e as { constraint?: string }).constraint === "requests_unique_slot") {
+        throw new StoreError("Someone just took that slot. Pick another one.", 409);
+      }
+      throw e;
+    }
+  },
+
   async upsertTeams(list: ImportedTeam[]) {
     if (!list.length) return 0;
+    // A blank cell leaves what is stored (see ImportedTeam), so nulls come in as nulls. The proposed row is
+    // checked against not null before the conflict is looked at, so it has to carry a name, division and type:
+    // the stored one for a team that exists, else the default. Pit has no default and coalesces on update.
     await query(
       `insert into teams (number, name, pit, division, category)
-       select * from unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[])
+       select t.number,
+              coalesce(t.name, (select k.name from teams k where k.number = t.number), 'Team ' || t.number),
+              t.pit,
+              coalesce(t.division, (select k.division from teams k where k.number = t.number), $6::text),
+              coalesce(t.category, (select k.category from teams k where k.number = t.number), $7::text)
+       from unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[]) as t(number, name, pit, division, category)
        on conflict (number) do update set
          name = excluded.name,
-         pit = excluded.pit,
+         pit = coalesce(excluded.pit, teams.pit),
          division = excluded.division,
          category = excluded.category,
-         -- A team that changes division loses its panel: the old one is
-         -- on the far side of the wall.
+         -- A team that changes division loses its panel only when that
+         -- panel can't judge the new one: divisionsCompatible, with $8 the
+         -- blended divisions.
          panel_id = case
-           when teams.division is distinct from excluded.division then null
-           else teams.panel_id
+           when teams.division is not distinct from excluded.division then teams.panel_id
+           when exists (
+             select 1 from panels p
+             where p.id = teams.panel_id
+               and (p.division = excluded.division
+                    or excluded.division = any($8::text[])
+                    or p.division = any($8::text[]))
+           ) then teams.panel_id
+           else null
          end`,
       [
         list.map((t) => t.number),
-        list.map((t) => t.name),
+        list.map((t) => t.name ?? null),
         list.map((t) => t.pit),
-        list.map((t) => t.division),
-        list.map((t) => t.category),
+        list.map((t) => t.division ?? null),
+        list.map((t) => t.category ?? null),
+        presetDivisions()[0],
+        defaultCategory(),
+        blendedDivisions(),
       ],
     );
     return list.length;
@@ -719,9 +1075,7 @@ export const postgresStore: Store = {
     }
 
     // A panel that must stay away from a team is not a candidate for it.
-    const barred = new Set(
-      (await this.listConflicts()).map((c) => `${c.panel_id}:${c.team_id}`),
-    );
+    const blocks = panelBlocks(await this.listConflicts(), await this.listJudges());
 
     const assignments: { teamId: string; panelId: string }[] = [];
     for (const team of pending) {
@@ -731,7 +1085,7 @@ export const postgresStore: Store = {
       // blended division before it can be judged at all.
       // and never one with a declared conflict.
       const eligible = panels.filter(
-        (p) => divisionsCompatible(team.division, p.division) && !barred.has(`${p.id}:${team.id}`),
+        (p) => divisionsCompatible(team.division, p.division) && !isPanelBlocked(blocks, p.id, team.id),
       );
       const target = eligible
         .map((p) => ({ id: p.id, count: load.get(p.id) ?? 0 }))
@@ -757,86 +1111,82 @@ export const postgresStore: Store = {
 
   async createPanel(input) {
     try {
-      return one(
-        await query<Panel>(
+      const id = await withClient(async (run) => {
+        const [made] = await run<{ id: string }>(
           `insert into panels
-             (name, code, division, judges, sort_order, slot_start_at, slot_minutes, slot_count,
-            languages)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-           returning *`,
+             (name, code, division, sort_order, slot_start_at, slot_minutes, slot_count, languages)
+           values ($1, $2, $3, $4, $5, $6, $7, $8)
+           returning id`,
           [
             input.name,
             input.code,
             input.division,
-            input.judges,
             input.sort_order,
             input.slot_start_at,
             input.slot_minutes,
             input.slot_count,
             input.languages,
           ],
-        ),
-      )!;
+        );
+        await syncPanelJudges(run, made.id, input.judges);
+        return made.id;
+      });
+      return (await panelById(id))!;
     } catch (e) {
       translate(e, "panel");
     }
   },
 
   async updatePanel(id, patch) {
-    const columns = Object.keys(patch);
+    // The judges are the roster's; they are synced below, not a column.
+    const { judges, ...fields } = patch;
+    const columns = Object.keys(fields);
     if (!columns.length) {
-      const current = one(await query<Panel>("select * from panels where id = $1", [id]));
+      const current = await panelById(id);
       if (!current) throw new StoreError("That panel no longer exists.", 404);
-      return current;
+      if (!judges) return current;
+      await withClient((run) => syncPanelJudges(run, id, judges));
+      return (await panelById(id))!;
     }
 
-    // The division this panel had before any change, so the "moved to a
-    // new division" side effect below compares against what it actually
-    // was -- once the panel's own row is updated, a live subquery for its
-    // division would just read back the NEW value and never fire.
-    const before = one(await query<Panel>("select * from panels where id = $1", [id]));
-    if (!before) throw new StoreError("That panel no longer exists.", 404);
-
     const assignments = columns.map((c, i) => `${c} = $${i + 2}`).join(", ");
-    let updated: Panel | null;
     try {
-      updated = one(
-        await query<Panel>(`update panels set ${assignments} where id = $1 returning *`, [
-          id,
-          ...columns.map((c) => (patch as Record<string, unknown>)[c]),
-        ]),
-      );
+      await withClient(async (run) => {
+        const before = one(await run<{ division: string; code: string }>(
+          "select division, code from panels where id = $1 for update", [id],
+        ));
+        if (!before) throw new StoreError("That panel no longer exists.", 404);
+
+        let release: string[] = [];
+        if (patch.division && patch.division !== before.division) {
+          const moved = patch.division;
+          const held = await run<{ id: string; division: string }>(
+            "select id, division from teams where panel_id = $1 for update", [id],
+          );
+          release = held.filter((t) => !divisionsCompatible(t.division, moved)).map((t) => t.id);
+          if (release.length && (await run(
+            `select 1 from requests where team_id = any($1::uuid[])
+             and status in ('requested', 'acknowledged', 'interviewing', 'scheduled') limit 1`,
+            [release],
+          )).length) {
+            throw new StoreError("Reassign or cancel this panel's active requests before changing its division.", 409);
+          }
+        }
+
+        const updated = one(await run<{ id: string }>(
+          `update panels set ${assignments} where id = $1 returning id`,
+          [id, ...columns.map((c) => (fields as Record<string, unknown>)[c])],
+        ));
+        if (!updated) throw new StoreError("That panel no longer exists.", 404);
+        if (release.length) await run("update teams set panel_id = null where id = any($1::uuid[])", [release]);
+        if (judges) await syncPanelJudges(run, id, judges,
+          patch.code && patch.code.toUpperCase() !== before.code?.toUpperCase() ? id : undefined);
+      });
     } catch (e) {
       if (e instanceof StoreError) throw e;
       translate(e, "panel");
     }
-    if (!updated) throw new StoreError("That panel no longer exists.", 404);
-
-    // Moving a panel across the wall cannot drag its teams with it — those
-    // teams belong to the division they compete in, so they are released
-    // for another panel in that division to pick up. Done only now, after
-    // the panel's own update has actually committed: a rejected update —
-    // a duplicate code, say — must never unassign a single team on its
-    // way to being refused.
-    if (patch.division && patch.division !== before.division) {
-      // A team the panel may still judge after the move stays with it --
-      // a blended team belongs on either side of the wall. Filtered here
-      // with the same predicate the rest of the app uses rather than in
-      // SQL, so the two backends cannot answer this differently.
-      const moved = patch.division;
-      const held = await query<{ id: string; division: string }>(
-        "select id, division from teams where panel_id = $1",
-        [id],
-      );
-      const release = held
-        .filter((t) => !divisionsCompatible(t.division, moved))
-        .map((t) => t.id);
-      if (release.length) {
-        await query("update teams set panel_id = null where id = any($1::uuid[])", [release]);
-      }
-    }
-
-    return updated;
+    return (await panelById(id))!;
   },
 
   /** Teams and requests fall back to no panel rather than vanishing. */
@@ -875,6 +1225,79 @@ export const postgresStore: Store = {
 
   async listConflicts() {
     return rows(await query<ConflictRow>("select * from conflicts"));
+  },
+
+  async listJudges() {
+    return rows(
+      await query<JudgeRow>("select id, name, note, panel_id, created_at from judges order by seq"),
+    );
+  },
+
+  async addJudge(input: NewJudge) {
+    const name = input.name.trim();
+    if (!name) throw new StoreError("A judge needs a name.", 400);
+    try {
+      return one(
+        await query<JudgeRow>(
+          "insert into judges (name, note) values ($1, $2) returning id, name, note, panel_id, created_at",
+          [name, input.note ?? null],
+        ),
+      )!;
+    } catch (e) {
+      translateJudge(e, name);
+    }
+  },
+
+  async updateJudge(id: string, patch: JudgePatch) {
+    const sets: string[] = [];
+    const values: unknown[] = [id];
+    const set = (column: string, value: unknown) => {
+      values.push(value);
+      sets.push(`${column} = $${values.length}`);
+    };
+    let name: string | undefined;
+    if (patch.name !== undefined) {
+      name = patch.name.trim();
+      if (!name) throw new StoreError("A judge needs a name.", 400);
+      set("name", name);
+    }
+    if (patch.note !== undefined) set("note", patch.note);
+    if (patch.panel_id !== undefined) set("panel_id", patch.panel_id);
+
+    const sql = sets.length
+      ? `update judges set ${sets.join(", ")} where id = $1 returning id, name, note, panel_id, created_at`
+      : "select id, name, note, panel_id, created_at from judges where id = $1";
+    try {
+      const save = async (run: Run) => {
+        const before = patch.panel_id === undefined ? null : one(await run<{ panel_id: string | null }>(
+          "select panel_id from judges where id = $1 for update", [id],
+        ));
+        const updated = one(await run<JudgeRow>(sql, values));
+        if (before?.panel_id && updated && updated.panel_id !== before.panel_id) {
+          await rotatePanelCode(run, before.panel_id);
+        }
+        return updated;
+      };
+      const updated = patch.panel_id === undefined
+        ? await save(query)
+        : await withClient(save);
+      if (!updated) throw new StoreError("That judge is no longer on the roster.", 404);
+      return updated;
+    } catch (e) {
+      if (e instanceof StoreError) throw e;
+      translateJudge(e, name);
+    }
+  },
+
+  /** The judge's conflicts go with them (on delete cascade). */
+  async removeJudge(id) {
+    return withClient(async (run) => {
+      const gone = one(await run<{ id: string; panel_id: string | null }>(
+        "delete from judges where id = $1 returning id, panel_id", [id],
+      ));
+      if (gone?.panel_id) await rotatePanelCode(run, gone.panel_id);
+      return Boolean(gone);
+    });
   },
 
   /** Declaring the same pair twice returns the one already recorded. */
@@ -942,18 +1365,67 @@ export const postgresStore: Store = {
     return gone.length > 0;
   },
 
-  async addConflict(input: NewConflict) {
+  async getRefereeSetup() {
+    // Named columns, not *: the row's id is an implementation detail.
     return one(
-      await query<ConflictRow>(
-        `insert into conflicts (panel_id, team_id, judge_name, note, declared_by)
-         values ($1, $2, $3, $4, $5)
-         on conflict (panel_id, team_id) do update set
-           judge_name = coalesce(excluded.judge_name, conflicts.judge_name),
-           note = coalesce(excluded.note, conflicts.note)
-         returning *`,
-        [input.panelId, input.teamId, input.judgeName, input.note, input.declaredBy],
+      await query<RefereeSetup>(
+        "select ruleset, field_count, set_by, set_on, updated_at from referee_setup",
+      ),
+    );
+  },
+
+  async saveRefereeSetup(input: NewRefereeSetup) {
+    return one(
+      await query<RefereeSetup>(
+        `insert into referee_setup (id, ruleset, field_count, set_by, set_on)
+         values (1, $1, $2, $3, $4)
+         on conflict (id) do update set
+           ruleset = excluded.ruleset,
+           field_count = excluded.field_count,
+           set_by = excluded.set_by,
+           set_on = excluded.set_on,
+           updated_at = now()
+         returning ruleset, field_count, set_by, set_on, updated_at`,
+        [input.ruleset, input.fieldCount, input.setBy, input.setOn],
       ),
     )!;
+  },
+
+  async addConflict(input: NewConflict) {
+    const panelId = input.panelId || null;
+    const judgeId = input.judgeId || null;
+    if (!panelId === !judgeId) {
+      throw new StoreError("A conflict belongs to a judge or to a panel, not both.", 400);
+    }
+
+    // A judge's conflict names the judge by id and writes no label. Asking
+    // twice returns the first row untouched, as the file store does.
+    try {
+      return one(
+        judgeId
+          ? await query<ConflictRow>(
+              `insert into conflicts (judge_id, team_id, note, declared_by)
+               values ($1, $2, $3, $4)
+               on conflict (judge_id, team_id) do update set note = conflicts.note
+               returning *`,
+              [judgeId, input.teamId, input.note, input.declaredBy],
+            )
+          : await query<ConflictRow>(
+              `insert into conflicts (panel_id, team_id, judge_name, note, declared_by)
+               values ($1, $2, $3, $4, $5)
+               on conflict (panel_id, team_id) do update set
+                 judge_name = coalesce(excluded.judge_name, conflicts.judge_name),
+                 note = coalesce(excluded.note, conflicts.note)
+               returning *`,
+              [panelId, input.teamId, input.judgeName ?? null, input.note, input.declaredBy],
+            ),
+      )!;
+    } catch (e) {
+      if ((e as { constraint?: string })?.constraint === "conflicts_judge_id_fkey") {
+        throw new StoreError("That judge is no longer on the roster.", 404);
+      }
+      throw e;
+    }
   },
 
   async removeConflict(id) {
@@ -1036,17 +1508,134 @@ export const postgresStore: Store = {
     return gone.length > 0;
   },
 
+  async listNominations() {
+    return rows(await query<NominationRow>("select * from nominations order by created_at, id"));
+  },
+
+  /**
+   * One statement, so two judges tapping at once cannot both insert. The
+   * conflict is on the same expression as the nominations_one_per_judge index,
+   * so "dana" lands on "Dana"'s row and leaves its spelling alone. The
+   * reason is three-way: left out (`$6` false) keeps the stored one, a string
+   * or null sets it. `updated_at` moves only when the reason really changes.
+   */
+  async nominate(input: NewNomination) {
+    try {
+      return one(
+        await query<NominationRow>(
+          `insert into nominations (award_id, team_id, panel_id, judge, reason)
+           values ($1, $2, $3, $4, $5)
+           on conflict (award_id, team_id, panel_id, lower(btrim(judge))) do update set
+             reason = case when $6::boolean then excluded.reason else nominations.reason end,
+             updated_at = case
+               when $6::boolean and excluded.reason is distinct from nominations.reason then now()
+               else nominations.updated_at
+             end
+           returning *`,
+          [input.awardId, input.teamId, input.panelId, input.judge, input.reason ?? null, input.reason !== undefined],
+        ),
+      )!;
+    } catch (e) {
+      // The team or panel was deleted since the caller looked.
+      const err = e as { code?: string; constraint?: string };
+      if (err?.code === "23503") {
+        const panel = err.constraint === "nominations_panel_id_fkey";
+        throw new StoreError(`That ${panel ? "panel" : "team"} no longer exists.`, 404);
+      }
+      throw e;
+    }
+  },
+
+  /**
+   * The Judge Advisor's nomination: the same upsert with no panel, conflicting
+   * on the partial index nominations_one_per_admin (its predicate is repeated
+   * so Postgres can infer it). A judge's nomination of the same team and award
+   * is another row, in the other index.
+   */
+  async nominateAsAdmin(input: NewAdminNomination) {
+    try {
+      return one(
+        await query<NominationRow>(
+          `insert into nominations (award_id, team_id, panel_id, judge, role, reason)
+           values ($1, $2, null, $3, 'admin', $4)
+           on conflict (award_id, team_id, lower(btrim(judge))) where role = 'admin' do update set
+             reason = case when $5::boolean then excluded.reason else nominations.reason end,
+             updated_at = case
+               when $5::boolean and excluded.reason is distinct from nominations.reason then now()
+               else nominations.updated_at
+             end
+           returning *`,
+          [input.awardId, input.teamId, input.judge, input.reason ?? null, input.reason !== undefined],
+        ),
+      )!;
+    } catch (e) {
+      // The team was deleted since the caller looked.
+      if ((e as { code?: string })?.code === "23503") throw new StoreError("That team no longer exists.", 404);
+      throw e;
+    }
+  },
+
+  async removeNomination(id: string) {
+    const gone = await query<{ id: string }>("delete from nominations where id = $1 returning id", [id]);
+    return gone.length > 0;
+  },
+
+  async withdrawNomination(key: NominationKey) {
+    const gone = await query<{ id: string }>(
+      `delete from nominations
+        where award_id = $1 and team_id = $2 and panel_id = $3
+          and lower(btrim(judge)) = lower(btrim($4))
+        returning id`,
+      [key.awardId, key.teamId, key.panelId, key.judge],
+    );
+    return gone.length > 0;
+  },
+
+  async listWinners() {
+    return rows(await query<WinnerRow>("select * from award_winners order by decided_at, award_id, division"));
+  },
+
+  async setWinner(input: NewWinner) {
+    try {
+      return one(
+        await query<WinnerRow>(
+          `insert into award_winners (award_id, division, team_id, decided_by)
+           values ($1, $2, $3, $4)
+           on conflict (award_id, division) do update set
+             team_id = excluded.team_id,
+             decided_by = excluded.decided_by,
+             decided_at = now()
+           returning *`,
+          [input.awardId, input.division, input.teamId, input.decidedBy],
+        ),
+      )!;
+    } catch (e) {
+      if ((e as { code?: string })?.code === "23503") throw new StoreError("That team no longer exists.", 404);
+      throw e;
+    }
+  },
+
+  async clearWinner(awardId, division) {
+    const gone = await query<{ award_id: string }>(
+      "delete from award_winners where award_id = $1 and division = $2 returning award_id",
+      [awardId, division],
+    );
+    return gone.length > 0;
+  },
+
   async logActivity(entry: NewActivity) {
     // The log is a convenience, not a record of account. Never let a
     // failed audit write break the thing the user actually asked for.
     try {
       await query(
-        `insert into activity (request_id, team_id, actor, action, detail)
-         values ($1, $2, $3, $4, $5)`,
+        `insert into activity (request_id, team_id, kind, actor, actor_role, action, detail)
+         values ($1, $2, $3, $4, $5, $6, $7)`,
         [
           entry.requestId ?? null,
           entry.teamId ?? null,
+          entry.kind,
           entry.actor,
+          entry.actorRole,
           entry.action,
           entry.detail ?? null,
         ],
@@ -1058,13 +1647,17 @@ export const postgresStore: Store = {
 
   async resetDay() {
     // Referee flags intentionally survive a day reset: repeat history is
-    // event-wide, including at multi-day events.
-    await query("truncate activity, notes, scores, requests");
+    // event-wide, including at multi-day events. So does the referee setup.
+    await query("truncate activity, notes, scores, nominations, award_winners, requests");
   },
 
   async resetAll() {
     // Teams cascade to referee flags. This is the application's event
     // boundary and must be used before importing the next event's roster.
-    await query("truncate activity, notes, scores, conflicts, requests, teams, panels cascade");
+    // The referee setup is the event's too, so it goes with them.
+    // cascade also takes nominations and award_winners: both reference teams.
+    await query(
+      "truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup cascade",
+    );
   },
 };

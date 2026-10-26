@@ -1,36 +1,51 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { call, useAppState } from "@/components/useAppState";
-import { Banner, inputClass, TopBar } from "@/components/ui";
-import { TabBar } from "@/components/nav";
-import { SignOutButton } from "@/components/judging";
+import { Banner } from "@/components/ui";
+import { useConfirm } from "@/components/ConfirmDialog";
+import { FlagList, FlagSummary, flagsOnDay, kindOf } from "@/components/Flags";
+import { CorrectSheet } from "@/components/admin/RefereeTab";
+import { AllRulesPicker } from "@/components/AllRulesPicker";
+import { ProgramTag, SetupGate } from "@/components/referee/HeadReferee";
+import { MatchSheet } from "@/components/referee/MatchSheet";
+import { RefereeFrame } from "@/components/referee/RefereeFrame";
+import { SeverityButtons } from "@/components/referee/SeverityButtons";
 import {
-  FieldPicker,
-  FlagList,
-  FlagSummary,
-  flagsOnDay,
-  kindOf,
-  MatchAffectingCheck,
-  RulePicker,
-  RulesetPicker,
-} from "@/components/Flags";
+  canSetUp,
+  localDate,
+  matchIsSet,
+  needsEventSetup,
+  recordBlocker,
+  recordLabel,
+  recordPayload,
+  setupChangeQuestion,
+  setupRequest,
+  type CurrentMatch,
+} from "@/components/referee/logic";
 import { toneSolid } from "@/lib/tone";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
-import { filterMatchNumberInput, isValidMatchNumber, matchReference, normalizeField } from "@/lib/match";
-import { DISQUALIFIED_KIND, isValidFieldPick, type FlagReport } from "@/lib/flagValidation";
+import { fieldLabel, matchReference } from "@/lib/match";
+import { DISQUALIFIED_KIND, MAX_FIELD_COUNT, type FlagReport } from "@/lib/flagValidation";
 import { refereeHistory } from "@/lib/refereeHistory";
-import { DEFAULT_RULESET_ID, isValidRulesetId, ruleDisplayLabel } from "@/lib/rules";
+import {
+  commonFieldRules,
+  DEFAULT_RULESET_ID,
+  getRuleset,
+  MAX_FLAG_RULES,
+  ruleDisplayLabel,
+  toggleRule,
+} from "@/lib/rules";
 import type { Session } from "@/lib/auth";
 import type { FlagRow, Team } from "@/lib/types";
 
 /**
  * The referee's page.
  *
- * A referee works the field, not the judging room: they look up a team by
- * number, say what they saw, and pick how serious it was. What they write
- * reaches the judges who will interview that team.
+ * A referee works the field, not the judging room: they set the match once,
+ * look a team up by number, say what they saw, pick how serious it was and
+ * record it. What they write reaches the judges who will interview that team.
  *
  * They see every team in every division, because a referee on the field
  * is not inside anybody's division wall.
@@ -43,70 +58,63 @@ export default function RefereePage() {
   );
 }
 
-/** localStorage key for the ruleset this device last used. */
-const RULESET_STORAGE_KEY = "judge-queue-referee-ruleset";
-
 function Referee() {
   const router = useRouter();
   const params = useSearchParams();
-  const { state, online, refresh } = useAppState(5000);
+  const { state, loaded, online, refresh } = useAppState(5000);
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const bodyRef = useRef<HTMLElement>(null);
 
   const [number, setNumber] = useState("");
   const [body, setBody] = useState("");
   /* Which match and field this happened at. Deliberately NOT reset after a
-     flag is recorded, the way body is — a referee works one match at a
+     flag is recorded, the way body is -- a referee works one match at a
      time and flags several teams against it, so re-typing "Q23, Field 2"
      for every one of them would be the opposite of easy to track back. */
-  const [matchType, setMatchType] = useState("");
-  const [matchNumber, setMatchNumber] = useState("");
-  /* Field is built from a division prefix and a number. Both parts remain
-     selected after a successful report, just like match type and number. */
-  const [fieldPrefix, setFieldPrefix] = useState("");
-  const [fieldNumber, setFieldNumber] = useState("");
-  const field = normalizeField(`${fieldPrefix}${fieldNumber}`);
+  const [match, setMatch] = useState<CurrentMatch>({ matchType: "", matchNumber: "", field: "" });
+  const { matchType, matchNumber, field } = match;
+  // Which severity is selected. Tapping a button only selects it; the Record
+  // button saves.
+  const [kindId, setKindId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Which rules this was against, from the ruleset below. Cleared on a
+  // Which rules this was against, from the event's program. Cleared on a
   // successful submit (see record() below) so they can never accidentally
   // carry over to the next report the way match/field deliberately do.
   const [rules, setRules] = useState<string[]>([]);
   const [matchAffecting, setMatchAffecting] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editingFlag, setEditingFlag] = useState<FlagRow | null>(null);
 
-  // Which ruleset the event's referee is working from. Remembered per
-  // device -- a referee on the IQ fields stays on IQ all day -- so unlike
-  // the rules below it is NOT cleared after a flag. Read in an effect, not
-  // the initializer, so the server render and first client render agree.
-  const [rulesetId, setRulesetId] = useState(DEFAULT_RULESET_ID);
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(RULESET_STORAGE_KEY);
-      if (isValidRulesetId(saved)) setRulesetId(saved as string);
-    } catch {
-      // Storage blocked: stay on the default.
-    }
-  }, []);
+  const [editingSetup, setEditingSetup] = useState(false);
+  const [setupBusy, setSetupBusy] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
+  const { ask, dialog } = useConfirm();
 
-  function chooseRuleset(id: string) {
-    setRulesetId(id);
-    // A rule id means nothing outside the ruleset it was picked from.
-    setRules([]);
-    try {
-      localStorage.setItem(RULESET_STORAGE_KEY, id);
-    } catch {
-      // Remembering is a convenience; the choice still applies this session.
-    }
-  }
+  // The program and field count are the event's, not this device's: one setup
+  // that every referee works from. Before there is one (which the gate below
+  // never lets the form see) a flag falls back to VEX IQ and any field.
+  const setup = state.refereeSetup;
+  const rulesetId = setup?.ruleset ?? DEFAULT_RULESET_ID;
+  const ruleset = getRuleset(rulesetId);
+  const fieldCount = setup?.field_count ?? MAX_FIELD_COUNT;
+  const today = localDate();
+  const settingUp = loaded && (editingSetup || needsEventSetup(setup, today));
+  // Only the head referee (or the Judge Advisor) sets it up; the rest wait for
+  // it and see it read-only.
+  const mayEditSetup = canSetUp(session);
+  const mayCorrectFlags = session?.role === "admin" || (session?.role === "referee" && session.head === true);
 
   /* Arriving from the all-teams list, which passes the team it picked.
      Only seeds the box: typing over it afterwards is the point of the
      page, so this does not fight what the referee does next. */
-  const picked = params.get("team");
+  const pickedTeam = params.get("team");
   useEffect(() => {
-    if (picked) setNumber(normalizeTeamNumber(picked));
-  }, [picked]);
+    if (pickedTeam) setNumber(normalizeTeamNumber(pickedTeam));
+  }, [pickedTeam]);
 
   useEffect(() => {
     call<{ session: Session | null }>("/api/session", { method: "GET" })
@@ -120,25 +128,37 @@ function Referee() {
       .catch(() => router.replace("/referee/login"));
   }, [router]);
 
+  // "Today" in the tab bar is a link to #today. Coming from another page the
+  // section does not exist until the page has loaded, so go there once it does.
+  useEffect(() => {
+    if (session && loaded && window.location.hash === "#today") {
+      document.getElementById("today")?.scrollIntoView();
+    }
+  }, [session, loaded]);
+
   const teamByNumber = useMemo(
     () => new Map(state.teams.map((t) => [t.number, t])),
     [state.teams],
   );
   const team = teamByNumber.get(normalizeTeamNumber(number)) ?? null;
 
-  // Worst first, so the sharpest button is not the one under your thumb.
+  // Least serious first, the order the buttons are laid out in.
   const kinds = useMemo(
     () => [...state.flagKinds].sort((a, b) => a.severity - b.severity),
     [state.flagKinds],
   );
+  const kind = kinds.find((k) => k.id === kindId) ?? null;
 
   const flagsFor = (teamId: string) => state.flags.filter((f) => f.team_id === teamId);
 
-  /** Teams flagged today, worst first, so a referee can see the pattern.
-   *  Only today's reports are listed; older ones stay on each team's record. */
+  /** Today's reports only; older ones stay on each team's record. The event has
+   *  no date setting to read "today" from, so the device clock is the source. */
+  const todayFlags = useMemo(() => flagsOnDay(state.flags, new Date()), [state.flags]);
+
+  /** Teams flagged today, newest first, so a referee can see the pattern. */
   const flagged = useMemo(() => {
     const byTeam = new Map<string, FlagRow[]>();
-    for (const f of flagsOnDay(state.flags, new Date())) {
+    for (const f of todayFlags) {
       byTeam.set(f.team_id, [...(byTeam.get(f.team_id) ?? []), f]);
     }
     return [...byTeam.entries()]
@@ -147,15 +167,10 @@ function Referee() {
         Boolean(row.team),
       )
       .sort((a, b) => b.flags[0].created_at.localeCompare(a.flags[0].created_at));
-  }, [state.flags, state.teams]);
-
-  // What a head referee needs to trace this back to a moment. Required
-  // the same way "what did you see" is — a flag with no match reference
-  // is exactly the kind of thing that cannot be tracked back later.
-  const matchReady = Boolean(matchType) && isValidMatchNumber(matchNumber) && isValidFieldPick(field);
+  }, [todayFlags, state.teams]);
 
   // The most serious kind short of Disqualified gets the escalation
-  // highlight — derived from severity rather than a hardcoded "major" id,
+  // highlight -- derived from severity rather than a hardcoded "major" id,
   // the same way the button order above is. Disqualified is left out on
   // purpose: a repeated Minor may prompt a review, but nothing on this page
   // ever steers a referee toward a DQ.
@@ -172,34 +187,52 @@ function Referee() {
   const repeatedRules = history.byRule.filter((h) => h.sameRule.length > 0);
   const eventTotalsForTeam = history.eventTotals;
   const escalationReviewRequired = history.escalationReviewRequired;
+  const escalateId = escalationReviewRequired ? kinds.find((k) => k.severity === maxSeverity)?.id : null;
+
+  // The common rules are the shortcuts; anything else picked from All rules is
+  // listed after them so what is selected can always be seen and undone.
+  const commonIds = commonFieldRules(rulesetId).map((r) => r.id);
+  const chipIds = [...commonIds, ...rules.filter((id) => !commonIds.includes(id))];
+  const atRuleCap = rules.length >= MAX_FLAG_RULES;
+
+  const blocker = recordBlocker({
+    match,
+    rulesetId,
+    fieldCount,
+    hasTeam: Boolean(team),
+    kind,
+    rules,
+  });
 
   async function correctFlag(id: string, edit: FlagReport) {
-    await call(`/api/flags`, { method: "PATCH", body: { id, ...edit } });
+    await call("/api/flags", { method: "PATCH", body: { id, ...edit } });
     await refresh();
   }
 
-  async function record(kind: string) {
-    if (!team || !matchReady) return;
+  async function record() {
     // Defence in depth: the button is already disabled for this case, but
     // the request must never depend on the UI alone to enforce it.
-    if (kindOf(kind, state.flagKinds)?.requiresRule && !rules.length) return;
+    if (!team || !kind || blocker) return;
     setBusy(true);
     setError(null);
     setSaved(null);
     try {
       await call("/api/flags", {
-        body: { teamId: team.id, kind, body, matchType, matchNumber, field, ruleset: rulesetId, rules, matchAffecting },
+        body: recordPayload({ teamId: team.id, kind: kind.id, body, match, rulesetId, rules, matchAffecting }),
       });
-      const label = state.flagKinds.find((k) => k.id === kind)?.label ?? kind;
       setSaved(
-        `${label} recorded against ${team.number} for ${matchType}${matchNumber} · ${field}. ` +
+        `${kind.label} recorded against ${team.number} for ${matchReference(matchType, matchNumber)} · ${fieldLabel(field)}. ` +
           `The judges will see it.`,
       );
       setBody("");
       // Rules are cleared on success so they never silently carry over to
-      // the next report — unlike match/matchNumber/field/ruleset, which stay.
+      // the next report -- unlike the team, match and field, which stay.
       setRules([]);
       setMatchAffecting(false);
+      setKindId(null);
+      // Record is pinned, so the referee is usually at the foot of the form:
+      // take them back to the banner and the team box.
+      bodyRef.current?.scrollTo({ top: 0 });
       await refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -208,271 +241,260 @@ function Referee() {
     }
   }
 
+  async function saveSetup(nextRuleset: string, count: number) {
+    const question = setupChangeQuestion(setup, { ruleset: nextRuleset, fieldCount: count }, today);
+    if (question && !(await ask(question, { confirmLabel: "Change for everyone" }))) return;
+    setSetupBusy(true);
+    setSetupError(null);
+    try {
+      await call("/api/referee-setup", { method: "PUT", body: setupRequest(nextRuleset, count, today) });
+      // A rule id means nothing outside the program it was picked from.
+      if (nextRuleset !== rulesetId) setRules([]);
+      // A poll already in flight when the PUT landed may predate it, and
+      // refresh() hands that one back; the second call starts a fresh one.
+      await refresh();
+      await refresh();
+      setEditingSetup(false);
+    } catch (e) {
+      setSetupError((e as Error).message);
+    } finally {
+      setSetupBusy(false);
+    }
+  }
+
   if (session === undefined) {
     return <p className="p-10 text-center text-ink-faint">Loading…</p>;
   }
 
-  return (
-    <>
-      <TopBar
-        title="Referee"
-        subtitle={session ? session.name : undefined}
-        online={online}
-        role={state.viewer.role}
-        current="/referee"
-        right={<SignOutButton to="/referee/login" />}
-      />
+  const frame = { name: session?.name, online, role: state.viewer.role, current: "/referee" } as const;
 
-      <main className="mx-auto max-w-lg space-y-5 px-5 py-6">
-        {/* The head referee's main move is "show me all the teams", so the
-            way there is the first thing on the page rather than a link in
-            the bar. */}
-        <TabBar
-          label="Referee views"
-          variant="segmented"
-          active={"lookup"}
-          items={[
-            { id: "lookup", label: "Type a number", href: "/referee" },
-            { id: "teams", label: "All teams", href: "/referee/teams" },
-          ]}
+  if (!loaded) {
+    return (
+      <RefereeFrame {...frame}>
+        <main className="rf-body">
+          <p className="rf-empty">Loading…</p>
+        </main>
+      </RefereeFrame>
+    );
+  }
+
+  if (settingUp) {
+    return (
+      <RefereeFrame {...frame} tabs={false}>
+        <SetupGate
+          canSetUp={mayEditSetup}
+          setup={setup}
+          name={session?.name ?? ""}
+          busy={setupBusy}
+          error={setupError}
+          onSave={saveSetup}
+          onCancel={needsEventSetup(setup, today) ? undefined : () => setEditingSetup(false)}
         />
+        {dialog}
+      </RefereeFrame>
+    );
+  }
 
-        {error ? <Banner kind="error">{error}</Banner> : null}
+  return (
+    <RefereeFrame {...frame}>
+      {/* The match every flag is pinned to, kept in view while the form scrolls. */}
+      <section className="rf-mbar" aria-label="Current match">
+        <div className="rf-mm">
+          <span>Current match</span>
+          <b>{matchReference(matchType, matchNumber) ?? "Not set"}</b>
+        </div>
+        {fieldLabel(field) ? <span className="rf-mchip">{fieldLabel(field)}</span> : null}
+        <ProgramTag
+          program={ruleset.program}
+          fieldCount={fieldCount}
+          onEdit={mayEditSetup ? () => setEditingSetup(true) : undefined}
+        />
+        <button type="button" className="rf-chg" onClick={() => setSheetOpen(true)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />
+          </svg>
+          {matchIsSet(match, rulesetId, fieldCount) ? "Change" : "Set match"}
+        </button>
+      </section>
+
+      <main className="rf-body" ref={bodyRef}>
         {saved ? <Banner kind="success">{saved}</Banner> : null}
 
-        <div className="space-y-3 rounded-2xl bg-surface p-4 ring-1 ring-inset ring-line">
-          {/* Which manual the rules below come from. Set once and remembered
-              on this device, so it sits out of the way at the top rather than
-              between the team and the severity buttons. */}
-          <RulesetPicker value={rulesetId} onChange={chooseRuleset} />
-
-          <label className="block">
-            <span className="mb-1 block text-xs text-ink-subtle">Team number</span>
-            <input
-              value={number}
-              onChange={(e) => setNumber(filterTeamNumberInput(e.target.value))}
-              placeholder="9882K"
-              inputMode="text"
-              autoCapitalize="characters"
-              autoComplete="off"
-              className={`${inputClass} text-2xl font-bold tracking-wide`}
-            />
+        <section>
+          <label className="rf-lab" htmlFor="rf-team">
+            <span>Team to flag</span>
           </label>
+          <input
+            id="rf-team"
+            value={number}
+            onChange={(e) => setNumber(filterTeamNumberInput(e.target.value))}
+            placeholder="9882K"
+            inputMode="text"
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
+            className="rf-input rf-big"
+          />
 
-          {number && !team ? (
-            <p className="text-sm text-caution-quiet">No team with that number.</p>
-          ) : null}
+          {number && !team ? <p className="rf-miss">No team with that number.</p> : null}
 
           {team ? (
-            <>
-              <div className="rounded-xl bg-sunken px-3 py-2">
-                <p className="text-lg font-semibold">{team.name}</p>
-                <p className="text-xs text-ink-faint">
-                  {team.division}
-                  {team.pit ? ` · pit ${team.pit}` : ""}
-                </p>
-                {flagsFor(team.id).length ? (
-                  <div className="mt-2">
-                    <FlagSummary flags={flagsFor(team.id)} kinds={state.flagKinds} />
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Which match this happened at. Required, same standing as
-                  "what did you see" — a flag nobody can trace back to a
-                  match is not much use to a head referee days later.
-                  Match and Match # share a row (2:1 — "Qualification" needs
-                  the room, a 4-digit number never does); Field gets its own
-                  full-width row so a longer name is not squeezed to a
-                  sliver, the way it briefly was in testing. */}
-              <div className="flex flex-wrap gap-2">
-                <label className="min-w-[10rem] flex-[2]">
-                  <span className="mb-1 block text-xs text-ink-subtle">Match</span>
-                  <select
-                    value={matchType}
-                    onChange={(e) => setMatchType(e.target.value)}
-                    className={`${inputClass} py-2`}
-                  >
-                    <option value="" className="bg-surface">
-                      — select —
-                    </option>
-                    {state.matchTypes.map((t) => (
-                      <option key={t.id} value={t.id} className="bg-surface">
-                        {t.id} — {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="min-w-[4.5rem] flex-1">
-                  <span className="mb-1 block text-xs text-ink-subtle">Match #</span>
-                  <input
-                    value={matchNumber}
-                    onChange={(e) => setMatchNumber(filterMatchNumberInput(e.target.value))}
-                    placeholder="23"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    className={`${inputClass} py-2 text-center`}
-                  />
-                </label>
-              </div>
-
-              <FieldPicker
-                prefix={fieldPrefix}
-                number={fieldNumber}
-                onPrefix={setFieldPrefix}
-                onNumber={setFieldNumber}
-              />
-
-              <label className="block">
-                <span className="mb-1 block text-xs text-ink-subtle">
-                  What did you see? <span className="text-ink-faint">(optional)</span>
-                </span>
-                <textarea
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  rows={3}
-                  maxLength={500}
-                  placeholder="Helped another team reset their field. / Touched the robot during the match."
-                  className={inputClass}
-                />
-              </label>
-
-              {/* Required for Minor/Major/DQ, optional for Warning, not shown
-                  as required for Good conduct — enforced by the button
-                  disabling below and, server-side, by the API. One
-                  searchable multi-select, not a category-then-rule pair: a
-                  referee searches "holding" or "SG6" and gets there in one
-                  tap, and a single incident can cite more than one rule. */}
-              <div className="block">
-                <span className="mb-1 block text-xs text-ink-subtle">Rules violated</span>
-                <RulePicker rulesetId={rulesetId} value={rules} onChange={setRules} />
-              </div>
-
-              {/* Counts only for Minor and Major (the server stores false for
-                  anything else). Shown once a rule is picked because the
-                  severity buttons save on tap -- there is no chosen severity
-                  yet -- and every kind that can use it requires a rule. */}
-              {rules.length ? (
-                <MatchAffectingCheck checked={matchAffecting} onChange={setMatchAffecting} />
-              ) : null}
-
-              {/* Repeated-violation warning. Display only — never selects
-                  or creates anything. The Head Referee reads this and
-                  still chooses Minor or Major themselves. One block per
-                  cited rule that this team already has a record for, in
-                  this ruleset. */}
-              {team && repeatedRules.length ? (
-                <div className="space-y-3 rounded-xl bg-caution/12 p-3 ring-1 ring-inset ring-caution/35">
-                  <p className="text-sm font-semibold text-caution-quiet">⚠ Repeated violation</p>
-                  {repeatedRules.map(({ rule, sameRule, sameMatchSameRule }) => (
-                    <div key={rule} className="space-y-1.5">
-                      <p className="break-words text-sm text-ink">{ruleDisplayLabel(rule, rulesetId)}</p>
-                      <p className="text-xs text-ink-subtle">
-                        {sameRule.length} previous {sameRule.length === 1 ? "report" : "reports"} for
-                        this rule.
-                      </p>
-                      <ul className="space-y-0.5 text-xs text-ink-faint">
-                        {sameRule.map((f) => (
-                          <li key={f.id}>
-                            {matchReference(f.match_type, f.match_number) ?? "—"} —{" "}
-                            {kindOf(f.kind, state.flagKinds)?.short ?? f.kind}
-                          </li>
-                        ))}
-                      </ul>
-
-                      {sameMatchSameRule.length && matchReference(matchType, matchNumber) ? (
-                        <p className="text-xs font-medium text-waiting-quiet">
-                          ⚠ {rule} already recorded {sameMatchSameRule.length}{" "}
-                          {sameMatchSameRule.length === 1 ? "time" : "times"} in this Match (
-                          {matchReference(matchType, matchNumber)}).
-                        </p>
-                      ) : null}
-                    </div>
-                  ))}
-
-                  {escalationReviewRequired ? (
-                    <p className="text-xs font-medium text-caution-quiet">
-                      Repeated Minor Violations may require escalation review by the Head
-                      Referee.
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {eventTotalsForTeam.size ? (
-                <div className="rounded-xl bg-surface p-3 ring-1 ring-inset ring-line">
-                  <p className="text-xs text-ink-subtle">
-                    Event violation history for {team.number}:{" "}
-                    {[...eventTotalsForTeam.entries()]
-                      .map(([id, count]) => `${kindOf(id, state.flagKinds)?.short ?? id} ×${count}`)
-                      .join(", ")}
-                  </p>
-                </div>
-              ) : null}
-
-              {/* One button per kind. The colour is the severity, and the
-                  label says it too, so nobody taps "Major" meaning "Good". */}
-              <div className="grid gap-2">
-                {kinds.map((k) => {
-                  const missingRule = k.requiresRule && !rules.length;
-                  // Highlight only the highest-severity kind, and only as
-                  // a visual nudge — this never selects or submits it.
-                  const highlight = escalationReviewRequired && k.severity === maxSeverity;
-                  return (
-                    <button
-                      key={k.id}
-                      disabled={busy || !matchReady || missingRule}
-                      onClick={() => record(k.id)}
-                      className={`rounded-xl px-4 py-3 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                        toneSolid(k.color)
-                      } ${highlight ? "ring-2 ring-offset-2 ring-offset-canvas ring-caution" : ""}`}
-                    >
-                      {k.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {!matchReady ? (
-                <p className="text-center text-xs text-ink-faint">
-                  Pick the match, the match number and the field first — that is what lets this
-                  be traced back later.
-                </p>
-              ) : !rules.length && kinds.some((k) => k.requiresRule) ? (
-                <p className="text-center text-xs text-ink-faint">
-                  Minor, Major and Disqualified need at least one rule picked first.
-                </p>
-              ) : null}
-
+            <div className="rf-tline">
+              <span>{[team.name, team.division, team.pit ? `Pit ${team.pit}` : null].filter(Boolean).join(" · ")}</span>
               {flagsFor(team.id).length ? (
-                <div className="pt-1">
-                  <h2 className="mb-2 text-xs font-semibold text-ink-subtle">
-                    Already on {team.number}
-                  </h2>
-                  <FlagList
-                    flags={flagsFor(team.id)}
-                    kinds={state.flagKinds}
-                    matchTypes={state.matchTypes}
-                    onEdit={correctFlag}
-                  />
-                </div>
+                <span className="rf-tflags">
+                  <FlagSummary flags={flagsFor(team.id)} kinds={state.flagKinds} />
+                </span>
               ) : null}
-            </>
+            </div>
           ) : null}
-        </div>
+        </section>
 
         <section>
-          <h2 className="mb-2 text-sm font-semibold text-ink-muted">Flagged today</h2>
+          <div className="rf-lab" id="rf-rules-l">
+            <span>What happened</span>
+            <span className="rf-tag">{atRuleCap ? `Limit of ${MAX_FLAG_RULES} reached` : "Rules broken"}</span>
+          </div>
+          <div className="rf-chips" role="group" aria-labelledby="rf-rules-l">
+            {chipIds.map((id) => (
+              <button
+                key={id}
+                type="button"
+                className="rf-chip"
+                aria-pressed={rules.includes(id)}
+                disabled={atRuleCap && !rules.includes(id)}
+                title={ruleDisplayLabel(id, rulesetId) ?? id}
+                onClick={() => setRules(toggleRule(rules, id))}
+              >
+                {id}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="rf-dd" aria-haspopup="dialog" onClick={() => setRulesOpen(true)}>
+            <span className="rf-dl">
+              All rules <em>· {ruleset.rules.length} in {ruleset.label}</em>
+            </span>
+            {rules.length ? <span className="rf-cnt">{rules.length} selected</span> : null}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+        </section>
+
+        <details className="rf-note">
+          <summary>
+            <span>Add a note</span>
+            <span className="rf-tag">Optional</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </summary>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={3}
+            maxLength={500}
+            aria-label="What did you see?"
+            placeholder="Helped another team reset their field. / Touched the robot during the match."
+            className="rf-input rf-text"
+          />
+        </details>
+
+        {/* Counts only for Minor and Major (the server stores false for
+            anything else). Shown once a rule is picked because every kind that
+            can use it requires one. */}
+        {rules.length ? (
+          <label className="rf-row">
+            <span>
+              Match affecting<small>Minor and Major only</small>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              className="rf-sw"
+              checked={matchAffecting}
+              onChange={(e) => setMatchAffecting(e.target.checked)}
+            />
+          </label>
+        ) : null}
+
+        {/* Repeated-violation warning. Display only -- never selects
+            or creates anything. The Head Referee reads this and
+            still chooses Minor or Major themselves. One line per
+            cited rule that this team already has a record for, in
+            this ruleset. */}
+        {team && repeatedRules.length ? (
+          <div className="rf-caution" role="note">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01" />
+            </svg>
+            <div>
+              {repeatedRules.map(({ rule, sameRule, sameMatchSameRule }) => (
+                <p key={rule}>
+                  <b>Repeated.</b> {team.number} had {rule} in{" "}
+                  {sameRule
+                    .map(
+                      (f) =>
+                        `${matchReference(f.match_type, f.match_number) ?? "—"} (${kindOf(f.kind, state.flagKinds)?.short ?? f.kind})`,
+                    )
+                    .join(", ")}
+                  .
+                  {sameMatchSameRule.length && matchReference(matchType, matchNumber) ? (
+                    <>
+                      {" "}
+                      <b>
+                        {rule} already recorded {sameMatchSameRule.length}{" "}
+                        {sameMatchSameRule.length === 1 ? "time" : "times"} in this match (
+                        {matchReference(matchType, matchNumber)}).
+                      </b>
+                    </>
+                  ) : null}
+                </p>
+              ))}
+              {escalationReviewRequired ? (
+                <p>Repeated Minor Violations may require escalation review by the Head Referee.</p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {team && eventTotalsForTeam.size ? (
+          <p className="rf-hist">
+            Event violation history for {team.number}:{" "}
+            {[...eventTotalsForTeam.entries()]
+              .map(([id, count]) => `${kindOf(id, state.flagKinds)?.short ?? id} ×${count}`)
+              .join(", ")}
+          </p>
+        ) : null}
+
+        {/* One button per kind, picked here and recorded by the bar below. */}
+        <SeverityButtons kinds={kinds} value={kindId} onChange={setKindId} escalateId={escalateId} />
+
+        {team && flagsFor(team.id).length ? (
+          <section>
+            <h2 className="rf-h2">Already on {team.number}</h2>
+            <FlagList
+              flags={flagsFor(team.id)}
+              kinds={state.flagKinds}
+              onEdit={mayCorrectFlags ? setEditingFlag : undefined}
+            />
+          </section>
+        ) : null}
+
+        <section id="today">
+          <h2 className="rf-h2">Flagged today</h2>
           {!flagged.length ? (
-            <p className="rounded-xl px-4 py-6 text-center text-sm text-ink-faint ring-1 ring-inset ring-line">
-              Nothing flagged yet.
-            </p>
+            <p className="rf-empty">Nothing flagged yet.</p>
           ) : (
             <ul className="space-y-2">
               {flagged.map(({ team: t, flags }) => (
                 <li key={t.id} className="rounded-xl bg-surface px-4 py-3 ring-1 ring-inset ring-line">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                     <button
-                      onClick={() => setNumber(t.number)}
+                      onClick={() => {
+                        setNumber(t.number);
+                        bodyRef.current?.scrollTo({ top: 0 });
+                      }}
                       className="text-lg font-bold tabular-nums hover:text-accent"
                     >
                       {t.number}
@@ -481,7 +503,7 @@ function Referee() {
                     <FlagSummary flags={flags} kinds={state.flagKinds} />
                   </div>
                   <div className="mt-3">
-                    <FlagList flags={flags} kinds={state.flagKinds} matchTypes={state.matchTypes} />
+                    <FlagList flags={flags} kinds={state.flagKinds} onEdit={mayCorrectFlags ? setEditingFlag : undefined} />
                   </div>
                 </li>
               ))}
@@ -489,6 +511,58 @@ function Referee() {
           )}
         </section>
       </main>
-    </>
+
+      {/* Pinned above the tabs: the one button that saves, and one line saying
+          what it is waiting for. */}
+      <div className="rf-abar">
+        {error ? (
+          <p className="rf-need rf-need--error" role="alert">
+            {error}
+          </p>
+        ) : blocker ? (
+          <p className="rf-need" id="rf-need" role="status">
+            {blocker}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          className={`rf-prim ${kind ? toneSolid(kind.color) : "rf-prim--idle"}`}
+          disabled={busy || Boolean(blocker)}
+          aria-describedby={blocker ? "rf-need" : undefined}
+          onClick={record}
+        >
+          {busy ? "Recording…" : recordLabel(kind, team)}
+        </button>
+      </div>
+
+      <CorrectSheet
+        flag={editingFlag}
+        team={editingFlag ? state.teams.find((t) => t.id === editingFlag.team_id) ?? null : null}
+        kinds={kinds}
+        fieldCount={fieldCount}
+        correctorName={session?.name}
+        onSave={correctFlag}
+        onClose={() => setEditingFlag(null)}
+      />
+      <MatchSheet
+        open={sheetOpen}
+        rulesetId={rulesetId}
+        fieldCount={fieldCount}
+        value={match}
+        onUse={(next) => {
+          setMatch(next);
+          setSheetOpen(false);
+        }}
+        onClose={() => setSheetOpen(false)}
+      />
+      <AllRulesPicker
+        open={rulesOpen}
+        rulesetId={rulesetId}
+        value={rules}
+        onChange={setRules}
+        onClose={() => setRulesOpen(false)}
+      />
+      {dialog}
+    </RefereeFrame>
   );
 }

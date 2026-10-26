@@ -12,17 +12,23 @@ import type {
   ActivityRow,
   ConflictRow,
   FlagRow,
+  JudgeRow,
+  NominationRow,
   Note,
   Panel,
+  RefereeSetup,
   RequestRow,
   ScoreRow,
   Team,
+  WinnerRow,
 } from "../types";
 import type { Status } from "../status";
+import { readActivity, type StoredActivity } from "../activity";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
 import { divisionsCompatible } from "../presets";
 import { hasNearbyBooking } from "../data";
+import { isPanelBlocked, judgeKey, panelBlocks } from "../roster";
 import {
   bookingDefaults,
   DEFAULT_DIVISION,
@@ -37,9 +43,17 @@ import {
   type ImportedTeam,
   type NewActivity,
   type NewNote,
+  type JudgePatch,
   type NewConflict,
   type NewFlag,
+  type NewJudge,
+  type AdminNominationKey,
+  type NewAdminNomination,
+  type NewNomination,
+  type NewWinner,
+  type NominationKey,
   type FlagEdit,
+  type NewRefereeSetup,
   type NewRequest,
   type SaveScore,
   type Store,
@@ -64,15 +78,26 @@ import {
  * later: same names, same arguments, same return shapes.
  */
 
+/** A panel as kept on disk: its judges are the roster's, not a list of its own. */
+type StoredPanel = Omit<Panel, "judges">;
+
 type Data = {
-  panels: Panel[];
+  panels: StoredPanel[];
   teams: Team[];
   requests: RequestRow[];
   notes: Note[];
   scores: ScoreRow[];
+  /** Judges' award nominations, oldest first. */
+  nominations: NominationRow[];
+  /** The Judge Advisor's pick per (award, division). */
+  winners: WinnerRow[];
   conflicts: ConflictRow[];
+  /** The judge roster, in the order judges were added. */
+  judges: JudgeRow[];
   flags: FlagRow[];
-  activity: ActivityRow[];
+  /** The event's program and field count; null until one is saved. */
+  refereeSetup: RefereeSetup | null;
+  activity: StoredActivity[];
 };
 
 const FILE = resolve(process.env.DATA_FILE ?? ".data/state.json");
@@ -88,8 +113,32 @@ const LIVE: Status[] = ["requested", "acknowledged", "interviewing", "scheduled"
  * Loading and saving
  * ------------------------------------------------------------------ */
 
-let loaded: Data | null = null;
-let pendingWrite: ReturnType<typeof setTimeout> | null = null;
+/**
+ * Everything one process knows about the data file: the in-memory copy, its
+ * pending save, the lock's heartbeat, and whether the shutdown hooks are on.
+ *
+ * It lives on `globalThis`, not in this module, because `next dev` evaluates
+ * the server modules again whenever it compiles a route for the first time.
+ * Module-level state would then start a NEW copy that reloads the file while
+ * the old copy's save timer is still pending: the new copy misses what the
+ * old one had not written yet, and its next write erases it. Every evaluation
+ * of this module shares the one entry for its file, so there is one copy, one
+ * save timer, one heartbeat and one set of hooks. (A test that wants a cold
+ * start drops `globalThis.__judgeQueueFileStore`.)
+ */
+type Shared = {
+  loaded: Data | null;
+  pendingWrite: ReturnType<typeof setTimeout> | null;
+  heartbeat: ReturnType<typeof setInterval> | null;
+  hooksInstalled: boolean;
+};
+
+const globals = globalThis as { __judgeQueueFileStore?: Map<string, Shared> };
+const registry = (globals.__judgeQueueFileStore ??= new Map<string, Shared>());
+if (!registry.has(FILE)) {
+  registry.set(FILE, { loaded: null, pendingWrite: null, heartbeat: null, hooksInstalled: false });
+}
+const shared = registry.get(FILE)!;
 
 /**
  * The in-memory copy, loaded on first use rather than at import.
@@ -100,15 +149,15 @@ let pendingWrite: ReturnType<typeof setTimeout> | null = null;
  * actually in use.
  */
 function state(): Data {
-  if (!loaded) {
+  if (!shared.loaded) {
     // Claim before reading. A second copy must be refused before it can
     // touch the file; if it is refused, `loaded` stays null, so the next
     // call asks again rather than quietly running without the lock.
     claimLock();
-    loaded = load();
+    shared.loaded = load();
     installShutdownFlush();
   }
-  return loaded;
+  return shared.loaded;
 }
 
 function empty(): Data {
@@ -118,8 +167,12 @@ function empty(): Data {
     requests: [],
     notes: [],
     scores: [],
+    nominations: [],
+    winners: [],
     conflicts: [],
+    judges: [],
     flags: [],
+    refereeSetup: null,
     activity: [],
   };
 }
@@ -145,7 +198,27 @@ function load(): Data {
   }
   try {
     const parsed = JSON.parse(readFileSync(FILE, "utf8")) as Partial<Data>;
-    return migrate({ ...empty(), ...parsed });
+    const merged = { ...empty(), ...parsed };
+    const before = JSON.stringify(merged);
+    const data = migrate(merged);
+
+    // A migration that moved something -- the roster's ids are minted here --
+    // is saved now. Left in memory it would be redone with new ids by every
+    // fresh copy of this module (each Next route compiles its own) or restart
+    // before the first write, and an id the browser got from one copy would
+    // be unknown to the next. Best-effort, and caught HERE: the catch below
+    // reads any throw as a corrupt file and sets it aside.
+    if (JSON.stringify(data) !== before) {
+      try {
+        persist(data);
+      } catch (e) {
+        console.error(
+          `[store] cannot save the migrated ${FILE}: ${(e as Error).message}\n` +
+            "        Carrying on in memory; the roster's ids will change on restart.",
+        );
+      }
+    }
+    return data;
   } catch {
     // A corrupt file should not stop the event. Keep the bad copy for
     // forensics and carry on with a clean slate.
@@ -178,8 +251,20 @@ function load(): Data {
  */
 function migrate(data: Data): Data {
   data.scores ??= [];
+  data.nominations ??= [];
+  // Nominations gained a role when the Judge Advisor could nominate; an older one is a judge's.
+  for (const n of data.nominations) n.role ??= "judge";
+  data.winners ??= [];
   data.conflicts ??= [];
+  data.judges ??= [];
   data.flags ??= [];
+  data.refereeSetup ??= null;
+  // Activity entries gained a kind and the actor's role; an older one has
+  // neither and is read as what it implies (see readActivity).
+  for (const a of data.activity) {
+    a.kind ??= null;
+    a.actor_role ??= null;
+  }
   // Match and field arrived after the first flags did; rule after that,
   // then the ruleset it belongs to. A flag with no ruleset is a VEX IQ one.
   for (const f of data.flags) {
@@ -190,6 +275,38 @@ function migrate(data: Data): Data {
     f.ruleset ??= null;
     f.manual_version ??= null;
     f.match_affecting ??= false;
+    // A dev data file from the build that briefly recorded an alliance.
+    delete (f as { alliance?: unknown }).alliance;
+  }
+
+  // A conflict used to belong to a panel only; a judge's conflict has no panel.
+  for (const c of data.conflicts) {
+    c.panel_id ??= null;
+    c.judge_id ??= null;
+  }
+
+  // Panels used to carry their judges as a list of names. The roster owns
+  // them now: move each name over once (case-insensitively deduped, in the
+  // panels' own order, as the Postgres migration does) and drop the list, so
+  // nothing can read it afterwards and a judge removed later stays removed.
+  const known = new Set(data.judges.map((j) => judgeKey(j.name)));
+  const ordered = [...data.panels].sort(
+    (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name),
+  );
+  for (const panel of ordered as (StoredPanel & { judges?: unknown })[]) {
+    for (const raw of Array.isArray(panel.judges) ? panel.judges : []) {
+      const name = String(raw).trim();
+      if (!name || known.has(judgeKey(name))) continue;
+      known.add(judgeKey(name));
+      data.judges.push({
+        id: randomUUID(),
+        name,
+        note: null,
+        panel_id: panel.id,
+        created_at: panel.created_at ?? new Date().toISOString(),
+      });
+    }
+    delete panel.judges;
   }
 
   // Languages and panel language cover arrived after the first rosters.
@@ -222,20 +339,22 @@ function persist(snapshot: Data = state()): void {
  * once should not mean fifty separate file writes.
  */
 function save(): void {
-  if (pendingWrite) return;
-  pendingWrite = setTimeout(() => {
-    pendingWrite = null;
+  if (shared.pendingWrite) return;
+  shared.pendingWrite = setTimeout(() => {
+    shared.pendingWrite = null;
     try {
       persist();
     } catch (e) {
       console.error("[store] could not write state file:", e);
     }
   }, 200);
-  pendingWrite.unref?.();
+  shared.pendingWrite.unref?.();
 }
 
 /** Flush before the process dies so the last few seconds are not lost. */
 function installShutdownFlush(): void {
+  if (shared.hooksInstalled) return;
+  shared.hooksInstalled = true;
   // SIGHUP is what closing a terminal window sends, and SIGBREAK is its
   // Windows equivalent. Without them, shutting down by closing the window
   // rather than pressing Ctrl+C would skip the flush below and leave the
@@ -334,13 +453,15 @@ function claimLock(): void {
     }
   }
 
-  setInterval(() => {
+  if (shared.heartbeat) return;
+  shared.heartbeat = setInterval(() => {
     try {
       writeLock(false);
     } catch {
       /* read-only disk: carry on without a heartbeat */
     }
-  }, 5_000).unref?.();
+  }, 5_000);
+  shared.heartbeat.unref?.();
 }
 
 function releaseLock(): void {
@@ -357,10 +478,18 @@ function releaseLock(): void {
  * Reads
  * ------------------------------------------------------------------ */
 
+/** The panel as the app sees it: its judges are the roster judges sitting on it. */
+function withJudges(panel: StoredPanel): Panel {
+  return {
+    ...panel,
+    judges: state().judges.filter((j) => j.panel_id === panel.id).map((j) => j.name),
+  };
+}
+
 function listPanels(): Panel[] {
-  return [...state().panels].sort(
-    (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name),
-  );
+  return [...state().panels]
+    .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
+    .map(withJudges);
 }
 
 function listTeams(): Team[] {
@@ -379,14 +508,22 @@ function listNotes(teamId?: string): Note[] {
 }
 
 function listActivity(limit = 150): ActivityRow[] {
+  const numbers = new Map(state().teams.map((t) => [t.id, t.number]));
   return [...state().activity]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .slice(0, limit);
+    .slice(0, limit)
+    .map((a) => readActivity(a, (a.team_id && numbers.get(a.team_id)) || null));
 }
 
 function findPanelByCode(code: string): Panel | null {
   const wanted = code.trim().toUpperCase();
-  return state().panels.find((p) => p.code.toUpperCase() === wanted) ?? null;
+  const panel = state().panels.find((p) => p.code.toUpperCase() === wanted);
+  return panel ? withJudges(panel) : null;
+}
+
+function findPanelById(id: string): Panel | null {
+  const panel = state().panels.find((p) => p.id === id);
+  return panel ? withJudges(panel) : null;
 }
 
 function findTeamByNumber(number: string): Team | null {
@@ -514,6 +651,25 @@ function updateRequest(
   return row;
 }
 
+function reassignRequest(
+  id: string,
+  fromPanelId: string | null,
+  toPanelId: string,
+  ifStatus: RequestRow["status"],
+): RequestRow {
+  const row = state().requests.find((r) => r.id === id);
+  if (!row) throw new StoreError("That request no longer exists.", 404);
+  if (row.status !== ifStatus || row.panel_id !== fromPanelId) {
+    throw new StoreError(STALE_STATUS_MESSAGE, 409);
+  }
+  const team = state().teams.find((t) => t.id === row.team_id);
+  if (!team) throw new StoreError("That team no longer exists.", 404);
+  const updated = updateRequest(id, { panel_id: toPanelId }, ifStatus);
+  team.panel_id = toPanelId;
+  save();
+  return updated;
+}
+
 /* ------------------------------------------------------------------ *
  * Teams
  * ------------------------------------------------------------------ */
@@ -523,23 +679,25 @@ function upsertTeams(rows: ImportedTeam[]): number {
   for (const row of rows) {
     const existing = state().teams.find((t) => t.number === row.number);
     if (existing) {
-      existing.name = row.name;
-      existing.pit = row.pit;
+      // A blank cell leaves what is stored (see ImportedTeam).
+      if (row.name) existing.name = row.name;
+      if (row.pit) existing.pit = row.pit;
       if (row.category) existing.category = row.category;
-      // A team that changes division loses its panel: the old one is on
-      // the far side of the wall.
+      // A team that changes division loses its panel only when that panel
+      // can't judge the new one (as PATCH /api/admin/teams does).
       if (row.division && row.division !== existing.division) {
         existing.division = row.division;
-        existing.panel_id = null;
+        const held = state().panels.find((p) => p.id === existing.panel_id);
+        if (!held || !divisionsCompatible(row.division, held.division)) existing.panel_id = null;
       }
     } else {
       state().teams.push({
         id: randomUUID(),
         number: row.number,
-        name: row.name,
+        name: row.name || `Team ${row.number}`,
         panel_id: null,
-        division: row.division,
-        category: row.category,
+        division: row.division || presetDivisions()[0],
+        category: row.category || defaultCategory(),
         pit: row.pit,
         created_at: now,
       });
@@ -576,6 +734,9 @@ function deleteTeam(id: string): void {
   state().requests = state().requests.filter((r) => r.team_id !== id);
   state().notes = state().notes.filter((n) => n.team_id !== id);
   state().scores = state().scores.filter((s) => s.team_id !== id);
+  // Nominations and winners cascade with the team in Postgres (on delete cascade).
+  state().nominations = state().nominations.filter((n) => n.team_id !== id);
+  state().winners = state().winners.filter((w) => w.team_id !== id);
   state().conflicts = state().conflicts.filter((c) => c.team_id !== id);
   // Postgres cascades flags on team delete and nulls activity.team_id
   // (on delete set null) rather than dropping the row. Match both here so
@@ -620,7 +781,7 @@ function autoAssignTeams(perPanel: number, includeAssigned = false, division?: s
   }
 
   // A panel that must stay away from a team is not a candidate for it.
-  const barred = new Set(state().conflicts.map((c) => `${c.panel_id}:${c.team_id}`));
+  const blocks = panelBlocks(state().conflicts, state().judges);
 
   let assigned = 0;
   for (const team of pending) {
@@ -630,7 +791,7 @@ function autoAssignTeams(perPanel: number, includeAssigned = false, division?: s
     // it matches only a panel created in the blended division, and if the
     // event never made one it is skipped here and silently goes unjudged.
     const eligible = panels.filter(
-      (p) => divisionsCompatible(team.division, p.division) && !barred.has(`${p.id}:${team.id}`),
+      (p) => divisionsCompatible(team.division, p.division) && !isPanelBlocked(blocks, p.id, team.id),
     );
     const target = eligible
       .map((p) => ({ id: p.id, count: load.get(p.id) ?? 0 }))
@@ -656,10 +817,54 @@ function createPanel(input: Omit<Panel, "id" | "created_at">): Panel {
   if (state().panels.some((p) => p.code.toUpperCase() === normalizePanelCode(input.code))) {
     throw new StoreError("That panel code is already in use.", 409);
   }
-  const panel: Panel = { ...input, id: randomUUID(), created_at: new Date().toISOString() };
+  const { judges, ...rest } = input;
+  const panel: StoredPanel = { ...rest, id: randomUUID(), created_at: new Date().toISOString() };
   state().panels.push(panel);
+  syncPanelJudges(panel.id, judges);
   save();
-  return panel;
+  return withJudges(panel);
+}
+
+/**
+ * Make the roster say that exactly these names sit on this panel: each is
+ * found (case-insensitively) or added, and put on the panel -- taking them
+ * off whichever panel they were on -- and any other judge on it is taken
+ * off. Nobody leaves the roster; their conflicts stay with them.
+ */
+function syncPanelJudges(panelId: string, names: string[], keepCodeFor?: string): void {
+  const wanted = new Set<string>();
+  const left = new Set<string>();
+  for (const raw of names) {
+    const name = raw.trim();
+    if (!name || wanted.has(judgeKey(name))) continue;
+    wanted.add(judgeKey(name));
+    const found = state().judges.find((j) => judgeKey(j.name) === judgeKey(name));
+    if (found) {
+      if (found.panel_id && found.panel_id !== panelId) left.add(found.panel_id);
+      found.panel_id = panelId;
+    }
+    else {
+      state().judges.push({
+        id: randomUUID(),
+        name,
+        note: null,
+        panel_id: panelId,
+        created_at: new Date().toISOString(),
+      });
+    }
+  }
+  for (const j of state().judges) {
+    if (j.panel_id === panelId && !wanted.has(judgeKey(j.name))) {
+      left.add(panelId);
+      j.panel_id = null;
+    }
+  }
+  for (const id of left) if (id !== keepCodeFor) rotatePanelCode(id);
+}
+
+function rotatePanelCode(id: string): void {
+  const panel = state().panels.find((p) => p.id === id);
+  if (panel) panel.code = generatePanelCode();
 }
 
 function updatePanel(id: string, patch: Partial<Panel>): Panel {
@@ -678,17 +883,20 @@ function updatePanel(id: string, patch: Partial<Panel>): Panel {
   // refused.
   if (patch.division && patch.division !== panel.division) {
     const moved = patch.division;
-    for (const t of state().teams) {
-      // A team the panel may still judge after the move stays with it: a
-      // blended team belongs on either side of the wall, so releasing it
-      // would be busywork for the Judge Advisor to undo by hand.
-      if (t.panel_id === id && !divisionsCompatible(t.division, moved)) t.panel_id = null;
+    const release = state().teams.filter((t) => t.panel_id === id && !divisionsCompatible(t.division, moved));
+    const ids = new Set(release.map((t) => t.id));
+    if (state().requests.some((r) => ids.has(r.team_id) && LIVE.includes(r.status))) {
+      throw new StoreError("Reassign or cancel this panel's active requests before changing its division.", 409);
     }
+    for (const team of release) team.panel_id = null;
   }
 
-  Object.assign(panel, patch);
+  const { judges, ...rest } = patch;
+  const changingCode = Boolean(patch.code && patch.code.toUpperCase() !== panel.code.toUpperCase());
+  Object.assign(panel, rest);
+  if (judges) syncPanelJudges(id, judges, changingCode ? id : undefined);
   save();
-  return panel;
+  return withJudges(panel);
 }
 
 /** Deleting a panel orphans its teams and requests rather than losing them. */
@@ -696,8 +904,12 @@ function deletePanel(id: string): void {
   state().panels = state().panels.filter((p) => p.id !== id);
   for (const t of state().teams) if (t.panel_id === id) t.panel_id = null;
   for (const r of state().requests) if (r.panel_id === id) r.panel_id = null;
-  // A conflict names a panel that no longer exists; it protects nobody.
+  // A nomination outlives its panel, as a score does (on delete set null).
+  for (const n of state().nominations) if (n.panel_id === id) n.panel_id = null;
+  // A whole-panel conflict names a panel that no longer exists; it protects
+  // nobody. A judge's conflict stays: the judge just has no panel for now.
   state().conflicts = state().conflicts.filter((c) => c.panel_id !== id);
+  for (const j of state().judges) if (j.panel_id === id) j.panel_id = null;
   save();
 }
 
@@ -706,12 +918,12 @@ function seedPresetPanels(): number {
   let created = 0;
   for (const preset of presetPanels()) {
     if (state().panels.some((p) => p.code.toUpperCase() === preset.code)) continue;
+    const id = randomUUID();
     state().panels.push({
-      id: randomUUID(),
+      id,
       name: preset.name,
       code: preset.code,
       division: preset.division,
-      judges: preset.judges,
       languages: [],
       sort_order: state().panels.length + 1,
       slot_start_at: preset.slotStartAt,
@@ -719,6 +931,7 @@ function seedPresetPanels(): number {
       slot_count: preset.slotCount,
       created_at: new Date().toISOString(),
     });
+    syncPanelJudges(id, preset.judges);
     created++;
   }
   if (created) save();
@@ -737,9 +950,12 @@ function deleteAllPanels(): number {
   if (!removed) return 0;
 
   state().panels = [];
-  state().conflicts = [];
+  // Whole-panel conflicts went with their panels; judges' conflicts stay.
+  state().conflicts = state().conflicts.filter((c) => c.panel_id === null);
+  for (const j of state().judges) j.panel_id = null;
   for (const t of state().teams) t.panel_id = null;
   for (const r of state().requests) r.panel_id = null;
+  for (const n of state().nominations) n.panel_id = null;
   save();
   return removed;
 }
@@ -776,16 +992,29 @@ function listConflicts(): ConflictRow[] {
 }
 
 function addConflict(input: NewConflict): ConflictRow {
+  const panelId = input.panelId || null;
+  const judgeId = input.judgeId || null;
+  if (!panelId === !judgeId) {
+    throw new StoreError("A conflict belongs to a judge or to a panel, not both.", 400);
+  }
+  if (judgeId && !state().judges.some((j) => j.id === judgeId)) {
+    throw new StoreError("That judge is no longer on the roster.", 404);
+  }
+
   const existing = state().conflicts.find(
-    (c) => c.panel_id === input.panelId && c.team_id === input.teamId,
+    (c) =>
+      c.team_id === input.teamId &&
+      (judgeId ? c.judge_id === judgeId : c.panel_id === panelId),
   );
   if (existing) return existing;
 
   const row: ConflictRow = {
     id: randomUUID(),
-    panel_id: input.panelId,
+    panel_id: panelId,
+    judge_id: judgeId,
     team_id: input.teamId,
-    judge_name: input.judgeName,
+    // A judge's conflict names the judge by id; the typed label is legacy only.
+    judge_name: judgeId ? null : (input.judgeName ?? null),
     note: input.note,
     declared_by: input.declaredBy,
     created_at: new Date().toISOString(),
@@ -793,6 +1022,66 @@ function addConflict(input: NewConflict): ConflictRow {
   state().conflicts.push(row);
   save();
   return row;
+}
+
+function listJudges(): JudgeRow[] {
+  return state().judges.map((j) => ({ ...j }));
+}
+
+/** Trimmed, non-empty, and not already on the roster under another spelling of the case. */
+function cleanJudgeName(name: string, exceptId?: string): string {
+  const clean = name.trim();
+  if (!clean) throw new StoreError("A judge needs a name.", 400);
+  if (state().judges.some((j) => j.id !== exceptId && judgeKey(j.name) === judgeKey(clean))) {
+    throw new StoreError(`${clean} is already on the roster.`, 409);
+  }
+  return clean;
+}
+
+function addJudge(input: NewJudge): JudgeRow {
+  const row: JudgeRow = {
+    id: randomUUID(),
+    name: cleanJudgeName(input.name),
+    note: input.note ?? null,
+    panel_id: null,
+    created_at: new Date().toISOString(),
+  };
+  state().judges.push(row);
+  save();
+  return { ...row };
+}
+
+function updateJudge(id: string, patch: JudgePatch): JudgeRow {
+  const judge = state().judges.find((j) => j.id === id);
+  if (!judge) throw new StoreError("That judge is no longer on the roster.", 404);
+
+  // Validate everything before touching the row, so a refusal changes nothing.
+  const name = patch.name === undefined ? judge.name : cleanJudgeName(patch.name, id);
+  if (patch.panel_id && !state().panels.some((p) => p.id === patch.panel_id)) {
+    throw new StoreError("That panel no longer exists.", 404);
+  }
+
+  const oldPanelId = judge.panel_id;
+  judge.name = name;
+  if (patch.note !== undefined) judge.note = patch.note;
+  if (patch.panel_id !== undefined) judge.panel_id = patch.panel_id;
+  if (oldPanelId && judge.panel_id !== oldPanelId) rotatePanelCode(oldPanelId);
+  save();
+  return { ...judge };
+}
+
+/** A judge's conflicts leave with them: they would point at nobody. */
+function removeJudge(id: string): boolean {
+  const oldPanelId = state().judges.find((j) => j.id === id)?.panel_id;
+  const before = state().judges.length;
+  state().judges = state().judges.filter((j) => j.id !== id);
+  const removed = state().judges.length < before;
+  if (removed) {
+    state().conflicts = state().conflicts.filter((c) => c.judge_id !== id);
+    if (oldPanelId) rotatePanelCode(oldPanelId);
+    save();
+  }
+  return removed;
 }
 
 function listFlags(teamId?: string): FlagRow[] {
@@ -844,6 +1133,25 @@ function removeFlag(id: string): boolean {
   state().flags = state().flags.filter((f) => f.id !== id);
   save();
   return state().flags.length < before;
+}
+
+function getRefereeSetup(): RefereeSetup | null {
+  return state().refereeSetup;
+}
+
+/** Replaces the record rather than editing it, so a caller holding the old
+ *  one (to log what it was) still reads the old values afterwards. */
+function saveRefereeSetup(input: NewRefereeSetup): RefereeSetup {
+  const setup: RefereeSetup = {
+    ruleset: input.ruleset,
+    field_count: input.fieldCount,
+    set_by: input.setBy,
+    set_on: input.setOn,
+    updated_at: new Date().toISOString(),
+  };
+  state().refereeSetup = setup;
+  save();
+  return setup;
 }
 
 function removeConflict(id: string): boolean {
@@ -913,12 +1221,145 @@ function clearScore(teamId: string, rubricId: string): boolean {
   return removed;
 }
 
+/* ------------------------------------------------------------------ *
+ * Awards: nominations and winners
+ * ------------------------------------------------------------------ */
+
+// Copies, not the stored rows: a caller holding one across a later write
+// (the route comparing a reason before and after) must not see it change.
+function listNominations(): NominationRow[] {
+  return state().nominations.map((n) => ({ ...n }));
+}
+
+// The judge is compared as the roster compares a name, so "Dana" and " dana " are one judge.
+// A judge's key has a panel, which the Judge Advisor's rows never do: the two never match.
+const sameNomination = (n: NominationRow, k: NominationKey) =>
+  n.role === "judge" &&
+  n.award_id === k.awardId &&
+  n.team_id === k.teamId &&
+  n.panel_id === k.panelId &&
+  judgeKey(n.judge) === judgeKey(k.judge);
+
+const sameAdminNomination = (n: NominationRow, k: AdminNominationKey) =>
+  n.role === "admin" && n.award_id === k.awardId && n.team_id === k.teamId && judgeKey(n.judge) === judgeKey(k.judge);
+
+/**
+ * One row per judge per award per team, so asking twice is asking once. The
+ * row keeps the spelling of the judge's name it was first made with.
+ * Only a changed reason writes: a repeat tap must not look like an edit.
+ */
+function nominate(input: NewNomination): NominationRow {
+  // Postgres refuses these through the foreign keys; so does this.
+  if (!state().teams.some((t) => t.id === input.teamId)) throw new StoreError("That team no longer exists.", 404);
+  if (!state().panels.some((p) => p.id === input.panelId)) throw new StoreError("That panel no longer exists.", 404);
+
+  const now = new Date().toISOString();
+  let row = state().nominations.find((n) => sameNomination(n, input));
+  if (!row) {
+    row = {
+      id: randomUUID(),
+      award_id: input.awardId,
+      team_id: input.teamId,
+      panel_id: input.panelId,
+      judge: input.judge,
+      role: "judge",
+      reason: input.reason ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+    state().nominations.push(row);
+  } else if (input.reason !== undefined && input.reason !== row.reason) {
+    row.reason = input.reason;
+    row.updated_at = now;
+  }
+
+  save();
+  return { ...row };
+}
+
+/** The same idempotent write for the Judge Advisor: no panel, and a row of its own beside any judge's. */
+function nominateAsAdmin(input: NewAdminNomination): NominationRow {
+  if (!state().teams.some((t) => t.id === input.teamId)) throw new StoreError("That team no longer exists.", 404);
+
+  const now = new Date().toISOString();
+  let row = state().nominations.find((n) => sameAdminNomination(n, input));
+  if (!row) {
+    row = {
+      id: randomUUID(),
+      award_id: input.awardId,
+      team_id: input.teamId,
+      panel_id: null,
+      judge: input.judge,
+      role: "admin",
+      reason: input.reason ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+    state().nominations.push(row);
+  } else if (input.reason !== undefined && input.reason !== row.reason) {
+    row.reason = input.reason;
+    row.updated_at = now;
+  }
+
+  save();
+  return { ...row };
+}
+
+function removeNomination(id: string): boolean {
+  const before = state().nominations.length;
+  state().nominations = state().nominations.filter((n) => n.id !== id);
+  const removed = state().nominations.length < before;
+  if (removed) save();
+  return removed;
+}
+
+function withdrawNomination(key: NominationKey): boolean {
+  const before = state().nominations.length;
+  state().nominations = state().nominations.filter((n) => !sameNomination(n, key));
+  const removed = state().nominations.length < before;
+  if (removed) save();
+  return removed;
+}
+
+function listWinners(): WinnerRow[] {
+  return state().winners.map((w) => ({ ...w }));
+}
+
+/** Awards are decided per division, so (award, division) holds one team and a second replaces it. */
+function setWinner(input: NewWinner): WinnerRow {
+  if (!state().teams.some((t) => t.id === input.teamId)) throw new StoreError("That team no longer exists.", 404);
+
+  const row: WinnerRow = {
+    award_id: input.awardId,
+    division: input.division,
+    team_id: input.teamId,
+    decided_by: input.decidedBy,
+    decided_at: new Date().toISOString(),
+  };
+  const at = state().winners.findIndex((w) => w.award_id === row.award_id && w.division === row.division);
+  if (at >= 0) state().winners[at] = row;
+  else state().winners.push(row);
+
+  save();
+  return { ...row };
+}
+
+function clearWinner(awardId: string, division: string): boolean {
+  const before = state().winners.length;
+  state().winners = state().winners.filter((w) => !(w.award_id === awardId && w.division === division));
+  const removed = state().winners.length < before;
+  if (removed) save();
+  return removed;
+}
+
 function logActivity(entry: NewActivity): void {
   state().activity.push({
     id: randomUUID(),
     request_id: entry.requestId ?? null,
     team_id: entry.teamId ?? null,
+    kind: entry.kind,
     actor: entry.actor,
+    actor_role: entry.actorRole,
     action: entry.action,
     detail: entry.detail ?? null,
     created_at: new Date().toISOString(),
@@ -934,20 +1375,22 @@ function logActivity(entry: NewActivity): void {
  * Whole-store operations
  * ------------------------------------------------------------------ */
 
-/** Clears day-of workflow data. Teams, panels and event-wide referee flags survive. */
+/** Clears day-of workflow data. Teams, panels, event-wide referee flags and the referee setup survive. */
 function resetDay(): void {
   state().requests = [];
   state().notes = [];
   state().scores = [];
+  state().nominations = [];
+  state().winners = [];
   state().activity = [];
   save();
 }
 
-/** Wipes the active event, including its roster, panels and referee flags. */
+/** Wipes the active event, including its roster, panels, referee flags and referee setup. */
 function resetAll(): void {
   // Going through state() first claims the file, so a second copy cannot wipe it.
   state();
-  loaded = empty();
+  shared.loaded = empty();
   save();
 }
 
@@ -972,12 +1415,11 @@ function demoData(): Data {
     ["Panel C", "CHARLIE3", second, ["Alex Tran", "Jamie Fox", "Rae Mensah"]],
   ];
 
-  const panels: Panel[] = panelNames.map(([name, code, division, judges], i) => ({
+  const panels: StoredPanel[] = panelNames.map(([name, code, division], i) => ({
     id: randomUUID(),
     name,
     code,
     division,
-    judges,
     // Demo: the third panel covers Thai as well, so a mismatch is visible.
     languages: i === 2 ? ["en", "th"] : ["en"],
     sort_order: i + 1,
@@ -988,6 +1430,16 @@ function demoData(): Data {
     slot_count: i === 2 ? 5 : 8,
     created_at: iso(0),
   }));
+
+  const judges: JudgeRow[] = panelNames.flatMap(([, , , names], i) =>
+    names.map((name) => ({
+      id: randomUUID(),
+      name,
+      note: null,
+      panel_id: panels[i].id,
+      created_at: iso(0),
+    })),
+  );
 
   const names = [
     "Iron Hawks", "Circuit Breakers", "Gear Grinders", "Quantum Quokkas",
@@ -1084,7 +1536,20 @@ function demoData(): Data {
     ),
   ];
 
-  return { panels, teams, requests, notes: [], scores: [], conflicts: [], flags: [], activity: [] };
+  return {
+    panels,
+    teams,
+    requests,
+    notes: [],
+    scores: [],
+    nominations: [],
+    winners: [],
+    conflicts: [],
+    judges,
+    flags: [],
+    refereeSetup: null,
+    activity: [],
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -1107,11 +1572,14 @@ export const fileStore: Store = {
   listActivity: async (limit) => listActivity(limit),
 
   findPanelByCode: async (code) => findPanelByCode(code),
+  findPanelById: async (id) => findPanelById(id),
   findTeamByNumber: async (number) => findTeamByNumber(number),
   findRequest: async (id) => findRequest(id),
 
   createRequest: async (input) => createRequest(input),
   updateRequest: async (id, patch, ifStatus) => updateRequest(id, patch, ifStatus),
+  reassignRequest: async (id, fromPanelId, toPanelId, ifStatus) =>
+    reassignRequest(id, fromPanelId, toPanelId, ifStatus),
 
   upsertTeams: async (rows) => upsertTeams(rows),
   updateTeam: async (id, patch) => updateTeam(id, patch),
@@ -1133,6 +1601,14 @@ export const fileStore: Store = {
   updateFlag: async (id, edit) => updateFlag(id, edit),
   removeFlag: async (id) => removeFlag(id),
 
+  getRefereeSetup: async () => getRefereeSetup(),
+  saveRefereeSetup: async (input) => saveRefereeSetup(input),
+
+  listJudges: async () => listJudges(),
+  addJudge: async (input) => addJudge(input),
+  updateJudge: async (id, patch) => updateJudge(id, patch),
+  removeJudge: async (id) => removeJudge(id),
+
   listConflicts: async () => listConflicts(),
   addConflict: async (input) => addConflict(input),
   removeConflict: async (id) => removeConflict(id),
@@ -1141,6 +1617,15 @@ export const fileStore: Store = {
   saveScore: async (input) => saveScore(input),
   clearScore: async (teamId, rubricId) => clearScore(teamId, rubricId),
   logActivity: async (entry) => logActivity(entry),
+
+  listNominations: async () => listNominations(),
+  nominate: async (input) => nominate(input),
+  withdrawNomination: async (key) => withdrawNomination(key),
+  nominateAsAdmin: async (input) => nominateAsAdmin(input),
+  removeNomination: async (id) => removeNomination(id),
+  listWinners: async () => listWinners(),
+  setWinner: async (input) => setWinner(input),
+  clearWinner: async (awardId, division) => clearWinner(awardId, division),
 
   resetDay: async () => resetDay(),
   resetAll: async () => resetAll(),

@@ -222,7 +222,7 @@ const hasEnvFile = existsSync(".env.local") || existsSync(".env");
 /* The codes printed in this repo's docs. MIRRORS PUBLISHED_CODES in
    src/lib/auth.ts, which this script cannot import (it is TypeScript) --
    tests/authHardening.test.ts fails if the two lists drift apart. */
-const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "REF001", "ALPHA1", "BRAVO2", "CHARLIE3"]);
+const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "REF001", "HREF01", "ALPHA1", "BRAVO2", "CHARLIE3"]);
 
 if (productionLike) {
   const found = problems.length + warnings.length;
@@ -253,7 +253,7 @@ if (productionLike) {
   if (!process.env.ADMIN_CODE) {
     bad("ADMIN_CODE is not set, and production refuses to run without it", "Set ADMIN_CODE and restart.");
   }
-  for (const key of ["QUEUER_CODE", "REFEREE_CODE"]) {
+  for (const key of ["QUEUER_CODE", "REFEREE_CODE", "HEAD_REFEREE_CODE"]) {
     if (!process.env[key]) {
       warn(
         `${key} is not set, so that role cannot sign in`,
@@ -264,7 +264,7 @@ if (productionLike) {
 
   // Production refuses these even when set on purpose, which leaves that
   // role locked out; say so here rather than on event day.
-  for (const key of ["ADMIN_CODE", "ADMIN_CODE_2", "ADMIN_CODE_3", "ADMIN_CODE_4", "QUEUER_CODE", "REFEREE_CODE"]) {
+  for (const key of ["ADMIN_CODE", "ADMIN_CODE_2", "ADMIN_CODE_3", "ADMIN_CODE_4", "QUEUER_CODE", "REFEREE_CODE", "HEAD_REFEREE_CODE"]) {
     const code = (process.env[key] ?? "").trim().toUpperCase();
     if (PUBLISHED_CODES.has(code)) {
       bad(

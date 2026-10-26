@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseFlagFields } from "../src/lib/flagValidation";
+import { parseFlagFields, parseRefereeSetup } from "../src/lib/flagValidation";
 import { normalizeMatchNumber } from "../src/lib/match";
-import { refereeFlags } from "../src/lib/presets";
+import { isValidMatchType, matchTypes, refereeFlags } from "../src/lib/presets";
 import { refereeHistory } from "../src/lib/refereeHistory";
 import {
   getRuleset,
@@ -19,7 +19,7 @@ const validReport = {
   body: "Robot contacted a second Bean Bag.",
   matchType: "Q",
   matchNumber: "23",
-  field: "ES2",
+  field: "2",
   rule: null,
 };
 
@@ -57,6 +57,7 @@ test("the real validator preserves the required match fields", () => {
     ["matchType", "X"],
     ["matchNumber", ""],
     ["field", ""],
+    ["field", "ES2"], // the division prefix is no longer a field
   ] as const) {
     const result = parseFlagFields({ ...validReport, [field]: value });
     assert.equal(result.ok, false, `${field} must still be validated`);
@@ -202,6 +203,179 @@ test("Disqualified is a configured kind: the most severe, rule-requiring, and ne
   assert.equal(unknown.ok && unknown.kind, "good");
 });
 
+/* ---- match types and field ------------------------------------- */
+
+const ids = (rulesetId: string) => matchTypes(rulesetId).map((t) => t.id);
+
+test("each program offers its own Teamwork types, and Driver and Auto for Skills", () => {
+  assert.deepEqual(ids("viqrc"), ["P", "Q", "F", "SKD", "SKA"]);
+  assert.deepEqual(ids("v5rc"), ["P", "Q", "R16", "QF", "SF", "F", "SKD", "SKA"]);
+  for (const rulesetId of ["viqrc", "v5rc"]) {
+    const groups = Object.fromEntries(matchTypes(rulesetId).map((t) => [t.id, t.group]));
+    assert.equal(groups.SKD, "skills");
+    assert.equal(groups.SKA, "skills");
+    assert.equal(groups.Q, "teamwork");
+  }
+  assert.equal(matchTypes("v5rc").find((t) => t.id === "QF")?.label, "Quarterfinal");
+});
+
+test("a V5RC-only type is refused on VEX IQ, and VEX IQ's plain Final on V5RC is not a bracket", () => {
+  assert.equal(isValidMatchType("QF", "v5rc"), true);
+  assert.equal(isValidMatchType("QF", "viqrc"), false);
+  assert.equal(isValidMatchType("R16", "viqrc"), false);
+
+  const onIq = parseFlagFields({ ...validReport, matchType: "QF", matchNumber: "2-1", ruleset: "viqrc" });
+  assert.equal(onIq.ok, false, "QF is not a VEX IQ match type");
+  assert.match(!onIq.ok ? onIq.error : "", /Pick which match this was/);
+  assert.doesNotMatch(!onIq.ok ? onIq.error : "", /QF/, "and the answer lists VEX IQ's own types");
+
+  // The reverse: VEX IQ's shapes do not pass on V5RC.
+  const plainFinal = parseFlagFields({ ...validReport, matchType: "F", matchNumber: "3", ruleset: "v5rc" });
+  assert.equal(plainFinal.ok, false, "a V5RC Final is a bracket and a match");
+  assert.match(!plainFinal.ok ? plainFinal.error : "", /bracket and match/);
+  const iqFinal = parseFlagFields({ ...validReport, matchType: "F", matchNumber: "3", ruleset: "viqrc" });
+  assert.equal(iqFinal.ok && iqFinal.matchNumber, "3");
+  const bracketOnIq = parseFlagFields({ ...validReport, matchType: "F", matchNumber: "1-2", ruleset: "viqrc" });
+  assert.equal(bracketOnIq.ok && bracketOnIq.matchNumber, "12", "VEX IQ numbers are plain: the dash is dropped");
+
+  // Old flags' types stay valid on both.
+  for (const type of ["P", "Q", "F"]) {
+    assert.equal(isValidMatchType(type, "viqrc"), true, type);
+  }
+});
+
+test("a V5RC elimination is stored as bracket-match, \"QF 2-1\"", () => {
+  const qf = parseFlagFields({ ...validReport, matchType: "QF", matchNumber: "2 1", ruleset: "v5rc" });
+  assert.equal(qf.ok && qf.matchType, "QF");
+  assert.equal(qf.ok && qf.matchNumber, "2-1");
+  for (const half of ["2", "", "2-"]) {
+    assert.equal(
+      parseFlagFields({ ...validReport, matchType: "QF", matchNumber: half, ruleset: "v5rc" }).ok,
+      false,
+      `"${half}" is not a bracket and a match`,
+    );
+  }
+});
+
+test("the legacy SK is refused on a new flag but a flag already holding it can be corrected", () => {
+  assert.equal(isValidMatchType("SK", "viqrc"), false, "never offered");
+  const fresh = parseFlagFields({ ...validReport, matchType: "SK", matchNumber: "3" });
+  assert.equal(fresh.ok, false);
+
+  const legacy = flag("1", { match_type: "SK", match_number: "3", field: "HS2" });
+  const kept = parseFlagFields(
+    { ...validReport, matchType: "SK", matchNumber: "3", field: "HS2" },
+    { existing: legacy },
+  );
+  assert.equal(kept.ok, true, "an unchanged correction keeps the legacy type and field");
+  assert.equal(kept.ok && kept.matchType, "SK");
+  assert.equal(kept.ok && kept.field, "HS2");
+
+  // Moving it to a type the program offers is a normal pick.
+  const moved = parseFlagFields(
+    { ...validReport, matchType: "SKD", matchNumber: "3", field: "HS2" },
+    { existing: legacy },
+  );
+  assert.equal(moved.ok && moved.matchType, "SKD");
+});
+
+test("an alliance in the request is ignored: nothing of it is validated, kept or returned", () => {
+  for (const matchType of ["Q", "SKD"]) {
+    for (const alliance of ["red", "blue", "green", "", null]) {
+      const r = parseFlagFields({ ...validReport, matchType, matchNumber: "1", alliance });
+      assert.equal(r.ok, true, `${matchType} with alliance ${JSON.stringify(alliance)}`);
+      assert.equal(r.ok && "alliance" in r, false, "the parsed fields carry no alliance");
+    }
+  }
+});
+
+test("a field is a number from 1 to the event's field count", () => {
+  const field = (f: unknown, fieldCount?: number | null) =>
+    parseFlagFields({ ...validReport, field: f }, { fieldCount });
+  const stored = (f: unknown, fieldCount?: number | null) => {
+    const r = field(f, fieldCount);
+    return r.ok ? r.field : null;
+  };
+
+  assert.equal(stored("1", 3), "1");
+  assert.equal(stored(" 3 ", 3), "3");
+  assert.equal(stored(2, 3), "2", "a JSON number is fine");
+  assert.equal(stored("02", 3), "2", "stored as a plain number");
+
+  for (const bad of ["4", "0", "", "-1", "1.5", "two", "ES2", "Field 2", "100"]) {
+    const r = field(bad, 3);
+    assert.equal(r.ok, false, `"${bad}" with 3 fields`);
+    assert.equal(!r.ok && r.error, "Pick the field — 1 to 3.");
+  }
+
+  // No setup saved yet: the setup's own ceiling, 20.
+  assert.equal(stored("20"), "20");
+  const tooMany = field("21");
+  assert.equal(!tooMany.ok && tooMany.error, "Pick the field — 1 to 20.");
+  assert.equal(stored("5", null), "5");
+});
+
+test("a correction that leaves the field alone keeps a legacy or outgrown one; changing it must be a real pick", () => {
+  const old = flag("1", { field: "HS2" });
+  const keep = parseFlagFields({ ...validReport, field: "HS2" }, { existing: old, fieldCount: 3 });
+  assert.equal(keep.ok && keep.field, "HS2");
+
+  // The event shrank from 4 fields to 3 after this flag was raised on field 4.
+  const outgrown = flag("2", { field: "4" });
+  assert.equal(parseFlagFields({ ...validReport, field: "4" }, { existing: outgrown, fieldCount: 3 }).ok, true);
+
+  // Changing it is a new pick: not a legacy value, not above the count.
+  assert.equal(parseFlagFields({ ...validReport, field: "ES3" }, { existing: old, fieldCount: 3 }).ok, false);
+  assert.equal(parseFlagFields({ ...validReport, field: "5" }, { existing: outgrown, fieldCount: 3 }).ok, false);
+  assert.equal(parseFlagFields({ ...validReport, field: "2" }, { existing: old, fieldCount: 3 }).ok, true);
+  // And "unchanged" needs something to be unchanged from.
+  assert.equal(parseFlagFields({ ...validReport, field: "HS2" }, { fieldCount: 3 }).ok, false);
+  assert.equal(parseFlagFields({ ...validReport, field: "" }, { existing: flag("3", { field: null }) }).ok, false);
+});
+
+test("a new flag takes the event's program, and naming another is refused with its name", () => {
+  const defaulted = parseFlagFields({ ...validReport, kind: "minor", rule: "SG6" }, { eventRuleset: "v5rc" });
+  assert.equal(defaulted.ok && defaulted.ruleset, "v5rc", "the request named none");
+  assert.equal(defaulted.ok && defaulted.manualVersion, "2.1");
+
+  const same = parseFlagFields({ ...validReport, ruleset: "v5rc", kind: "minor", rule: "SG6" }, { eventRuleset: "v5rc" });
+  assert.equal(same.ok, true);
+
+  const other = parseFlagFields({ ...validReport, ruleset: "viqrc", kind: "minor", rule: "SG6" }, { eventRuleset: "v5rc" });
+  assert.equal(other.ok, false);
+  assert.equal(!other.ok && other.error, "This event is set to V5RC Override.");
+  assert.equal(!other.ok && other.status, 400);
+  const otherWay = parseFlagFields({ ...validReport, ruleset: "v5rc", kind: "minor", rule: "SG6" }, { eventRuleset: "viqrc" });
+  assert.equal(!otherWay.ok && otherWay.error, "This event is set to VEX IQ.");
+
+  // No setup: today's behaviour, VEX IQ, and any real ruleset may be named.
+  assert.equal(parseFlagFields({ ...validReport, kind: "minor", rule: "SG6" }).ok && "viqrc", "viqrc");
+  assert.equal(parseFlagFields({ ...validReport, ruleset: "v5rc", kind: "minor", rule: "SG6" }, { eventRuleset: null }).ok, true);
+
+  // A correction names no event ruleset: a flag keeps (or is moved off) its own.
+  const corrected = parseFlagFields(
+    { ...validReport, ruleset: "viqrc", kind: "minor", rule: "SG6" },
+    { defaultRuleset: "v5rc" },
+  );
+  assert.equal(corrected.ok && corrected.ruleset, "viqrc");
+});
+
+test("the setup body: a real program, 1 to 20 fields and a real calendar date", () => {
+  const ok = parseRefereeSetup({ ruleset: "v5rc", field_count: 3, today: "2026-09-09" });
+  assert.deepEqual(ok, { ok: true, ruleset: "v5rc", fieldCount: 3, today: "2026-09-09" });
+  assert.equal(parseRefereeSetup({ ruleset: "viqrc", field_count: 1, today: "2024-02-29" }).ok, true, "a leap day");
+  assert.equal(parseRefereeSetup({ ruleset: "viqrc", field_count: 20, today: "2026-12-31" }).ok, true);
+
+  const bad = (body: Record<string, unknown>) => parseRefereeSetup({ ruleset: "v5rc", field_count: 3, today: "2026-09-09", ...body });
+  for (const ruleset of ["", "vexu", undefined, 5]) assert.equal(bad({ ruleset }).ok, false, `ruleset ${ruleset}`);
+  for (const field_count of [0, 21, 1.5, -1, "3", null, undefined, NaN, 3.0000001]) {
+    assert.equal(bad({ field_count }).ok, false, `field_count ${field_count}`);
+  }
+  for (const today of ["", undefined, "2026-9-9", "09/09/2026", "2026-09-09T10:00", "2026-02-30", "2025-02-29", "2026-13-01", "2026-00-10", "today"]) {
+    assert.equal(bad({ today }).ok, false, `today ${today}`);
+  }
+});
+
 /* ---- repeat history ------------------------------------------------------ */
 
 function flag(id: string, values: Partial<FlagRow> = {}): FlagRow {
@@ -213,7 +387,7 @@ function flag(id: string, values: Partial<FlagRow> = {}): FlagRow {
     author: "Head Referee",
     match_type: "Q",
     match_number: "23",
-    field: "Field 2",
+    field: "2",
     rule: "SG6",
     ruleset: "viqrc",
     manual_version: null,
@@ -342,4 +516,31 @@ test("the real search finds every mandated IQ rule using partial, case-insensiti
       assert.ok(searchRules(query.toUpperCase(), "viqrc").some((rule) => rule.id === id), `${query} missed ${id}`);
     }
   }
+});
+
+test("\"same match\" is the whole reference: QF 2-1 and QF 2-2 are different matches", () => {
+  const reports = [
+    flag("1", { ruleset: "v5rc", rule: "GG17", match_type: "QF", match_number: "2-1" }),
+    flag("2", { ruleset: "v5rc", rule: "GG17", match_type: "QF", match_number: "2-2" }),
+    flag("3", { ruleset: "v5rc", rule: "GG17", match_type: "QF", match_number: "02-01" }),
+    flag("4", { ruleset: "v5rc", rule: "GG17", match_type: "SF", match_number: "2-1" }),
+    flag("5", { ruleset: "v5rc", rule: "GG17", match_type: "QF", match_number: "1-12" }),
+    flag("6", { ruleset: "v5rc", rule: "GG17", match_type: "QF", match_number: "11-2" }),
+  ];
+  const sameMatch = (type: string, number: string) =>
+    refereeHistory(reports, "team-1852B", ["GG17"], type, number, "v5rc").byRule[0].sameMatchSameRule.map((f) => f.id);
+
+  assert.deepEqual(sameMatch("QF", "2-1"), ["1", "3"], "the stored 02-01 is the same bracket and match");
+  assert.deepEqual(sameMatch("QF", "2-2"), ["2"]);
+  assert.deepEqual(sameMatch("SF", "2-1"), ["4"], "a different type is a different match");
+  assert.deepEqual(sameMatch("QF", "1-12"), ["5"], "1-12 is not 11-2");
+  assert.deepEqual(sameMatch("QF", "11-2"), ["6"]);
+  assert.deepEqual(sameMatch("QF", ""), [], "no match number, no match");
+  assert.deepEqual(sameMatch("", "2-1"), [], "no match type, no match");
+
+  const plain = [flag("7", { match_type: "P", match_number: "3" }), flag("8", { match_type: "Q", match_number: "3" })];
+  assert.deepEqual(
+    refereeHistory(plain, "team-1852B", ["SG6"], "Q", "3", "viqrc").byRule[0].sameMatchSameRule.map((f) => f.id),
+    ["8"],
+  );
 });

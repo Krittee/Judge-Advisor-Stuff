@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { actorParts } from "@/lib/activity";
 import { actorLabel, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
@@ -8,14 +9,16 @@ import { isRealSlot } from "@/lib/data";
 export const dynamic = "force-dynamic";
 
 /**
- * Create a request. Open to everyone, including teams with no login —
- * that is the front door of the whole app.
+ * The queue desk or Judge Advisor creates a request when a team asks in person.
  *
  * kind = 'queue' -> walk-up, goes straight to orange.
  * kind = 'slot'  -> books a future slot, sits at 'scheduled' until its time.
  */
 export async function POST(request: Request) {
   const session = await getSession();
+  if (session?.role !== "queuer" && session?.role !== "admin") {
+    return NextResponse.json({ error: "Only the queue desk or Judge Advisor can create requests." }, { status: 403 });
+  }
   const body = await request.json().catch(() => ({}));
 
   const teamNumber = normalizeTeamNumber(body.teamNumber);
@@ -87,7 +90,7 @@ export async function POST(request: Request) {
       panelId: team.panel_id,
       kind,
       message,
-      createdBy: session ? actorLabel(session) : "team",
+      createdBy: actorLabel(session),
       slotStart,
       slotEnd,
       language: resolveLanguage(body.language),
@@ -96,7 +99,8 @@ export async function POST(request: Request) {
     await store().logActivity({
       requestId: created.id,
       teamId: team.id,
-      actor: session ? actorLabel(session) : "team",
+      kind: "request",
+      ...actorParts(session),
       action: kind === "slot" ? "booked slot" : "joined queue",
       detail: `Team ${team.number}`,
     });

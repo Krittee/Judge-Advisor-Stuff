@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -58,7 +59,16 @@ async function inRequestScope<T>(session: Session | null, fn: () => Promise<T>):
 
   const headers = new Headers();
   if (session) {
-    const token = await new SignJWT({ ...session })
+    const panel = session.role === "judge"
+      ? await (await import("../src/lib/db/file")).fileStore.findPanelById(session.panelId)
+      : null;
+    if (session.role === "judge") assert.ok(panel);
+    const judgeClaims = panel ? {
+      panelAuth: createHmac("sha256", process.env.SESSION_SECRET!)
+        .update(panel.id).update("\0").update(panel.code.toUpperCase()).digest("hex"),
+      judgeDay: new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
+    } : {};
+    const token = await new SignJWT({ ...session, ...judgeClaims })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
       .setExpirationTime("1h")
@@ -138,6 +148,42 @@ async function world() {
 
 type World = Awaited<ReturnType<typeof world>>;
 
+test("only the desk and Judge Advisor can create requests", async () => {
+  const w = await world();
+  for (const session of [null, judgeOf(w.panelA), REFEREE]) {
+    const reply = await post(session, { teamNumber: "1001", kind: "queue", message: "private note" });
+    assert.equal(reply.status, 403);
+    assert.equal(reply.body.request, undefined);
+  }
+  assert.equal((await w.db.listRequests()).length, 0);
+  assert.equal((await post(QUEUER, { teamNumber: "1001", kind: "queue" })).status, 200);
+  assert.equal((await post(ADMIN, { teamNumber: "1002", kind: "queue" })).status, 200);
+});
+
+test("public visitors cannot change a booking or read its private fields in a mutation response", async () => {
+  const w = await world();
+  const held = await booking(w, 12);
+  for (const body of [
+    { action: "cancel" },
+    { action: "ready-now" },
+    { action: "reschedule", ...slotOf(w.panelA, 13) },
+  ]) {
+    const reply = await patch(null, held.id, body);
+    assert.equal(reply.status, 403);
+    assert.equal(reply.body.request, undefined);
+    assert.ok(!JSON.stringify(reply.body).includes("created_by"));
+    assert.equal((await patch(judgeOf(w.panelA), held.id, body)).status, 403);
+  }
+  assert.equal((await reload(w.db, held.id)).status, "scheduled");
+});
+
+test("judges can advance status but cannot reopen a completed interview", async () => {
+  const w = await world();
+  const request = await liveRequest(w, "completed");
+  assert.equal((await patch(judgeOf(w.panelA), request.id, { action: "reopen" })).status, 403);
+  assert.equal((await reload(w.db, request.id)).status, "completed");
+});
+
 /** A walk-up request for t1, moved on to `status` (as the judges would have). */
 async function liveRequest({ db, panelA, t1 }: World, status: RequestRow["status"] = "requested") {
   const req = await db.createRequest({
@@ -215,14 +261,12 @@ test("the route hands the store the status it read: a screen that wins between r
   assert.equal((await reload(w.db, req.id)).status, "interviewing", "the other screen's change was overwritten");
 });
 
-test("a completed interview cannot be cancelled, even by the Judge Advisor or the judge on that panel", async () => {
+test("a completed interview cannot be cancelled by the Judge Advisor", async () => {
   const w = await world();
   const req = await liveRequest(w, "completed");
 
-  for (const who of [ADMIN, judgeOf(w.panelA)]) {
-    const reply = await patch(who, req.id, { action: "cancel" });
-    assert.equal(reply.status, 409, who.role);
-  }
+  const reply = await patch(ADMIN, req.id, { action: "cancel" });
+  assert.equal(reply.status, 409);
   const after = await reload(w.db, req.id);
   assert.equal(after.status, "completed");
   assert.equal(after.cancelled_at, null);
@@ -232,7 +276,7 @@ test("an open request can still be cancelled at every stage before it finishes",
   for (const status of ["requested", "acknowledged", "interviewing"] as const) {
     const w = await world();
     const req = await liveRequest(w, status);
-    const reply = await patch(judgeOf(w.panelA), req.id, { action: "cancel", from: status });
+    const reply = await patch(ADMIN, req.id, { action: "cancel", from: status });
     assert.equal(reply.status, 200, status);
     assert.equal(reply.body.request?.status, "cancelled");
     assert.ok(reply.body.request?.cancelled_at);
@@ -308,6 +352,37 @@ test("reassign: when it succeeds, the request and the team both move", async () 
   assert.equal((await w.db.listTeams()).find((t) => t.id === w.t1.id)?.panel_id, w.panelB.id);
 });
 
+test("reassign: a second move from the old panel is refused even when status has not changed", async () => {
+  const w = await world();
+  const mine = await liveRequest(w);
+  await w.db.reassignRequest(mine.id, w.panelA.id, w.panelB.id, mine.status);
+
+  await assert.rejects(
+    () => w.db.reassignRequest(mine.id, w.panelA.id, w.panelA.id, mine.status),
+    (e: unknown) => (e as { status?: number }).status === 409,
+  );
+  assert.equal((await reload(w.db, mine.id)).panel_id, w.panelB.id);
+  assert.equal((await w.db.listTeams()).find((t) => t.id === w.t1.id)?.panel_id, w.panelB.id);
+});
+
+test("reassign: a concurrent move after the route reads the request returns 409", async () => {
+  const w = await world();
+  const mine = await liveRequest(w);
+  const real = w.db.reassignRequest;
+  w.db.reassignRequest = async (id, oldPanel, newPanel, status) => {
+    await real(id, oldPanel, newPanel, status);
+    return real(id, oldPanel, newPanel, status);
+  };
+  try {
+    const reply = await patch(ADMIN, mine.id, { action: "reassign", panelId: w.panelB.id });
+    assert.equal(reply.status, 409);
+  } finally {
+    w.db.reassignRequest = real;
+  }
+  assert.equal((await reload(w.db, mine.id)).panel_id, w.panelB.id);
+  assert.equal((await w.db.listTeams()).find((t) => t.id === w.t1.id)?.panel_id, w.panelB.id);
+});
+
 /* ===== BUG-016: "ready now" converts the booking in one write ============= */
 
 test("ready-now turns the booking into a queue request in place: same row, slot cleared, nothing cancelled", async () => {
@@ -315,7 +390,7 @@ test("ready-now turns the booking into a queue request in place: same row, slot 
   const held = await booking(w, 12);
   const before = Date.now();
 
-  const reply = await patch(null, held.id, { action: "ready-now", from: "scheduled", language: "en", message: " by pit 4 " });
+  const reply = await patch(QUEUER, held.id, { action: "ready-now", from: "scheduled", language: "en", message: " by pit 4 " });
   assert.equal(reply.status, 200);
 
   const row = reply.body.request as RequestRow;
@@ -337,7 +412,7 @@ test("ready-now keeps the booking when it cannot go through", async () => {
 
   // Refused for a caller who may not touch it, and for a stale screen.
   assert.equal((await patch(REFEREE, held.id, { action: "ready-now" })).status, 403);
-  const stale = await patch(null, held.id, { action: "ready-now", from: "requested" });
+  const stale = await patch(QUEUER, held.id, { action: "ready-now", from: "requested" });
   assert.equal(stale.status, 409);
 
   const row = await reload(w.db, held.id);
@@ -349,7 +424,7 @@ test("ready-now keeps the booking when it cannot go through", async () => {
 test("ready-now is for bookings only", async () => {
   const w = await world();
   const walkUp = await liveRequest(w);
-  const reply = await patch(null, walkUp.id, { action: "ready-now" });
+  const reply = await patch(QUEUER, walkUp.id, { action: "ready-now" });
   assert.equal(reply.status, 409);
   assert.equal((await reload(w.db, walkUp.id)).status, "requested");
 });
@@ -358,7 +433,7 @@ test("ready-now cannot resurrect a booking another screen has just cancelled", a
   const w = await world();
   const held = await booking(w, 12);
 
-  // The team cancels on their phone after the desk's request was read.
+  // Another desk screen cancels after this screen read the booking.
   const real = w.db.updateRequest;
   w.db.updateRequest = async (id, p, ifStatus) => {
     await real(id, { status: "cancelled", cancelled_at: new Date().toISOString() });
@@ -426,12 +501,12 @@ test("the queue desk still cannot touch a request judges have taken", async () =
   assert.equal((await reload(w.db, req.id)).status, "acknowledged");
 });
 
-/* ===== D2: anonymous callers (accepted risk, pinned so it is a choice) ===== */
+/* ===== Public visitors may only read status =============================== */
 
-test("a team with no login can cancel an early request, and only an early one", async () => {
+test("a team with no login cannot cancel an early request", async () => {
   const w = await world();
   const early = await liveRequest(w);
-  assert.equal((await patch(null, early.id, { action: "cancel" })).status, 200);
+  assert.equal((await patch(null, early.id, { action: "cancel" })).status, 403);
 
   const w2 = await world();
   const underway = await liveRequest(w2, "acknowledged");
@@ -443,12 +518,12 @@ test("a team with no login can cancel an early request, and only an early one", 
 test("booking a slot that has already ended is a 409; a slot still to come is accepted", async () => {
   const w = await world();
 
-  const past = await post(null, { teamNumber: "1001", kind: "slot", ...slotOf(w.panelA, 3) });
+  const past = await post(QUEUER, { teamNumber: "1001", kind: "slot", ...slotOf(w.panelA, 3) });
   assert.equal(past.status, 409);
   assert.equal(past.body.error, "That slot has already passed.");
   assert.equal((await w.db.listRequests()).length, 0, "an expired booking was created anyway");
 
-  const future = await post(null, { teamNumber: "1001", kind: "slot", ...slotOf(w.panelA, 12) });
+  const future = await post(QUEUER, { teamNumber: "1001", kind: "slot", ...slotOf(w.panelA, 12) });
   assert.equal(future.status, 200, future.body.error);
 });
 
@@ -465,6 +540,44 @@ test("rescheduling onto a slot that has already ended is a 409 and leaves the bo
   assert.equal(future.status, 200, future.body.error);
 });
 
+test("rescheduling logs the new time on the Bangkok clock, wherever the server runs", async () => {
+  const w = await world();
+  // A grid starting 10:00 in Bangkok (03:00 UTC), so slot 1 is 10:20 there.
+  const panel = await w.db.createPanel({
+    name: "Panel C",
+    code: "WFC001",
+    division: ES,
+    judges: [],
+    languages: [],
+    sort_order: 1,
+    slot_start_at: "2099-01-01T03:00:00.000Z",
+    slot_minutes: 20,
+    slot_count: 6,
+  });
+  const held = await w.db.createRequest({
+    teamId: w.t1.id,
+    panelId: panel.id,
+    kind: "slot",
+    createdBy: "team",
+    language: "en",
+    ...slotOf(panel, 0),
+  });
+
+  // Vercel runs in UTC; any zone but Bangkok shows the old local-time line up.
+  const zone = process.env.TZ;
+  process.env.TZ = "America/Los_Angeles";
+  try {
+    const reply = await patch(ADMIN, held.id, { action: "reschedule", ...slotOf(panel, 1) });
+    assert.equal(reply.status, 200, reply.body.error);
+  } finally {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
+
+  const line = (await w.db.listActivity()).find((a) => a.request_id === held.id);
+  assert.equal(line?.action, "rescheduled to 10:20");
+});
+
 /* ===== the screens: what they send (source-checked, like the other pages) = */
 
 const root = new URL("..", import.meta.url).pathname;
@@ -472,17 +585,13 @@ const page = (path: string) => readFileSync(join(root, path), "utf8");
 
 test("the judge and admin consoles say which status they were showing when a button was pressed", () => {
   assert.match(page("src/app/judge/page.tsx"), /body: \{ action, from: request\.status, \.\.\.extra \}/);
-  assert.match(page("src/app/admin/page.tsx"), /body: \{ action, from: request\.status, \.\.\.extra \}/);
-  assert.match(page("src/app/admin/page.tsx"), /body: \{ action, from: request\.status, \.\.\.\(action === "set-status"/);
+  // The Floor's writes moved out of the page with the Floor itself (src/components/admin/FloorTab.tsx).
+  assert.match(page("src/components/admin/FloorTab.tsx"), /body: \{ action, from: request\.status, \.\.\.extra \}/);
+  // ...and so does the Teams tab's status override (src/components/admin/teamsLogic.ts).
+  assert.match(page("src/components/admin/teamsLogic.ts"), /body: \{ action, from: request\.status, \.\.\.\(action === "set-status"/);
 });
 
-test("'ready now' is one call on both screens, never cancel-then-create", () => {
-  const team = page("src/app/team/[number]/page.tsx");
-  const readyNow = team.slice(team.indexOf("function readyNow"), team.indexOf("async function cancel()"));
-  assert.match(team, /action: "ready-now"/);
-  assert.ok(readyNow.includes("booking?.id"), "readyNow no longer hands the held booking to the single ready-now call");
-  assert.ok(!readyNow.includes('"cancel"'), "readyNow cancels the booking again, then creates a request");
-
+test("'ready now' is one call on the desk screen, never cancel-then-create", () => {
   const desk = page("src/app/queue/page.tsx");
   const interviewNow = desk.slice(desk.indexOf("function interviewNow"), desk.indexOf("const bookSlot"));
   assert.match(desk, /action: "ready-now"/);

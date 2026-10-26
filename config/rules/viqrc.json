@@ -14,6 +14,13 @@
   "SG2",
   "S1"
  ],
+ "matchTypes": [
+  { "id": "P", "label": "Practice", "group": "teamwork" },
+  { "id": "Q", "label": "Qualification", "group": "teamwork" },
+  { "id": "F", "label": "Final", "group": "teamwork" },
+  { "id": "SKD", "label": "Driver", "group": "skills" },
+  { "id": "SKA", "label": "Auto", "group": "skills" }
+ ],
  "rules": [
   {
    "id": "SC1",

@@ -72,8 +72,7 @@ database setting the app needs, and you never have to look at it.
 dashboard open **Connect → Transaction pooler** (port 6543), copy the
 `postgresql://…pooler.supabase.com:6543/postgres` string, fill in your
 database password, and add it as `DATABASE_URL` in **Environment Variables**
-(Step 4). The app creates its own tables on first connect; running
-`supabase/schema.sql` in the SQL editor first is optional.
+(Step 4). The app creates its own tables on first connect.
 
 ---
 
@@ -92,6 +91,7 @@ as well:
 | `ADMIN_CODE_4` | Optional fourth Judge Advisor code. |
 | `QUEUER_CODE` | A code for whoever works the queue desk. |
 | `REFEREE_CODE` | A code for the referees, who flag what they see on the field. |
+| `HEAD_REFEREE_CODE` | A code for the head referee, who also sets the program and fields for the event. |
 | `SESSION_SECRET` | A long random string — see below. |
 
 **For `SESSION_SECRET`,** just mash your keyboard for 40+ characters. It does
@@ -140,7 +140,8 @@ All in the browser, at `your-address.vercel.app/admin`:
 
 1. **Panels tab** — click **Add preset panels**, then fill in each group's
    judge names. Each panel has a **code** and a **division**; write the codes
-   down and hand each one to that group.
+   down and hand each one to that group. Removing or moving a judge off a
+   panel rotates that panel's code; give its remaining judges the new code.
 2. **Import tab** — paste your team list, one per line:
    ```
    1234, Iron Hawks, Pit 12
@@ -166,6 +167,7 @@ A deployed app starts empty — no demo teams to clear.
 | Judges | `your-address.vercel.app/login` + their panel code |
 | Queue desk | `your-address.vercel.app/login` + your `QUEUER_CODE` |
 | Referees | `your-address.vercel.app/login` + your `REFEREE_CODE` |
+| Head referee | `your-address.vercel.app/login` + your `HEAD_REFEREE_CODE` |
 | The TV | `your-address.vercel.app/board`, then press Fullscreen |
 
 Make the team address short and readable — Vercel lets you rename the project

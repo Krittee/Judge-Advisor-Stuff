@@ -1,4 +1,5 @@
 import type { Status } from "./status";
+import type { MatchType } from "./rules";
 
 export type Panel = {
   id: string;
@@ -78,9 +79,28 @@ export type TeamCategoryView = {
   excludesRubrics: string[];
 };
 
+/**
+ * A person on the Judge Advisor's roster. A judge sits on at most one
+ * panel; the panel's `judges` list is derived from this, never stored on
+ * the panel. Conflicts point at a judge's id, not at a typed name.
+ */
+export type JudgeRow = {
+  id: string;
+  name: string;
+  note: string | null;
+  panel_id: string | null;
+  created_at: string;
+};
+
+/**
+ * Exactly one of `judge_id` and `panel_id` is set: a judge's conflict (the
+ * panel they are on is blocked from the team), or a whole-panel conflict
+ * from before there was a roster. `judge_name` is only ever read on the latter.
+ */
 export type ConflictRow = {
   id: string;
-  panel_id: string;
+  panel_id: string | null;
+  judge_id: string | null;
   team_id: string;
   judge_name: string | null;
   note: string | null;
@@ -102,10 +122,14 @@ export type FlagRow = {
   kind: string;
   body: string;
   author: string;
-  /** One of config/event.json's matchTypes ids (P/Q/F). Null on a flag
-   *  recorded before this was required. */
+  /** One of the flag's ruleset's matchTypes ids (config/rules/*.json: Q, QF,
+   *  SKD...), or the legacy "SK". Null on a flag recorded before this was
+   *  required. */
   match_type: string | null;
+  /** "23", or "2-1" (bracket and match) for a V5RC elimination. */
   match_number: string | null;
+  /** The field number as a string ("2"); a flag recorded before fields were
+   *  just a number may hold a prefixed one ("HS2"). */
   field: string | null;
   /** Rule ids from src/lib/rules.ts, comma-joined ("GG17,SG9"; one rule is
    *  just "SG6"). Null for Good Conduct, an optional-rule Warning, or a flag
@@ -122,6 +146,23 @@ export type FlagRow = {
   created_at: string;
 };
 
+/**
+ * The program and number of fields every referee works from at this event.
+ * One record per event: saved by any referee or the Judge Advisor, and read
+ * by anyone (nothing in it is secret).
+ */
+export type RefereeSetup = {
+  /** A ruleset id ("viqrc", "v5rc"). */
+  ruleset: string;
+  /** 1 to 20. */
+  field_count: number;
+  /** The name of whoever saved it. */
+  set_by: string;
+  /** YYYY-MM-DD on the saver's own device clock -- see parseRefereeSetup. */
+  set_on: string;
+  updated_at: string;
+};
+
 export type ScoreRow = {
   id: string;
   team_id: string;
@@ -135,14 +176,79 @@ export type ScoreRow = {
   updated_at: string;
 };
 
+/** One of config/event.json's awards, as the browser receives it (judges and the Judge Advisor only). */
+export type AwardView = {
+  id: string;
+  label: string;
+  short: string;
+  blurb: string;
+};
+
+/** Whose nomination a row is: a judge's, or the Judge Advisor's own. */
+export type NominationRole = "judge" | "admin";
+
+/**
+ * One judge's nomination of one team for one award. The key is
+ * (award_id, team_id, panel_id, judge): two judges on a panel nominating the
+ * same team are two rows, which is what "2 judges" counts. The Judge Advisor
+ * can nominate too, for any team: that row has role "admin" and no panel, and
+ * its `judge` is the Judge Advisor's session name.
+ */
+export type NominationRow = {
+  id: string;
+  /** One of config/event.json's awards ids. */
+  award_id: string;
+  team_id: string;
+  /** The nominating judge's panel; null once that panel has been deleted, and always null for the Judge Advisor's. */
+  panel_id: string | null;
+  /** The nominator's session name, like a note's author. */
+  judge: string;
+  role: NominationRole;
+  reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** The Judge Advisor's pick for one award in one division. Secret until the ceremony. */
+export type WinnerRow = {
+  award_id: string;
+  division: string;
+  team_id: string;
+  decided_by: string;
+  decided_at: string;
+};
+
+/**
+ * GET /api/awards for the Judge Advisor: every nomination and every winner.
+ * A judge's reply is `AwardsJudgeView` and has no `winners` key at all, so
+ * `"winners" in reply` tells the two apart.
+ */
+export type AwardsAdminView = { awards: AwardView[]; nominations: NominationRow[]; winners: WinnerRow[] };
+/** GET /api/awards for a judge: their own panel's nominations only, and never a winner. */
+export type AwardsJudgeView = { awards: AwardView[]; nominations: NominationRow[] };
+
+/** POST /api/awards (a judge or the Judge Advisor nominates, or changes the reason). */
+export type NominateReply = { nomination: NominationRow };
+/** DELETE /api/awards (a judge withdraws their own; the Judge Advisor removes any, by id) and DELETE /api/awards/winners (clear). `removed` is false when there was nothing to remove. */
+export type RemoveReply = { ok: true; removed: boolean };
+/** PUT /api/awards/winners. */
+export type WinnerReply = { winner: WinnerRow };
+
+export type ActivityKind = "request" | "referee" | "conflict" | "setup" | "award";
+
 export type ActivityRow = {
   id: string;
   request_id: string | null;
   team_id: string | null;
+  kind: ActivityKind;
+  /** The plain name; `actor_role` is what they were acting as ("Judge Advisor", "Panel 2", "Referee", "Head referee", "Front desk", "Team"). */
   actor: string;
+  actor_role: string | null;
   action: string;
   detail: string | null;
   created_at: string;
+  /** `teams.number` of `team_id`; null when the entry names no team. */
+  team_number: string | null;
 };
 
 /** Panel with its judge code stripped — safe to send to any browser. */
@@ -161,10 +267,15 @@ export type AppState = {
   languages: { id: string; label: string; short: string }[];
   /** Panel/team pairs that must stay apart. */
   conflicts: ConflictRow[];
+  /** The judge roster. Admin only: judges and the desk are sent none. */
+  judges: JudgeRow[];
   /** Which way round the pit floor is drawn, so the plan matches the room. */
   pitFloor: { columns: "left-to-right" | "right-to-left"; rows: "top-to-bottom" | "bottom-to-top" };
-  /** The match types a flag can be pinned to (P/Q/F), so it can be traced back. */
-  matchTypes: { id: string; label: string }[];
+  /** The match types a new flag can be pinned to under the event's program
+   *  (VEX IQ's when no setup is saved yet), so it can be traced back. */
+  matchTypes: MatchType[];
+  /** Null until a referee or the Judge Advisor sets the event up. */
+  refereeSetup: RefereeSetup | null;
   /** The kinds of flag a referee can record, with their colours. */
   flagKinds: {
     id: string;

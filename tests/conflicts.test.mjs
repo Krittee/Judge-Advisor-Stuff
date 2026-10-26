@@ -34,7 +34,7 @@ test("the event runs English and Thai", () => {
 test("a language resolves from its id, short code or label", () => {
   assert.equal(resolveLanguage("th"), "th");
   assert.equal(resolveLanguage("TH"), "th");
-  assert.equal(resolveLanguage("ไทย (Thai)"), "th");
+  assert.equal(resolveLanguage("Thai"), "th");
   assert.equal(resolveLanguage("English"), "en");
   assert.equal(resolveLanguage("EN"), "en");
 });

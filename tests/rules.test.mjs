@@ -7,7 +7,6 @@ import {
   isValidRuleId,
   isValidRulesetId,
   joinRuleList,
-  manualLabel,
   parseRuleList,
   ruleDisplayLabel,
   RULESETS,
@@ -364,12 +363,6 @@ test("ruleDisplayLabel reads \"<ID> — official title\" for both rulesets, null
   assert.equal(ruleDisplayLabel(undefined), null);
   assert.equal(ruleDisplayLabel(""), null);
   assert.equal(ruleDisplayLabel("not-a-rule"), null);
-});
-
-test("manualLabel comes from the data, and is just the label when no version is recorded", () => {
-  assert.equal(manualLabel(V5), "Override Manual v2.1");
-  assert.equal(manualLabel(IQ), "VEX IQ");
-  assert.equal(manualLabel({ ...V5, manualVersion: "3.0" }), "Override Manual v3.0");
 });
 
 /* ---- a flag stores its rules as one comma-joined list ------------------- */

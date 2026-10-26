@@ -1,8 +1,8 @@
 # Judge Queue
 
-A judging queue and interview tracker for a robotics-style event. Teams request
-a judge from their phone; judges work the queue; a colour-coded board shows the
-whole floor at a glance.
+A judging queue and interview tracker for a robotics-style event. Teams ask the
+queue desk for an interview and follow its status on their phones; judges work
+the queue; a colour-coded board shows the whole floor at a glance.
 
 ## Two ways to run it
 
@@ -45,8 +45,9 @@ cp .env.example .env.local     # then edit the codes
 |---|---|---|
 | `ADMIN_CODE` | `JA2026` | First Judge Advisor. Full control. |
 | `ADMIN_CODE_2`–`ADMIN_CODE_4` | unset | Optional codes for up to three more Judge Advisors. |
-| `QUEUER_CODE` | `DESK01` | Queue desk. Can only add teams to the queue. |
+| `QUEUER_CODE` | `DESK01` | Queue desk. Can request or book for teams and change early bookings. |
 | `REFEREE_CODE` | `REF001` | Referees. Can only flag what they saw on the field. Referees must enter their name to sign in; flags are recorded under it. |
+| `HEAD_REFEREE_CODE` | `HREF01` | The head referee: a referee who can also set the event program and fields and correct filed flags. Keep it different from `REFEREE_CODE`. |
 | `SESSION_SECRET` | insecure key | Signs the login cookie. `openssl rand -base64 32` |
 | `TRUST_PROXY` | unset | Set to `1` only if a reverse proxy **you control** sits in front of the app and sets `X-Forwarded-For` itself. See below. |
 | `DATABASE_URL` | unset | Set it to use Postgres; unset uses the JSON file. |
@@ -74,7 +75,10 @@ it unset.
 
 Judge panel codes are **not** environment variables. Each panel gets its own,
 generated in the admin console under **Panels** — so you can add a panel
-mid-event without restarting anything.
+mid-event without restarting anything. Removing or moving a judge off a panel
+generates a new shared code for that panel and signs out everyone on it. Give
+the new code to the remaining judges. Judges also sign in again on each new
+Bangkok calendar day.
 
 ---
 
@@ -144,10 +148,11 @@ same refusal.
 
 | | request | advance status | cancel | judging notes | manage teams & panels |
 |---|:---:|:---:|:---:|:---:|:---:|
-| **Team** (no login) | own team | — | own request | — | — |
+| **Team** (no login) | — | — | — | — | — |
 | **Queue desk** (`QUEUER_CODE`) | any team | — | un-seen only | — | — |
-| **Judge** (panel code) | own panel | **own panel** | own panel | **own panel** | — |
+| **Judge** (panel code) | — | **own panel** | — | **own panel** | — |
 | **Referee** (`REFEREE_CODE`) | — | — | — | — | — |
+| **Head referee** (`HEAD_REFEREE_CODE`) | — | — | — | — | — |
 | **Judge Advisor** (`ADMIN_CODE`–`ADMIN_CODE_4`) | any | any | any | any | ✅ |
 
 A referee sits outside that table: they touch no interview and read no
@@ -159,7 +164,7 @@ poll `/api/state` with no login, so conflicts go only to the Judge Advisor and,
 for their own panel, to judges. The desk and anonymous viewers get an empty
 list — not a filtered one.
 
-**"Own panel" is the load-bearing part.** A judge may only advance, cancel, read
+**"Own panel" is the load-bearing part.** A judge may only advance, read
 or write against teams assigned to the panel whose code they typed. Another
 panel's team returns `403` on every one of those, and a judge's `/api/state` is
 scoped to their own division — they do not receive the other division's teams at
@@ -170,16 +175,14 @@ board change without you touching it. If you would rather they could not, one
 line in `canAdvance()` in [`src/lib/auth.ts`](src/lib/auth.ts) turns it off.
 
 The queue desk can also **cancel, reschedule or mark "ready now"** any request
-that is still early (*requested* or *scheduled*), whoever made it — a team that
-booked from its phone and then walks up to the desk is who the desk is for. Once
+that is still early (*requested* or *scheduled*), whoever entered it. Once
 judges acknowledge it, it is out of their hands.
 
 ---
 
 ## Booking: now, or later
 
-Both routes are offered side by side, on the team's own page and at the queue
-desk:
+Both routes are offered at the queue desk. The team's page shows status only:
 
 - **Interview now** — joins the walk-up queue and goes straight to orange.
 - **Book a time** — claims one of the panel's slots and waits at *scheduled*
@@ -231,14 +234,13 @@ For a **walk-up**, the ask is one button per language rather than a button plus
 a menu — the language is chosen in the same tap as the request, so it cannot be
 left on whatever the last team picked:
 
-- team's own page — *"Request a judge — English"* / *"Request a judge — ไทย"*
 - queue desk — *"Request — English"* / *"Request — ไทย"*
 
-(If the team already holds a booking, those read *"We're ready now — …"* and
-*"Now — …"*, and either one frees the slot before queueing them.)
+(If the team already holds a booking, the desk can choose *"Now — …"* to free
+the slot before queueing them.)
 
-For a **booking**, the language is picked once above the slot grid — chips on
-the team page, a dropdown at the desk — then applies to the slot they claim.
+For a **booking**, the language is picked once above the desk's slot grid and
+applies to the slot they claim.
 
 The language travels with the request: a short **EN**/**TH** tag on the judge
 console and the board, and a `language` column in storage.
@@ -353,20 +355,42 @@ months later when someone asks why a panel never saw a particular team.
 Referees work the field, not the judging room, and what they see there is
 often the thing a judge most needs to know. `/referee` is their page:
 
-0. Once per device: pick the **ruleset** (VEX IQ or V5RC Override) at the
-   top of the form. It is remembered on that device.
-1. Find the team — **type the number** if you can read it off the robot,
-   or **All teams** to scroll and pick one.
-2. Say which match — **P / Q / F** and the match number — and which
-   **field**.
-3. Pick the **rule(s)** broken, and say what happened if it needs saying.
-4. Tap how serious it was.
+0. **Once per event, not per device:** the **head referee** (the referee who
+   signed in with `HEAD_REFEREE_CODE`) opens `/referee` each day to **Event
+   setup** — the **program** (V5RC or VIQRC) and the **number of fields**
+   (1–20, default 3). It is saved for everyone, and every referee then works
+   from it, so there is no ruleset to pick on a phone. Until it is done every
+   other referee sees *Waiting for the head referee*, and the page opens on
+   its own once it is. The screen comes back once a day pre-filled with
+   yesterday's choice (a multi-day event is one tap), and a change to a setup
+   other referees are already using asks first. The head referee, or the
+   Judge Advisor, can change it later from the *{PROGRAM} · {N} fields* tag at
+   the top of the console; other referees see that tag but cannot open it.
+   Every save is logged in the Activity log.
+1. **Set the match** — the pinned *Current match* bar (`QF 2-1 · Field 2`,
+   with the program as a read-only tag) opens the *Set the match* sheet:
+   **Teamwork** or **Skills**, the match type and number, and the field.
+2. Find the **team to flag** — **type the number** if you can read it off
+   the robot, or use **All teams** to scroll and pick one. A referee cannot
+   know who is in a match, so there is no roster step: you flag the one team
+   you saw. Under the box, one line gives its name, division and pit, with
+   any flags it already has.
+3. Pick the **rule(s)** broken — the program's common rules are chips, and
+   **All rules** opens the whole manual with search — and add a note if it
+   needs saying.
+4. Tap **how serious** it was, then **Record**. A severity button only
+   selects; the pinned Record bar (`Record Minor · 9882K`) saves, and
+   says in one line what it is still waiting for.
 
-The **All teams** page searches by number, name *or* pit (`9882`, `nova`
-and `A1` all find a team), filters by division, and narrows to teams that
-have already been flagged. Picking one hands it to the flagging page
-rather than repeating the form there, so a flag is still only ever
-written in one place.
+The tab bar along the bottom has **Report**, **All teams** and **Today**
+(the *Flagged today* section, further down the Report page).
+
+The **All teams** page has a pinned search by number, name *or* pit (`9882`,
+`nova` and `A1` all find a team), a division filter, a *Flagged only* chip
+and a `shown of total teams` count. Each row shows the team's number, name,
+division and pit, and any flags it has; tapping one opens Report with that
+team filled in, rather than repeating the form there, so a flag is still
+only ever written in one place.
 
 Five kinds, each its own colour, ordered least to most serious so the
 sharpest button is not the one under your thumb:
@@ -390,43 +414,50 @@ anyone who cannot separate amber from orange still knows which is which.
 A flag is only useful to a head referee later if it can be traced back to a
 moment, so every one carries a match reference:
 
-- **Match** — a dropdown, **P**ractice / **Q**ualification / **F**inal.
-- **Match #** — the match number.
-- **Field** — an ES/MS/HS/BL selector plus its short field number.
+- **Teamwork or Skills.** Teamwork is **P**ractice and **Q**ualification in
+  both programs, **F**inal in VIQRC, and in V5RC the eliminations **R16**,
+  **QF**, **SF** and **F**, whose number is a bracket and a match (`QF 2-1`).
+  Skills is **Driver** or **Auto** with a run number.
+- **Field** — a plain number, 1 to the event's field count (`Field 2`).
 
-All three are required; the description is optional. A flag nobody can trace
-back is not much use days later. They show up everywhere a flag does as a
-compact reference, `Q23 · ES2`, right beside who wrote it and when.
+The match and field are required; the note is optional. A flag nobody can
+trace back is not much use days later. They show up everywhere a flag does
+as a compact reference, `Q23 · Field 2`, right beside who wrote it and
+when. A flag recorded with an old `HS2`-style field still shows and can be
+corrected without losing it.
 
 **Match and field are remembered between flags, on purpose.** A referee
 works one match at a time and often flags more than one team against it,
-so only the description clears after each save — re-typing the match for
-every team would work against the whole point of tracking it. Change the
-dropdown or the number the moment you move to a different match; there is
-nothing that resets them for you.
+so after each save only the note, rules, match-affecting tick and severity
+clear — the team, the match and the field stay, and re-typing them for
+every team would work against the whole point of tracking it. Open *Set the
+match* the moment you move to a different one; nothing resets it for you.
 
 ### Rulesets and rules
 
-The event runs VEX IQ and V5RC side by side, so a flag names a **ruleset**
-first (the dropdown at the top of the referee form, with the manual edition
-underneath — "Override Manual v2.1"), then **one or more rules** from it
-(up to 5). Switching ruleset clears the rules you had picked, because a rule
-id means nothing outside its own manual.
+VEX IQ and V5RC have different manuals, so a flag names a **ruleset** — and
+it is always the event's: the program set in Event setup. The server fills it
+in when a request leaves it out and refuses another ("This event is set to
+V5RC Override."). A flag then cites **one or more rules** from that manual
+(up to 5). Changing the program clears the rules you had picked, because a
+rule id means nothing outside its own manual.
 
-The **Rules violated** picker is one searchable, multi-select list:
+The rules are picked on the form like this:
 
-- Search by id (`SG6`), title words (`holding`, `autonomous`) or number.
-- Rules are grouped by the manual's categories in collapsible sections —
-  Scoring, Specific Game and General Game open, the rest collapsed; every
-  section opens while you are searching. Each row reads
-  `<SG6> — <the manual's own title>`.
-- Common field rules sit at the top as shortcuts; picked rules show above as
-  removable chips (`SG9 ×`).
+- The program's **common rules** are chips under *What happened*; tap to
+  select, tap again to undo. Anything picked from the full list is shown
+  there too, so what is selected can always be seen.
+- **All rules · n in V5RC Override** opens the whole manual in a full-screen
+  dialog: search by id (`SG6`), title words (`holding`, `autonomous`) or
+  number; *Common* first, then each of the manual's categories as a
+  collapsible group with its count (every group opens while you search). Each
+  row reads `<SG6> — <the manual's own title>`.
 - TS1–TS3 (this event's Tournament Special rules) are in **every** ruleset.
 
 A rule is required for Minor, Major and Disqualified, optional for Warning,
 and never attached to Good Conduct. **Match affecting** can be ticked for a
-Minor or Major (the server stores it only for those two). The referee page
+Minor or Major (the server stores it only for those two; the switch appears
+once a rule is picked). The referee page
 shows same-rule, same-match and overall active-event history — per rule
 picked, and only against flags from the **same ruleset** (V5RC `SG6` and IQ
 `SG6` are different rules; a flag recorded before rulesets existed counts as
@@ -487,18 +518,14 @@ shows up in three places:
 - **Only a referee raises a flag.** Not a judge, not the Judge Advisor.
   A flag is a record of what an official saw; if anyone could add one it
   would stop meaning that, so the API refuses all three.
-- **A referee or the Judge Advisor can correct one** — the wrong severity
-  tapped, a mis-typed match number. Tapping "edit" on a flag reopens the
-  same form it was raised with, pre-filled, and re-selecting a kind saves
-  the whole correction the same way raising it did in the first place.
-- **Only the Judge Advisor removes one** — and a referee cannot remove
-  their own, or a flag could be quietly unsaid after a team complained.
-  Correcting is not that: the incident stays on the board, just described
-  more accurately, and every correction is logged to Activity (`corrected
-  a flag: major → minor`) so nothing about it happens quietly either.
-  Team and author cannot be changed this way — reassigning a flag to a
-  different team is a bigger mistake than this fixes, and goes through
-  the Judge Advisor deleting and refiling it.
+- **The Head Referee or Judge Advisor corrects one; only the Judge Advisor
+  removes one.** Ordinary referees discuss a correction with either of them.
+  A correction stays on the board and is logged to Activity (`corrected a flag:
+  major → minor`). Ordinary referees share an access code, so a typed name
+  cannot prove who filed a report.
+  Team and author cannot be changed by correction — reassigning a flag to a
+  different team requires the Judge Advisor to remove the wrong report and
+  a referee to file the replacement.
 - **Judges read their own panel's only**, the same wall notes and scores
   sit behind. They cannot correct or remove a flag — read-only, same as
   everything else in judging.
@@ -526,15 +553,21 @@ They live in `config/event.json` and are yours to change:
 what fits on a chip. Colours are `emerald`, `amber`, `orange`, `rose`,
 `black`, `sky` and `zinc`.
 
-The match types are separate, in the same file:
+The match types depend on the program, so they live with each ruleset in
+`config/rules/*.json` (not in `event.json`), each with a `group` of `teamwork`
+or `skills`. A V5RC elimination (`R16`, `QF`, `SF`, `F`) carries
+`"bracket": true`, which makes its number a bracket and a match (`2-1`):
 
 ```json
 "matchTypes": [
-  { "id": "P", "label": "Practice" },
-  { "id": "Q", "label": "Qualification" },
-  { "id": "F", "label": "Final" }
+  { "id": "Q", "label": "Qualification", "group": "teamwork" },
+  { "id": "QF", "label": "Quarterfinal", "group": "teamwork", "bracket": true },
+  { "id": "SKD", "label": "Driver", "group": "skills" }
 ]
 ```
+
+Skills runs are stored as `SKD` (Driver) and `SKA` (Auto); the older plain
+`SK` stays valid on a flag that already has it but is no longer offered.
 
 ### Signing in
 
@@ -547,6 +580,10 @@ the staff page.
 
 The code is `REFEREE_CODE` (development default `REF001`, which — being
 printed here — is refused in production like every other published code).
+The head referee signs in the same way, at any door, with
+`HEAD_REFEREE_CODE` (development default `HREF01`): a referee in every
+respect, who also sets up refereeing. If the two codes are set equal, the
+code is a plain referee's.
 
 ---
 
@@ -771,7 +808,7 @@ labels and ordering all live in one table.
 
 ## On a phone
 
-Teams request from their own phones and judges work off theirs, so every
+Teams read status from their own phones and judges work off theirs, so every
 screen is checked at phone size rather than assumed to reflow.
 
 - **Nothing scrolls sideways** on any screen, down to a 320px-wide viewport.
@@ -792,7 +829,7 @@ screen is checked at phone size rather than assumed to reflow.
   number on a phone in a loud hall.
 
 Checked on iPhone SE (375x667), iPhone 14 (390x844) and Pixel 7 (412x915),
-by driving real taps through each screen: a team requesting a judge, a judge
+by driving real taps through each screen: a desk worker requesting a judge, a judge
 advancing the status and saving a note, and the Judge Advisor reaching every
 tab.
 
@@ -803,7 +840,7 @@ tab.
 | URL | Who | What |
 |---|---|---|
 | `/` | teams | Enter team number |
-| `/team/1234` | teams | Status, request a judge, book a slot |
+| `/team/1234` | teams | Read request and booking status |
 | `/board` | everyone | Big-screen board. Has a fullscreen button. |
 | `/login` | staff | One code box for all three staff roles |
 | `/judge` | judges | Your panel's queue, oldest orange first |
@@ -847,11 +884,11 @@ rather than demo data, so a real event never finds itself with invented teams.
 
 ## Known limitations
 
-- **Anyone on the network can cancel or reschedule an early request.** A team
-  needs no login to cancel its own request, and request ids are public (they are
-  in `/api/state`), so anyone who can reach the app can cancel or move any
-  *requested* or *scheduled* request. Accepted for a LAN event; there are
-  deliberately no per-request tokens.
+What happened to each audit finding, and what is still open, is in the status table at the top of the [Full application bug audit](FULL_APPLICATION_BUG_AUDIT.md).
+
+- **Team status is public.** Anyone who knows a team number can view its queue
+  and booking status. Request creation and booking changes require a queue desk
+  or Judge Advisor session.
 
 ---
 
@@ -874,7 +911,9 @@ Four runtime dependencies: `next`, `react`, `react-dom`, `jose`.
   to another panel from the dropdown.
 - **Someone queued the wrong team.** Queue desk can undo it while it is orange;
   after that, admin cancels it from the Floor tab.
-- **A judge lost their code.** Admin → Panels shows every code.
+- **A judge lost their code.** Admin → Panels shows every current code. If a
+  judge was removed or moved, share the new code with everyone remaining on
+  their old panel.
 - **You need to know what happened.** Admin → Activity logs every status change
   with who did it.
 - **The server restarted.** Nothing is lost — it reloads from the file.

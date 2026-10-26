@@ -7,13 +7,14 @@ import specialsFile from "../../config/rules/event-specials.json";
  *
  * The event runs VEX IQ and V5RC side by side, so a flag names a RULESET
  * first and then one or more rules from it. Each ruleset is one JSON file
- * (id, program, game, label, manual version, common-rule shortcuts and the
- * rules themselves); this module is the only place those files are read.
+ * (id, program, game, label, manual version, common-rule shortcuts, the
+ * match types the program runs and the rules themselves); this module is the
+ * only place those files are read.
  * The data lives in config, the same way rubrics.json does, so tests can
  * read the real rulesets directly rather than a hand-mirrored copy -- this
  * repo's tests run under plain `node --test` via tsx. A season's rules are
  * fixed by VEX, not something an event organizer customizes per event, so
- * unlike refereeFlags/matchTypes in config/event.json there is no admin UI
+ * unlike refereeFlags in config/event.json there is no admin UI
  * over these files.
  *
  * To add a new manual version: drop its JSON in config/rules/, import it
@@ -35,6 +36,17 @@ export type Rule = {
   searchKeywords: string[];
 };
 
+/** A kind of match a flag can be pinned to, as one ruleset offers it. */
+export type MatchType = {
+  /** Stored on a flag: "Q", "QF", "SKD". */
+  id: string;
+  label: string;
+  /** Skills runs are one team alone; every other type is a Teamwork match. */
+  group: "teamwork" | "skills";
+  /** Its number is a bracket and a match ("2-1"), not a single number. */
+  bracket: boolean;
+};
+
 export type Ruleset = {
   /** Stable id stored on a flag ("viqrc", "v5rc"). */
   id: string;
@@ -46,6 +58,8 @@ export type Ruleset = {
   manualVersion: string | null;
   /** Shortcut ids shown at the top of the picker. */
   commonRuleIds: string[];
+  /** The match types a new flag can be pinned to under this program. */
+  matchTypes: MatchType[];
   rules: Rule[];
 };
 
@@ -106,6 +120,23 @@ function parseRules(raw: unknown): Rule[] {
     .filter((r): r is Rule => r !== null);
 }
 
+function parseMatchTypes(raw: unknown): MatchType[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry): MatchType | null => {
+      const o = (entry ?? {}) as Record<string, unknown>;
+      const id = String(o.id ?? "").trim();
+      if (!id) return null;
+      return {
+        id,
+        label: String(o.label ?? id),
+        group: o.group === "skills" ? "skills" : "teamwork",
+        bracket: o.bracket === true,
+      };
+    })
+    .filter((t): t is MatchType => t !== null);
+}
+
 /** Event specials (TS1-TS3) go after the official categories of EVERY
  *  ruleset, so a sportsmanship report is available whichever is selected. */
 const EVENT_SPECIALS = parseRules((specialsFile as { rules?: unknown }).rules);
@@ -131,6 +162,7 @@ function parseRuleset(raw: unknown): Ruleset | null {
     commonRuleIds: (Array.isArray(o.commonRuleIds) ? o.commonRuleIds : [])
       .map((r) => String(r).trim().toUpperCase())
       .filter((r) => known.has(r)),
+    matchTypes: parseMatchTypes(o.matchTypes),
     rules,
   };
 }
@@ -156,10 +188,25 @@ export function isValidRulesetId(id: unknown): boolean {
   return typeof id === "string" && RULESETS.some((r) => r.id === id);
 }
 
-/** "Override Manual v2.1"; just the label when no version is recorded.
- *  The version comes from the data file, never from a component. */
-export function manualLabel(ruleset: Ruleset): string {
-  return ruleset.manualVersion ? `${ruleset.game} Manual v${ruleset.manualVersion}` : ruleset.label;
+/** Recorded before Driver and Auto were told apart. Still valid on a flag
+ *  that already holds it, never offered for a new one. */
+const LEGACY_MATCH_TYPES: MatchType[] = [
+  { id: "SK", label: "Skills", group: "skills", bracket: false },
+];
+
+/** The type a ruleset offers, or a legacy one; null for anything else. */
+export function findMatchType(id: string | null | undefined, rulesetId?: string | null): MatchType | null {
+  return (
+    getRuleset(rulesetId).matchTypes.find((t) => t.id === id) ??
+    LEGACY_MATCH_TYPES.find((t) => t.id === id) ??
+    null
+  );
+}
+
+/** Whether this type's number is a bracket and a match ("2-1"). It depends
+ *  on the program: Final is a plain number in VEX IQ and a bracket in V5RC. */
+export function isBracketMatch(id: string | null | undefined, rulesetId?: string | null): boolean {
+  return findMatchType(id, rulesetId)?.bracket === true;
 }
 
 function findRule(id: string | null | undefined, rulesetId?: string | null): Rule | null {

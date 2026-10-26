@@ -1,8 +1,9 @@
 "use client";
 
+import type { Language } from "@/lib/presets";
 import type { PublicPanel } from "@/lib/types";
 
-export type Language = { id: string; label: string; short: string };
+export type { Language };
 
 /** The language an interview will run in, as a small tag. */
 export function LanguageTag({
@@ -29,6 +30,14 @@ export function LanguageTag({
 }
 
 /**
+ * Whether a request in `asking` lands on a panel that has said which
+ * languages it covers and left that one out. An unstated cover is never a gap.
+ */
+export function hasLanguageGap(covers: string[], asking?: string): boolean {
+  return !!asking && covers.length > 0 && !covers.includes(asking);
+}
+
+/**
  * What this panel can interview in.
  *
  * Says nothing when a panel has not stated its languages — an unstated
@@ -51,7 +60,7 @@ export function LanguageCover({
     .map((id) => languages.find((l) => l.id === id)?.label ?? id)
     .join(", ");
 
-  const gap = asking && !panel.languages.includes(asking);
+  const gap = hasLanguageGap(panel.languages, asking);
   const wanted = languages.find((l) => l.id === asking)?.label ?? asking;
 
   return (

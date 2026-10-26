@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
+import { createHmac } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { store } from "./db";
+import { bangkokDay } from "./stepTimes";
 
 export const ROLES = ["admin", "judge", "queuer", "referee"] as const;
 export type Role = (typeof ROLES)[number];
@@ -10,10 +12,15 @@ export type Session =
   | { role: "admin"; name: string }
   | { role: "judge"; name: string; panelId: string; panelName: string }
   | { role: "queuer"; name: string }
-  | { role: "referee"; name: string };
+  | { role: "referee"; name: string; head?: true };
 
 const COOKIE = "jq_session";
-const MAX_AGE = 60 * 60 * 16; // one long event day
+const MAX_AGE = 60 * 60 * 16; // upper bound; judges also stop at the next Bangkok day
+
+// The event's day is Bangkok's calendar day; the timezone lives in bangkokDay().
+const judgeDay = () => bangkokDay(new Date().toISOString());
+const panelAuth = (id: string, code: string) =>
+  createHmac("sha256", secret()).update(id).update("\0").update(code.trim().toUpperCase()).digest("hex");
 
 /**
  * Whether this looks like a real deployment rather than a laptop running
@@ -80,8 +87,12 @@ function secret(): Uint8Array {
   return new TextEncoder().encode(value);
 }
 
-export async function createSession(session: Session): Promise<void> {
-  const token = await new SignJWT({ ...session })
+export async function createSession(session: Session, code?: string): Promise<void> {
+  if (session.role === "judge" && !code) throw new Error("A judge session needs the panel code.");
+  const claims = session.role === "judge"
+    ? { panelAuth: panelAuth(session.panelId, code!), judgeDay: judgeDay() }
+    : {};
+  const token = await new SignJWT({ ...session, ...claims })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
@@ -106,15 +117,24 @@ export async function getSession(): Promise<Session | null> {
   try {
     const { payload } = await jwtVerify(token, secret());
     const role = payload.role;
-    if (role === "admin" || role === "queuer" || role === "referee") {
+    if (role === "admin" || role === "queuer") {
       return { role, name: String(payload.name ?? role) };
     }
+    if (role === "referee") {
+      const name = String(payload.name ?? role);
+      // Only a literal `true` in a token we signed is the head referee;
+      // "true", 1 or anything else is a referee like any other.
+      return payload.head === true ? { role, name, head: true } : { role, name };
+    }
     if (role === "judge" && typeof payload.panelId === "string") {
+      if (typeof payload.panelAuth !== "string" || payload.judgeDay !== judgeDay()) return null;
+      const panel = await store().findPanelById(payload.panelId);
+      if (!panel || !sameCode(payload.panelAuth, panelAuth(panel.id, panel.code))) return null;
       return {
         role: "judge",
         name: String(payload.name ?? "Judge"),
         panelId: payload.panelId,
-        panelName: String(payload.panelName ?? "Panel"),
+        panelName: panel.name,
       };
     }
     return null;
@@ -146,7 +166,7 @@ const warnedAboutCode = new Set<string>();
  * so in production they are not access codes at all — setting one
  * explicitly is refused just as firmly as leaving it unset.
  */
-const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "REF001", "ALPHA1", "BRAVO2", "CHARLIE3"]);
+const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "REF001", "HREF01", "ALPHA1", "BRAVO2", "CHARLIE3"]);
 
 /** Read and validate a code that may be left unset. */
 function configuredRoleCode(envVar: string): string {
@@ -220,6 +240,7 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
   const adminSlot = adminCodeSlots().find((slot) => sameCode(code, slot.code));
   const queuerCode = roleCode("QUEUER_CODE", "DESK01");
   const refereeCode = roleCode("REFEREE_CODE", "REF001");
+  const headRefereeCode = roleCode("HEAD_REFEREE_CODE", "HREF01");
   const cleanName = name.trim().slice(0, 60);
 
   if (adminSlot) {
@@ -230,6 +251,11 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
   }
   if (refereeCode && sameCode(code, refereeCode)) {
     return { role: "referee", name: cleanName || "Referee" };
+  }
+  // After the shared code, so if the two are set equal the code stays a
+  // plain referee's: a collision must never promote everyone.
+  if (headRefereeCode && sameCode(code, headRefereeCode)) {
+    return { role: "referee", name: cleanName || "Head referee", head: true };
   }
 
   // Judge codes live in the store, so a panel can be added mid-event
@@ -380,14 +406,12 @@ export function clientKeyFor(request: Request): string {
  * do, but hiding is not the control.
  *
  *                    create   advance     cancel        notes       admin
- *   team (no login)   own       no       any early (!)   no          no
- *   queuer            any       no       any early       no          no
- *   judge             own      own panel own panel      own panel    no
- *   admin             any       any       any            any         yes
+ *   team (no login)   no        no         no             no          no
+ *   queuer            any       no         any early      no          no
+ *   judge             no        own panel  no             own panel   no
+ *   admin             any       any        any            any         yes
  *
- * (!) not tied to the team's own request -- see the risk noted on canCancel.
- *
- * "own panel" is the load-bearing part: a judge may only advance, cancel,
+ * "own panel" is the load-bearing part: a judge may only advance,
  * read or write against teams assigned to the panel whose code they
  * typed. Divisions sit above that — a panel only ever holds teams from
  * its own division.
@@ -405,6 +429,15 @@ export function canReadNotes(s: Session | null): boolean {
 
 export function canAdminister(s: Session | null): boolean {
   return s?.role === "admin";
+}
+
+/**
+ * Who may set the program and field count every referee works from: the
+ * head referee (a referee signed in with HEAD_REFEREE_CODE) and the Judge
+ * Advisor. Any other referee only reads it.
+ */
+export function canSetUpRefereeing(s: Session | null): boolean {
+  return canAdminister(s) || (s?.role === "referee" && s.head === true);
 }
 
 /**
@@ -447,33 +480,14 @@ export function mayActOnPanel(s: Session | null, panelId: string | null): boolea
  * same cancel-and-rebook with the slot never left empty, reschedule a
  * booking or move it into the queue ("ready now").
  *
- * The queue desk may do all three to ANY request that is still early
- * (requested or scheduled), whoever created it: a team that booked from
- * its own phone and then walks up to the desk is exactly who the desk is
- * there for. Once judges have acknowledged it, it is out of their hands.
- * Drop the "queuer" branch to make the role create-only.
- *
- * A team with no session at all is a separate case, not a queuer acting
- * without a login: creating a request needs no login (see POST
- * /api/requests), so cancelling the one they just created -- the "Cancel
- * this request" / "Cancel this booking" button on their own team page --
- * cannot need one either, or that button is dead on arrival for every
- * team, every time.
- *
- * KNOWN, ACCEPTED RISK (decided by the product owner for a LAN event app):
- * that anonymous branch proves nothing about WHOSE request it is. Request
- * ids are public (they are in /api/state), so anyone on the network who
- * can read an id can cancel or reschedule any early request. There is
- * deliberately no per-request token. Do not add a check on `createdBy`
- * here to "fix" this -- it would only break the team page for the people
- * it is meant to serve. See "Known limitations" in the README.
+ * The queue desk may do all three to any request that is still early
+ * (requested or scheduled), whoever created it. Once judges have
+ * acknowledged it, only the Judge Advisor can correct the booking.
  */
 export function canCancel(s: Session | null, status: string): boolean {
-  if (s?.role === "admin" || s?.role === "judge") return true;
+  if (s?.role === "admin") return true;
   const early = status === "requested" || status === "scheduled";
-  if (!s) return early;
-  if (s.role === "queuer") return early;
-  return false;
+  return s?.role === "queuer" && early;
 }
 
 
@@ -483,18 +497,4 @@ export function actorLabel(s: Session | null): string {
   if (s.role === "queuer") return `queuer:${s.name}`;
   if (s.role === "referee") return `referee:${s.name}`;
   return `admin:${s.name}`;
-}
-
-/**
- * Whether two sign-in names are the same person for the purpose of owning
- * a report.
- *
- * A referee's name is typed by hand on a phone, so "dana", "Dana " and
- * "DANA" are one person -- comparing exactly would lock a referee out of
- * their own flag over a capital letter. This is a stopgap, not identity:
- * two referees who type the same name are still the same author until
- * referees get individual codes.
- */
-export function sameAuthor(a: string, b: string): boolean {
-  return a.trim().toLowerCase() === b.trim().toLowerCase();
 }

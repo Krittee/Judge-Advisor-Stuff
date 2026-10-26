@@ -49,12 +49,13 @@ test("this event's setting draws the floor the way the hall runs", () => {
   );
 });
 
-test("column letters render beneath the pit cells", () => {
+test("each column's letter heads it, above the pit cells", () => {
+  /* The redesign puts "A  10 pits" at the top of the column, as the mock does. */
   const src = readFileSync(new URL("../src/components/PitMap.tsx", import.meta.url), "utf8");
-  const column = src.slice(src.indexOf("{columns.map"), src.indexOf("</div>", src.indexOf("{columns.map")));
+  const column = src.slice(src.indexOf("{columns.map"), src.indexOf("</section>", src.indexOf("{columns.map")));
   assert.ok(
-    column.indexOf("numbered.map") < column.lastIndexOf("{row}"),
-    "the column letter moved above the pit cells",
+    column.indexOf("<b>{row}</b>") !== -1 && column.indexOf("<b>{row}</b>") < column.indexOf("numbered.map"),
+    "the column letter is no longer above the pit cells",
   );
 });
 

@@ -74,6 +74,9 @@ test("the same process may load the store again, as a hot reload does", async ()
   const requireFile = createRequire(import.meta.url);
   const path = requireFile.resolve("../src/lib/db/file.ts");
   const { fileStore: first } = await import("../src/lib/db/file");
+  // A reload that finds the process already holding the file would never claim the lock again;
+  // forget what it holds so this one starts cold, over the lock this pid left behind.
+  delete (globalThis as { __judgeQueueFileStore?: unknown }).__judgeQueueFileStore;
   delete requireFile.cache[path];
   const reloaded = requireFile(path) as typeof import("../src/lib/db/file");
   assert.notEqual(reloaded.fileStore, first, "the reload must be a new module instance, or this proves nothing");

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { isValidFieldPick, parseFlagFields, splitField } from "../src/lib/flagValidation";
+import { isValidFieldPick, parseFlagFields } from "../src/lib/flagValidation";
+import { isValidMatchType } from "../src/lib/presets";
 
 /* Referee flags. A referee records what they saw on the field and the
    judges read it before they interview the team. Two things must not go
@@ -93,30 +94,6 @@ test("the source really does fall back on severity, not position", () => {
   );
 });
 
-/* ---- the worst flag on a team ---------------------------------------- */
-
-function worstFlag(flags) {
-  let worst = null;
-  for (const f of flags) {
-    const kind = kinds.find((k) => k.id === f.kind);
-    if (kind && (!worst || kind.severity > worst.severity)) worst = kind;
-  }
-  return worst;
-}
-
-test("a team's worst flag is what shows at a glance", () => {
-  assert.equal(worstFlag([{ kind: "good" }, { kind: "minor" }, { kind: "warning" }]).id, "minor");
-  assert.equal(worstFlag([{ kind: "good" }]).id, "good");
-  assert.equal(worstFlag([{ kind: "major" }, { kind: "good" }]).id, "major");
-  assert.equal(worstFlag([]), null);
-});
-
-test("praise does not cancel out a violation", () => {
-  /* Five good flags and one major is still a major. */
-  const flags = [...Array(5).fill({ kind: "good" }), { kind: "major" }];
-  assert.equal(worstFlag(flags).id, "major");
-});
-
 /* ---- who may do what -------------------------------------------------- */
 
 const canFlag = (role) => role === "referee";
@@ -169,27 +146,54 @@ test("the observation text is optional and capped when supplied", () => {
 
 /* ---- match reference: which match and field a flag happened at -------- */
 
-const types = event.matchTypes;
+/* Match types depend on the program, so they live with each ruleset in
+   config/rules/*.json rather than in config/event.json. */
+const rulesetFile = (name) => JSON.parse(readFileSync(new URL(`../config/rules/${name}`, import.meta.url)));
+const viqrc = rulesetFile("viqrc.json");
+const v5rc = rulesetFile("v5rc-override-2.1.json");
 
-test("the config offers exactly Practice, Qualification, Final and Skills", () => {
+test("the event config no longer carries match types: each ruleset offers its own", () => {
+  assert.equal(event.matchTypes, undefined, "config/event.json still has a matchTypes list nothing reads");
   assert.deepEqual(
-    types.map((t) => t.id),
-    ["P", "Q", "F", "SK"],
+    viqrc.matchTypes.map((t) => t.id),
+    ["P", "Q", "F", "SKD", "SKA"],
+  );
+  assert.deepEqual(
+    v5rc.matchTypes.map((t) => t.id),
+    ["P", "Q", "R16", "QF", "SF", "F", "SKD", "SKA"],
   );
 });
 
-function isValidMatchType(input, list = types) {
-  const wanted = String(input ?? "").trim();
-  return list.some((t) => t.id === wanted);
-}
+test("every match type is Teamwork or Skills, and only V5RC's eliminations are brackets", () => {
+  for (const file of [viqrc, v5rc]) {
+    for (const t of file.matchTypes) {
+      assert.ok(["teamwork", "skills"].includes(t.group), `${file.id} ${t.id} has no group`);
+      assert.ok(t.label, `${file.id} ${t.id} has no label`);
+    }
+    assert.deepEqual(
+      file.matchTypes.filter((t) => t.group === "skills").map((t) => [t.id, t.label]),
+      [["SKD", "Driver"], ["SKA", "Auto"]],
+    );
+  }
+  assert.deepEqual(
+    v5rc.matchTypes.filter((t) => t.bracket).map((t) => t.id),
+    ["R16", "QF", "SF", "F"],
+  );
+  assert.deepEqual(viqrc.matchTypes.filter((t) => t.bracket), [], "VEX IQ numbers are all plain");
+});
 
-test("a configured id is valid; anything else is not", () => {
-  assert.ok(isValidMatchType("P"));
-  assert.ok(isValidMatchType("Q"));
-  assert.ok(isValidMatchType("F"));
-  assert.ok(isValidMatchType("SK"));
-  for (const bad of ["", "p", "practice", "skills", "X", null, undefined, "Practice"]) {
-    assert.ok(!isValidMatchType(bad), `"${bad}" should not resolve to a match type`);
+test("a configured id is valid for its ruleset; anything else is not", () => {
+  for (const id of ["P", "Q", "F", "SKD", "SKA"]) {
+    assert.ok(isValidMatchType(id, "viqrc"), `${id} on viqrc`);
+    assert.ok(isValidMatchType(id, "v5rc"), `${id} on v5rc`);
+  }
+  for (const id of ["QF", "SF", "R16"]) {
+    assert.ok(isValidMatchType(id, "v5rc"), `${id} on v5rc`);
+    assert.ok(!isValidMatchType(id, "viqrc"), `${id} is V5RC-only`);
+  }
+  for (const bad of ["", "p", "practice", "skills", "X", null, undefined, "Practice", "SK"]) {
+    assert.ok(!isValidMatchType(bad, "viqrc"), `"${bad}" should not resolve to a match type`);
+    assert.ok(!isValidMatchType(bad, "v5rc"), `"${bad}" should not resolve to a match type`);
   }
 });
 
@@ -214,48 +218,28 @@ test("unlike a flag kind, an unrecognised match type has no safe fallback", () =
 
 test("the API route requires match type, match number and field, and rejects rather than guesses", () => {
   const src = readFileSync(new URL("../src/lib/flagValidation.ts", import.meta.url), "utf8");
-  assert.ok(src.includes("isValidMatchType(matchType)"), "match type is no longer validated");
-  assert.ok(src.includes("isValidMatchNumber(matchNumber)"), "match number is no longer validated");
-  assert.ok(src.includes("isValidFieldPick(field)"), "field is no longer validated as a division and number");
+  assert.ok(src.includes("isValidMatchType(matchType, ruleset.id)"), "match type is no longer validated");
+  assert.ok(
+    src.includes("isValidMatchNumber(matchNumber, matchType, ruleset.id)"),
+    "match number is no longer validated for its type",
+  );
+  assert.ok(src.includes("isValidFieldPick(rawField, maxField)"), "field is no longer validated as a number");
   const route = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
   assert.ok(route.indexOf("parseFlagFields(body") < route.indexOf("store().createFlag"));
 });
 
 test("the activity log entry carries the match reference, so Activity can trace it too", () => {
   const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
+  const post = src.slice(src.indexOf("export async function POST"), src.indexOf("export async function PATCH"));
   assert.ok(
-    /detail:\s*`Team \$\{team\.number\} · \$\{matchType\}\$\{matchNumber\} · \$\{field\}`/.test(src),
+    post.includes("matchReference(matchType, matchNumber)") && post.includes("fieldLabel(field)"),
     "the activity log no longer records which match a flag happened at",
   );
-  // Not "· Field ${field}" -- a referee typing the box's own placeholder,
-  // "Field 2", would otherwise read back as "Field Field 2".
+  // fieldLabel adds the word once; a "Field" typed in front would double it.
   assert.ok(!src.includes("· Field ${field}"), "the field is double-labelled again");
 });
 
 /* ---- correcting a flag already on record ------------------------------ */
-
-/* A referee tapping "Major" when they meant "Minor" is a slip of the
-   finger, not a request to erase the incident. Unlike removal, a
-   correction leaves the flag on the board -- just described more
-   accurately -- so it stands on different footing than deletion and gets
-   a wider set of hands. */
-
-test("both a referee and the Judge Advisor may correct a flag", () => {
-  const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
-  const fn = src.slice(src.indexOf("export async function PATCH"));
-  const guard = fn.slice(0, fn.indexOf("\n}"));
-  assert.ok(
-    /!canFlag\(session\)\s*&&\s*!canAdminister\(session\)/.test(guard),
-    "PATCH no longer accepts both a referee and the Judge Advisor",
-  );
-});
-
-test("a judge cannot correct a flag -- canFlag and canAdminister are both false for one", () => {
-  const canFlag = (role) => role === "referee";
-  const canAdminister = (role) => role === "admin";
-  const role = "judge";
-  assert.ok(!(canFlag(role) || canAdminister(role)), "a judge must not pass the PATCH guard");
-});
 
 test("PATCH validates with the same rules as POST, not a looser copy", () => {
   const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
@@ -289,7 +273,7 @@ test("removal stays the Judge Advisor's alone -- correction is not a route aroun
   const del = src.slice(src.indexOf("export async function DELETE"));
   assert.ok(
     /!canAdminister\(session\)/.test(del) && !/canFlag\(session\)/.test(del),
-    "DELETE must remain admin-only even though PATCH is not",
+    "DELETE must remain admin-only",
   );
 });
 
@@ -418,30 +402,26 @@ test("PATCH captures the previous kind before updateFlag runs, not after", () =>
   );
 });
 
-/* ---- the field: a division and a number, the same shape for both forms -- */
+/* ---- the field: just a number, up to the event's field count --------------- */
 
-test("a field is a division prefix and a number, the only shape the form can produce", () => {
-  for (const ok of ["ES2", "MS10", "HS1", "BL3", "SK4", "SK0"]) {
+test("a field is a plain number from 1 to the field count; the division prefix is gone", () => {
+  for (const ok of ["1", "2", "10", "20"]) {
     assert.ok(isValidFieldPick(ok), `${ok} should be a valid field`);
   }
-  for (const bad of ["", "ES", "2", "Field 2", "es2", "XX2", "ES 2", "ES12345", "ESX"]) {
+  for (const bad of ["", "0", "21", "ES2", "es2", "Field 2", "2.5", "-1", " 2", "ESX", "100"]) {
     assert.ok(!isValidFieldPick(bad), `"${bad}" should not be a valid field`);
   }
+  assert.ok(isValidFieldPick("3", 3) && !isValidFieldPick("4", 3), "the event's own count is the ceiling");
 });
 
-test("a stored field splits back into the form's two boxes, and legacy text is not guessed at", () => {
-  assert.deepEqual(splitField("SK10"), { prefix: "SK", number: "10" });
-  assert.deepEqual(splitField("Field 2"), { prefix: "", number: "" }, "free text is re-picked, not guessed");
-  assert.deepEqual(splitField(null), { prefix: "", number: "" });
-});
-
-test("a correction with free-text or empty field is refused, and a picked field is stored uppercased", () => {
+test("a correction with a prefixed, free-text or empty field is refused, and a picked number is stored plain", () => {
   const report = { kind: "warning", body: "", matchType: "Q", matchNumber: "23", rule: null };
   assert.equal(parseFlagFields({ ...report, field: "Field 2" }).ok, false);
+  assert.equal(parseFlagFields({ ...report, field: "ES2" }).ok, false);
   assert.equal(parseFlagFields({ ...report, field: "" }).ok, false);
-  const picked = parseFlagFields({ ...report, field: "es2" });
+  const picked = parseFlagFields({ ...report, field: "2" });
   assert.equal(picked.ok, true);
-  if (picked.ok) assert.equal(picked.field, "ES2");
+  if (picked.ok) assert.equal(picked.field, "2");
 });
 
 test("a correction can change the rule, not only keep the one already on record", () => {
@@ -450,20 +430,17 @@ test("a correction can change the rule, not only keep the one already on record"
     body: "",
     matchType: "Q",
     matchNumber: "23",
-    field: "ES2",
+    field: "2",
     rule: "sg7",
   });
   assert.equal(edit.ok && edit.rule, "SG7");
 });
 
-test("the correction form offers the same field and rule pickers as the raise form", () => {
-  const flags = readFileSync(new URL("../src/components/Flags.tsx", import.meta.url), "utf8");
-  const page = readFileSync(new URL("../src/app/referee/page.tsx", import.meta.url), "utf8");
-  assert.ok(flags.includes("<FieldPicker") && flags.includes("<RulePicker"), "the correction form lost a picker");
-  assert.ok(page.includes("<FieldPicker") && page.includes("<RulePicker"), "the raise form lost a picker");
-  assert.ok(!/draftField\b/.test(flags), "the correction form has a free-text field box again");
-  assert.ok(flags.includes("rules: draftRules"), "the correction form no longer sends the rules it shows");
-  assert.ok(flags.includes("ruleset: draftRuleset"), "the correction form no longer sends its ruleset");
-  assert.ok(flags.includes("matchAffecting: draftMatchAffecting"), "the correction form lost match affecting");
-  assert.ok(flags.includes("<RulesetPicker"), "the correction form lost the ruleset dropdown");
+test("the alliance concept is gone from the shared match and flag components", () => {
+  for (const file of ["Flags.tsx", "MatchFields.tsx"]) {
+    const src = readFileSync(new URL(`../src/components/${file}`, import.meta.url), "utf8");
+    assert.ok(!/alliance/i.test(src), `${file} still mentions an alliance`);
+  }
+  const match = readFileSync(new URL("../src/components/MatchFields.tsx", import.meta.url), "utf8");
+  assert.ok(!/export\s+function\s+AllianceToggle/.test(match), "AllianceToggle is exported again");
 });

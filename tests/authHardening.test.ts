@@ -8,7 +8,7 @@ import { join } from "node:path";
 import type { Session } from "../src/lib/auth";
 
 /* Phase 2 security fixes (BUG-004, 013, 020, 026): the session secret
-   placeholder, the login throttle, referee report ownership, what the
+   placeholder, the login throttle, referee sign-in names, what the
    state payload tells whom, and the doctor script.
 
    Where a function can be imported it is -- these call the real code, not
@@ -294,23 +294,6 @@ test("a named referee gets past the name check; other roles never needed one", a
   });
 });
 
-test("report authors compare case-insensitively and trimmed", async () => {
-  const { sameAuthor } = await importAuth();
-  assert.equal(sameAuthor("Dana", "Dana"), true);
-  assert.equal(sameAuthor("Dana", "dana"), true);
-  assert.equal(sameAuthor("  DANA ", "dana"), true);
-  assert.equal(sameAuthor("Dana", "Dane"), false);
-  assert.equal(sameAuthor("Dana", "Dana Smith"), false);
-  assert.equal(sameAuthor("Dana", ""), false);
-});
-
-test("PATCH /api/flags checks authorship with sameAuthor, not an exact string compare", () => {
-  const src = read("src/app/api/flags/route.ts");
-  const patch = src.slice(src.indexOf("export async function PATCH"), src.indexOf("export async function DELETE"));
-  assert.match(patch, /!canAdminister\(session\)\s*&&\s*!sameAuthor\(existing\.author,\s*session!\.name\)/);
-  assert.ok(!/existing\.author\s*!==/.test(patch), "the exact-match author compare is back");
-});
-
 test("a flag edit logs before -> after for every field it changed", () => {
   const src = read("src/app/api/flags/route.ts");
   const patch = src.slice(src.indexOf("export async function PATCH"), src.indexOf("export async function DELETE"));
@@ -427,7 +410,7 @@ test("loadState sends messages only to those who run interviews, and staff names
 
 test("no page reads the staff fields loadState nulls for the public", () => {
   // If one starts to, the board or a team page would silently go blank.
-  const pages = ["src/app/board/page.tsx", "src/app/team/[number]/page.tsx", "src/app/page.tsx"];
+  const pages = ["src/app/board/page.tsx", "src/app/team/[number]/page.tsx", "src/app/page.tsx", "src/app/team/page.tsx"];
   for (const page of pages) {
     assert.ok(!/\b(created_by|acknowledged_by|interviewer|outcome)\b/.test(read(page)), `${page} reads a nulled field`);
   }
@@ -450,6 +433,7 @@ test("the doctor's published-code list is the one auth.ts refuses", () => {
   const ours = publishedCodes(read("src/lib/auth.ts"));
   assert.ok(ours.length >= 6, "could not read PUBLISHED_CODES out of auth.ts");
   assert.deepEqual(theirs, ours, "scripts/doctor.mjs and src/lib/auth.ts disagree about which codes are published");
+  assert.ok(ours.includes("HREF01"), "the head referee's dev default is printed in .env.example, so it is published");
   assert.ok(read("src/lib/auth.ts").includes("/change-?me/i") && read("scripts/doctor.mjs").includes("/change-?me/i"));
 });
 
@@ -479,12 +463,28 @@ test("the doctor reads .env.local, so a DATABASE_URL there makes it production-l
 
 test("the doctor flags a published role code and warns below 32 characters", () => {
   const { out } = runDoctor(
-    "DATABASE_URL=postgresql://u:p@db.example.invalid/x\nSESSION_SECRET=k3j4h5g6f7d8s9a0q1w2e3r4t5y6\nADMIN_CODE=JA2026\nREFEREE_CODE=ref001\nQUEUER_CODE=Desk77x\n",
+    "DATABASE_URL=postgresql://u:p@db.example.invalid/x\nSESSION_SECRET=k3j4h5g6f7d8s9a0q1w2e3r4t5y6\nADMIN_CODE=JA2026\nREFEREE_CODE=ref001\nHEAD_REFEREE_CODE=href01\nQUEUER_CODE=Desk77x\n",
   );
   assert.match(out, /ADMIN_CODE is "JA2026"/);
   assert.match(out, /REFEREE_CODE is "REF001"/);
+  assert.match(out, /HEAD_REFEREE_CODE is "HREF01"/);
   assert.ok(!/QUEUER_CODE is "/.test(out), "a private code was reported as published");
   assert.match(out, /SESSION_SECRET is only 28 characters/);
+});
+
+test("the doctor warns when the head referee's code is not set, and not when it is", () => {
+  const base = "DATABASE_URL=postgresql://u:p@db.example.invalid/x\nSESSION_SECRET=k3j4h5g6f7d8s9a0q1w2e3r4t5y6\nADMIN_CODE=Zq8mXk\n";
+  assert.match(runDoctor(base).out, /HEAD_REFEREE_CODE is not set, so that role cannot sign in/);
+  assert.ok(!/HEAD_REFEREE_CODE is not set/.test(runDoctor(`${base}HEAD_REFEREE_CODE=Mq4tRw\n`).out));
+});
+
+test(".env.example lists the head referee's code next to the shared referee code", () => {
+  const lines = read(".env.example").split("\n");
+  const at = lines.indexOf("REFEREE_CODE=REF001");
+  assert.ok(at >= 0, "REFEREE_CODE is in .env.example");
+  const head = lines.indexOf("HEAD_REFEREE_CODE=HREF01");
+  assert.ok(head > at && head - at <= 3, "HEAD_REFEREE_CODE=HREF01 follows it, with its one-line comment between");
+  assert.match(lines[head - 1], /^# .*head referee/i);
 });
 
 test("the doctor warns when a file store has no judge panels, and not when it has one", () => {

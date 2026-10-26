@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Referee event setup · dark</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Fira+Sans:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit}
+.jq{--canvas:oklch(0.165 0.012 265);--surface:oklch(0.205 0.014 265);--ink:oklch(0.955 0.005 265);--muted:oklch(0.670 0.013 265);--line:oklch(0.320 0.016 265);--accent:oklch(0.680 0.140 258);--on-accent:oklch(0.165 0.012 265);--accent-tint:oklch(0.680 0.140 258 / 0.14);--field:oklch(0.180 0.013 265);--field-line:oklch(0.520 0.014 265);--ref:oklch(0.760 0.150 55);--good:oklch(0.745 0.140 158);position:relative;box-sizing:border-box;width:375px;height:812px;overflow:hidden;display:flex;flex-direction:column;background:var(--canvas);color:var(--ink);font-family:'Fira Sans',system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.jq *,.jq *::before,.jq *::after{box-sizing:border-box}
+.jq :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 6px 0 14px}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.av{flex:none;width:28px;height:28px;display:block}
+.av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:22%;box-shadow:0 0 0 2px var(--ref)}
+.who-t{display:flex;flex-direction:column;line-height:1.15}
+.who-t b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.who-t span{font-size:12px;color:var(--muted)}
+.top-r{display:flex;align-items:center;gap:2px}
+.live{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--good)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--good)}
+.signout{min-height:44px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:14px;text-decoration:underline;cursor:pointer}
+.strip{display:block;flex:none;height:6px;background:repeating-linear-gradient(135deg,oklch(0.985 0.003 265) 0 6px,oklch(0.180 0.012 265) 6px 12px)}
+.body{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:20px;padding:20px 16px 8px}
+.body>*{flex:none}
+.eyebrow{margin:0 0 4px;font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{margin:0 0 8px;font-family:Archivo,sans-serif;font-weight:700;font-size:26px;line-height:1.15;letter-spacing:-.01em}
+.intro{margin:0;font-size:15px;line-height:1.45;color:var(--muted)}
+.lab{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 8px;font-weight:500;font-size:15px;line-height:1.3}
+.cards{display:flex;flex-direction:column;gap:8px}
+.pc{display:flex;align-items:center;gap:12px;width:100%;min-height:76px;padding:12px 14px;border:2px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);text-align:left;cursor:pointer}
+.pc[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-tint)}
+.pc .pt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pc .pt b{font-family:Archivo,sans-serif;font-weight:700;font-size:20px;line-height:1.2}
+.pc .pt span{font-size:13px;line-height:1.35;color:var(--muted)}
+.pc .ck{flex:none;display:grid;place-items:center;width:26px;height:26px;border:2px solid var(--field-line);border-radius:50%;color:transparent}
+.pc[aria-pressed="true"] .ck{border-color:var(--accent);background:var(--accent);color:var(--on-accent)}
+.stepper{display:flex;align-items:center;gap:8px;padding:8px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface)}
+.sb{flex:none;width:48px;height:48px;border:1.5px solid var(--field-line);border-radius:12px;background:var(--field);color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.fnum{flex:1;text-align:center;font-family:Archivo,sans-serif;font-weight:700;font-size:32px;line-height:1}
+.prev{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.prev span{display:inline-flex;align-items:center;height:28px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:13px;font-weight:500}
+.hint{margin:8px 0 0;font-size:13px;line-height:1.4;color:var(--muted)}
+.abar{flex:none;display:flex;flex-direction:column;gap:8px;padding:10px 16px 18px;background:var(--surface);border-top:1px solid var(--line)}
+.by{margin:0;text-align:center;font-size:13px;line-height:1.3;color:var(--muted)}
+.prim{width:100%;height:52px;border:1px solid var(--accent);border-radius:12px;background:var(--accent);color:var(--on-accent);font-family:Archivo,sans-serif;font-weight:700;font-size:17px;cursor:pointer}
+</style>
+</helmet>
+<div class="jq" data-theme="dark">
+<header class="top">
+<div class="who"><span class="av"><img src="/avatars/referee.jpg" alt="" width="28" height="28"></span><span class="who-t"><b>Referee</b><span>Jordan Lee</span></span></div>
+<div class="top-r"><span class="live"><i aria-hidden="true"></i>Live</span><button type="button" class="signout">Sign out</button></div>
+</header>
+<div class="strip" aria-hidden="true"></div>
+<main class="body">
+<div>
+<p class="eyebrow">Today's event</p>
+<h1>Set up refereeing</h1>
+<p class="intro">Choose once for this event. Every referee will use it. You can change it for another event or day.</p>
+</div>
+<div>
+<div class="lab" id="pg-l"><span>Program</span></div>
+<div class="cards" role="group" aria-labelledby="pg-l">
+<button type="button" class="pc" aria-pressed="true"><span class="pt"><b>V5RC</b><span>V5 Robotics Competition · Override 2.1 rules</span></span><span class="ck" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span></button>
+<button type="button" class="pc" aria-pressed="false"><span class="pt"><b>VIQRC</b><span>VEX IQ Robotics Competition · VIQRC rules</span></span><span class="ck" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span></button>
+</div>
+</div>
+<div>
+<div class="lab" id="nf-l"><span>Number of fields</span></div>
+<div class="stepper" role="group" aria-labelledby="nf-l">
+<button type="button" class="sb" aria-label="Fewer fields"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+<output class="fnum" aria-label="Fields">3</output>
+<button type="button" class="sb" aria-label="More fields"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+</div>
+<div class="prev" aria-hidden="true"><span>Field 1</span><span>Field 2</span><span>Field 3</span></div>
+<p class="hint">Most events run 2–4 fields. Add more if yours does.</p>
+</div>
+</main>
+<div class="abar">
+<p class="by">Set by Jordan Lee · applies to all referees</p>
+<button type="button" class="prim">Start refereeing</button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":375,"height":812}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

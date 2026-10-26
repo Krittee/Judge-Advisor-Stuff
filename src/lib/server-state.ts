@@ -1,5 +1,6 @@
 import { store } from "./db";
 import { stripCode } from "./data";
+import { blockedTeams, conflictsFor, panelBlocks } from "./roster";
 import {
   divisionsCompatible,
   languages,
@@ -44,23 +45,24 @@ import type { AppState, ViewerCapabilities } from "./types";
  */
 export async function loadState(session: Session | null): Promise<AppState> {
   const db = store();
-  const [panels, teams, rows, allConflicts, allFlags] = await Promise.all([
+  const [panels, teams, rows, allConflicts, judges, allFlags, refereeSetup] = await Promise.all([
     db.listPanels(),
     db.listTeams(),
     db.listRequests(),
     db.listConflicts(),
+    db.listJudges(),
     db.listFlags(),
+    db.getRefereeSetup(),
   ]);
 
   const isJudge = session?.role === "judge";
   const judgePanel = isJudge ? panels.find((p) => p.id === session.panelId) : undefined;
 
   // A judge's session names one specific panel. If that panel cannot be
-  // resolved -- deleted mid-event, or a token that simply outlived a
-  // panel code that got rotated -- there is no division to scope by.
+  // resolved -- for example, deleted mid-event -- there is no division to scope by.
   // Falling through to the same `division === null` a non-judge caller
   // gets would silently hand a stale judge session global visibility for
-  // up to its 16-hour lifetime. Fail closed instead: still authenticated
+  // until the next session check. Fail closed instead: still authenticated
   // as a judge, but sees nothing, until they sign in again with a panel
   // that actually exists.
   const judgeSessionValid = !isJudge || Boolean(judgePanel);
@@ -69,11 +71,8 @@ export async function loadState(session: Session | null): Promise<AppState> {
   // A judge sees their own division and nothing else — and nothing at all
   // of a team their panel has a declared conflict with. "Cannot interview"
   // has to mean cannot see, or the team is still there to be worked on.
-  const barred = new Set(
-    isJudge && judgeSessionValid
-      ? allConflicts.filter((c) => c.panel_id === session.panelId).map((c) => c.team_id)
-      : [],
-  );
+  const blocks = panelBlocks(allConflicts, judges);
+  const barred = isJudge && judgeSessionValid ? blockedTeams(blocks, session.panelId) : new Set<string>();
 
   // divisionsCompatible rather than `===`: a blended team competes across
   // age groups, so it is judged by whichever panel holds it. Comparing
@@ -162,10 +161,18 @@ export async function loadState(session: Session | null): Promise<AppState> {
     conflicts: !canReadNotes(session) || (isJudge && !judgeSessionValid)
       ? []
       : session?.role === "judge"
-        ? allConflicts.filter((c) => c.panel_id === session.panelId)
+        ? conflictsFor(session.panelId, allConflicts, blocks)
         : allConflicts,
+    /* The roster is the Judge Advisor's to run. A judge already sees the
+       names on their own panel; nobody else needs the list, and a judge
+       must not learn which of their colleagues has a conflict with whom. */
+    judges: canAdminister(session) ? judges : [],
     pitFloor: pitFloor(),
-    matchTypes: matchTypes(),
+    /* The program and field count are the same for every viewer, so they
+       go to everyone. Who set them is a staff name, nulled like the rest. */
+    matchTypes: matchTypes(refereeSetup?.ruleset),
+    refereeSetup:
+      refereeSetup && !includeStaffFields ? { ...refereeSetup, set_by: "" } : refereeSetup,
     flagKinds: refereeFlags(),
     /* A referee's flag is about a team's conduct, not the queue, so it
        goes only to those who act on it: referees writing them, judges

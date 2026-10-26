@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Judge Queue · door B · five doors · key 2 · sample tiles · phone · light</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Fira+Sans:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+.jq{--canvas:oklch(0.968 0.005 265);--surface:oklch(0.995 0.002 265);--ink:oklch(0.225 0.016 265);--muted:oklch(0.520 0.014 265);--line:oklch(0.885 0.010 265);--accent:oklch(0.510 0.160 258);--accent-hover:oklch(0.455 0.160 258);--on-accent:oklch(0.995 0.002 265);--danger:oklch(0.560 0.200 18);--danger-ink:oklch(0.470 0.180 18);--danger-tint:oklch(0.560 0.200 18 / 0.08);--danger-line:oklch(0.560 0.200 18 / 0.35);--tint:oklch(0.510 0.160 258 / 0.09);--ring:oklch(0.510 0.160 258 / 0.25);--field:oklch(0.995 0.002 265);--field-line:oklch(0.640 0.012 265);--disabled:oklch(0.915 0.008 265);--booked-quiet:oklch(0.430 0.016 265);--waiting:oklch(0.700 0.180 52);--enroute:oklch(0.745 0.120 232);--active:oklch(0.680 0.170 300);--done:oklch(0.735 0.135 158);--desk:oklch(0.560 0.110 185);--ja:oklch(0.520 0.180 300);--ref-band:oklch(0.225 0.016 265);--band-desk:oklch(0.520 0.105 185);--band-team:oklch(0.380 0.022 265);--tile:oklch(0.225 0.016 265 / 0.06);--rail:oklch(0.740 0.012 265);--shadow:0 1px 2px oklch(0.225 0.016 265 / 0.05),0 18px 40px -24px oklch(0.225 0.016 265 / 0.25);position:relative;box-sizing:border-box;width:375px;height:846px;overflow:hidden;display:flex;flex-direction:column;background:var(--canvas);color:var(--ink);font-family:'Fira Sans',system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.jq[data-theme="dark"]{--canvas:oklch(0.165 0.012 265);--surface:oklch(0.205 0.014 265);--ink:oklch(0.955 0.005 265);--muted:oklch(0.670 0.013 265);--line:oklch(0.320 0.016 265);--accent:oklch(0.680 0.140 258);--accent-hover:oklch(0.730 0.125 258);--on-accent:oklch(0.165 0.012 265);--danger:oklch(0.555 0.200 18);--danger-ink:oklch(0.800 0.110 18);--danger-tint:oklch(0.555 0.200 18 / 0.16);--danger-line:oklch(0.555 0.200 18 / 0.55);--tint:oklch(0.680 0.140 258 / 0.14);--ring:oklch(0.680 0.140 258 / 0.35);--field:oklch(0.180 0.013 265);--field-line:oklch(0.520 0.014 265);--disabled:oklch(0.280 0.014 265);--booked-quiet:oklch(0.780 0.014 265);--waiting:oklch(0.735 0.185 58);--enroute:oklch(0.720 0.140 232);--active:oklch(0.680 0.170 300);--done:oklch(0.745 0.140 158);--desk:oklch(0.740 0.110 185);--ja:oklch(0.720 0.140 300);--ref-band:oklch(0.300 0.016 265);--band-desk:oklch(0.740 0.110 185);--band-team:oklch(0.340 0.020 265);--tile:oklch(0.955 0.005 265 / 0.08);--rail:oklch(0.420 0.016 265);--shadow:none}
+.jq *,.jq *::before,.jq *::after{box-sizing:border-box}
+.jq :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{flex:none;display:flex;align-items:center;justify-content:space-between;height:44px;padding:6px 8px 6px 16px}
+.jq--wide .top{height:auto;padding:20px 28px}
+.brand{display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap}
+.mark{flex:none;width:26px;height:26px;border-radius:8px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center}
+.brand-n{font-family:Archivo,sans-serif;font-weight:700;font-size:16px;letter-spacing:-0.01em}
+.brand-s{font-size:14px;color:var(--muted)}
+.icon-btn{flex:none;width:44px;height:44px;border-radius:12px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;transition:background .15s,color .15s}
+.icon-btn:hover{background:var(--tint);color:var(--ink)}
+.stage{flex:1;min-height:0;overflow-y:auto;display:flex}
+.grid{width:100%;margin:0 auto;padding:4px 16px 20px}
+.jq--wide .grid{margin:auto;max-width:1280px;padding:8px 32px 40px}
+ul{list-style:none;margin:0;padding:0}
+.title{margin:0;font-family:Archivo,sans-serif;font-weight:700;font-size:28px;line-height:1.1;letter-spacing:-0.02em}
+.jq--wide .title{font-size:36px}
+.intro{margin:6px 0 0;color:var(--muted);font-size:15px;line-height:1.4}
+.label{display:block;margin-bottom:6px;font-weight:500;font-size:15px;line-height:1.4}
+.team-input{height:60px;width:100%;margin:0;border:1.5px solid var(--field-line);border-radius:14px;background:var(--field);color:var(--ink);padding:0 18px 0 calc(18px + 0.12em);text-align:center;font-family:Archivo,sans-serif;font-weight:700;font-size:40px;letter-spacing:0.12em;text-transform:uppercase;transition:border-color .15s,box-shadow .15s}
+.jq--wide .team-input{height:84px;font-size:46px}
+.team-input::placeholder{color:var(--muted);opacity:1;letter-spacing:0.12em}
+.team-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.team-input--error{border-color:var(--danger)}
+.team-input--error:focus{border-color:var(--danger);box-shadow:0 0 0 3px var(--danger-tint)}
+.alert{display:flex;gap:10px;align-items:flex-start;margin-top:6px;padding:10px 12px;border-radius:12px;background:var(--danger-tint);border:1px solid var(--danger-line);color:var(--danger-ink);font-size:15px;line-height:1.35;font-weight:500}
+.alert svg{flex:none;margin-top:1px}
+.btn{width:100%;height:52px;margin-top:12px;border:0;border-radius:12px;background:var(--accent);color:var(--on-accent);font-family:Archivo,sans-serif;font-weight:600;font-size:17px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s}
+.btn:hover:not(:disabled){background:var(--accent-hover)}
+.btn:disabled{background:var(--disabled);color:var(--muted);cursor:not-allowed}
+.h-caps{margin:0 0 8px;font-family:Archivo,sans-serif;font-weight:700;font-size:12px;line-height:1.4;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted)}
+.board{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;color:var(--ink);text-decoration:none;transition:border-color .15s}
+.board:hover{border-color:var(--accent)}
+.board>svg{flex:none;color:var(--muted)}
+.btile{flex:none;display:block;width:40px;height:40px;border-radius:12px;overflow:hidden;background:var(--tile)}
+.btile img{display:block;width:100%;height:100%;object-fit:cover}
+.rt{flex:1;min-width:0;display:flex;flex-direction:column}
+.rt-s{font-size:13px;line-height:1.35;color:var(--muted)}
+.b-t{font-family:Archivo,sans-serif;font-weight:600;font-size:16px;line-height:1.3}
+.b-pill{display:inline-block;vertical-align:middle;margin-left:8px;padding:2px 6px;border:1px solid var(--accent);border-radius:999px;color:var(--accent);font-family:Archivo,sans-serif;font-weight:700;font-size:10px;line-height:1.2;letter-spacing:0.16em}
+.r-judge{--rc:var(--accent);--band:var(--accent);--on-band:var(--on-accent)}
+.r-desk{--rc:var(--desk);--band:var(--band-desk);--on-band:var(--on-accent)}
+.r-ja{--rc:var(--ja);--band:var(--ja);--on-band:var(--on-accent)}
+.r-ref{--rc:repeating-linear-gradient(135deg,oklch(0.985 0.003 265) 0 4px,oklch(0.180 0.012 265) 4px 8px);--band:var(--ref-band);--on-band:oklch(0.985 0.003 265)}
+.r-team{--band:var(--band-team);--on-band:oklch(0.985 0.003 265)}
+.av{--s:44px;flex:none;display:block;width:var(--s);height:var(--s);padding:2px;border-radius:25%;background:var(--rc)}
+.av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:22%}
+.av--team{padding:0;background:none}
+.gl{display:grid;place-items:center;width:100%;height:100%;border-radius:25%;background:var(--tile);color:var(--ink)}
+@media (prefers-reduced-motion: reduce){.jq *,.jq *::before,.jq *::after{transition:none !important}}
+.head{margin:8px 0 14px}
+.jq--wide .grid{max-width:1184px}
+.d5{display:flex;flex-direction:column;gap:8px}
+.cell{position:relative}
+.dcard{display:flex;align-items:center;gap:14px;height:72px;padding:0 14px;background:var(--surface);border:1px solid var(--line);border-radius:16px;color:var(--ink);text-decoration:none;transition:border-color .15s}
+.dcard:hover{border-color:var(--accent)}
+.dcard>svg{flex:none;color:var(--muted)}
+.dcard .av{--s:48px}
+.dt{font-family:Archivo,sans-serif;font-weight:600;font-size:17px;line-height:1.3}
+.cap{margin:4px 0 0 14px;font-size:12px;line-height:1.3;color:var(--muted)}
+.below{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+.jq--wide .head{margin:0 0 28px;text-align:center}
+.jq--wide .title{font-size:40px}
+.jq--wide .intro{margin-top:8px;font-size:17px}
+.jq--wide .d5{flex-direction:row;gap:16px}
+.jq--wide .cell{flex:1;min-width:0}
+.jq--wide .dcard{flex-direction:column;align-items:center;height:auto;min-height:248px;padding:22px 16px 16px;gap:0;text-align:center}
+.jq--wide .dcard .av{--s:72px}
+.jq--wide .dcard .rt{flex:1 0 auto;margin-top:16px}
+.jq--wide .dt{font-size:19px}
+.jq--wide .rt-s{margin-top:4px;font-size:14px;line-height:1.4}
+.jq--wide .dcard>svg{margin-top:10px}
+.jq--wide .cap{position:absolute;left:0;right:0;top:100%;margin:8px 0 0;text-align:center}
+.jq{--booked-ink:oklch(0.975 0.004 265);--waiting-ink:oklch(0.200 0.050 52);--enroute-ink:oklch(0.200 0.040 232);--active-ink:oklch(0.170 0.050 300);--done-ink:oklch(0.200 0.050 158)}
+.jq[data-theme="dark"]{--booked-ink:oklch(0.200 0.014 265)}
+.s-bk{--c:var(--booked-quiet);--ci:var(--booked-ink)}
+.s-rq{--c:var(--waiting);--ci:var(--waiting-ink)}
+.s-en{--c:var(--enroute);--ci:var(--enroute-ink)}
+.s-in{--c:var(--active);--ci:var(--active-ink)}
+.s-dn{--c:var(--done);--ci:var(--done-ink)}
+.bcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.bcard .board{border:0;border-radius:0;background:transparent;transition:background .15s}
+.bcard .board:hover{background:var(--tint)}
+.samples{padding:12px 14px 14px;border-top:1px solid var(--line)}
+.k-n{margin:0 0 10px;font-size:13px;line-height:1.35;color:var(--muted)}
+.sg{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.sg li{grid-column:span 2}
+.sg li:nth-child(n+4){grid-column:span 3}
+.tl{display:flex;flex-direction:column;gap:2px;height:76px;padding:8px 10px;border:1px solid transparent;border-radius:10px;background:var(--c);color:var(--ci)}
+.tl.s-dn{background:color-mix(in srgb,var(--done) 22%,var(--surface));color:var(--ink);border-color:color-mix(in srgb,var(--done) 55%,transparent)}
+.tl-n{font-family:Archivo,sans-serif;font-weight:700;font-size:20px;line-height:22px;letter-spacing:-0.02em;white-space:nowrap}
+.tl-s{font-size:13px;line-height:16px;font-weight:500;white-space:nowrap}
+.tl-t{font-family:Archivo,sans-serif;font-weight:700;font-size:13px;line-height:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.jq--wide .below{display:grid;grid-template-columns:minmax(0,760px);justify-content:center;gap:0;margin-top:52px}
+.jq--wide .samples{padding:14px 20px 20px}
+.jq--wide .k-n{margin-bottom:12px;font-size:14px}
+.jq--wide .sg{grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.jq--wide .sg li,.jq--wide .sg li:nth-child(n+4){grid-column:auto}
+.jq--wide .tl{height:92px;padding:12px 14px;border-radius:12px}
+.jq--wide .tl-n{font-size:28px;line-height:30px}
+.jq--wide .tl-s{font-size:15px;line-height:18px}
+.jq--wide .tl-t{font-size:14px;line-height:17px}
+</style>
+</helmet>
+<!-- Direction B, five doors, key 2 · sample tiles. The door page sits in front of the Pit ticket; the ticket moves unchanged to /team and the Team door opens it. -->
+<div class="jq jq--phone" data-theme="{{theme}}">
+<header class="top">
+<div class="brand">
+<span class="mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 7h14M5 12h10M5 17h6"></path></svg></span>
+<span class="brand-n">Judge Queue</span>
+<span class="brand-s">VEX IQ · V5RC</span>
+</div>
+<button type="button" class="icon-btn" onClick="{{onTheme}}" aria-label="{{themeLabel}}">
+<sc-if value="{{light}}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path></svg></sc-if>
+<sc-if value="{{dark}}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"></path></svg></sc-if>
+</button>
+</header>
+<main class="stage">
+<div class="grid">
+<div class="head">
+<h1 class="title" id="jq-title">Who are you?</h1>
+<p class="intro">Choose your door</p>
+</div>
+<ul class="d5" aria-labelledby="jq-title">
+<li class="cell">
+<a class="dcard" href="#"><span class="av av--team"><span class="gl"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"></path><path d="M14.5 7.5v9" stroke-dasharray="2 2.4"></path></svg></span></span><span class="rt"><span class="dt">Team</span><span class="rt-s">Book a time or call a judge</span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+<p class="cap">Opens the team ticket</p>
+</li>
+<li class="cell"><a class="dcard" href="#"><span class="av r-judge"><img src="/avatars/judge.jpg" alt="" width="48" height="48"></span><span class="rt"><span class="dt">Judge</span><span class="rt-s">Panel code from your Judge Advisor</span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a></li>
+<li class="cell"><a class="dcard" href="#"><span class="av r-ref"><img src="/avatars/referee.jpg" alt="" width="48" height="48"></span><span class="rt"><span class="dt">Referee</span><span class="rt-s">Referees and the head referee</span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a></li>
+<li class="cell"><a class="dcard" href="#"><span class="av r-desk"><img src="/avatars/queue-desk.jpg" alt="" width="48" height="48"></span><span class="rt"><span class="dt">Queue desk</span><span class="rt-s">Check teams in and book times</span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a></li>
+<li class="cell"><a class="dcard" href="#"><span class="av r-ja"><img src="/avatars/judge-advisor.jpg" alt="" width="48" height="48"></span><span class="rt"><span class="dt">Judge Advisor</span><span class="rt-s">Runs judging for the event</span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a></li>
+</ul>
+<div class="below">
+<div class="bcard">
+<a class="board" href="#">
+<span class="btile"><img src="/avatars/live-board.jpg" alt="" width="40" height="40"></span>
+<span class="rt"><span class="b-t">Live board<span class="b-pill">LIVE</span></span><span class="rt-s">See every team's judging status</span></span>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+</a>
+<div class="samples">
+<p class="k-n" id="jq-legend">Each team shows on the board as a tile in one of these colours.</p>
+<ul class="sg" aria-labelledby="jq-legend">
+<li><div class="tl s-bk"><span class="tl-n">1234A</span><span class="tl-s">Booked</span><span class="tl-t">10:40</span></div></li>
+<li><div class="tl s-rq"><span class="tl-n">1234A</span><span class="tl-s">Requesting</span><span class="tl-t">3 min</span></div></li>
+<li><div class="tl s-en"><span class="tl-n">1234A</span><span class="tl-s">On the way</span></div></li>
+<li><div class="tl s-in"><span class="tl-n">1234A</span><span class="tl-s">Interviewing</span></div></li>
+<li><div class="tl s-dn"><span class="tl-n">1234A</span><span class="tl-s">Complete</span></div></li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":375,"height":846}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const theme = s.theme ?? this.props.theme ?? 'light';
+    const base = {
+      theme,
+      light: theme !== 'dark',
+      dark: theme === 'dark',
+      themeLabel: theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
+      onTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' })
+    };
+    return base;
+  }
+}
+</script>
+</body>
+</html>

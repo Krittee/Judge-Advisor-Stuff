@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
+import { actorParts } from "@/lib/activity";
 import {
-  actorLabel,
   canAdminister,
   canFlag,
   canReadFlags,
   getSession,
-  sameAuthor,
 } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { parseFlagFields } from "@/lib/flagValidation";
 import type { FlagEdit } from "@/lib/db/types";
+import { fieldLabel, matchReference } from "@/lib/match";
 import { getRuleset } from "@/lib/rules";
 
 export const dynamic = "force-dynamic";
@@ -65,12 +65,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That team no longer exists." }, { status: 404 });
   }
 
-  const parsed = parseFlagFields(body);
+  // The event's setup decides the program a new flag is under and how many
+  // fields there are to pick from. With none saved, parseFlagFields falls back.
+  const setup = await store().getRefereeSetup();
+  const parsed = parseFlagFields(body, {
+    eventRuleset: setup?.ruleset,
+    fieldCount: setup?.field_count,
+  });
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   }
-  const { kind, text, matchType, matchNumber, field, rule, ruleset, manualVersion, matchAffecting } =
-    parsed;
+  const {
+    kind,
+    text,
+    matchType,
+    matchNumber,
+    field,
+    rule,
+    ruleset,
+    manualVersion,
+    matchAffecting,
+  } = parsed;
 
   const flag = await store().createFlag({
     teamId,
@@ -88,12 +103,16 @@ export async function POST(request: Request) {
 
   await store().logActivity({
     teamId,
-    actor: actorLabel(session),
+    kind: "referee",
+    ...actorParts(session),
     action: `flagged ${kind}`,
-    // No "Field" label here: the field value is free text and a referee
-    // typing "Field 2" (the box's own placeholder) would otherwise read as
-    // "Field Field 2". FlagList shows it the same bare way on screen.
-    detail: `Team ${team.number} · ${matchType}${matchNumber} · ${field}`,
+    detail: [
+      `Team ${team.number}`,
+      matchReference(matchType, matchNumber),
+      fieldLabel(field),
+    ]
+      .filter(Boolean)
+      .join(" · "),
   });
 
   return NextResponse.json({ flag });
@@ -101,30 +120,20 @@ export async function POST(request: Request) {
 
 /**
  * Correct a flag already on record — the wrong severity tapped, a
- * mis-typed match number. Open to the referee who raised it and the
- * Judge Advisor, unlike removal, because this does not make the
- * incident disappear: it stays on the board, just described more
- * accurately, and the correction itself is logged to Activity so
- * nothing about it happens quietly.
- *
- * A referee correcting a colleague's flag was previously accepted from
- * any referee session, not just the one who wrote it — the role check
- * below never compared against the flag's own `author`. The record's
- * author has always been fixed once a flag is created (see the note
- * below), so who is allowed to invoke this correction in the first
- * place should match that: the one name attached to the report, or the
- * Judge Advisor's standing authority to correct anything.
+ * mis-typed match number. The head referee and Judge Advisor can do this;
+ * ordinary referees share a code and their typed names cannot prove
+ * authorship. The correction is logged to Activity.
  *
  * Team and author are not editable here. Reassigning a flag to a
  * different team, or rewriting who raised it, is a bigger mistake than
- * this is meant to fix — that goes through the Judge Advisor deleting and
- * refiling it.
+ * this is meant to fix — the Judge Advisor removes it and a referee files
+ * the replacement.
  */
 export async function PATCH(request: Request) {
   const session = await getSession();
-  if (!canFlag(session) && !canAdminister(session)) {
+  if (!canAdminister(session) && !(session?.role === "referee" && session.head === true)) {
     return NextResponse.json(
-      { error: "Only a referee or the Judge Advisor can correct a flag." },
+      { error: "Only the head referee or the Judge Advisor can correct a flag." },
       { status: 403 },
     );
   }
@@ -140,17 +149,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "That flag no longer exists." }, { status: 404 });
   }
 
-  // Case-insensitive and trimmed: the author is a hand-typed sign-in name,
-  // and "dana" must still be able to correct the flag "Dana" raised. The
-  // name is required at sign-in now (see POST /api/session), so this no
-  // longer collapses every nameless referee into one "Referee" author.
-  if (!canAdminister(session) && !sameAuthor(existing.author, session!.name)) {
-    return NextResponse.json(
-      { error: "Only the referee who raised this flag, or the Judge Advisor, can correct it." },
-      { status: 403 },
-    );
-  }
-
   // Read before updateFlag runs, not after: the file store hands back the
   // very object it stores, so existing.kind would already read as the NEW
   // value by the time we get here otherwise — the same trap the conflicts
@@ -162,7 +160,7 @@ export async function PATCH(request: Request) {
   // `existing` may already be the new values.
   const before = {
     kind: previousKind,
-    match: `${existing.match_type ?? ""}${existing.match_number ?? ""}`,
+    match: matchReference(existing.match_type, existing.match_number) ?? "",
     field: existing.field,
     body: existing.body,
     rules: existing.rule,
@@ -175,12 +173,23 @@ export async function PATCH(request: Request) {
   const parsed = parseFlagFields(body, {
     allowLegacyRulelessKind: existing.rule ? null : existing.kind,
     defaultRuleset: existing.ruleset,
+    fieldCount: (await store().getRefereeSetup())?.field_count,
+    existing,
   });
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   }
-  const { kind, text, matchType, matchNumber, field, rule, ruleset, manualVersion, matchAffecting } =
-    parsed;
+  const {
+    kind,
+    text,
+    matchType,
+    matchNumber,
+    field,
+    rule,
+    ruleset,
+    manualVersion,
+    matchAffecting,
+  } = parsed;
 
   const edit: FlagEdit = {
     kind,
@@ -212,7 +221,7 @@ export async function PATCH(request: Request) {
   // itself no longer does.
   const after = {
     kind,
-    match: `${matchType}${matchNumber}`,
+    match: matchReference(matchType, matchNumber) ?? "",
     field,
     body: text,
     rules: rule,
@@ -226,7 +235,8 @@ export async function PATCH(request: Request) {
 
   await store().logActivity({
     teamId,
-    actor: actorLabel(session),
+    kind: "referee",
+    ...actorParts(session),
     action: changedKind ? `corrected a flag: ${previousKind} → ${kind}` : "corrected a flag",
     detail: [`Team ${team?.number ?? "?"}`, ...(changes.length ? changes : ["nothing changed"])].join(
       " · ",
@@ -254,6 +264,21 @@ export async function DELETE(request: Request) {
   const id = new URL(request.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required." }, { status: 400 });
 
-  const removed = await store().removeFlag(id);
+  // Read before removing: once it is gone nothing says whose flag it was.
+  const db = store();
+  const flag = (await db.listFlags()).find((f) => f.id === id);
+  const removed = await db.removeFlag(id);
+  if (removed && flag) {
+    const team = (await db.listTeams()).find((t) => t.id === flag.team_id);
+    await db.logActivity({
+      teamId: flag.team_id,
+      kind: "referee",
+      ...actorParts(session),
+      action: `removed a flag: ${flag.kind}`,
+      detail: [`Team ${team?.number ?? "?"}`, matchReference(flag.match_type, flag.match_number), fieldLabel(flag.field)]
+        .filter(Boolean)
+        .join(" · "),
+    });
+  }
   return NextResponse.json({ ok: true, removed });
 }

@@ -3,9 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { call, useAppState } from "@/components/useAppState";
-import { inputClass, TopBar } from "@/components/ui";
-import { TabBar } from "@/components/nav";
-import { SignOutButton } from "@/components/judging";
+import { RefereeFrame } from "@/components/referee/RefereeFrame";
 import { FlagSummary } from "@/components/Flags";
 import { compareTeamNumbers } from "@/lib/teamNumber";
 import type { Session } from "@/lib/auth";
@@ -69,53 +67,33 @@ export default function RefereeTeamsPage() {
   }
 
   return (
-    <>
-      <TopBar
-        title="Referee"
-        subtitle={session ? session.name : undefined}
-        online={online}
-        role={state.viewer.role}
-        current="/referee/teams"
-        right={<SignOutButton to="/referee/login" />}
-      />
-
-      <main className="mx-auto max-w-lg space-y-4 px-5 py-6">
-        {/* The head referee's main move is "show me all the teams", so the
-            way there is the first thing on the page rather than a link in
-            the bar. */}
-        <TabBar
-          label="Referee views"
-          variant="segmented"
-          active={"teams"}
-          items={[
-            { id: "lookup", label: "Type a number", href: "/referee" },
-            { id: "teams", label: "All teams", href: "/referee/teams" },
-          ]}
-        />
-
-        <div className="space-y-3 rounded-2xl bg-surface p-4 ring-1 ring-inset ring-line">
-          <label className="block">
-            <span className="mb-1 block text-xs text-ink-subtle">
-              Search by number, name or pit
-            </span>
+    <RefereeFrame name={session?.name} online={online} role={state.viewer.role} current="/referee/teams">
+      <main className="rf-body rf-body--list">
+        <div className="rf-find">
+          <label className="rf-lab" htmlFor="rf-find">
+            <span>Search number, name or pit</span>
+          </label>
+          <div className="rf-sf">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3.5-3.5" />
+            </svg>
             <input
+              id="rf-find"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="9882K, Nova, A1"
+              autoCapitalize="characters"
               autoComplete="off"
-              className={inputClass}
+              spellCheck={false}
+              className="rf-input"
             />
-          </label>
+          </div>
 
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="rf-filt">
             {state.divisions.length > 1 ? (
-              <label className="min-w-[10rem] flex-1">
-                <span className="mb-1 block text-xs text-ink-subtle">Division</span>
-                <select
-                  value={division}
-                  onChange={(e) => setDivision(e.target.value)}
-                  className={`${inputClass} py-2`}
-                >
+              <span className="rf-dsel">
+                <select value={division} onChange={(e) => setDivision(e.target.value)} aria-label="Division">
                   <option value="" className="bg-surface">
                     All divisions
                   </option>
@@ -125,35 +103,28 @@ export default function RefereeTeamsPage() {
                     </option>
                   ))}
                 </select>
-              </label>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </span>
             ) : null}
-
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-subtle">
-              <input
-                type="checkbox"
-                checked={flaggedOnly}
-                onChange={(e) => setFlaggedOnly(e.target.checked)}
-                className="h-4 w-4 accent-[var(--accent)]"
-              />
+            <button type="button" className="rf-fchip" aria-pressed={flaggedOnly} onClick={() => setFlaggedOnly(!flaggedOnly)}>
               Flagged only
-            </label>
+            </button>
+            <span className="rf-count" aria-live="polite">
+              {shown.length} of {state.teams.length} teams
+            </span>
           </div>
-
-          <p className="text-xs text-ink-faint">
-            {shown.length} of {state.teams.length} teams
-          </p>
         </div>
 
+        <p className="rf-tcap">Tap a team to flag it on Report.</p>
+
         {!state.teams.length ? (
-          <p className="rounded-xl px-4 py-8 text-center text-sm text-ink-faint ring-1 ring-inset ring-line">
-            No teams have been imported yet.
-          </p>
+          <p className="rf-empty">No teams have been imported yet.</p>
         ) : !shown.length ? (
-          <p className="rounded-xl px-4 py-8 text-center text-sm text-ink-faint ring-1 ring-inset ring-line">
-            Nothing matches that.
-          </p>
+          <p className="rf-empty">Nothing matches that.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="rf-tlist">
             {shown.map((t) => {
               const flags = flagsByTeam.get(t.id) ?? [];
               return (
@@ -161,28 +132,30 @@ export default function RefereeTeamsPage() {
                   {/* The whole row is the target: on a phone, aiming at a
                       team number is not something to ask of anyone. */}
                   <button
+                    type="button"
+                    className="rf-trow"
                     onClick={() => router.push(`/referee?team=${encodeURIComponent(t.number)}`)}
-                    className="group flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-surface px-4 py-3 text-left ring-1 ring-inset ring-line transition hover:bg-surface-2 hover:ring-accent/60 focus-visible:ring-2 focus-visible:ring-accent"
                   >
-                    <span className="text-lg font-bold tabular-nums">{t.number}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm text-ink-subtle">
-                      {t.name}
+                    <span className="rf-tn">
+                      <span className="rf-t1">
+                        <b>{t.number}</b>
+                        <span>{t.name}</span>
+                      </span>
+                      <span className="rf-t2">
+                        {t.division}
+                        {t.pit ? ` · Pit ${t.pit}` : ""}
+                      </span>
                     </span>
                     {flags.length ? (
-                      <FlagSummary flags={flags} kinds={state.flagKinds} size="xs" />
+                      <span className="rf-fl">
+                        <FlagSummary flags={flags} kinds={state.flagKinds} />
+                      </span>
                     ) : null}
                     {/* Says the row goes somewhere, before anyone has to
                         hover to find out. */}
-                    <span
-                      aria-hidden
-                      className="text-ink-faint transition group-hover:translate-x-0.5 group-hover:text-accent"
-                    >
-                      ›
-                    </span>
-                    <span className="w-full text-xs text-ink-faint">
-                      {t.division}
-                      {t.pit ? ` · pit ${t.pit}` : ""}
-                    </span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M9 6l6 6-6 6" />
+                    </svg>
                   </button>
                 </li>
               );
@@ -190,6 +163,6 @@ export default function RefereeTeamsPage() {
           </ul>
         )}
       </main>
-    </>
+    </RefereeFrame>
   );
 }

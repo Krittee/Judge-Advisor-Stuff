@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo } from "react";
-import { STATUS_META, type Status } from "@/lib/status";
+import { STATUS_META } from "@/lib/status";
 import { buildFloorPlan, comparePits, isMappablePit, parsePit } from "@/lib/pit";
-import type { AppState, RequestRow, Team } from "@/lib/types";
+import type { AppState } from "@/lib/types";
+import { bestRequests, divisionClass, plural, statusClass, tileFor, type TileData } from "./board/boardLogic";
+import { TileTime } from "./board/TileTime";
 
 /**
- * The pit floor, seen from above.
+ * The pit floor, seen from above ("Panel columns, refined", design/board-redesign/).
  *
  * One floor, not one per division: at a real event the two divisions are
  * interleaved across the same aisles, so splitting them into blocks would
@@ -27,39 +29,17 @@ import type { AppState, RequestRow, Team } from "@/lib/types";
  * Which way round it is drawn comes from config/event.json, because the
  * plan is a picture of a real room and rooms do not all run the same way.
  * Only the drawing flips — a pit is still A1 and still sorts as A1.
+ *
+ * Styles are the `bd-*` ones under `.board` in globals.css. The division
+ * colours are the --cat-* tokens: labels, not states.
  */
 
-/* Labels, not states. These are the only categorical colours in the app:
-   they say which division a pit belongs to and nothing about whether
-   anyone needs to go there. Kept clear of the waiting orange and the
-   danger red for exactly that reason -- see --cat-* in globals.css. */
-const DIVISION_TONES = [
-  { ring: "ring-cat-1", dot: "bg-cat-1", text: "text-cat-1" },
-  { ring: "ring-cat-2", dot: "bg-cat-2", text: "text-cat-2" },
-  { ring: "ring-cat-3", dot: "bg-cat-3", text: "text-cat-3" },
-  { ring: "ring-cat-4", dot: "bg-cat-4", text: "text-cat-4" },
-];
-
-function divisionTone(division: string, divisions: string[]) {
-  const i = Math.max(0, divisions.indexOf(division));
-  return DIVISION_TONES[i % DIVISION_TONES.length];
-}
-
-type Placed = { team: Team; status: Status | null };
+type Placed = TileData;
 
 export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean }) {
   const placed = useMemo<Placed[]>(() => {
-    const best = new Map<string, RequestRow>();
-    for (const r of state.requests) {
-      const current = best.get(r.team_id);
-      if (!current || rank(r.status) < rank(current.status)) best.set(r.team_id, r);
-    }
-
-    return state.teams.map((team) => {
-      const r = best.get(team.id);
-      const status = !r || r.status === "cancelled" ? null : (r.status as Status);
-      return { team, status };
-    });
+    const best = bestRequests(state.requests);
+    return state.teams.map((team) => tileFor(team, best.get(team.id)));
   }, [state.teams, state.requests]);
 
   // One grid across the whole floor, both divisions together, then turned
@@ -85,38 +65,27 @@ export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean
     .filter((p) => !isMappablePit(p.team.pit))
     .sort((a, b) => a.team.number.localeCompare(b.team.number));
 
-  const perDivision = state.divisions.map((d) => ({
-    division: d,
-    tone: divisionTone(d, state.divisions),
-    total: mapped.filter((p) => p.team.division === d).length,
-    waiting: mapped.filter((p) => p.team.division === d && p.status === "requested").length,
-  }));
+  // Only divisions with a team on the plan: "High School 0 pits" is noise on a TV.
+  const perDivision = state.divisions
+    .map((d) => ({
+      division: d,
+      tone: divisionClass(d, state.divisions),
+      total: mapped.filter((p) => p.team.division === d).length,
+      waiting: mapped.filter((p) => p.team.division === d && p.status === "requested").length,
+    }))
+    .filter((d) => d.total > 0);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-        {perDivision.map(({ division, tone, total, waiting }) => (
-          <span key={division} className="flex items-center gap-2">
-            <span className={`h-3 w-3 rounded-sm ${tone.dot}`} />
-            <span className={tone.text}>{division}</span>
-            <span className="text-ink-faint">
-              {total} pit{total === 1 ? "" : "s"}
-              {waiting ? <span className="ml-1.5 text-waiting-quiet">{waiting} waiting</span> : null}
-            </span>
-          </span>
-        ))}
-      </div>
-
+    <div className="bd-pits">
       {columns.length ? (
-        <section className="rounded-2xl bg-surface p-4 ring-1 ring-inset ring-line">
-          <div className="flex flex-wrap gap-2">
-            {columns.map(({ row, numbered }) => (
-              // Compress to fit rather than wrapping a lone aisle onto its
-              // own line, but never stretch past a pit's worth of width.
-              <div
-                key={row}
-                className="flex min-w-[4.75rem] max-w-[8rem] flex-1 flex-col gap-1.5"
-              >
+        <section className="bd-floor">
+          {columns.map(({ row, numbered }) => (
+            <section key={row} className="bd-fc" aria-label={`Column ${row}`}>
+              <div className="bd-fh">
+                <b>{row}</b>
+                <span>{plural(numbered.filter((n) => n.cell.length).length, "pit")}</span>
+              </div>
+              <div className="bd-fg">
                 {numbered.map(({ cell, position }) => (
                   <PitCell
                     key={position}
@@ -127,44 +96,71 @@ export function PitMap({ state, hideDone }: { state: AppState; hideDone: boolean
                     hideDone={hideDone}
                   />
                 ))}
-                <span className="rounded-md bg-surface py-1 text-center text-sm font-bold text-ink-muted">
-                  {row}
-                </span>
               </div>
-            ))}
-          </div>
+            </section>
+          ))}
         </section>
       ) : (
-        <p className="rounded-2xl bg-surface px-4 py-8 text-center text-sm text-ink-faint">
-          No pits to show. Give teams a pit like <code className="text-ink-faint">A1</code> in
-          Admin → Teams and they will appear here.
+        <p className="bd-none">
+          No pits to show. Give teams a pit like <code>A1</code> in Admin → Teams and they will
+          appear here.
         </p>
       )}
 
       {unmapped.length ? (
-        <section className="rounded-2xl bg-surface p-4 ring-1 ring-inset ring-line">
-          <h3 className="mb-2 text-sm font-semibold text-ink-subtle">
-            No pit on the plan ({unmapped.length})
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {unmapped.map(({ team, status }) => {
-              const tone = divisionTone(team.division, state.divisions);
-              return (
-                <span
-                  key={team.id}
-                  title={`${team.number} ${team.name} · ${team.division}`}
-                  className={`rounded-lg px-2 py-1 text-sm tabular-nums ring-2 ${tone.ring} ${
-                    status ? STATUS_META[status].fill : "bg-surface text-ink-subtle"
-                  }`}
-                >
-                  {team.number}
-                </span>
-              );
-            })}
+        <section className="bd-extra">
+          <h3>No pit on the plan ({unmapped.length})</h3>
+          <div className="bd-chips">
+            {unmapped.map((tile) => (
+              <span
+                key={tile.team.id}
+                title={`${tile.team.number} ${tile.team.name} · ${tile.team.division}`}
+                className={`bd-chipn ${statusClass(tile.status)} ${divisionClass(tile.team.division, state.divisions)}`}
+              >
+                {tile.team.number}
+              </span>
+            ))}
           </div>
         </section>
       ) : null}
+
+      <footer className="bd-keyrow bd-keyrow--pits">
+        <StatusSwatches />
+        <span className="bd-vr" aria-hidden="true" />
+        {perDivision.map(({ division, tone, total, waiting }) => (
+          <span key={division} className={`bd-ki ${tone}`}>
+            <i className="bd-rg" aria-hidden="true" />
+            {division}
+            <span className="bd-mu">
+              {plural(total, "pit")}
+              {waiting ? ` · ${waiting} waiting` : ""}
+            </span>
+          </span>
+        ))}
+      </footer>
     </div>
+  );
+}
+
+/** The status colours as a row of swatches, in the short words the tiles use. */
+export function StatusSwatches() {
+  const rows: [string, string][] = [
+    ["bd-s-req", STATUS_META.requested.short],
+    ["bd-s-en", STATUS_META.acknowledged.short],
+    ["bd-s-int", STATUS_META.interviewing.short],
+    ["bd-s-bk", STATUS_META.scheduled.short],
+    ["bd-s-done", STATUS_META.completed.short],
+    ["bd-s-none", "Not yet"],
+  ];
+  return (
+    <>
+      {rows.map(([cls, label]) => (
+        <span key={cls} className="bd-ki">
+          <i className={`bd-sw ${cls}`} aria-hidden="true" />
+          {label}
+        </span>
+      ))}
+    </>
   );
 }
 
@@ -185,8 +181,8 @@ function PitCell({
   // a blank really is a blank.
   if (!cell.length) {
     return (
-      <div className="flex h-[3.25rem] items-center justify-center rounded-md border border-dashed border-line">
-        <span className="text-[10px] text-ink-faint">
+      <div className="bd-pit bd-pit--empty">
+        <span className="bd-pcode">
           {row}
           {position}
         </span>
@@ -197,56 +193,46 @@ function PitCell({
   // Hide completed removes the tile itself. An empty box of the same height
   // keeps every other tile where it was.
   const shown = hideDone ? cell.filter((p) => p.status !== "completed") : cell;
-  if (!shown.length) return <div aria-hidden className="h-[3.25rem]" />;
+  if (!shown.length) return <div aria-hidden className="bd-pit bd-pit--gone" />;
 
   // Two teams on one pit: both numbers, so neither is hidden behind the other.
   if (shown.length > 1) {
     return (
       <div
         title={shown.map((p) => `${p.team.number} ${p.team.name} · ${p.team.division}`).join("\n")}
-        className="flex h-[3.25rem] flex-col justify-center overflow-hidden rounded-md px-1 text-center bg-surface text-ink-muted ring-2 ring-caution"
+        className="bd-pit bd-pit--shared"
       >
-        <div className="text-[10px] font-medium text-caution-quiet">
+        <div className="bd-shared-h">
           {row}
           {position} · {shown.length} teams
         </div>
-        <div className="truncate text-xs font-bold tabular-nums leading-tight">
-          {shown.map((p) => p.team.number).join(" / ")}
-        </div>
+        <div className="bd-shared-n">{shown.map((p) => p.team.number).join(" / ")}</div>
       </div>
     );
   }
 
-  const { team, status } = shown[0];
+  const tile = shown[0];
+  const { team, status } = tile;
   const meta = status ? STATUS_META[status] : null;
-  const tone = divisionTone(team.division, divisions);
 
   return (
     <div
       title={`${row}${position} · ${team.number} ${team.name} · ${team.division}${
         meta ? ` · ${meta.label}` : ""
       }`}
-      className={`flex h-[3.25rem] flex-col justify-center overflow-hidden rounded-md px-1 text-center ring-2 ${
-        tone.ring
-      } ${meta ? meta.fill : "bg-surface text-ink-muted"} ${
-        status === "requested" ? "pulse-waiting" : ""
-      }`}
+      className={`bd-pit ${statusClass(status)} ${divisionClass(team.division, divisions)}`}
     >
-      <div className="text-[10px] font-medium opacity-70">
+      <span className="bd-pcode">
         {row}
         {position}
-      </div>
-      <div className="truncate text-sm font-bold tabular-nums leading-tight">{team.number}</div>
+      </span>
+      <span className="bd-pnum">{team.number}</span>
+      {meta ? (
+        <span className="bd-ps">
+          {meta.short} <TileTime tile={tile} className="bd-pt" />
+        </span>
+      ) : null}
     </div>
-  );
-}
-
-/** Lower rank wins when a team has more than one request on record. */
-function rank(status: string): number {
-  return (
-    { requested: 0, acknowledged: 1, interviewing: 2, scheduled: 3, completed: 4, cancelled: 5 }[
-      status
-    ] ?? 9
   );
 }
 

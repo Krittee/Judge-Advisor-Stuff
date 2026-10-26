@@ -12,8 +12,10 @@ const EMPTY: AppState = {
   categories: [],
   languages: [],
   conflicts: [],
+  judges: [],
   pitFloor: { columns: "right-to-left", rows: "bottom-to-top" },
   matchTypes: [],
+  refereeSetup: null,
   flagKinds: [],
   flags: [],
   viewer: {
@@ -190,12 +192,17 @@ export async function call<T = unknown>(
  * `enabled` exists so a screen that only shows scores on one tab does not
  * poll for them while that tab is closed. The judge console leaves it on:
  * it wants each team's total on the queue card as well.
+ *
+ * `reload` asks again now, for a screen that has just let the user change
+ * scores elsewhere (the Judge Advisor's team sheet) and should not show the
+ * old totals until the next poll.
  */
 export function useScores({ enabled = true }: { enabled?: boolean } = {}) {
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [again, setAgain] = useState(0);
 
   useEffect(() => {
     if (!enabled) return;
@@ -225,7 +232,10 @@ export function useScores({ enabled = true }: { enabled?: boolean } = {}) {
       clearInterval(t);
       document.removeEventListener("visibilitychange", load);
     };
-  }, [enabled]);
+  }, [enabled, again]);
 
-  return { scores, rubrics, error, loaded };
+  // Re-running the effect is a load now, then the 15 s poll starts over.
+  const reload = useCallback(() => setAgain((n) => n + 1), []);
+
+  return { scores, rubrics, error, loaded, reload };
 }
