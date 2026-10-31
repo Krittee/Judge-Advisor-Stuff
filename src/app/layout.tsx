@@ -54,7 +54,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitializer }} />
       </head>
-      <body className="min-h-screen antialiased">
+      {/* dvh, not screen (100vh): on iPhone Safari 100vh is taller than the visible area, so the whole page could scroll and slide the app shells' pinned header and tabs. */}
+      <body className="min-h-dvh antialiased">
         {children}
         <ThemeToggle />
       </body>
