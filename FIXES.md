@@ -4,9 +4,56 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-10-31 | [Referee: keyboard hides the team being typed](#referee-keyboard-hides-the-team-being-typed-2026-10-31) | `cf7d3a5` | Not yet | Local, not pushed |
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Local, not pushed |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Local, not pushed |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Local, not pushed |
+
+---
+
+## Referee: keyboard hides the team being typed (2026-10-31)
+
+### Problem
+
+On the live site, on some phones, tapping **Team to flag** in the Referee console (`/referee`) opened the keyboard and squashed the app into the space above it. The header and the CURRENT MATCH bar stayed full size, the Record bar and the tabs sat right under them, and the form between them was about one line tall. Only the "Team to flag" label showed, cut off. The referee couldn't see the team number they were typing or the team it matched. The user: "some phones have this problem and they cannot see the team they are choosing".
+
+### Root cause
+
+The referee screen is a phone app shell: `.referee` is exactly one screen tall (`height: 100dvh`) and only `.rf-body` scrolls. Five parts are pinned around it at full size: header 73px, stripe 6px, match bar 109px (two rows on a phone), Record bar 98px, tabs 65px, 351px in all.
+
+On most iPhones the keyboard slides over the page and nothing shrinks. Some phones shrink the page to the space above the keyboard instead (iOS 26.0 Safari has reported WebKit bugs where the page height changes around the keyboard, and some Android browsers resize the page by default). That leaves about 400–440px. The pinned parts don't shrink, so `.rf-body` got about 90px, and iOS 26's floating autofill bar (key / card / location) covered part of that.
+
+### What changed
+
+- `src/app/globals.css`: one `@media (pointer: coarse) and (max-height: 500px)` block. While a text field in `.rf-body` has focus, it hides the header, stripe, "VIQRC · N fields" pill, Record bar, tabs and floating theme toggle. They come back on blur. Phones that don't shrink (taller than 500px) and desktops (fine pointer) are untouched.
+- `src/components/referee/RefereeFrame.tsx`: a `visualViewport` resize listener scrolls the focused field back into view, for fields lower in the form, like the note box, that the shrink pushes out of sight.
+
+It works with the earlier `min-h-dvh` body fix (`4415991`): the page still can't scroll as a whole.
+
+### How it was tested
+
+- **Chromium simulation:** local dev server on a copy of the data (not `.data/`), 390px wide with touch emulation. A 440px-tall window stands in for the space above the keyboard in the user's screenshot.
+  - **Before the fix:** reproduced the squash. `.rf-body` measured 89px, with only the label and the top of the input showing.
+  - **After the fix:** with Team to flag focused, `.rf-body` is 383px. The typed "1101", the matched "Iron Hawks · Elementary School · Pit A1" and its flags, and the rule chips all show. Blur brings the Record bar (98px) and tabs (65px) back.
+  - **Note box:** focused at full height, then shrunk to 440px (the order a keyboard opens in). The note box scrolled into view.
+  - **All teams search:** the same rule applies. The search and its result show (checked in dark mode).
+  - **Full phone height (844px):** focusing a field changes nothing. **Desktop (1024px):** the Record bar and tabs stay while typing, and the page doesn't scroll.
+  - **Set match sheet and All rules picker:** already fine at 440px (each scrolls on its own), so unchanged.
+- `npm test`: 1582 pass, 0 fail, 1 skipped. `eslint src tests` and `tsc --noEmit`: clean.
+- **Real phone:** not yet confirmed. A desktop browser has no real on-screen keyboard. A local server on the same Wi-Fi was offered for that check.
+
+### Commit and branch
+
+- Fix: `cf7d3a5` on `claude/fix-ref-keyboard-f90990`.
+
+### Status
+
+Committed locally. NOT pushed or deployed.
+
+### Follow-ups
+
+- Confirm on a real phone that shows the problem (the user's iPhone) before or after the deploy.
+- The judge and Judge Advisor phone screens use the same shell. Their text fields are in pop-up sheets that scroll on their own, so they're likely fine, but check them on a squashing phone.
 
 ---
 
