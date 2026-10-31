@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { TopBar } from "@/components/ui";
 import { SignOutButton } from "@/components/judging";
@@ -44,6 +45,17 @@ export function RefereeFrame({
   children: React.ReactNode;
 }) {
   const report = current === "/referee";
+  // The shell can shrink after a field got focus (keyboard opening), leaving it out of view -- e.g. the note box lower in the form.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      const el = document.activeElement;
+      if (el?.matches(".rf-body input, .rf-body textarea")) el.scrollIntoView({ block: "nearest" });
+    };
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
   return (
     <div className="referee">
       <TopBar

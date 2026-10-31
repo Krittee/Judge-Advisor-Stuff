@@ -1493,6 +1493,12 @@ body:has(.referee) > .theme-toggle:hover {
   padding: 10px var(--rf-gutter) 14px; overflow-y: auto; overscroll-behavior: contain;
 }
 .rf-body > * { flex: none; }
+/* Some phones shrink the page to the space above the keyboard. While typing in a short touch window, drop the pinned chrome (header, stripe, program pill, Record bar, tabs, theme toggle) so the focused field and the team it matched stay in view; everything returns when the keyboard closes. */
+@media (pointer: coarse) and (max-height: 500px) {
+  .referee:has(.rf-body :is(input:not([type="checkbox"]):not([type="radio"]), textarea):focus) :is(.app-header, .rf-strip, .rf-ptag, .rf-abar, .rf-tabs),
+  .referee:has(.rf-body :is(input:not([type="checkbox"]):not([type="radio"]), textarea):focus) .rf-mbar::after { display: none; }
+  body:has(.referee .rf-body :is(input:not([type="checkbox"]):not([type="radio"]), textarea):focus) > .theme-toggle { display: none; }
+}
 
 .rf-tabs {
   display: flex; flex: none; padding: 0 calc(var(--rf-gutter) - 16px) env(safe-area-inset-bottom);
