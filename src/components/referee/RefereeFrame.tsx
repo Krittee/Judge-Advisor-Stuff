@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { TopBar } from "@/components/ui";
 import { SignOutButton } from "@/components/judging";
 import type { Role } from "@/lib/auth";
@@ -21,8 +20,8 @@ function Icon({ children }: { children: React.ReactNode }) {
  * app shell -- the page itself never scrolls, so what a page pins above or
  * below its `.rf-body` stays put. Styles live under `.referee` in globals.css.
  *
- * Today is not a view of its own: it is the "Flagged today" section further
- * down the Report page, reached by an anchor.
+ * Today is not a page of its own: it is the Report page with `?tab=today`,
+ * which shows only its "Flagged today" list. The page passes `today`.
  */
 export function RefereeFrame({
   name,
@@ -30,6 +29,7 @@ export function RefereeFrame({
   role,
   current,
   tabs = true,
+  today = false,
   children,
 }: {
   name?: string;
@@ -39,13 +39,10 @@ export function RefereeFrame({
   current: "/referee" | "/referee/teams";
   /** The event setup screen is a gate, not a place to navigate from. */
   tabs?: boolean;
+  /** On the Report page, showing its Today list rather than the form. */
+  today?: boolean;
   children: React.ReactNode;
 }) {
-  // The hash is not something a router state carries; read it once the page is
-  // here, and follow the taps after that.
-  const [onToday, setOnToday] = useState(false);
-  useEffect(() => setOnToday(window.location.hash === "#today"), []);
-
   const report = current === "/referee";
   return (
     <div className="referee">
@@ -71,9 +68,8 @@ export function RefereeFrame({
           <Link
             href="/referee"
             className="rf-tab"
-            aria-current={report && !onToday ? "page" : undefined}
+            aria-current={report && !today ? "page" : undefined}
             onClick={() => {
-              setOnToday(false);
               // Already on the page: the link goes nowhere, so take it to the top.
               document.querySelector(".rf-body")?.scrollTo({ top: 0 });
             }}
@@ -91,10 +87,9 @@ export function RefereeFrame({
             All teams
           </Link>
           <Link
-            href="/referee#today"
+            href="/referee?tab=today"
             className="rf-tab"
-            aria-current={report && onToday ? "page" : undefined}
-            onClick={() => setOnToday(true)}
+            aria-current={report && today ? "page" : undefined}
           >
             <Icon>
               <circle cx="12" cy="12" r="9" />
