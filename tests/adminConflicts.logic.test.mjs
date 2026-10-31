@@ -69,7 +69,10 @@ test("a division is a short tag: initials, a number kept whole, one word left al
   assert.equal(divisionTag("High School"), "HS");
   assert.equal(divisionTag("Division 1"), "D1");
   assert.equal(divisionTag("Division 12"), "D12");
-  assert.equal(divisionTag("Blended"), "Blended");
+  assert.equal(divisionTag("Blended"), "BLN");
+  assert.equal(divisionTag("blended"), "BLN");
+  assert.equal(divisionTag("  BLENDED "), "BLN");
+  assert.equal(divisionTag("Open"), "Open");
   assert.equal(divisionTag("  Middle   School "), "MS");
   assert.equal(panelTag(p2), "Panel 2 · MS");
 });

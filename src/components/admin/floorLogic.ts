@@ -160,11 +160,12 @@ export function chipLabel(name: string): string {
 
 /**
  * A division as a tag: "Middle School" is "MS", "Elementary School" "ES",
- * "Division 1" "D1". A one-word division ("Blended") has no shorter form and
- * stays whole. Where room is tight, as in the "Move to panel…" rows, so the
- * panel's name keeps its line.
+ * "Division 1" "D1", "Blended" "BLN". Any other one-word division has no
+ * shorter form and stays whole. Where room is tight, as in the "Move to panel…"
+ * rows, so the panel's name keeps its line.
  */
 export function divisionTag(division: string): string {
+  if (/^blended$/i.test(division.trim())) return "BLN";
   const words = division.trim().split(/\s+/).filter(Boolean);
   if (words.length < 2) return division.trim();
   return words.map((w) => (/^\d+$/.test(w) ? w : [...w][0].toUpperCase())).join("");

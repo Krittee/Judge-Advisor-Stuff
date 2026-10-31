@@ -124,7 +124,7 @@ test("the division chips each count what they have decided; the panel chips coun
     "false ESElementary School0/11 decided",
     "true MSMiddle School3/11 decided",
     "false HSHigh School0/11 decided",
-    "false BlendedBlended0/11 decided",
+    "false BLNBlended0/11 decided",
   ]);
   assert.deepEqual(chips(group("Panel")), ["true All panels9 teams", "false Panel 25 teams", "false Panel 34 teams"]);
   assert.deepEqual(chips(group("Panel")).length, 3);
