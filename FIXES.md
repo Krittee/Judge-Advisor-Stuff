@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-10-31 | [Blended division shows as BLN](#blended-division-shows-as-bln-2026-10-31) | `600a5e8` | Not needed | Local, not pushed |
 | 2026-10-31 | [Judging Board: colour key above Unassigned](#judging-board-colour-key-above-unassigned-2026-10-31) | `4a001a8` | Not needed | Local, not pushed |
 | 2026-10-31 | [Team page: a way back, and no details strip](#team-page-a-way-back-and-no-details-strip-2026-10-31) | `be78288` | Not yet | Local, not pushed |
 | 2026-10-31 | [Head referee can remove a flag](#head-referee-can-remove-a-flag-2026-10-31) | `ebbd0ab` | Not yet | Local, not pushed |
@@ -11,6 +12,39 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Local, not pushed |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Local, not pushed |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Local, not pushed |
+
+---
+
+## Blended division shows as BLN (2026-10-31)
+
+### Problem / request
+
+The user: "I saw Division for Blended still show as blended while the others like Middle School use MS. Make Blended be BLN." `divisionTag()` shortened multi-word divisions to initials but returned one-word divisions whole, on purpose, so Blended stayed "Blended".
+
+### What changed
+
+- `src/components/admin/floorLogic.ts`: `divisionTag()` returns "BLN" for Blended (trimmed, any case); other one-word divisions still stay whole. Doc comment updated.
+- `tests/adminConflicts.logic.test.mjs`: Blended, blended and " BLENDED " give "BLN"; "Open" stays "Open"; MS/ES/HS/D1/D12 unchanged.
+- `tests/adminAwards.runtime.test.tsx`: the Awards division chip now reads "BLN" (full name kept for screen readers).
+
+Every short division label already goes through `divisionTag`, so there was no hand-rolled copy to unify. Screens that now show "BLN": JA Teams list (Div column, panel picker hints), JA Panels tags, JA Floor "Move to panel…" rows, Conflicts (team and panel labels, roster groups), Awards division chips, Scores division filter (short label), and the referee console's team tags. Unchanged, still full names: panel headers on Floor and the judge console, the Judging Board and its colour key, pit map tooltips, queue desk, team page, setup forms. Blended's compatibility logic is not touched.
+
+### How it was tested
+
+- `npm test`: 1584 tests, 1583 pass, 0 fail, 1 skipped. `npx eslint src tests`: clean.
+- In the browser, on a copy of the local data (not `.data/`) with two teams and one panel set to Blended: the Teams list shows "BLN" in the Div column beside "ES" and "MS"; the Panels tab tags read ES, ES, MS, BLN; Floor panel headers still say "Blended".
+
+### Commit and branch
+
+- Change: `600a5e8` on `claude/blended-bln-b74f84`.
+
+### Status
+
+Committed locally. NOT pushed or deployed.
+
+### Follow-ups
+
+- None.
 
 ---
 
