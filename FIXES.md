@@ -4,12 +4,50 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-10-31 | [Judging Board: colour key above Unassigned](#judging-board-colour-key-above-unassigned-2026-10-31) | `4a001a8` | Not needed | Local, not pushed |
 | 2026-10-31 | [Team page: a way back, and no details strip](#team-page-a-way-back-and-no-details-strip-2026-10-31) | `be78288` | Not yet | Local, not pushed |
 | 2026-10-31 | [Head referee can remove a flag](#head-referee-can-remove-a-flag-2026-10-31) | `ebbd0ab` | Not yet | Local, not pushed |
 | 2026-10-31 | [Referee: keyboard hides the team being typed](#referee-keyboard-hides-the-team-being-typed-2026-10-31) | `cf7d3a5` | Skipped | Local, not pushed |
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Local, not pushed |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Local, not pushed |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Local, not pushed |
+
+---
+
+## Judging Board: colour key above Unassigned (2026-10-31)
+
+### Problem / request
+
+On the Judging Board's "By panel" view (`/board`), the "What the colours mean" key sat in the right column after the Unassigned card. With many unassigned teams (17 in the user's screenshot), Unassigned pushed the key below the fold of the big screen, where nobody saw it. The user chose "top of the right column" over a one-line key strip under the header, as the smallest change during the event.
+
+### What changed
+
+- `src/components/board/BoardView.tsx`: the two children of `.bd-side` are swapped, so `<ColourKey/>` comes first and the Unassigned `PanelCard` second. No CSS change: nothing in `globals.css` depended on the order, and the phone rule `.bd-side .bd-key { display: none; }` still hides the key.
+- `tests/board.runtime.test.tsx`: the "a division with no teams is not in the By panel key" test now reads only the key's own `<section>`. Before, it sliced to the end of the page, which now also takes in the Unassigned card.
+
+The Pit floor view and the `.bd-pkey` status line are unchanged.
+
+### How it was tested
+
+- `npm test`: 1584 tests, 1583 pass, 0 fail, 1 skipped. `npx eslint src tests`: clean.
+- In the browser, on a copy of the local data (not `.data/`) with 17 unassigned teams added:
+  - Big screen (1920×1080), light and dark: the key is at the top of the right column and Unassigned (17 teams) follows it.
+  - Laptop (1440×900), dark: same order, with the key fully visible above the fold.
+  - Tablet (900px): the right column becomes a two-across grid, with the key first and Unassigned beside it.
+  - Phone (375px): the key is still hidden (`display: none`).
+- Fullscreen: the in-app browser blocks the Fullscreen API, so it was checked as a 1920×1080 viewport, which is the same layout without the browser bars. Not checked on the real big screen.
+
+### Commit and branch
+
+- Change: `4a001a8` on `claude/board-key-top-423390`.
+
+### Status
+
+Committed locally. NOT pushed or deployed.
+
+### Follow-ups
+
+- None.
 
 ---
 
