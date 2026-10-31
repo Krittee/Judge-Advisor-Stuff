@@ -268,12 +268,12 @@ test("PATCH does not accept a new team or author -- only removal replaces a flag
   assert.ok(!/author:\s*session/.test(fn), "PATCH must not let a flag's author be rewritten");
 });
 
-test("removal stays the Judge Advisor's alone -- correction is not a route around that", () => {
+test("removal stays with the head referee and Judge Advisor -- a plain flag-writer is not enough", () => {
   const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
   const del = src.slice(src.indexOf("export async function DELETE"));
   assert.ok(
-    /!canAdminister\(session\)/.test(del) && !/canFlag\(session\)/.test(del),
-    "DELETE must remain admin-only",
+    /!canRemoveFlag\(session\)/.test(del) && !/canFlag\(session\)/.test(del),
+    "DELETE must stay limited to canRemoveFlag",
   );
 });
 

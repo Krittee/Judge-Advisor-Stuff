@@ -61,6 +61,13 @@ test("FlagList renders rule, severity, match, field, description, author and tim
   assert.match(markup, /\d/);
 });
 
+test("FlagList shows Edit and Remove only when it is given the handler", () => {
+  const read = (props: object) => renderToStaticMarkup(<FlagList flags={[report()]} kinds={kinds} {...props} />);
+  assert.doesNotMatch(read({}), />Remove</);
+  assert.match(read({ onRemove: () => {} }), /aria-label="Remove [^"]* by [^"]*"/);
+  assert.match(read({ onEdit: () => {}, onRemove: () => {} }), />Edit<\/button><button[^>]*>Remove</);
+});
+
 test("Good Conduct and legacy reports without rule information render no broken rule label", () => {
   const markup = renderToStaticMarkup(
     <FlagList

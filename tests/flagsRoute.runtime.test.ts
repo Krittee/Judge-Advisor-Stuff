@@ -25,8 +25,10 @@ delete process.env.DATABASE_URL;
 const REFEREE: Session = { role: "referee", name: "Dana" };
 const HEAD_REFEREE: Session = { role: "referee", name: "Morgan", head: true };
 const ADMIN: Session = { role: "admin", name: "Judge Advisor" };
+const JUDGE: Session = { role: "judge", name: "Sam", panelId: "p1", panelName: "Panel 1" };
+const QUEUER: Session = { role: "queuer", name: "Desk" };
 
-async function inRequestScope<T>(session: Session, fn: () => Promise<T>): Promise<T> {
+async function inRequestScope<T>(session: Session | null, fn: () => Promise<T>): Promise<T> {
   const [{ workAsyncStorage }, { workUnitAsyncStorage }, { RequestCookies }, { RequestCookiesAdapter }] =
     await Promise.all([
       import("next/dist/server/app-render/work-async-storage.external"),
@@ -34,12 +36,15 @@ async function inRequestScope<T>(session: Session, fn: () => Promise<T>): Promis
       import("next/dist/server/web/spec-extension/cookies"),
       import("next/dist/server/web/spec-extension/adapters/request-cookies"),
     ]);
-  const token = await new SignJWT({ ...session })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("1h")
-    .sign(new TextEncoder().encode(process.env.SESSION_SECRET));
-  const headers = new Headers({ cookie: `jq_session=${token}` });
+  const headers = new Headers();
+  if (session) {
+    const token = await new SignJWT({ ...session })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("1h")
+      .sign(new TextEncoder().encode(process.env.SESSION_SECRET));
+    headers.set("cookie", `jq_session=${token}`);
+  }
   const cookies = RequestCookiesAdapter.seal(new RequestCookies(headers));
   return workAsyncStorage.run({ route: "/api/flags" } as never, () =>
     workUnitAsyncStorage.run({ type: "request", phase: "render", cookies } as never, fn),
@@ -100,6 +105,45 @@ test("only the head referee and Judge Advisor can correct a filed flag", async (
   const advised = await send("PATCH", ADMIN, { id: original.id, ...base, ...sg6, body: "advisor correction" });
   assert.equal(advised.status, 200, advised.body.error);
   assert.equal(advised.body.flag?.body, "advisor correction");
+});
+
+async function remove(session: Session | null, id: string) {
+  const route = await import("../src/app/api/flags/route");
+  const res = await inRequestScope(session, () =>
+    route.DELETE(new Request(`http://localhost/api/flags?id=${id}`, { method: "DELETE" })),
+  );
+  return { status: res.status, body: await res.json() };
+}
+
+test("only the head referee and Judge Advisor can remove a filed flag", async () => {
+  const t = await team();
+  const file = async () => {
+    const created = await send("POST", REFEREE, { ...base, ...sg6, teamId: t.id });
+    assert.equal(created.status, 200, created.body.error);
+    return created.body.flag!;
+  };
+  const flag = await file();
+  const db = await store();
+
+  for (const session of [REFEREE, JUDGE, QUEUER, null]) {
+    const denied = await remove(session, flag.id);
+    assert.equal(denied.status, 403, session?.role ?? "anonymous");
+    assert.equal(denied.body.error, "Only the head referee or the Judge Advisor can remove a flag.");
+    assert.equal((await db.listFlags(t.id)).length, 1, "a refused removal leaves the flag");
+  }
+
+  const headed = await remove(HEAD_REFEREE, flag.id);
+  assert.equal(headed.status, 200);
+  assert.equal(headed.body.removed, true);
+  assert.equal((await db.listFlags(t.id)).length, 0);
+  const [entry] = (await db.listActivity()).filter((a) => a.action === "removed a flag: minor");
+  assert.deepEqual([entry.actor, entry.actor_role], ["Morgan", "Head referee"]);
+
+  const other = await file();
+  const advised = await remove(ADMIN, other.id);
+  assert.equal(advised.status, 200);
+  assert.equal(advised.body.removed, true);
+  assert.equal((await db.listFlags(t.id)).length, 0);
 });
 
 /** Save the event's setup straight into the store, as PUT /api/referee-setup would. */

@@ -90,18 +90,38 @@ export function FlagSummary({
 }
 
 /** The full record, in the referee's own words. */
-export function FlagList({ flags, kinds, onEdit }: { flags: FlagRow[]; kinds: FlagKind[]; onEdit?: (flag: FlagRow) => void }) {
+export function FlagList({
+  flags,
+  kinds,
+  onEdit,
+  onRemove,
+}: {
+  flags: FlagRow[];
+  kinds: FlagKind[];
+  onEdit?: (flag: FlagRow) => void;
+  onRemove?: (flag: FlagRow) => void;
+}) {
   if (!flags.length) {
     return <p className="text-sm text-ink-faint">Nothing flagged by a referee.</p>;
   }
   return (
     <ul className="space-y-2">
-      {flags.map((flag) => <FlagListItem key={flag.id} flag={flag} kinds={kinds} onEdit={onEdit} />)}
+      {flags.map((flag) => <FlagListItem key={flag.id} flag={flag} kinds={kinds} onEdit={onEdit} onRemove={onRemove} />)}
     </ul>
   );
 }
 
-function FlagListItem({ flag: f, kinds, onEdit }: { flag: FlagRow; kinds: FlagKind[]; onEdit?: (flag: FlagRow) => void }) {
+function FlagListItem({
+  flag: f,
+  kinds,
+  onEdit,
+  onRemove,
+}: {
+  flag: FlagRow;
+  kinds: FlagKind[];
+  onEdit?: (flag: FlagRow) => void;
+  onRemove?: (flag: FlagRow) => void;
+}) {
   const ruleIds = parseRuleList(f.rule);
   const ruleset = getRuleset(f.ruleset);
   const field = fieldLabel(f.field);
@@ -133,15 +153,29 @@ function FlagListItem({ flag: f, kinds, onEdit }: { flag: FlagRow; kinds: FlagKi
             Match affecting
           </span>
         ) : null}
-        {onEdit ? (
-          <button
-            type="button"
-            className="ml-auto min-h-11 px-2 text-xs text-accent-quiet"
-            aria-label={`Edit ${matchReference(f.match_type, f.match_number) ?? "flag"} by ${f.author}`}
-            onClick={() => onEdit(f)}
-          >
-            Edit
-          </button>
+        {onEdit || onRemove ? (
+          <span className="ml-auto flex">
+            {onEdit ? (
+              <button
+                type="button"
+                className="min-h-11 px-2 text-xs text-accent-quiet"
+                aria-label={`Edit ${matchReference(f.match_type, f.match_number) ?? "flag"} by ${f.author}`}
+                onClick={() => onEdit(f)}
+              >
+                Edit
+              </button>
+            ) : null}
+            {onRemove ? (
+              <button
+                type="button"
+                className="min-h-11 px-2 text-xs text-danger-quiet"
+                aria-label={`Remove ${matchReference(f.match_type, f.match_number) ?? "flag"} by ${f.author}`}
+                onClick={() => onRemove(f)}
+              >
+                Remove
+              </button>
+            ) : null}
+          </span>
         ) : null}
       </div>
 

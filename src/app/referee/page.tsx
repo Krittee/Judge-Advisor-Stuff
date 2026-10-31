@@ -7,6 +7,7 @@ import { Banner } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { FlagList, FlagSummary, flagsOnDay, kindOf } from "@/components/Flags";
 import { CorrectSheet } from "@/components/admin/RefereeTab";
+import { removeAfterAsking } from "@/components/admin/refereeLogic";
 import { AllRulesPicker } from "@/components/AllRulesPicker";
 import { ProgramTag, SetupGate } from "@/components/referee/HeadReferee";
 import { MatchSheet } from "@/components/referee/MatchSheet";
@@ -107,6 +108,8 @@ function Referee() {
   // it and see it read-only.
   const mayEditSetup = canSetUp(session);
   const mayCorrectFlags = session?.role === "admin" || (session?.role === "referee" && session.head === true);
+  // Same group as canRemoveFlag in auth.ts (which a page cannot import); the API refuses anyone else.
+  const mayRemoveFlags = mayCorrectFlags;
 
   /* Arriving from the all-teams list, which passes the team it picked.
      Only seeds the box: typing over it afterwards is the point of the
@@ -203,6 +206,18 @@ function Referee() {
   async function correctFlag(id: string, edit: FlagReport) {
     await call("/api/flags", { method: "PATCH", body: { id, ...edit } });
     await refresh();
+  }
+
+  function removeFlag(flag: FlagRow) {
+    return removeAfterAsking(ask, async () => {
+      setError(null);
+      try {
+        await call(`/api/flags?id=${flag.id}`, { method: "DELETE" });
+        await refresh();
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    });
   }
 
   async function record() {
@@ -477,6 +492,7 @@ function Referee() {
               flags={flagsFor(team.id)}
               kinds={state.flagKinds}
               onEdit={mayCorrectFlags ? setEditingFlag : undefined}
+              onRemove={mayRemoveFlags ? removeFlag : undefined}
             />
           </section>
         ) : null}
@@ -503,7 +519,8 @@ function Referee() {
                     <FlagSummary flags={flags} kinds={state.flagKinds} />
                   </div>
                   <div className="mt-3">
-                    <FlagList flags={flags} kinds={state.flagKinds} onEdit={mayCorrectFlags ? setEditingFlag : undefined} />
+                    <FlagList flags={flags} kinds={state.flagKinds} onEdit={mayCorrectFlags ? setEditingFlag : undefined}
+                      onRemove={mayRemoveFlags ? removeFlag : undefined} />
                   </div>
                 </li>
               ))}

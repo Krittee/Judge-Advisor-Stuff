@@ -4,10 +4,65 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-10-31 | [Head referee can remove a flag](#head-referee-can-remove-a-flag-2026-10-31) | `ebbd0ab` | Not yet | Local, not pushed |
 | 2026-10-31 | [Referee: keyboard hides the team being typed](#referee-keyboard-hides-the-team-being-typed-2026-10-31) | `cf7d3a5` | Skipped | Local, not pushed |
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Local, not pushed |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Local, not pushed |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Local, not pushed |
+
+---
+
+## Head referee can remove a flag (2026-10-31)
+
+### Problem / request
+
+The user: "add head ref - remove flag - authorization". Only the Judge Advisor could remove (delete) a referee flag. The head referee could already correct one, but had to ask the JA to remove a wrong one. The head referee heads the field, so they should be able to remove flags too.
+
+### What changed
+
+- `src/lib/auth.ts`: new `canRemoveFlag` (Judge Advisor or head referee); `canFlag` comment updated.
+- `src/app/api/flags/route.ts`: DELETE uses `canRemoveFlag`; the 403 now reads "Only the head referee or the Judge Advisor can remove a flag."; doc comments updated. The Activity log entry is unchanged and names whoever removed it.
+- `src/components/Flags.tsx`: `FlagList` takes an optional `onRemove` and shows a red **Remove** next to **Edit**; the two wrap together at the right on a phone.
+- `src/app/referee/page.tsx`: the head referee gets Remove on every flag (Today tab and "Already on <team>"), behind the same confirm the JA gets.
+- `README.md`, `RELEASE-NOTES-2.0-2.2.md`: the permission text and API table now say head referee or JA removes.
+- `tests/flagsRoute.runtime.test.ts`, `tests/flags.test.mjs`, `tests/flagsRendering.runtime.test.tsx`, `tests/refereePage.source.test.mjs`: new and updated tests.
+
+### Who can do what now
+
+| Who | Raise a flag | Correct a flag | Remove a flag |
+|---|---|---|---|
+| Referee | Yes | No | No (no button; the API says 403) |
+| Head referee | Yes | Yes | **Yes** (new) |
+| Judge Advisor | No | Yes | Yes |
+| Judge, queue desk, team, signed out | No | No | No (403) |
+
+The confirm reads "Remove this flag? The judges will stop seeing it." with **Cancel** and a red **Remove flag**. Each removal is logged to Activity, for example `removed a flag: warning · Morgan Head · Head referee`.
+
+### How it was tested
+
+- `npm test`: 1585 tests, 1584 pass, 0 fail, 1 skipped. `npx eslint src tests`: clean. `npx tsc --noEmit`: clean.
+- New route test: ordinary referee, judge, queue desk and a signed-out caller each get 403 and the flag stays; the head referee removes one (200, Activity shows "Head referee"); the JA removes another.
+- In the browser, on a copy of the local data (not `.data/`), at phone width (375px):
+  - Ordinary referee: Today tab shows flags with no Edit or Remove; a direct `DELETE /api/flags` from that sign-in returned 403.
+  - Head referee: Edit and Remove on every flag. Cancel kept the flag; Remove flag removed it and the list refreshed.
+  - Dark mode: the Remove text and the row are readable.
+  - JA: `DELETE /api/flags` returned 200 and removed a flag.
+  - Activity had both removals, with the right name and role.
+- The first build let Remove wrap onto its own line at the left at 375px; fixed by keeping Edit and Remove together.
+- Not checked on a real iPhone.
+
+### Commit and branch
+
+- Change: `ebbd0ab` on `claude/head-ref-remove-flag-43e7d7`.
+
+### Status
+
+Committed locally. NOT pushed or deployed.
+
+### Follow-ups
+
+- Check the Remove button on a real phone after the deploy.
+- Ordinary referees still can't remove their own mistaken flag; they ask the head referee or JA. That was intended.
 
 ---
 
