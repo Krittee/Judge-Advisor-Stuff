@@ -4,7 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-10-31 | [Referee: keyboard hides the team being typed](#referee-keyboard-hides-the-team-being-typed-2026-10-31) | `cf7d3a5` | Not yet | Local, not pushed |
+| 2026-10-31 | [Referee: keyboard hides the team being typed](#referee-keyboard-hides-the-team-being-typed-2026-10-31) | `cf7d3a5` | Skipped | Local, not pushed |
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Local, not pushed |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Local, not pushed |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Local, not pushed |
@@ -40,7 +40,7 @@ It works with the earlier `min-h-dvh` body fix (`4415991`): the page still can't
   - **Full phone height (844px):** focusing a field changes nothing. **Desktop (1024px):** the Record bar and tabs stay while typing, and the page doesn't scroll.
   - **Set match sheet and All rules picker:** already fine at 440px (each scrolls on its own), so unchanged.
 - `npm test`: 1582 pass, 0 fail, 1 skipped. `eslint src tests` and `tsc --noEmit`: clean.
-- **Real phone:** not yet confirmed. A desktop browser has no real on-screen keyboard. A local server on the same Wi-Fi was offered for that check.
+- **Real phone:** not checked. A desktop browser has no real on-screen keyboard. A local server on the same Wi-Fi was offered, and the user chose to skip the phone check.
 
 ### Commit and branch
 
@@ -52,7 +52,7 @@ Committed locally. NOT pushed or deployed.
 
 ### Follow-ups
 
-- Confirm on a real phone that shows the problem (the user's iPhone) before or after the deploy.
+- Watch for it on a phone that showed the problem after the deploy (the phone check was skipped).
 - The judge and Judge Advisor phone screens use the same shell. Their text fields are in pop-up sheets that scroll on their own, so they're likely fine, but check them on a squashing phone.
 
 ---
