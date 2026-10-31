@@ -53,7 +53,7 @@ cp .env.example .env.local     # then edit the codes
 | `ADMIN_CODE_2`–`ADMIN_CODE_4` | unset | Optional codes for up to three more Judge Advisors. |
 | `QUEUER_CODE` | `DESK01` | Queue desk. Can request or book for teams and change early bookings. |
 | `REFEREE_CODE` | `REF001` | Referees. Can only flag what they saw on the field. Referees must enter their name to sign in; flags are recorded under it. |
-| `HEAD_REFEREE_CODE` | `HREF01` | The head referee: a referee who can also set the event program and fields and correct filed flags. Keep it different from `REFEREE_CODE`. |
+| `HEAD_REFEREE_CODE` | `HREF01` | The head referee: a referee who can also set the event program and fields and correct or remove filed flags. Keep it different from `REFEREE_CODE`. |
 | `SESSION_SECRET` | insecure key | Signs the login cookie. `openssl rand -base64 32` |
 | `TRUST_PROXY` | unset | Set to `1` only if a reverse proxy **you control** sits in front of the app and sets `X-Forwarded-For` itself. See below. |
 | `DATABASE_URL` | unset | Set it to use Postgres; unset uses the JSON file. |
@@ -524,14 +524,15 @@ shows up in three places:
 - **Only a referee raises a flag.** Not a judge, not the Judge Advisor.
   A flag is a record of what an official saw; if anyone could add one it
   would stop meaning that, so the API refuses all three.
-- **The Head Referee or Judge Advisor corrects one; only the Judge Advisor
-  removes one.** Ordinary referees discuss a correction with either of them.
-  A correction stays on the board and is logged to Activity (`corrected a flag:
-  major → minor`). Ordinary referees share an access code, so a typed name
-  cannot prove who filed a report.
+- **The Head Referee or Judge Advisor corrects one, and either can remove
+  one.** Ordinary referees discuss a correction or removal with either of
+  them. A correction stays on the board and is logged to Activity (`corrected
+  a flag: major → minor`); a removal is logged too (`removed a flag: minor`).
+  Ordinary referees share an access code, so a typed name cannot prove who
+  filed a report.
   Team and author cannot be changed by correction — reassigning a flag to a
-  different team requires the Judge Advisor to remove the wrong report and
-  a referee to file the replacement.
+  different team requires the Head Referee or Judge Advisor to remove the
+  wrong report and a referee to file the replacement.
 - **Judges read their own panel's only**, the same wall notes and scores
   sit behind. They cannot correct or remove a flag — read-only, same as
   everything else in judging.

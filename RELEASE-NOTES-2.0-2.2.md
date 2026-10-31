@@ -77,7 +77,7 @@ deferred.
     one transaction. It refuses to release a team that has a live request.
 - **Judge sessions** end when the panel's code changes or a new Bangkok day
   starts (see §3.3).
-- **Flag corrections** are limited to the head referee and the Judge Advisor.
+- **Flag corrections and removals** are limited to the head referee and the Judge Advisor.
 - **Score taps** in quick succession read the stored score back, so the
   total can't go stale.
 - **Panel codes** come from `crypto.getRandomValues`.
@@ -246,6 +246,7 @@ store everywhere, and against Postgres only with `TEST_DATABASE_URL`.
 | `POST /api/requests` | Queue desk or JA only. |
 | `PATCH /api/requests/[id]` | Role gates per action. `reassign` is atomic. `reopen` is JA only. **`set-times`** is new and JA only. |
 | `PATCH /api/flags` | Head referee or JA only. |
+| `DELETE /api/flags` | Head referee or JA only; logged to Activity. |
 | `GET/POST/DELETE /api/awards` | New. Scoped GET; judges and the JA nominate; judges withdraw their own; the JA removes any by id. |
 | `PUT/DELETE /api/awards/winners` | New. JA only. |
 | `/api/state` | Unchanged in shape. Has no award data, and never will. |

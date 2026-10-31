@@ -21,6 +21,7 @@ const css = read("src/app/globals.css");
 test("only a head referee sees flag edit controls on the referee page", () => {
   assert.match(pageSrc, /const mayCorrectFlags = session\?\.role === "admin" \|\| \(session\?\.role === "referee" && session\.head === true\)/);
   assert.equal(pageSrc.match(/onEdit=\{mayCorrectFlags \? setEditingFlag : undefined\}/g)?.length, 2);
+  assert.equal(pageSrc.match(/onRemove=\{mayRemoveFlags \? removeFlag : undefined\}/g)?.length, 2);
   assert.ok(pageSrc.includes("<CorrectSheet"));
   assert.ok(pageSrc.includes("onSave={correctFlag}"));
 });

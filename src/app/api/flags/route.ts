@@ -4,6 +4,7 @@ import {
   canAdminister,
   canFlag,
   canReadFlags,
+  canRemoveFlag,
   getSession,
 } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
@@ -126,8 +127,8 @@ export async function POST(request: Request) {
  *
  * Team and author are not editable here. Reassigning a flag to a
  * different team, or rewriting who raised it, is a bigger mistake than
- * this is meant to fix — the Judge Advisor removes it and a referee files
- * the replacement.
+ * this is meant to fix — the head referee or Judge Advisor removes it and a
+ * referee files the replacement.
  */
 export async function PATCH(request: Request) {
   const session = await getSession();
@@ -247,16 +248,18 @@ export async function PATCH(request: Request) {
 }
 
 /**
- * Remove one. The Judge Advisor's alone: making the incident disappear
- * entirely is a different, larger power than correcting how it reads —
- * a referee who could delete their own flag could quietly unsay it after
- * a team complained, and the whole point is that the record stands.
+ * Remove one. Making the incident disappear entirely is a different, larger
+ * power than correcting how it reads — an ordinary referee (shared code,
+ * unprovable name) who could delete their own flag could quietly unsay it
+ * after a team complained, and the whole point is that the record stands.
+ * The head referee and the Judge Advisor can; every removal is logged to
+ * Activity with who did it.
  */
 export async function DELETE(request: Request) {
   const session = await getSession();
-  if (!canAdminister(session)) {
+  if (!canRemoveFlag(session)) {
     return NextResponse.json(
-      { error: "Only the Judge Advisor can remove a flag." },
+      { error: "Only the head referee or the Judge Advisor can remove a flag." },
       { status: 403 },
     );
   }

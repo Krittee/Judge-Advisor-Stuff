@@ -441,11 +441,22 @@ export function canSetUpRefereeing(s: Session | null): boolean {
 }
 
 /**
+ * Who may remove a flag: the head referee, who heads the field, and the
+ * Judge Advisor, who is second in command of the event. Ordinary referees
+ * share one code, so a typed name cannot prove who they are -- which is why
+ * they cannot make an incident disappear.
+ */
+export function canRemoveFlag(s: Session | null): boolean {
+  return canAdminister(s) || (s?.role === "referee" && s.head === true);
+}
+
+/**
  * Referee flags: written by referees, read by the people who judge.
  *
- * Writing is the referee's alone — the Judge Advisor can remove a flag
- * but does not raise one, because a flag is a record of what an official
- * saw, and it would stop meaning that if anyone could add to it.
+ * Writing is the referee's alone — the head referee and the Judge Advisor
+ * can remove a flag but do not raise one, because a flag is a record of
+ * what an official saw, and it would stop meaning that if anyone could add
+ * to it.
  */
 export function canFlag(s: Session | null): boolean {
   return s?.role === "referee";
