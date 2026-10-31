@@ -215,7 +215,7 @@ test("a booked tile's reserve for its clock leaves the number its full phone siz
 
 test("a division with no teams is not in the By panel key; one with teams is", () => {
   const state = appState([team("1101")], []); // divisions: Elementary School, Middle School; the team is Middle
-  const key = board(state).slice(board(state).indexOf('id="bd-key-t"'));
+  const key = board(state).slice(board(state).indexOf('id="bd-key-t"')).split("</section>")[0];
   assert.ok(key.includes("Middle School"));
   assert.ok(!key.includes("Elementary School"), "an empty division is listed in the key");
 });
