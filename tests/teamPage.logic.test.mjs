@@ -262,11 +262,11 @@ const blockStart = css.lastIndexOf("/*", css.indexOf('Team page ("Status board"'
 const block = css.slice(blockStart, css.lastIndexOf("/*", css.indexOf('Referee console ("Match first"')));
 const bare = block.replace(/\/\*[\s\S]*?\*\//g, "");
 
-test("the page's CSS sits after the landing block and is all .teampage / tp-* (plus the toggle it docks)", () => {
+test("the page's CSS sits after the landing block and is all .teampage / tp-* (plus the toggle it docks and the shared back link)", () => {
   assert.ok(block.length > 3000, "the Team page block was not found");
   assert.ok(blockStart > css.indexOf(".landing *, .landing *::before"), "the block belongs after the landing block");
   const classes = new Set([...bare.matchAll(/\.([a-z][\w-]*)/g)].map((m) => m[1]));
-  const stray = [...classes].filter((c) => !/^(tp-|teampage$|theme-toggle$)/.test(c));
+  const stray = [...classes].filter((c) => !/^(tp-|teampage$|theme-toggle$|lp-back$)/.test(c));
   assert.deepEqual(stray, [], "every class in the block is the page's own");
 });
 

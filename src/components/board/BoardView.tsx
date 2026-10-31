@@ -147,8 +147,8 @@ export function BoardView({ state, online, view, hideDone, onView, onHideDone }:
                 ))}
               </div>
               <div className="bd-side">
-                {unassigned ? <PanelCard group={unassigned} hideDone={hideDone} state={state} /> : null}
                 <ColourKey categories={state.categories} divisions={state.divisions} used={divisionsInUse(state.divisions, state.teams)} />
+                {unassigned ? <PanelCard group={unassigned} hideDone={hideDone} state={state} /> : null}
               </div>
             </div>
             <p className="bd-pkey">

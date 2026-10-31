@@ -4,11 +4,94 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-10-31 | [Judging Board: colour key above Unassigned](#judging-board-colour-key-above-unassigned-2026-10-31) | `4a001a8` | Not needed | Local, not pushed |
+| 2026-10-31 | [Team page: a way back, and no details strip](#team-page-a-way-back-and-no-details-strip-2026-10-31) | `be78288` | Not yet | Local, not pushed |
 | 2026-10-31 | [Head referee can remove a flag](#head-referee-can-remove-a-flag-2026-10-31) | `ebbd0ab` | Not yet | Local, not pushed |
 | 2026-10-31 | [Referee: keyboard hides the team being typed](#referee-keyboard-hides-the-team-being-typed-2026-10-31) | `cf7d3a5` | Skipped | Local, not pushed |
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Local, not pushed |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Local, not pushed |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Local, not pushed |
+
+---
+
+## Judging Board: colour key above Unassigned (2026-10-31)
+
+### Problem / request
+
+On the Judging Board's "By panel" view (`/board`), the "What the colours mean" key sat in the right column after the Unassigned card. With many unassigned teams (17 in the user's screenshot), Unassigned pushed the key below the fold of the big screen, where nobody saw it. The user chose "top of the right column" over a one-line key strip under the header, as the smallest change during the event.
+
+### What changed
+
+- `src/components/board/BoardView.tsx`: the two children of `.bd-side` are swapped, so `<ColourKey/>` comes first and the Unassigned `PanelCard` second. No CSS change: nothing in `globals.css` depended on the order, and the phone rule `.bd-side .bd-key { display: none; }` still hides the key.
+- `tests/board.runtime.test.tsx`: the "a division with no teams is not in the By panel key" test now reads only the key's own `<section>`. Before, it sliced to the end of the page, which now also takes in the Unassigned card.
+
+The Pit floor view and the `.bd-pkey` status line are unchanged.
+
+### How it was tested
+
+- `npm test`: 1584 tests, 1583 pass, 0 fail, 1 skipped. `npx eslint src tests`: clean.
+- In the browser, on a copy of the local data (not `.data/`) with 17 unassigned teams added:
+  - Big screen (1920×1080), light and dark: the key is at the top of the right column and Unassigned (17 teams) follows it.
+  - Laptop (1440×900), dark: same order, with the key fully visible above the fold.
+  - Tablet (900px): the right column becomes a two-across grid, with the key first and Unassigned beside it.
+  - Phone (375px): the key is still hidden (`display: none`).
+- Fullscreen: the in-app browser blocks the Fullscreen API, so it was checked as a 1920×1080 viewport, which is the same layout without the browser bars. Not checked on the real big screen.
+
+### Commit and branch
+
+- Change: `4a001a8` on `claude/board-key-top-423390`.
+
+### Status
+
+Committed locally. NOT pushed or deployed.
+
+### Follow-ups
+
+- None.
+
+---
+
+## Team page: a way back, and no details strip (2026-10-31)
+
+### Problem / request
+
+The user, from a desktop screenshot of team 9852Z's page: "this page doesnt have the back door", and "do not need to show what is inside the greenbox". The team page had no way back out. Under the header, a strip read `9852Z | PSP S P³ I K E | Pit BLENDED | Elementary School | Developing | No panel`, repeating what the card below says. Also fixed, on the user's OK: after "Interview complete" the page still said "Please ask the queue desk to request a judge…".
+
+The team page is public by team number (no team sign-in), reached from the "Find your team" ticket at `/team`, so the way back is a link to `/team`, not "Sign out". From there, "← All doors" leads to `/`.
+
+### What changed
+
+- `src/components/team/TeamView.tsx`: "← Change team" link to `/team` at the top of the page (the ticket page's `.lp-back` style); the details strip (`TeamDetails`) removed; the queue-desk note is hidden when the request is completed; `categories` prop dropped (only the strip used it).
+- `src/app/team/[number]/page.tsx`: stops passing `categories`.
+- `src/app/globals.css`: `.tp-meta` rules removed; `.teampage .lp-back` placement (spans both columns from 1024px); `align-content: start` on the desktop grid so the new row doesn't push the cards down.
+- `tests/teamPage.runtime.test.tsx`: the four strip tests replaced with tests for the link, the strip being gone, and the note hidden after completion (kept for cancelled and no request).
+- `tests/teamPage.logic.test.mjs`: the team-page CSS block may also style `lp-back`.
+
+The user chose to drop pit, division and notebook category: they now show nowhere on the team page (teams know their own). Number, name and panel are still on the card.
+
+### How it was tested
+
+- `npm test`: 1584 tests, 1583 pass, 0 fail, 1 skipped. `npx eslint src tests`: clean. `npx tsc --noEmit`: clean.
+- In the browser, on a copy of the local data (not `.data/`), at desktop (1440px) and phone (375px) width, light and dark:
+  - Team with no panel and no request (1115): link at top, no strip, "No judge panel assigned yet" and the queue-desk note show.
+  - Team with a panel and a live request (1101): same, with the panel on the card.
+  - Team whose interview completed today (1108): "Interview complete — thank you!" and no queue-desk note; "See the full board →" stays.
+  - Clicking "← Change team" opened "Find your team" at `/team`.
+- The first build had a large gap above the cards at desktop width (the grid rows stretched to fill the page); fixed with `align-content: start`.
+- Not checked on a real iPhone.
+
+### Commit and branch
+
+- Change: `be78288` on `claude/team-page-back-strip-981993`.
+
+### Status
+
+Committed locally. NOT pushed or deployed.
+
+### Follow-ups
+
+- Desktop layout: the card sits on the left and the note and board link sit alone on the right. The user chose to leave it for now.
+- On a phone, the queue-desk note also shows while a request is live ("Judges have been notified"); unchanged here.
 
 ---
 

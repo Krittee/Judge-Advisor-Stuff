@@ -56,7 +56,6 @@ export default function TeamPage({ params }: { params: Promise<{ number: string 
       current={current}
       history={earlierToday(state.requests, team.id, current?.id, now)}
       languages={state.languages}
-      categories={state.categories}
       requests={state.requests}
       online={online}
       now={now}
