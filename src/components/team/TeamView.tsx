@@ -5,7 +5,7 @@ import { PanelBusyLine, panelLoad, type PanelLoad } from "@/components/SlotPicke
 import { formatClock } from "@/components/ui";
 import type { Language } from "@/lib/presets";
 import { STATUS_META } from "@/lib/status";
-import type { PublicPanel, RequestRow, Team, TeamCategoryView } from "@/lib/types";
+import type { PublicPanel, RequestRow, Team } from "@/lib/types";
 import {
   agoParts,
   bigTimeOf,
@@ -36,8 +36,6 @@ export type TeamViewProps = {
   /** Up to five of their other requests. */
   history: RequestRow[];
   languages: Language[];
-  /** The event's notebook categories, to name the team's. */
-  categories: TeamCategoryView[];
   /** Every request, for the panel's busy line. */
   requests: RequestRow[];
   /** False when the last poll failed: what is on screen may be stale. */
@@ -67,6 +65,10 @@ export function TeamView(p: TeamViewProps) {
 
       <main className="tp-stage">
         <div className="tp-grid">
+          <Link href="/team" className="lp-back">
+            <span aria-hidden="true">←</span> Change team
+          </Link>
+
           {/* A poll that failed after the first answer leaves the last status
               on screen; say so rather than let it pass for current. */}
           {p.online ? null : (
@@ -76,7 +78,6 @@ export function TeamView(p: TeamViewProps) {
           )}
 
           <div className="tp-left">
-            <TeamDetails team={team} panel={panel} categories={p.categories} />
             <StatusPanel
               team={team}
               panel={panel}
@@ -89,9 +90,11 @@ export function TeamView(p: TeamViewProps) {
           </div>
 
           <div className="tp-right">
-            <section className="tp-acts" aria-label="How to request a judge">
-              <p>Please ask the queue desk to request a judge or book a time for your team.</p>
-            </section>
+            {current?.status === "completed" ? null : (
+              <section className="tp-acts" aria-label="How to request a judge">
+                <p>Please ask the queue desk to request a judge or book a time for your team.</p>
+              </section>
+            )}
 
             {p.history.length ? (
               <section className="tp-hist-s" aria-labelledby="tp-hist">
@@ -116,44 +119,6 @@ export function TeamView(p: TeamViewProps) {
         </div>
       </main>
     </div>
-  );
-}
-
-/* ---- 0 · the details row ------------------------------------------------------- */
-
-/**
- * "1150 | Silver Sprockets | Pit 12 | Elementary School | Developing | Panel A".
- * The bars are CSS borders, so a screen reader reads the six values only. A
- * missing pit or panel keeps its place, so the order never shifts.
- */
-function TeamDetails({ team, panel, categories }: { team: Team; panel: PublicPanel | undefined; categories: TeamCategoryView[] }) {
-  const category = categories.find((c) => c.id === team.category)?.label ?? team.category;
-  return (
-    <ul className="tp-meta" aria-label="Team details">
-      <li>
-        <b>{team.number}</b>
-      </li>
-      <li>{team.name}</li>
-      <li>
-        {team.pit ? (
-          `Pit ${team.pit}`
-        ) : (
-          <>
-            <span aria-hidden="true">—</span>
-            <span className="tp-sr">No pit</span>
-          </>
-        )}
-      </li>
-      <li>
-        <span className="tp-sr">Division: </span>
-        {team.division}
-      </li>
-      <li>
-        <span className="tp-sr">Notebook: </span>
-        {category}
-      </li>
-      <li>{panel ? panel.name : "No panel"}</li>
-    </ul>
   );
 }
 

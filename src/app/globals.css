@@ -1333,14 +1333,8 @@ body:has(.teampage) > .theme-toggle:hover {
   background: var(--surface); color: var(--caution-quiet); font-size: 14px; line-height: 1.4;
 }
 
-/* 0 · The details row. The bars are borders; the list is shifted left by one item's padding
-   and clips, so the bar at the start of a wrapped line falls outside it. */
-.tp-meta {
-  display: flex; flex-wrap: wrap; row-gap: 2px; margin: 0 0 0 -10px; padding: 0; overflow: hidden;
-  color: var(--ink-subtle); font-size: 14px; line-height: 1.4; list-style: none;
-}
-.tp-meta li { min-width: 0; margin-left: -1px; padding: 0 10px; border-left: 1px solid var(--tp-field-line); overflow-wrap: anywhere; }
-.tp-meta b { color: var(--ink); font-weight: 700; }
+/* The way back to the team-number page; the -10px lines its text up with the cards. */
+.teampage .lp-back { align-self: flex-start; margin: 0 0 0 -10px; }
 
 /* 1 · The status panel */
 .tp-pan { padding: 18px 20px; border-radius: 24px; background: var(--c); color: var(--ci); }
@@ -1410,8 +1404,9 @@ body:has(.teampage) > .theme-toggle:hover {
 
 /* From 1024px: the panel and the track beside the actions */
 @media (min-width: 1024px) {
-  .tp-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 32px; max-width: 1280px; padding: 8px 40px 32px; }
+  .tp-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: start; align-content: start; gap: 32px; max-width: 1280px; padding: 8px 40px 32px; }
   .tp-offline { grid-column: 1 / -1; }
+  .teampage .lp-back { grid-column: 1 / -1; justify-self: start; }
   .tp-left, .tp-right { gap: 16px; }
   .tp-pan { padding: 28px 32px; }
   .tp-pan-sent { font-size: 40px; }

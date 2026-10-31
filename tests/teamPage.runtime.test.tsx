@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { TeamNotFound, TeamView, type TeamViewProps } from "../src/components/team/TeamView";
 import { earlierToday } from "../src/components/team/teamLogic";
 import { formatClock } from "../src/components/ui";
-import type { PublicPanel, RequestRow, Team, TeamCategoryView } from "../src/lib/types";
+import type { PublicPanel, RequestRow, Team } from "../src/lib/types";
 
 /* The team page ("Status board"), rendered to markup. It is read-only -- only
    the queue desk and the Judge Advisor create or change a request -- so there is
@@ -30,11 +30,6 @@ const slotAt = (n: number) => new Date(SLOT_BASE + n * 20 * 60_000).toISOString(
 const languages = [
   { id: "en", label: "English", short: "EN" },
   { id: "es", label: "Español", short: "ES" },
-];
-
-const categories: TeamCategoryView[] = [
-  { id: "developing", label: "Developing", color: "oklch(0.7 0.1 250)", excludesRubrics: [] },
-  { id: "emerging", label: "Emerging", color: "oklch(0.7 0.1 150)", excludesRubrics: [] },
 ];
 
 const titans: Team = { id: "t-9882K", number: "9882K", name: "Torque Titans", panel_id: "p2", division: "Middle School", category: "developing", pit: "B4", created_at: "2026-10-20T08:00:00Z" };
@@ -74,7 +69,6 @@ function view(over: Partial<TeamViewProps> = {}) {
       current={current}
       history={earlierToday(requests, team.id, current?.id, NOW)}
       languages={languages}
-      categories={categories}
       requests={requests}
       online
       now={NOW}
@@ -91,42 +85,22 @@ const stepsOf = (m: string) => [...trackOf(m).matchAll(/<li class="tp-st tp-st--
 const controls = (m: string) => m.match(/<(?:button|input|form|select|textarea|label)\b/g) ?? [];
 const NOTE = /<section class="tp-acts" aria-label="How to request a judge"><p>Please ask the queue desk to request a judge or book a time for your team\.<\/p><\/section>/;
 
-/* ---- the details row ------------------------------------------------------------------- */
+/* ---- the way back, and the details row that is gone --------------------------------- */
 
-const detailsOf = (m: string) =>
-  [...(m.match(/<ul class="tp-meta"[\s\S]*?<\/ul>/)?.[0] ?? "").matchAll(/<li>([\s\S]*?)<\/li>/g)].map((x) => text(x[1]));
-const sprockets: Team = { ...titans, id: "t-1150", number: "1150", name: "Silver Sprockets", division: "Elementary School", category: "developing", pit: "12" };
-const panelA: PublicPanel = { ...panel2, name: "Panel A" };
-
-test("details row: number, name, pit, division, notebook and panel, in that order, above the card", () => {
-  const m = view({ team: sprockets, panel: panelA });
-  assert.deepEqual(detailsOf(m), ["1150", "Silver Sprockets", "Pit 12", "Division: Elementary School", "Notebook: Developing", "Panel A"]);
-  assert.match(m, /<li><b>1150<\/b><\/li>/, "the number is bold");
-  assert.match(m, /<li><span class="tp-sr">Division: <\/span>Elementary School<\/li><li><span class="tp-sr">Notebook: <\/span>Developing<\/li>/, "division and notebook carry hidden labels");
-  assert.ok(m.indexOf('class="tp-meta"') > 0 && m.indexOf('class="tp-meta"') < m.indexOf('<section class="tp-pan '), "the row comes before the card");
-  assert.ok(m.indexOf('class="tp-meta"') > m.indexOf('class="tp-left"'), "in the left column");
-  assert.doesNotMatch(m.match(/<ul class="tp-meta"[\s\S]*?<\/ul>/)?.[0] ?? "", /\|/, "the bars are CSS, not text a screen reader would read");
-  assert.match(text(panelOf(m)), /^Team 1150 · Silver Sprockets/, "the card keeps its own line");
+test("a link back to /team comes first, for a team with no request and for one with a panel and a live request", () => {
+  const live = req({ status: "acknowledged", acknowledged_at: ago(1) });
+  for (const m of [view({ team: loose }), view({ current: live, requests: [...crowd, live] })]) {
+    assert.match(m, /<a class="lp-back" href="\/team"><span aria-hidden="true">←<\/span> Change team<\/a>/);
+    assert.equal(text(m.match(/<a class="lp-back"[\s\S]*?<\/a>/)?.[0] ?? ""), "← Change team");
+    assert.ok(m.indexOf('class="lp-back"') < m.indexOf('<section class="tp-pan '), "before the status card");
+    assert.ok(m.indexOf('class="tp-grid"') < m.indexOf('class="lp-back"'), "inside the grid");
+  }
+  assert.ok(view({ online: false }).indexOf('class="lp-back"') < view({ online: false }).indexOf("tp-offline"), "before the offline note");
 });
 
-test("details row: no pit and no panel keep their places as '—' and 'No panel'", () => {
-  const m = view({ team: { ...sprockets, pit: null, panel_id: null } });
-  assert.deepEqual(detailsOf(m), ["1150", "Silver Sprockets", "—No pit", "Division: Elementary School", "Notebook: Developing", "No panel"]);
-  assert.match(m, /<li><span aria-hidden="true">—<\/span><span class="tp-sr">No pit<\/span><\/li>/);
-});
-
-test("details row: a category the event does not list shows its raw id", () => {
-  assert.equal(detailsOf(view({ team: { ...sprockets, category: "legacy-cat" } }))[4], "Notebook: legacy-cat");
-  assert.equal(detailsOf(view({ team: { ...sprockets, category: "emerging" } }))[4], "Notebook: Emerging");
-});
-
-test("details row styles: bars are borders that wrap cleanly, with tokens only", () => {
-  const css = read("src/app/globals.css");
-  const rules = css.match(/\.tp-meta[^{]*\{[^}]*\}/g)?.join("\n") ?? "";
-  assert.match(rules, /flex-wrap: wrap/);
-  assert.match(rules, /border-left: 1px solid var\(--tp-field-line\)/);
-  assert.match(rules, /overflow: hidden/, "clips the bar at the start of a wrapped line");
-  assert.doesNotMatch(rules, /#[0-9a-f]{3,8}\b|oklch\(|rgb|hsl/i, "no hard-coded colours");
+test("the details row is gone from the markup and the styles", () => {
+  assert.doesNotMatch(view(), /tp-meta/);
+  assert.doesNotMatch(read("src/app/globals.css"), /\.tp-meta/);
 });
 
 /* ---- idle ------------------------------------------------------------------------ */
@@ -157,6 +131,18 @@ test("idle: the queue desk note stands where the request controls were, and noth
   assert.match(m, NOTE);
   assert.deepEqual(controls(m), []);
   assert.doesNotMatch(m, /Request a judge|Ask for a judge|Cancel this|Book a time|tp-slot|Which language/);
+});
+
+test("the queue desk note is hidden once the interview is complete, and kept for cancelled and no request", () => {
+  const withStatus = (status: RequestRow["status"]) => {
+    const r = req({ status, finished_at: ago(30), cancelled_at: ago(30), updated_at: ago(30) });
+    return view({ current: r, requests: [...crowd, r] });
+  };
+  const done = withStatus("completed");
+  assert.doesNotMatch(done, /tp-acts|Please ask the queue desk/);
+  assert.match(done, /<a class="tp-more" href="\/board">See the full board →<\/a>/, "the board link stays");
+  assert.match(withStatus("cancelled"), NOTE);
+  assert.match(view(), NOTE);
 });
 
 test("idle: 'See the full board' goes to /board", () => {
@@ -327,7 +313,6 @@ test("the public page renders TeamView and keeps only polling and the lookup", (
   // The live request, else the latest from today, and history leaves that one out.
   assert.match(page, /liveRequestFor\(team\.id, requests\) \?\? latestToday\(requests, team\.id, now\)/);
   assert.match(page, /history=\{earlierToday\(state\.requests, team\.id, current\?\.id, now\)\}/);
-  assert.match(page, /categories=\{state\.categories\}/);
   // Not a second copy of the view's markup.
   assert.doesNotMatch(page, /tp-pan|tp-track|tp-acts|<main|<header|<section|trackSteps|STATUS_META/);
   assert.doesNotMatch(page, /\/api\/requests|onReady|onBook|onCancel|\brefresh\b/);
