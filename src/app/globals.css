@@ -1493,6 +1493,12 @@ body:has(.referee) > .theme-toggle:hover {
   padding: 10px var(--rf-gutter) 14px; overflow-y: auto; overscroll-behavior: contain;
 }
 .rf-body > * { flex: none; }
+/* Some phones shrink the page to the space above the keyboard. While typing in a short touch window, drop the pinned chrome (header, stripe, program pill, Record bar, tabs, theme toggle) so the focused field and the team it matched stay in view; everything returns when the keyboard closes. */
+@media (pointer: coarse) and (max-height: 500px) {
+  .referee:has(.rf-body :is(input:not([type="checkbox"]):not([type="radio"]), textarea):focus) :is(.app-header, .rf-strip, .rf-ptag, .rf-abar, .rf-tabs),
+  .referee:has(.rf-body :is(input:not([type="checkbox"]):not([type="radio"]), textarea):focus) .rf-mbar::after { display: none; }
+  body:has(.referee .rf-body :is(input:not([type="checkbox"]):not([type="radio"]), textarea):focus) > .theme-toggle { display: none; }
+}
 
 .rf-tabs {
   display: flex; flex: none; padding: 0 calc(var(--rf-gutter) - 16px) env(safe-area-inset-bottom);
@@ -2461,7 +2467,8 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-sh-top h2 { flex: 1; font-weight: 700; font-size: 22px; line-height: 1.2; }
 .ja-x { display: grid; flex: none; width: 44px; height: 44px; place-items: center; border-radius: 12px; background: transparent; color: var(--ink-subtle); }
 .ja-x:hover { background: var(--surface-2); color: var(--ink); }
-.ja-sh-list { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 6px; padding: 0 0 8px; overflow-y: auto; }
+/* flex: auto, not 1: the sheet has no fixed height, and iPhone Safari sizes a 0% flex-basis child at 0 there, so the list vanished. Same for the record sheets and the Awards drawer. */
+.ja-sh-list { display: flex; flex: auto; min-height: 0; flex-direction: column; gap: 6px; padding: 0 0 8px; overflow-y: auto; }
 .ja-sheet .ja-rl { display: flex; height: 28px; align-items: center; font-size: 12px; }
 .ja-sheet .ja-ri { height: 52px; gap: 14px; padding: 0 14px 0 20px; border-radius: 0 12px 12px 0; font-size: 16px; }
 .ja-sheet .ja-rc { font-size: 14px; }
@@ -2720,8 +2727,8 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-r-bad { color: var(--danger-quiet); }
 
 /* The record sheet (phone): a native <dialog> like the Sections sheet; the button that submits is pinned under the scrolling fields. */
-.ja-sh-form { display: flex; min-height: 0; flex: 1; flex-direction: column; }
-.ja-cf-scroll { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 12px; padding: 2px 16px 14px; overflow-y: auto; overscroll-behavior: contain; }
+.ja-sh-form { display: flex; min-height: 0; flex: auto; flex-direction: column; }
+.ja-cf-scroll { display: flex; min-height: 0; flex: auto; flex-direction: column; gap: 12px; padding: 2px 16px 14px; overflow-y: auto; overscroll-behavior: contain; }
 .ja-cf-scroll > * { flex: none; }
 .ja-cf-foot { flex: none; padding: 10px 16px max(18px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
 .ja-cfs .ja-sec { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -3775,7 +3782,7 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-aw-lnk:disabled { opacity: 0.5; }
 
 /* On a phone the panel is the bottom sheet's body, under a grab handle and a Close at its corner */
-.ja-aw-sheet .ja-aw-dr { flex: 1; min-height: 0; padding: 16px 20px max(20px, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; border: 0; border-radius: 0; background: transparent; }
+.ja-aw-sheet .ja-aw-dr { flex: auto; min-height: 0; padding: 16px 20px max(20px, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; border: 0; border-radius: 0; background: transparent; }
 .ja-aw-sheet .ja-aw-eyebrow { padding-right: 48px; }
 .ja-aw-sx { position: absolute; top: 12px; right: 8px; }
 

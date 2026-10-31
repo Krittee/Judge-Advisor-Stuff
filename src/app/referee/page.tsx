@@ -116,6 +116,10 @@ function Referee() {
     if (pickedTeam) setNumber(normalizeTeamNumber(pickedTeam));
   }, [pickedTeam]);
 
+  // The Today tab is this same page with only "Flagged today" showing; every
+  // hook and bit of state above stays put, so the form is as it was on return.
+  const onToday = params.get("tab") === "today";
+
   useEffect(() => {
     call<{ session: Session | null }>("/api/session", { method: "GET" })
       .then(({ session }) => {
@@ -127,14 +131,6 @@ function Referee() {
       })
       .catch(() => router.replace("/referee/login"));
   }, [router]);
-
-  // "Today" in the tab bar is a link to #today. Coming from another page the
-  // section does not exist until the page has loaded, so go there once it does.
-  useEffect(() => {
-    if (session && loaded && window.location.hash === "#today") {
-      document.getElementById("today")?.scrollIntoView();
-    }
-  }, [session, loaded]);
 
   const teamByNumber = useMemo(
     () => new Map(state.teams.map((t) => [t.number, t])),
@@ -266,7 +262,7 @@ function Referee() {
     return <p className="p-10 text-center text-ink-faint">Loading…</p>;
   }
 
-  const frame = { name: session?.name, online, role: state.viewer.role, current: "/referee" } as const;
+  const frame = { name: session?.name, online, role: state.viewer.role, current: "/referee", today: onToday } as const;
 
   if (!loaded) {
     return (
@@ -298,6 +294,7 @@ function Referee() {
   return (
     <RefereeFrame {...frame}>
       {/* The match every flag is pinned to, kept in view while the form scrolls. */}
+      {onToday ? null : (
       <section className="rf-mbar" aria-label="Current match">
         <div className="rf-mm">
           <span>Current match</span>
@@ -316,8 +313,11 @@ function Referee() {
           {matchIsSet(match, rulesetId, fieldCount) ? "Change" : "Set match"}
         </button>
       </section>
+      )}
 
       <main className="rf-body" ref={bodyRef}>
+        {onToday ? null : (
+          <>
         {saved ? <Banner kind="success">{saved}</Banner> : null}
 
         <section>
@@ -481,7 +481,10 @@ function Referee() {
           </section>
         ) : null}
 
-        <section id="today">
+          </>
+        )}
+
+        <section>
           <h2 className="rf-h2">Flagged today</h2>
           {!flagged.length ? (
             <p className="rf-empty">Nothing flagged yet.</p>
@@ -491,10 +494,7 @@ function Referee() {
                 <li key={t.id} className="rounded-xl bg-surface px-4 py-3 ring-1 ring-inset ring-line">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                     <button
-                      onClick={() => {
-                        setNumber(t.number);
-                        bodyRef.current?.scrollTo({ top: 0 });
-                      }}
+                      onClick={() => router.push(`/referee?team=${encodeURIComponent(t.number)}`)}
                       className="text-lg font-bold tabular-nums hover:text-accent"
                     >
                       {t.number}
@@ -514,6 +514,7 @@ function Referee() {
 
       {/* Pinned above the tabs: the one button that saves, and one line saying
           what it is waiting for. */}
+      {onToday ? null : (
       <div className="rf-abar">
         {error ? (
           <p className="rf-need rf-need--error" role="alert">
@@ -534,6 +535,7 @@ function Referee() {
           {busy ? "Recording…" : recordLabel(kind, team)}
         </button>
       </div>
+      )}
 
       <CorrectSheet
         flag={editingFlag}

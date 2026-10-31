@@ -96,14 +96,14 @@ test("both referee pages share the frame: top bar, stripe and a Report / All tea
   assert.ok(frameSrc.includes('title="Referee"') && frameSrc.includes("subtitle={name}") && frameSrc.includes("online={online}"));
   assert.ok(frameSrc.includes('<SignOutButton to="/referee/login" />'));
   assert.ok(frameSrc.includes('className="rf-strip"'));
-  for (const href of ['href="/referee"', 'href="/referee/teams"', 'href="/referee#today"']) {
+  for (const href of ['href="/referee"', 'href="/referee/teams"', 'href="/referee?tab=today"']) {
     assert.ok(frameSrc.includes(href), `the tab bar lost ${href}`);
   }
   assert.ok(pageSrc.includes("<RefereeFrame") && teamsSrc.includes("<RefereeFrame"));
   assert.ok(teamsSrc.includes('current="/referee/teams"'));
   assert.ok(!teamsSrc.includes("TabBar") && !pageSrc.includes("TabBar"), "the old two-tab switch is replaced");
-  // Today is a section of the Report page, not a view.
-  assert.ok(pageSrc.includes('<section id="today">'));
+  // Today is the Report page with ?tab=today, showing only the Flagged today list.
+  assert.ok(pageSrc.includes('params.get("tab") === "today"'));
   assert.ok(pageSrc.includes("Flagged today") && pageSrc.includes("Already on {team.number}"));
 });
 
