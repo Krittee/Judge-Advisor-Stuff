@@ -250,6 +250,7 @@ const SIGN_IN_ENV = {
   DATABASE_URL: undefined,
   ADMIN_CODE: "TESTADMIN",
   QUEUER_CODE: "TESTQ",
+  COORDINATOR_CODE: "TESTCOORD",
   REFEREE_CODE: "TESTREF",
 };
 
@@ -273,6 +274,20 @@ test("a referee cannot sign in without a name -- the server says so with a 400",
       assert.match(error, /name/i, "the message has to say what is missing");
       assert.equal(res.headers.get("set-cookie"), null, "no session may be issued");
     }
+  });
+});
+
+test("a coordinator cannot sign in without a name -- several share one code", async () => {
+  await withEnv(SIGN_IN_ENV, async () => {
+    for (const name of [undefined, "", "   ", "\t\n"]) {
+      const res = await signIn({ code: "TESTCOORD", name });
+      assert.equal(res.status, 400, `name ${JSON.stringify(name)}`);
+      const { error } = (await res.json()) as { error: string };
+      assert.match(error, /name/i);
+      assert.equal(res.headers.get("set-cookie"), null, "no session may be issued");
+    }
+    const named = await signIn({ code: "TESTCOORD", name: "Pat" }).then((r) => r.status, () => "reached createSession");
+    assert.equal(named, "reached createSession");
   });
 });
 
@@ -316,9 +331,10 @@ test("a flag edit logs before -> after for every field it changed", () => {
   assert.match(log, /detail:[\s\S]*changes/, "the logged detail no longer carries the per-field changes");
 });
 
-test("the signed-in form asks a referee for their name, and nobody else", () => {
+test("the signed-in form asks a referee or coordinator for their name, and nobody else", () => {
   const src = read("src/components/SignInForm.tsx");
-  assert.match(src, /usePathname\(\)\?\.startsWith\("\/referee"\)/);
+  assert.match(src, /path\.startsWith\("\/referee"\) \|\| coordinatorDoor/);
+  assert.match(src, /const coordinatorDoor = path\.startsWith\("\/coordinator"\)/);
   assert.match(src, /required=\{nameRequired\}/);
   assert.match(src, /nameRequired && !name\.trim\(\)/, "the button should wait for the name");
 });
@@ -433,6 +449,7 @@ test("the doctor's published-code list is the one auth.ts refuses", () => {
   const ours = publishedCodes(read("src/lib/auth.ts"));
   assert.ok(ours.length >= 6, "could not read PUBLISHED_CODES out of auth.ts");
   assert.deepEqual(theirs, ours, "scripts/doctor.mjs and src/lib/auth.ts disagree about which codes are published");
+  assert.ok(ours.includes("COORD1"), "the coordinator's dev default is published too");
   assert.ok(ours.includes("HREF01"), "the head referee's dev default is printed in .env.example, so it is published");
   assert.ok(read("src/lib/auth.ts").includes("/change-?me/i") && read("scripts/doctor.mjs").includes("/change-?me/i"));
 });
@@ -463,11 +480,12 @@ test("the doctor reads .env.local, so a DATABASE_URL there makes it production-l
 
 test("the doctor flags a published role code and warns below 32 characters", () => {
   const { out } = runDoctor(
-    "DATABASE_URL=postgresql://u:p@db.example.invalid/x\nSESSION_SECRET=k3j4h5g6f7d8s9a0q1w2e3r4t5y6\nADMIN_CODE=JA2026\nREFEREE_CODE=ref001\nHEAD_REFEREE_CODE=href01\nQUEUER_CODE=Desk77x\n",
+    "DATABASE_URL=postgresql://u:p@db.example.invalid/x\nSESSION_SECRET=k3j4h5g6f7d8s9a0q1w2e3r4t5y6\nADMIN_CODE=JA2026\nREFEREE_CODE=ref001\nHEAD_REFEREE_CODE=href01\nQUEUER_CODE=Desk77x\nCOORDINATOR_CODE=coord1\n",
   );
   assert.match(out, /ADMIN_CODE is "JA2026"/);
   assert.match(out, /REFEREE_CODE is "REF001"/);
   assert.match(out, /HEAD_REFEREE_CODE is "HREF01"/);
+  assert.match(out, /COORDINATOR_CODE is "COORD1"/);
   assert.ok(!/QUEUER_CODE is "/.test(out), "a private code was reported as published");
   assert.match(out, /SESSION_SECRET is only 28 characters/);
 });

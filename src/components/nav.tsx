@@ -30,6 +30,8 @@ function linksFor(role: Role | "team"): ConsoleLink[] {
       return [{ href: "/judge", label: "My panel" }, board];
     case "queuer":
       return [{ href: "/queue", label: "Desk" }, board];
+    case "coordinator":
+      return [{ href: "/coordinator", label: "Pits" }, board];
     case "referee":
       /* Nothing. The two referee screens switch between themselves in the
          page, where the head referee actually looks for them, and the

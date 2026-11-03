@@ -13,6 +13,7 @@ function homeFor(role: Role): string {
   if (role === "admin") return "/admin";
   if (role === "judge") return "/judge";
   if (role === "referee") return "/referee";
+  if (role === "coordinator") return "/coordinator";
   return "/queue";
 }
 
@@ -22,6 +23,8 @@ const ROLES: Record<Role, { label: string; avatar: string; tone: string }> = {
   queuer: { label: "Queue desk", avatar: "/avatars/queue-desk.jpg", tone: "r-desk" },
   admin: { label: "Judge Advisor", avatar: "/avatars/judge-advisor.jpg", tone: "r-ja" },
   referee: { label: "Referee", avatar: "/avatars/referee.jpg", tone: "r-ref" },
+  // Placeholder art (the queue desk's) until the coordinator's own avatar lands.
+  coordinator: { label: "Coordinator", avatar: "/avatars/queue-desk.jpg", tone: "r-desk" },
 };
 const CREW: Role[] = ["judge", "queuer", "admin"];
 
@@ -59,11 +62,14 @@ export function SignInForm({
   const router = useRouter();
   /* A referee's name is what each flag they file is recorded under, and
      the only thing that stops them correcting a colleague's, so the server
-     refuses a referee without one. This form cannot know the role before
+     refuses a referee without one. A coordinator's is what each booking they
+     make is recorded under, so the same goes for them. This form cannot know the role before
      the code is checked, so it goes by which door they came through: a
      referee who types their code at /login instead still gets the server's
      message in the banner. */
-  const nameRequired = usePathname()?.startsWith("/referee") ?? false;
+  const path = usePathname() ?? "";
+  const coordinatorDoor = path.startsWith("/coordinator");
+  const nameRequired = path.startsWith("/referee") || coordinatorDoor;
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -169,7 +175,7 @@ export function SignInForm({
                       />
                       <p className="si-help" id="si-name-help">
                         {nameRequired
-                          ? "Every flag you file is recorded under this name. Use your full name."
+                          ? `Every ${coordinatorDoor ? "booking you make" : "flag you file"} is recorded under this name. Use your full name.`
                           : door === "admin"
                             ? "Shown on the activity log."
                             : "Shown to the Judge Advisor on the activity log."}

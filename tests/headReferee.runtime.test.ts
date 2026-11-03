@@ -43,6 +43,7 @@ const DEV = {
   DATABASE_URL: undefined,
   ADMIN_CODE: undefined,
   QUEUER_CODE: undefined,
+  COORDINATOR_CODE: undefined,
   REFEREE_CODE: undefined,
   HEAD_REFEREE_CODE: undefined,
 };
@@ -84,6 +85,46 @@ test("an earlier role keeps a code that the head code collides with", async () =
   });
   await withEnv({ ...DEV, QUEUER_CODE: "CLASH2", HEAD_REFEREE_CODE: "CLASH2" }, async () => {
     assert.deepEqual(await resolveCode("CLASH2", "Sam"), { role: "queuer", name: "Sam" });
+  });
+});
+
+test("COORD1 is the coordinator's dev default; a set code replaces it, and production has no fallback", async () => {
+  const { resolveCode } = await auth();
+  await withEnv(DEV, async () => {
+    assert.deepEqual(await resolveCode("COORD1", "Pat"), { role: "coordinator", name: "Pat" });
+    assert.deepEqual(await resolveCode(" coord1 ", ""), { role: "coordinator", name: "Coordinator" });
+  });
+  await withEnv({ ...DEV, COORDINATOR_CODE: "PITS77" }, async () => {
+    assert.deepEqual(await resolveCode("PITS77", "Pat"), { role: "coordinator", name: "Pat" });
+    assert.equal(await resolveCode("COORD1", "Pat"), null, "the published default is not an extra way in");
+  });
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    await withEnv({ ...DEV, NODE_ENV: "production" }, async () => {
+      assert.equal(await resolveCode("COORD1", "Pat"), null, "unset: no default in production");
+    });
+    await withEnv({ ...DEV, NODE_ENV: "production", COORDINATOR_CODE: "COORD1" }, async () => {
+      assert.equal(await resolveCode("COORD1", "Pat"), null, "set to the published default: refused");
+    });
+    await withEnv({ ...DEV, DATABASE_URL: "postgresql://u:p@db.example.invalid/x" }, async () => {
+      assert.equal(await resolveCode("COORD1", "Pat"), null, "a database URL alone makes it production-like");
+    });
+  } finally {
+    console.error = quiet;
+  }
+});
+
+test("the coordinator code never shadows the admin, queuer or referee codes", async () => {
+  const { resolveCode } = await auth();
+  await withEnv({ ...DEV, ADMIN_CODE: "CLASH1", COORDINATOR_CODE: "CLASH1" }, async () => {
+    assert.deepEqual(await resolveCode("CLASH1", "Alex"), { role: "admin", name: "Alex" });
+  });
+  await withEnv({ ...DEV, QUEUER_CODE: "CLASH2", COORDINATOR_CODE: "CLASH2" }, async () => {
+    assert.deepEqual(await resolveCode("CLASH2", "Sam"), { role: "queuer", name: "Sam" });
+  });
+  await withEnv({ ...DEV, REFEREE_CODE: "CLASH3", COORDINATOR_CODE: "CLASH3" }, async () => {
+    assert.deepEqual(await resolveCode("CLASH3", "Dana"), { role: "coordinator", name: "Dana" });
   });
 });
 
