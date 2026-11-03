@@ -37,7 +37,7 @@ auto-assigner all use. Every change below is local and not pushed.
 | [Coordinator: no team messages, "Already booked", placeholder avatar](#coordinator-deltas) | `d5aa4c0` | Not yet (browser phone size only) | Local, not pushed |
 | [Coordinator console `/coordinator`: Teams + Slots](#coordinator-console) | `2fe4d72` | Not yet (browser phone size only) | Local, not pushed |
 | [The sixth door, the last docs and these notes](#door-and-docs) | `2ae05d9` | Not yet (browser phone size only) | Local, not pushed |
-| [Review fixes: booked time no longer wraps; coordinator tabs open at the top](#review-fixes) | (this commit) | Not yet (browser phone size only) | Local, not pushed |
+| [Review fixes: booked time no longer wraps; coordinator tabs open at the top](#review-fixes) | `ac9a4bf` | Not yet (browser phone size only) | Local, not pushed |
 
 ### Your decisions for 2.1.0
 
@@ -216,9 +216,9 @@ and sixth (language) columns. Files: `src/components/door/DoorPage.tsx`,
 
 **What changed.** `.ja-tm-bk` gets `white-space: nowrap`. The coordinator body (`.co-body`) scrolls back to the top on every tab change. Files: `src/app/globals.css`, `src/components/coordinator/CoordinatorView.tsx`, `tests/coordinatorPage.runtime.test.tsx`.
 
-**How it was tested.** The scroll reset has a source-read test in `coordinatorPage.runtime.test.tsx`. The `nowrap` change has no test. Neither fix was checked in the browser after the change.
+**How it was tested.** The scroll reset has a source-read test in `coordinatorPage.runtime.test.tsx`. The `nowrap` change has no test. Both were re-checked in the browser at `ac9a4bf`: at 1280 the booked time reads "3:40 PM" on one line and the table still fits without a sideways scroll; on the phone, scrolling Teams down 600px and pressing "Book a time" opens Slots at the top.
 
-**Commit and branch.** (this commit) on `claude/v21-coordinator-c9e080`.
+**Commit and branch.** `ac9a4bf` on `claude/v21-coordinator-c9e080`.
 
 ---
 
