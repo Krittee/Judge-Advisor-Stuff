@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseLanguageList } from "../src/lib/presets";
+import { bookingLanguage, parseLanguageList } from "../src/lib/presets";
 
 /* The event config lists English then Thai (ids "en", "th", shorts "EN", "TH"). */
 
@@ -33,4 +33,13 @@ test("unknown tokens are dropped, and nothing recognised is an empty list", () =
   assert.deepEqual(parseLanguageList(""), []);
   assert.deepEqual(parseLanguageList(null), []);
   assert.deepEqual(parseLanguageList(undefined), []);
+});
+
+test("a booking uses the language named, else the team's first, else the event default", () => {
+  assert.equal(bookingLanguage("th", { languages: ["en"] }), "th");
+  assert.equal(bookingLanguage("Thai", { languages: [] }), "th");
+  assert.equal(bookingLanguage(undefined, { languages: ["th"] }), "th");
+  assert.equal(bookingLanguage("", { languages: ["en", "th"] }), "en");
+  assert.equal(bookingLanguage("klingon", { languages: ["th"] }), "th");
+  assert.equal(bookingLanguage(undefined, { languages: [] }), "en");
 });

@@ -29,6 +29,7 @@ const EMPTY: AppState = {
     canAdminister: false,
     canFlag: false,
     canReadFlags: false,
+    canSetTeamLanguage: false,
   },
   serverTime: "",
 };

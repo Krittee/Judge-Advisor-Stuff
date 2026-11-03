@@ -264,18 +264,33 @@ export function defaultLanguage(): string {
   return languages()[0].id;
 }
 
-/** Map free text onto a real language, by id, short code or label. */
-export function resolveLanguage(input: unknown): string {
+/** The configured language that free text names, by id, short code or label; undefined when none. */
+function findLanguage(input: unknown): Language | undefined {
   const wanted = String(input ?? "").trim().toLowerCase();
-  if (!wanted) return defaultLanguage();
+  if (!wanted) return undefined;
 
-  const match = languages().find(
+  return languages().find(
     (l) =>
       l.id.toLowerCase() === wanted ||
       l.short.toLowerCase() === wanted ||
       l.label.toLowerCase() === wanted,
   );
-  return match ? match.id : defaultLanguage();
+}
+
+/** Map free text onto a real language, by id, short code or label. */
+export function resolveLanguage(input: unknown): string {
+  return findLanguage(input)?.id ?? defaultLanguage();
+}
+
+/**
+ * The language a new booking is made in: one the caller names and we
+ * recognise, else the first language the team can be interviewed in, else
+ * the event default. Blank or unrecognised counts as "not named", so a
+ * coordinator who set a team to Thai gets a Thai booking without picking it
+ * again. Shared with the booking screens so they preselect the same choice.
+ */
+export function bookingLanguage(input: unknown, team: { languages: string[] }): string {
+  return findLanguage(input)?.id ?? team.languages[0] ?? defaultLanguage();
 }
 
 /**

@@ -3,21 +3,21 @@ import { actorParts } from "@/lib/activity";
 import { actorLabel, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
-import { resolveLanguage } from "@/lib/presets";
+import { bookingLanguage } from "@/lib/presets";
 import { isRealSlot } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
 /**
- * The queue desk or Judge Advisor creates a request when a team asks in person.
+ * The queue desk, a coordinator or the Judge Advisor creates a request when a team asks in person.
  *
  * kind = 'queue' -> walk-up, goes straight to orange.
  * kind = 'slot'  -> books a future slot, sits at 'scheduled' until its time.
  */
 export async function POST(request: Request) {
   const session = await getSession();
-  if (session?.role !== "queuer" && session?.role !== "admin") {
-    return NextResponse.json({ error: "Only the queue desk or Judge Advisor can create requests." }, { status: 403 });
+  if (session?.role !== "queuer" && session?.role !== "admin" && session?.role !== "coordinator") {
+    return NextResponse.json({ error: "Only the queue desk, a coordinator or the Judge Advisor can create requests." }, { status: 403 });
   }
   const body = await request.json().catch(() => ({}));
 
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       createdBy: actorLabel(session),
       slotStart,
       slotEnd,
-      language: resolveLanguage(body.language),
+      language: bookingLanguage(body.language, team),
     });
 
     await store().logActivity({
