@@ -38,7 +38,7 @@ auto-assigner all use. Every change below is local and not pushed.
 | [Coordinator console `/coordinator`: Teams + Slots](#coordinator-console) | `2fe4d72` | Not yet (browser phone size only) | Local, not pushed |
 | [The sixth door, the last docs and these notes](#door-and-docs) | `2ae05d9` | Not yet (browser phone size only) | Local, not pushed |
 | [Review fixes: booked time no longer wraps; coordinator tabs open at the top](#review-fixes) | `ac9a4bf` | Not yet (browser phone size only) | Local, not pushed |
-| [The Coordinator door moves after Queue desk](#door-order) | (this commit) | Not yet (browser phone size only) | Local, not pushed |
+| [The Coordinator door moves after Queue desk](#door-order) | `aecd28c` | Not yet (browser phone size only) | Local, not pushed |
 
 ### Your decisions for 2.1.0
 
@@ -229,9 +229,9 @@ and sixth (language) columns. Files: `src/components/door/DoorPage.tsx`,
 
 **What changed.** `DOORS` in `src/components/door/DoorPage.tsx` lists the Coordinator fifth. Files: `src/components/door/DoorPage.tsx`, `tests/doorPage.runtime.test.tsx`, `RELEASE-NOTES-2.0-2.2.md`.
 
-**How it was tested.** `tests/doorPage.runtime.test.tsx` checks the new hrefs, names, lines and card positions. Browser check at the new order: not done yet.
+**How it was tested.** `tests/doorPage.runtime.test.tsx` checks the new hrefs, names, lines and card positions. Browser check at `aecd28c` (demo-data copy): at 1280 dark the doors read Team, Judge, Referee / Queue desk, Coordinator, Judge Advisor; on the phone (375, light) the Coordinator's dashed door sits between Queue desk and Judge Advisor.
 
-**Commit and branch.** (this commit) on `claude/v21-coordinator-c9e080`.
+**Commit and branch.** `aecd28c` on `claude/v21-coordinator-c9e080`.
 
 ---
 
