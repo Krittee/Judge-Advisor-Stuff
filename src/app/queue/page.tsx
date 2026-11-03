@@ -48,6 +48,11 @@ export default function QueuePage() {
           router.replace("/queue/login");
           return;
         }
+        // This page offers cancel, move and messages; a coordinator has none of them, so their console is theirs.
+        if (session.role === "coordinator") {
+          router.replace("/coordinator");
+          return;
+        }
         setSession(session);
       })
       .catch(() => router.replace("/queue/login"));

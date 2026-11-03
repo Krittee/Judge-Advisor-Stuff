@@ -9,7 +9,7 @@ import type { Session } from "@/lib/auth";
 type Role = Session["role"];
 
 /** Where each role lands once its code is accepted. */
-function homeFor(role: Role): string {
+export function homeFor(role: Role): string {
   if (role === "admin") return "/admin";
   if (role === "judge") return "/judge";
   if (role === "referee") return "/referee";

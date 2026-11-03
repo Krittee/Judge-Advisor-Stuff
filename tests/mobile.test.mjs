@@ -112,7 +112,7 @@ test("every page a person opens is covered by the browser checks", () => {
   const checked = [
     "/", "/login", "/referee/login", "/team", "/team/[number]", "/queue",
     "/judge", "/referee", "/referee/teams", "/admin", "/board",
-    "/judge/login", "/queue/login", "/admin/login", "/coordinator/login",
+    "/judge/login", "/queue/login", "/admin/login", "/coordinator/login", "/coordinator",
   ];
   const missing = pages.filter((p) => !checked.includes(p));
   assert.deepEqual(

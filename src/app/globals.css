@@ -2136,6 +2136,226 @@ body:has(.judge) > .theme-toggle:hover {
 }
 
 /* ------------------------------------------------------------------ *
+ * Coordinator console ("Teams + Slots", design/coordinator-redesign/, direction B)
+ *
+ * A phone app shell like the referee's: the page never scrolls, so the top
+ * bar, the pinned Book bar and the tab bar stay put around .co-body. Colour
+ * is signal: status fills only on status pills (--c is the fill, --ci the
+ * ink on it), caution for warnings, accent for interactive chrome and the
+ * language chips a coordinator has lit. A language tag is neutral and "Not
+ * asked" is muted. Hover and focus colour changes only, nothing moves.
+ * The error and success banners and the caution box are the desk's own
+ * (.dk-msg, .dk-caution). --rail is the sign-in pass's, defined here as
+ * there because it is not an app-wide token.
+ * ------------------------------------------------------------------ */
+
+.co {
+  --co-gutter: max(16px, calc((100vw - 32rem) / 2));
+  --co-field: oklch(0.180 0.013 265);
+  --co-field-line: oklch(0.520 0.014 265);
+  --co-disabled: oklch(0.280 0.014 265);
+  /* Ink on the booked pill, whose fill is --booked-quiet: the app has no token for it. */
+  --co-booked-ink: oklch(0.200 0.014 265);
+  --co-ring: color-mix(in srgb, var(--accent) 35%, transparent);
+  --rail: oklch(0.420 0.016 265);
+
+  display: flex; height: 100dvh; flex-direction: column; overflow: hidden;
+  background: var(--canvas); color: var(--ink);
+}
+:root[data-theme="light"] .co {
+  --co-field: oklch(0.995 0.002 265);
+  --co-field-line: oklch(0.640 0.012 265);
+  --co-disabled: oklch(0.915 0.008 265);
+  --co-booked-ink: oklch(0.975 0.004 265);
+  --rail: oklch(0.740 0.012 265);
+}
+
+/* A status wears its fill and the ink that clears AA on it, in both themes. */
+.co .co-s-booked { --c: var(--booked-quiet); --ci: var(--co-booked-ink); }
+.co .co-s-waiting { --c: var(--waiting); --ci: var(--waiting-ink); }
+.co .co-s-enroute { --c: var(--enroute); --ci: var(--enroute-ink); }
+.co .co-s-active { --c: var(--active); --ci: var(--active-ink); }
+.co .co-s-done { --c: var(--done); --ci: var(--done-ink); }
+
+.co-who-t b, .co-input, .co-tgl b, .co-t1 b, .co-chip, .co-prim, .co-out, .co-pc, .co-gh h2, .co-st, .co-sh b, .co-bk, .co-pb-l b, .co-lts > span {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* The app's one floating theme toggle, docked into the top bar's corner as on the desk. */
+body:has(.co) > .theme-toggle {
+  top: 4px; right: 6px; bottom: auto; width: 44px; height: 44px;
+  border: 0; border-radius: 12px; background: transparent; box-shadow: none; color: var(--ink-subtle);
+}
+body:has(.co) > .theme-toggle:hover {
+  transform: none; color: var(--ink); background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* Chrome */
+.co-top {
+  display: flex; flex: none; height: 52px; align-items: center; justify-content: space-between;
+  padding: 0 calc(var(--co-gutter) - 10px) 0 calc(var(--co-gutter) - 2px); border-bottom: 1px solid var(--line); background: var(--canvas);
+}
+.co-who { display: flex; min-width: 0; align-items: center; gap: 10px; }
+/* The desk's avatar box; the picture is not drawn yet, so the empty dashed box (.si-av--ph) fills it. */
+.co-av { display: block; flex: none; width: 28px; height: 28px; }
+.co-who-t { display: flex; min-width: 0; flex-direction: column; line-height: 1.15; }
+.co-who-t b { font-weight: 700; font-size: 16px; }
+.co-who-t span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-subtle); font-size: 12px; }
+.co-top-r { display: flex; flex: none; align-items: center; gap: 2px; margin-right: 44px; }
+.co-live { display: flex; align-items: center; gap: 6px; color: var(--done-quiet); font-weight: 500; font-size: 12px; }
+.co-live i { width: 8px; height: 8px; border-radius: 50%; background: var(--done); }
+.co-live[data-online="false"] { color: var(--caution-quiet); }
+.co-live[data-online="false"] i { background: var(--caution); }
+.co-top-r > button { min-height: 44px; padding: 0 10px; border-radius: 10px; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
+.co-top-r > button:hover { color: var(--ink); }
+
+.co-msgs { display: flex; flex: none; flex-direction: column; gap: 8px; padding: 10px var(--co-gutter) 0; }
+
+.co-body {
+  display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 10px;
+  padding: 12px var(--co-gutter) 14px; overflow-y: auto; overscroll-behavior: contain;
+}
+.co-body > * { flex: none; }
+
+.co-pinb {
+  display: flex; flex: none; flex-direction: column; gap: 8px; padding: 10px var(--co-gutter);
+  background: var(--surface); border-top: 1px solid var(--line);
+}
+.co-pb-l { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 24px; color: var(--ink-subtle); font-size: 14px; }
+.co-pb-l b { color: var(--ink); font-weight: 700; font-size: 17px; }
+.co-pb-s { margin-left: auto; font-size: 12.5px; }
+.co-pb-s p { margin: 0; font-size: 12.5px; }
+.co-pb-s p.text-ink-faint { color: var(--ink-subtle); }
+
+.co-tabs {
+  display: grid; flex: none; grid-template-columns: 1fr 1fr; padding: 0 calc(var(--co-gutter) - 16px) env(safe-area-inset-bottom);
+  background: var(--surface); border-top: 1px solid var(--line);
+}
+.co-tabs button {
+  position: relative; display: flex; min-width: 56px; min-height: 64px; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  padding: 0; background: transparent; color: var(--ink-subtle); font-weight: 500; font-size: 12.5px;
+}
+.co-tabs button:hover { color: var(--ink); }
+.co-tabs button[aria-current="page"] { color: var(--accent); }
+.co-tabs button[aria-current="page"]::before {
+  content: ""; position: absolute; top: -1px; right: 30%; left: 30%; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent);
+}
+
+/* Teams: search, division, "Not asked" */
+.co-srch { position: relative; }
+.co-srch svg { position: absolute; top: 16px; left: 14px; color: var(--ink-subtle); pointer-events: none; }
+.co-input {
+  display: block; width: 100%; height: 48px; margin: 0; padding: 0 14px; border: 1.5px solid var(--co-field-line); border-radius: 12px;
+  background: var(--co-field); color: var(--ink); font-size: 16px;
+}
+.co-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--co-ring); }
+.co-input::placeholder { color: var(--ink-subtle); opacity: 1; }
+.co-srch .co-input { padding-left: 40px; -webkit-appearance: none; appearance: none; }
+.co-frow { display: flex; gap: 8px; }
+.co-selw { position: relative; flex: 1; min-width: 0; }
+.co-sel { appearance: none; -webkit-appearance: none; padding-right: 38px; color-scheme: inherit; }
+.co-selw svg { position: absolute; top: 17px; right: 12px; color: var(--ink-subtle); pointer-events: none; }
+.co-tgl {
+  display: inline-flex; flex: none; height: 48px; align-items: center; gap: 8px; padding: 0 14px; border: 1.5px solid var(--co-field-line);
+  border-radius: 12px; background: var(--co-field); color: var(--ink); font-weight: 500; font-size: 15px; white-space: nowrap;
+}
+.co-tgl b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.co-tgl:hover { border-color: var(--accent); }
+.co-tgl[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.co-sum { margin: 0; color: var(--ink-subtle); font-size: 13px; }
+
+/* Teams: a row each, opened in place */
+.co-tl, .co-sl { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.co-card { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.co-card[data-open="true"] { border-color: var(--accent); box-shadow: 0 0 0 0.5px var(--accent); }
+.co-trow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 6px; min-height: 68px; padding: 12px 8px 12px 12px; }
+.co-tt { display: flex; min-width: 0; min-height: 44px; align-items: center; gap: 6px; padding: 0; background: transparent; color: inherit; text-align: left; }
+.co-tx { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; line-height: 1.25; }
+.co-t1 { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
+.co-t1 b { flex: none; font-weight: 700; font-size: 20px; }
+.co-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.co-t2 { display: flex; align-items: center; gap: 8px; color: var(--ink-subtle); font-size: 12.5px; white-space: nowrap; }
+.co-ask { flex: none; width: 28px; color: var(--ink-subtle); text-align: right; font-weight: 500; font-size: 12px; }
+.co-chips { display: flex; gap: 6px; }
+.co-chip {
+  display: inline-flex; flex: none; width: 46px; height: 44px; align-items: center; justify-content: center; padding: 0;
+  border: 1.5px solid var(--co-field-line); border-radius: 12px; background: transparent; color: var(--ink-subtle);
+  font-weight: 600; font-size: 15px; letter-spacing: 0.02em;
+}
+.co-chip:hover { border-color: var(--accent); }
+.co-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.co-chips.none .co-chip { border-style: dashed; border-color: var(--ink-subtle); }
+
+.co-sc {
+  display: inline-flex; flex: none; height: 24px; align-items: center; justify-content: center; padding: 0 10px;
+  border: 1px solid var(--c); border-radius: 999px; background: var(--c); color: var(--ci);
+  font-weight: 500; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+
+.co-xp { display: flex; flex-direction: column; gap: 8px; padding: 12px 12px 8px; border-top: 1px solid var(--line); }
+.co-prim {
+  display: block; width: 100%; height: 56px; border-radius: 12px; background: var(--accent); color: var(--accent-ink);
+  font-weight: 700; font-size: 18px;
+}
+.co-prim:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, var(--ink)); }
+.co-prim:disabled { background: var(--co-disabled); color: var(--ink-subtle); }
+.co-out {
+  display: block; width: 100%; height: 52px; border: 1.5px solid var(--co-field-line); border-radius: 12px; background: transparent;
+  color: var(--ink); font-weight: 600; font-size: 17px;
+}
+.co-out:hover:not(:disabled) { background: var(--surface-2); }
+.co-out:disabled { opacity: 0.5; }
+.co-cover { margin: -2px 0 0; color: var(--ink-subtle); font-size: 12.5px; }
+.co-cover p { margin: 0; font-size: 12.5px; }
+.co-cover p.text-ink-faint { color: var(--ink-subtle); }
+.co-txb {
+  display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; gap: 6px; padding: 0 8px;
+  border-radius: 10px; background: transparent; color: var(--accent); font-weight: 500; font-size: 15px;
+}
+.co-txb:disabled { color: var(--ink-subtle); opacity: 0.6; }
+.co-held { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.4; }
+.co-ro { display: flex; align-items: flex-start; gap: 8px; margin: 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.4; }
+.co-ro svg { flex: none; margin-top: 2px; }
+.co-empty { margin: 0; padding: 24px 16px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-faint); text-align: center; font-size: 14px; }
+
+/* A language tag is neutral: LanguageTag's own markup, drawn as the mock's outlined tag. */
+.co-lts { display: inline-flex; gap: 4px; }
+.co-lts > span {
+  display: inline-flex; height: 24px; align-items: center; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--surface-2); color: var(--ink); font-weight: 600; font-size: 12px; letter-spacing: 0.04em;
+}
+
+/* Slots: the panel switcher, then one panel's day */
+.co-pcs { display: flex; flex-wrap: wrap; gap: 8px; }
+.co-pc {
+  flex: 1 1 72px; min-width: 0; height: 44px; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border: 1.5px solid var(--co-field-line); border-radius: 12px; background: transparent; color: var(--ink); font-weight: 600; font-size: 15px;
+}
+.co-pc:hover { border-color: var(--accent); }
+.co-pc[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.co-grp { display: flex; flex-direction: column; gap: 10px; }
+.co-gh { display: flex; min-height: 32px; align-items: center; gap: 8px; }
+.co-gh h2 { margin: 0; font-weight: 700; font-size: 18px; line-height: 1.2; }
+.co-cnt { margin-left: auto; color: var(--ink-subtle); font-size: 13px; }
+.co-srow {
+  display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; column-gap: 8px; min-height: 52px;
+  padding: 4px 6px 4px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+}
+.co-srow[data-picked="true"] { border-color: var(--accent); box-shadow: 0 0 0 0.5px var(--accent); }
+.co-st { font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; }
+.co-sh { display: flex; min-width: 0; flex-direction: column; line-height: 1.2; }
+.co-sh b { font-weight: 700; font-size: 20px; line-height: 1.2; }
+.co-sh span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-subtle); font-size: 12.5px; }
+.co-so { color: var(--ink-subtle); font-size: 14px; }
+.co-bk {
+  display: inline-flex; min-width: 84px; height: 44px; align-items: center; justify-content: center; gap: 6px; padding: 0 14px;
+  border: 1.5px solid var(--co-field-line); border-radius: 12px; background: transparent; color: var(--ink); font-weight: 600; font-size: 15px;
+}
+.co-bk:hover:not(:disabled) { border-color: var(--accent); }
+.co-bk:disabled { opacity: 0.5; }
+.co-bk[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); opacity: 1; }
+
+/* ------------------------------------------------------------------ *
  * Queue desk ("Now / Book", design/queue-redesign/, direction B)
  *
  * A phone page: the top bar and the Now | Book bar stay pinned while the
