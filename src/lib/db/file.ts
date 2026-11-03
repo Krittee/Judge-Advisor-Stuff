@@ -28,7 +28,7 @@ import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
 import { divisionsCompatible } from "../presets";
 import { hasNearbyBooking } from "../data";
-import { isPanelBlocked, judgeKey, panelBlocks } from "../roster";
+import { judgeKey, panelBlocks, planAssignments } from "../roster";
 import {
   bookingDefaults,
   DEFAULT_DIVISION,
@@ -312,6 +312,7 @@ function migrate(data: Data): Data {
   // Languages and panel language cover arrived after the first rosters.
   for (const r of data.requests) r.language ??= defaultLanguage();
   for (const p of data.panels) p.languages ??= [];
+  for (const t of data.teams) t.languages ??= [];
   const fallback = data.panels[0]?.division ?? DEFAULT_DIVISION;
 
   for (const team of data.teams) {
@@ -683,6 +684,7 @@ function upsertTeams(rows: ImportedTeam[]): number {
       if (row.name) existing.name = row.name;
       if (row.pit) existing.pit = row.pit;
       if (row.category) existing.category = row.category;
+      if (row.languages) existing.languages = row.languages;
       // A team that changes division loses its panel only when that panel
       // can't judge the new one (as PATCH /api/admin/teams does).
       if (row.division && row.division !== existing.division) {
@@ -699,6 +701,7 @@ function upsertTeams(rows: ImportedTeam[]): number {
         division: row.division || presetDivisions()[0],
         category: row.category || defaultCategory(),
         pit: row.pit,
+        languages: row.languages ?? [],
         created_at: now,
       });
     }
@@ -783,30 +786,15 @@ function autoAssignTeams(perPanel: number, includeAssigned = false, division?: s
   // A panel that must stay away from a team is not a candidate for it.
   const blocks = panelBlocks(state().conflicts, state().judges);
 
-  let assigned = 0;
-  for (const team of pending) {
-    // The hard wall: only panels this team's division may be judged by,
-    // and never one with a declared conflict. A blended team clears the
-    // wall against every panel (see divisionsCompatible) -- without that
-    // it matches only a panel created in the blended division, and if the
-    // event never made one it is skipped here and silently goes unjudged.
-    const eligible = panels.filter(
-      (p) => divisionsCompatible(team.division, p.division) && !isPanelBlocked(blocks, p.id, team.id),
-    );
-    const target = eligible
-      .map((p) => ({ id: p.id, count: load.get(p.id) ?? 0 }))
-      .filter((p) => p.count < perPanel)
-      .sort((a, b) => a.count - b.count)[0];
-    if (!target) continue; // no room left in this team's division
-
-    load.set(target.id, target.count + 1);
-    const row = state().teams.find((t) => t.id === team.id)!;
-    row.panel_id = target.id;
-    assigned++;
+  // The walls (division, conflicts, perPanel) and the language preference
+  // live in planAssignments, shared with the Postgres store.
+  const plan = planAssignments(pending, panels, load, perPanel, blocks);
+  for (const { teamId, panelId } of plan) {
+    state().teams.find((t) => t.id === teamId)!.panel_id = panelId;
   }
 
   save();
-  return assigned;
+  return plan.length;
 }
 
 /* ------------------------------------------------------------------ *
@@ -1460,6 +1448,14 @@ function demoData(): Data {
   // and tells you nothing about where anyone is standing.
   const perPanel = Math.ceil(names.length / panels.length);
 
+  // Mostly English, a few Thai or both, a couple not stated. Team 4 is Thai
+  // only on Panel A, which covers English only, so a mismatch shows up.
+  const demoLanguages: string[][] = [
+    ["en"], ["en"], ["en"], ["en"], ["th"], ["en"], ["en", "th"], ["en"],
+    ["en"], [], ["en"], ["en"], ["th"], ["en"], ["en"], ["en", "th"],
+    ["en"], ["th"], ["en"], ["en", "th"], ["en"], [], ["en"], ["en"],
+  ];
+
   const teams: Team[] = names.map((name, i) => {
     const panel = panels[Math.min(panels.length - 1, Math.floor(i / perPanel))];
     // Pit codes are a letter and a number: the letter is the row, which
@@ -1475,6 +1471,7 @@ function demoData(): Data {
       // Alternate the two kinds so the colour split shows on first run.
       category: i % 3 === 0 ? "fully-developed" : "developing",
       pit: `${row}${(i % 6) + 1}`,
+      languages: demoLanguages[i % demoLanguages.length],
       created_at: iso(0),
     };
   });

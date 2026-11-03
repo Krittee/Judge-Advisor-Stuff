@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LanguageTag, languageNames } from "@/components/Language";
 import { PanelBusyLine, panelLoad, type PanelLoad } from "@/components/SlotPicker";
 import { formatClock } from "@/components/ui";
 import type { Language } from "@/lib/presets";
@@ -141,6 +142,7 @@ function StatusPanel({
 }) {
   const big = current ? bigTimeOf(current) : null;
   const language = current ? languages.find((l) => l.id === current.language) : undefined;
+  const teamLanguage = languageNames(team.languages, languages);
 
   return (
     <section
@@ -170,6 +172,20 @@ function StatusPanel({
       ) : (
         <p className="tp-pan-foot tp-pan-foot--none">No judge panel assigned yet — check with the Judge Advisor.</p>
       )}
+      {teamLanguage ? (
+        <p className="tp-pan-lang">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
+          </svg>
+          <span>{`Interview in ${teamLanguage}`}</span>
+          <span className="tp-lts">
+            {team.languages.map((id) => (
+              <LanguageTag key={id} language={id} languages={languages} />
+            ))}
+          </span>
+        </p>
+      ) : null}
     </section>
   );
 }

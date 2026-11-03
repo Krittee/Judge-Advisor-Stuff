@@ -19,6 +19,7 @@ function team(number: string, pit: string | null): Team {
     panel_id: null,
     division: DIVISION,
     category: "ungraded",
+    languages: [],
     pit,
     created_at: "2026-10-01T00:00:00.000Z",
   };

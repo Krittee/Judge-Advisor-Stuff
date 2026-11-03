@@ -17,7 +17,7 @@ import { randomPanelCode } from "../panelCode";
 import { readActivity, type StoredActivity } from "../activity";
 import { blendedDivisions, defaultCategory, divisionsCompatible, presetDivisions, presetPanels } from "../presets";
 import { hasNearbyBooking } from "../data";
-import { isPanelBlocked, judgeKey, panelBlocks } from "../roster";
+import { judgeKey, panelBlocks, planAssignments } from "../roster";
 import {
   StoreError,
   STALE_STATUS_MESSAGE,
@@ -236,6 +236,7 @@ async function migrate(): Promise<void> {
       division   text not null default 'Division 1',
       category   text not null default 'developing',
       pit        text,
+      languages  text[] not null default '{}',
       created_at timestamptz not null default now()
     );
 
@@ -494,6 +495,7 @@ async function migrate(): Promise<void> {
       -- Interview language, and which languages a panel covers.
       alter table requests add column if not exists language text not null default 'en';
       alter table panels   add column if not exists languages text[] not null default '{}';
+      alter table teams    add column if not exists languages text[] not null default '{}';
 
       -- Panels used to carry a room, which turned out not to be wanted.
       alter table panels drop column if exists room;
@@ -967,19 +969,23 @@ export const postgresStore: Store = {
     // A blank cell leaves what is stored (see ImportedTeam), so nulls come in as nulls. The proposed row is
     // checked against not null before the conflict is looked at, so it has to carry a name, division and type:
     // the stored one for a team that exists, else the default. Pit has no default and coalesces on update.
+    // Languages go in as comma-joined ids, as one text[] cannot nest inside another: "" is none, null a blank cell.
     await query(
-      `insert into teams (number, name, pit, division, category)
+      `insert into teams (number, name, pit, division, category, languages)
        select t.number,
               coalesce(t.name, (select k.name from teams k where k.number = t.number), 'Team ' || t.number),
               t.pit,
               coalesce(t.division, (select k.division from teams k where k.number = t.number), $6::text),
-              coalesce(t.category, (select k.category from teams k where k.number = t.number), $7::text)
-       from unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[]) as t(number, name, pit, division, category)
+              coalesce(t.category, (select k.category from teams k where k.number = t.number), $7::text),
+              case when t.languages is null then coalesce((select k.languages from teams k where k.number = t.number), '{}')
+                   else string_to_array(t.languages, ',') end
+       from unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $9::text[]) as t(number, name, pit, division, category, languages)
        on conflict (number) do update set
          name = excluded.name,
          pit = coalesce(excluded.pit, teams.pit),
          division = excluded.division,
          category = excluded.category,
+         languages = excluded.languages,
          -- A team that changes division loses its panel only when that
          -- panel can't judge the new one: divisionsCompatible, with $8 the
          -- blended divisions.
@@ -1003,6 +1009,7 @@ export const postgresStore: Store = {
         presetDivisions()[0],
         defaultCategory(),
         blendedDivisions(),
+        list.map((t) => (t.languages ? t.languages.join(",") : null)),
       ],
     );
     return list.length;
@@ -1077,25 +1084,7 @@ export const postgresStore: Store = {
     // A panel that must stay away from a team is not a candidate for it.
     const blocks = panelBlocks(await this.listConflicts(), await this.listJudges());
 
-    const assignments: { teamId: string; panelId: string }[] = [];
-    for (const team of pending) {
-      // The hard wall: only panels this team's division may be judged by,
-      // and a blended team clears it against every panel (see
-      // divisionsCompatible) rather than needing a panel created in the
-      // blended division before it can be judged at all.
-      // and never one with a declared conflict.
-      const eligible = panels.filter(
-        (p) => divisionsCompatible(team.division, p.division) && !isPanelBlocked(blocks, p.id, team.id),
-      );
-      const target = eligible
-        .map((p) => ({ id: p.id, count: load.get(p.id) ?? 0 }))
-        .filter((p) => p.count < perPanel)
-        .sort((a, b) => a.count - b.count)[0];
-      if (!target) continue; // no room left in this team's division
-
-      load.set(target.id, target.count + 1);
-      assignments.push({ teamId: team.id, panelId: target.id });
-    }
+    const assignments = planAssignments(pending, panels, load, perPanel, blocks);
 
     if (assignments.length) {
       await query(

@@ -61,6 +61,17 @@ async function importTeams(session: Session | null, body: unknown): Promise<Repl
   return { status: res.status, body: await res.json() };
 }
 
+async function patchTeam(session: Session | null, body: unknown): Promise<Reply> {
+  const { PATCH } = await import("../src/app/api/admin/teams/route");
+  const request = new Request("http://localhost/api/admin/teams", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const res = await inRequestScope(session, () => PATCH(request));
+  return { status: res.status, body: await res.json() };
+}
+
 const store = async () => (await import("../src/lib/db/file")).fileStore;
 
 /** An empty event, optionally with team numbers already on the roster. */
@@ -282,4 +293,64 @@ test("only the Judge Advisor can import", async () => {
   assert.equal((await importTeams(QUEUER, { text: "1234, Iron Hawks" })).status, 403);
   assert.equal((await importTeams(null, { text: "1234, Iron Hawks" })).status, 403);
   assert.equal((await db.listTeams()).length, 0);
+});
+
+/* ===== interview languages ============================================== */
+
+const languagesOf = async (db: Awaited<ReturnType<typeof world>>, number: string) =>
+  (await db.listTeams()).find((t) => t.number === number)?.languages;
+
+test("a sixth column sets a new team's languages, in any of the usual spellings", async () => {
+  const db = await world();
+  const text = [
+    "1001, A, , , , EN",
+    "1002, B, , , , EN/TH",
+    "1003, C, , , , th+en",
+    "1004, D, , , , both",
+    "1005, E, , , , Thai",
+    "1006, F, , , , klingon",
+    "1007, G",
+  ].join("\n");
+  assert.equal((await importTeams(ADMIN, { text })).status, 200);
+  assert.deepEqual(await languagesOf(db, "1001"), ["en"]);
+  assert.deepEqual(await languagesOf(db, "1002"), ["en", "th"]);
+  assert.deepEqual(await languagesOf(db, "1003"), ["en", "th"]);
+  assert.deepEqual(await languagesOf(db, "1004"), ["en", "th"]);
+  assert.deepEqual(await languagesOf(db, "1005"), ["th"]);
+  assert.deepEqual(await languagesOf(db, "1006"), [], "nothing recognised: not stated");
+  assert.deepEqual(await languagesOf(db, "1007"), [], "no sixth column: not stated");
+});
+
+test("a sixth column replaces an existing team's languages, and a blank one keeps them", async () => {
+  const db = await world(["2001", "2002"]);
+  await importTeams(ADMIN, { text: "2001, , , , , TH\n2002, , , , , EN" });
+  assert.deepEqual(await languagesOf(db, "2001"), ["th"]);
+  assert.deepEqual(await languagesOf(db, "2002"), ["en"]);
+
+  await importTeams(ADMIN, { text: "2001, Renamed\n2002, , , , , both" });
+  assert.deepEqual(await languagesOf(db, "2001"), ["th"], "a blank cell keeps what is stored");
+  assert.deepEqual(await languagesOf(db, "2002"), ["en", "th"]);
+});
+
+test("PATCH sets a team's languages, and an empty list clears them", async () => {
+  const db = await world(["3001"]);
+  const id = (await db.listTeams())[0].id;
+
+  const set = await patchTeam(ADMIN, { teamId: id, languages: ["th", "en"] });
+  assert.equal(set.status, 200);
+  assert.deepEqual(set.body.team.languages, ["en", "th"]);
+
+  const cleared = await patchTeam(ADMIN, { teamId: id, languages: [] });
+  assert.deepEqual(cleared.body.team.languages, []);
+  assert.deepEqual(await languagesOf(db, "3001"), []);
+});
+
+test("PATCH logs languages as changed only when they really changed", async () => {
+  const db = await world(["4001"]);
+  const id = (await db.listTeams())[0].id;
+  await patchTeam(ADMIN, { teamId: id, languages: "EN" });
+  await patchTeam(ADMIN, { teamId: id, languages: "EN" });
+  const edits = (await db.listActivity()).filter((a) => a.action === "edited a team");
+  assert.equal(edits.length, 1);
+  assert.match(edits[0].detail ?? "", /languages/);
 });

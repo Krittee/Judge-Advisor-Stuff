@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { actorParts } from "@/lib/activity";
 import { canAdminister, getSession } from "@/lib/auth";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
-import { divisionsCompatible, presetDivisions, resolveCategory } from "@/lib/presets";
+import { divisionsCompatible, parseLanguageList, presetDivisions, resolveCategory } from "@/lib/presets";
 import { normalizePit } from "@/lib/pit";
 import { store, StoreError } from "@/lib/db";
 import { isPanelBlocked, loadBlocks } from "@/lib/conflicts";
@@ -17,6 +17,7 @@ type ParsedTeam = {
   pit: string | null;
   division: string | null;
   category: string | null;
+  languages: string[] | null;
 };
 
 /** A line the import could not read: 1-based, as it is numbered in the box. */
@@ -31,9 +32,10 @@ const BAD_CHARS = "team number has characters other than A–Z, 0–9 and -";
  *   1234, Iron Hawks, Pit 12
  *   9882K<TAB>Iron Hawks
  * Existing team numbers are updated rather than duplicated. A blank name,
- * pit, division or notebook column leaves an existing team's value alone (a
- * new team is called "Team <number>" and gets the first division and the
- * default notebook type).
+ * pit, division, notebook or languages column leaves an existing team's value
+ * alone (a new team is called "Team <number>" and gets the first division, the
+ * default notebook type and no languages). The sixth column is the languages
+ * the team can be interviewed in: EN, TH, EN/TH, EN+TH, both, Thai.
  *
  * Replies with `imported` (teams written, one per distinct number),
  * `created` and `updated` (which add up to it; a number already stored
@@ -206,6 +208,7 @@ export async function PATCH(request: Request) {
       }
     }
     if ("pit" in body) patch.pit = normalizePit(body.pit);
+    if ("languages" in body) patch.languages = parseLanguageList(body.languages);
 
     if ("name" in body) {
       const name = String(body.name).trim().slice(0, 120);
@@ -314,12 +317,15 @@ function parseTeams(
       continue;
     }
 
+    const languages = parseLanguageList(cells[5]);
     seen.set(number, {
       number,
       name: cells[1] || null,
       pit: normalizePit(cells[2]),
       division: cells[3] ? resolveDivision(cells[3]) : fallbackDivision,
       category: cells[4] ? resolveCategory(cells[4]) : fallbackCategory,
+      // Nothing recognised counts as blank, so a stray word never wipes what is stored.
+      languages: languages.length ? languages : null,
     });
   }
 

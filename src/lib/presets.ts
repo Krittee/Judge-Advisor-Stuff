@@ -1,7 +1,7 @@
 import presetFile from "../../config/event.json";
 import { normalizePanelCode } from "./panelCode";
 import { getRuleset, type MatchType } from "./rules";
-import type { AwardView } from "./types";
+import type { AwardView, Panel, Team } from "./types";
 
 /**
  * Preset panels, read from config/event.json.
@@ -105,6 +105,19 @@ export function divisionsCompatible(teamDivision: string, panelDivision: string)
   if (teamDivision === panelDivision) return true;
   const blended = blendedDivisions();
   return blended.includes(teamDivision) || blended.includes(panelDivision);
+}
+
+/**
+ * How well a panel's languages fit a team's. Advisory only: nothing
+ * refuses an assignment on it, the way the Floor tab's language gap only
+ * warns. Either side empty means "not stated", which is not a mismatch.
+ */
+export function languageFit(
+  team: Pick<Team, "languages">,
+  panel: Pick<Panel, "languages">,
+): "match" | "unstated" | "mismatch" {
+  if (!team.languages.length || !panel.languages.length) return "unstated";
+  return team.languages.some((l) => panel.languages.includes(l)) ? "match" : "mismatch";
 }
 
 /* ------------------------------------------------------------------ *
@@ -264,18 +277,59 @@ export function defaultLanguage(): string {
   return languages()[0].id;
 }
 
-/** Map free text onto a real language, by id, short code or label. */
-export function resolveLanguage(input: unknown): string {
+/** The configured language that free text names, by id, short code or label; undefined when none. */
+function findLanguage(input: unknown): Language | undefined {
   const wanted = String(input ?? "").trim().toLowerCase();
-  if (!wanted) return defaultLanguage();
+  if (!wanted) return undefined;
 
-  const match = languages().find(
+  return languages().find(
     (l) =>
       l.id.toLowerCase() === wanted ||
       l.short.toLowerCase() === wanted ||
       l.label.toLowerCase() === wanted,
   );
-  return match ? match.id : defaultLanguage();
+}
+
+/** Map free text onto a real language, by id, short code or label. */
+export function resolveLanguage(input: unknown): string {
+  return findLanguage(input)?.id ?? defaultLanguage();
+}
+
+/**
+ * The language a new booking is made in: one the caller names and we
+ * recognise, else the first language the team can be interviewed in, else
+ * the event default. Blank or unrecognised counts as "not named", so a
+ * coordinator who set a team to Thai gets a Thai booking without picking it
+ * again. Shared with the booking screens so they preselect the same choice.
+ */
+export function bookingLanguage(input: unknown, team: { languages: string[] }): string {
+  return findLanguage(input)?.id ?? team.languages[0] ?? defaultLanguage();
+}
+
+/**
+ * Read a list of languages out of an array or free text ("EN/TH", "en+th",
+ * "Thai", "both"). Tokens are matched by id, short code or label; "both" and
+ * "all" mean every configured language; anything unrecognised is dropped.
+ * The result is in config order and de-duplicated.
+ */
+export function parseLanguageList(input: unknown): string[] {
+  const configured = languages();
+  const tokens = (Array.isArray(input) ? input : String(input ?? "").split(/[,/+&;\s]+/))
+    .map((t) => String(t).trim().toLowerCase())
+    .filter(Boolean);
+
+  const wanted = new Set<string>();
+  for (const token of tokens) {
+    if (token === "both" || token === "all") {
+      for (const l of configured) wanted.add(l.id);
+      continue;
+    }
+    const match = configured.find(
+      (l) => l.id === token || l.short.toLowerCase() === token || l.label.toLowerCase() === token,
+    );
+    if (match) wanted.add(match.id);
+  }
+  return configured.map((l) => l.id).filter((id) => wanted.has(id));
 }
 
 const CATEGORY_FALLBACK: TeamCategory[] = [

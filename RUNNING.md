@@ -171,10 +171,12 @@ is something to look at. Try these in your browser:
 | `http://localhost:3000` | Team view. Type `1101` and press Continue. |
 | `http://localhost:3000/board` | The big colour board. |
 | `http://localhost:3000/login` | Staff sign-in. |
+| `http://localhost:3000/coordinator/login` | Coordinator sign-in. |
 
 At the sign-in page, use the code **`JA2026`** to get into your Judge Advisor
 console. Panel codes for the demo judges are `ALPHA1`, `BRAVO2` and `CHARLIE3`.
-The queue desk code is **`DESK01`**.
+The queue desk code is **`DESK01`**, and the coordinator code is **`COORD1`**
+(coordinators also type their name to sign in).
 
 Click around. You cannot break anything — Step 8 shows you how to wipe it all.
 
@@ -231,7 +233,7 @@ Sign in at `/login` with `JA2026`.
 
 ### Change the codes before the event
 
-`JA2026` and `DESK01` are published in this guide, so anyone reading it knows
+`JA2026`, `DESK01` and `COORD1` are published in this guide, so anyone reading it knows
 them. Before the real day:
 
 1. In the app folder, make a copy of the file `.env.example` and name the copy
@@ -245,6 +247,7 @@ them. Before the real day:
    ADMIN_CODE_3=third-admin-code
    ADMIN_CODE_4=fourth-admin-code
    QUEUER_CODE=pick-something-for-the-desk
+   COORDINATOR_CODE=pick-something-for-the-coordinators
    REFEREE_CODE=pick-something-for-the-referees
    HEAD_REFEREE_CODE=pick-something-for-the-head-referee
    ```

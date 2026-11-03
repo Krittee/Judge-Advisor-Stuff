@@ -1,6 +1,6 @@
 "use client";
 
-import type { Language } from "@/lib/presets";
+import { languageFit, type Language } from "@/lib/presets";
 import type { PublicPanel } from "@/lib/types";
 
 export type { Language };
@@ -35,6 +35,23 @@ export function LanguageTag({
  */
 export function hasLanguageGap(covers: string[], asking?: string): boolean {
   return !!asking && covers.length > 0 && !covers.includes(asking);
+}
+
+/**
+ * Whether a team's language list fits a panel's: true when either side has not
+ * said, or they share one. A misfit is flagged, never blocked. One rule, the
+ * same one auto-assign uses (`languageFit`).
+ */
+export function teamFitsPanel(team: string[], panel: string[]): boolean {
+  return languageFit({ languages: team }, { languages: panel }) !== "mismatch";
+}
+
+/** "English", "Thai" or "English or Thai": the labels of the ids we run, in the order given. */
+export function languageNames(ids: string[], languages: Language[]): string {
+  return ids
+    .map((id) => languages.find((l) => l.id === id)?.label)
+    .filter(Boolean)
+    .join(" or ");
 }
 
 /**

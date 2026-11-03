@@ -49,6 +49,14 @@ export async function POST(request: Request) {
     );
   }
 
+  // Several coordinators share one code, so the name is what shows who booked.
+  if (session.role === "coordinator" && !name.trim()) {
+    return NextResponse.json(
+      { error: "Enter your name. Each booking you make is recorded under it." },
+      { status: 400 },
+    );
+  }
+
   recordLoginSuccess(key);
   await createSession(session, code);
   return NextResponse.json({ session });

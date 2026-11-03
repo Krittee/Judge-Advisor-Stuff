@@ -50,7 +50,7 @@ const panels = [
 ];
 
 function team(number: string, name: string, panel_id: string | null, division = "Middle School"): Team {
-  return { id: `t-${number}`, number, name, panel_id, division, category: "developing", pit: null, created_at: "2026-10-17T08:00:00Z" };
+  return { id: `t-${number}`, number, name, panel_id, division, category: "developing", pit: null, languages: [], created_at: "2026-10-17T08:00:00Z" };
 }
 function request(t: Team, status: RequestRow["status"], over: Partial<RequestRow> = {}): RequestRow {
   return {
@@ -498,6 +498,18 @@ test("Move to panel… lists only panels in the team's division without a confli
   // A conflict with Panel 2 takes it out too.
   const conflicted = move({ conflicts: [{ id: "c1", panel_id: "p2", judge_id: null, team_id: sparky.id, judge_name: null, note: null, declared_by: "Alex", created_at: ago(60) }] });
   assert.doesNotMatch(conflicted, /ja-opt/);
+});
+
+test("Move to panel… words 'Doesn't cover TH' on an option that cannot interview the team, and still lists it", () => {
+  const move = (languages: string[]) =>
+    cardOf(board({ teams: teams.map((t) => (t === titans ? { ...t, languages } : t)), menu: { id: "r-9882K", view: "move" } }), "9882K");
+  // Torque Titans is on Panel 2; Panel 3 is the other Middle School panel and covers English only.
+  const thai = move(["th"]);
+  assert.match(thai, /<button type="button" class="ja-opt"[^>]*><b>Panel 3<\/b>[\s\S]*?<span class="jg-ptag">EN only<\/span>[\s\S]*?<span class="ja-opt-w">Doesn&#x27;t cover TH<\/span><\/button>/);
+  assert.doesNotMatch(move(["en"]), /ja-opt-w/, "English fits");
+  assert.doesNotMatch(move([]), /ja-opt-w/, "not asked is never a misfit");
+  assert.match(move(["en", "th"]), /ja-opt/, "a team asking for both fits an English panel and is not warned");
+  assert.doesNotMatch(move(["en", "th"]), /ja-opt-w/);
 });
 
 test("Move to panel… honours a judge's conflict through the panel the judge is on, and lifts it when the judge is off that panel", () => {

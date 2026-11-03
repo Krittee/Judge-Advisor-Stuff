@@ -33,13 +33,15 @@ const languages = [
 ];
 const categories = [{ id: "developing", label: "Developing", color: "sky" }] as DeskViewProps["categories"];
 
-const team = (number: string, name: string, panel_id: string | null = "p2"): Team =>
-  ({ id: `t-${number}`, number, name, panel_id, division: "Middle School", category: "developing", pit: "22", created_at: "" }) as Team;
+const team = (number: string, name: string, panel_id: string | null = "p2", langs: string[] = []): Team =>
+  ({ id: `t-${number}`, number, name, panel_id, division: "Middle School", category: "developing", pit: "22", languages: langs, created_at: "" }) as Team;
 const byte = team("7700B", "Byte Me");
 const robo = team("4410C", "Robo Rangers");
 const titans = team("9882K", "Torque Titans");
 const bolt = team("8123N", "Bolt Brigade", null);
 const high = team("5555H", "High Fives");
+const thai = team("1111T", "Thai Only", "p2", ["th"]);
+const both = team("2222B", "Both Tongues", "p2", ["en", "th"]);
 const teams = [byte, robo, titans, bolt, high];
 
 const panel2: PublicPanel = {
@@ -61,7 +63,7 @@ const requests = [req({}), slotReq("b-robo", robo, 2), slotReq("b-high", high, 4
 
 function view(over: Partial<DeskViewProps> = {}) {
   const number = over.number ?? "7700B";
-  const found = teams.find((t) => t.number === number) ?? null;
+  const found = [...teams, thai, both].find((t) => t.number === number) ?? null;
   const panel = found?.panel_id ? panel2 : null;
   const existing = found ? (requests.find((r) => r.team_id === found.id && r.status !== "cancelled") ?? null) : null;
   return renderToStaticMarkup(
@@ -435,6 +437,47 @@ test("All teams: a tap goes through the number setter, then scrolls to the top w
   assert.match(noComments(read("src/app/queue/page.tsx")), /onNumber=\{\(n\) => \{\s*setNumber\(n\);\s*setPicked\(null\);/, "the same setter typing uses");
 });
 
+/* ---- team language ------------------------------------------------------------------------------ */
+
+const langRow = (m: string) => m.match(/<div class="dk-lrow">[\s\S]*?<\/div>/)?.[0];
+const nowButtons = (m: string) => labelled(m, /^Request ·/).map((b) => [b.text, /dk-prim/.test(b.attrs) ? "prim" : "out"]);
+
+test("the team's language shows as read-only tags beside the lookup; nothing when not asked", () => {
+  assert.equal(text(langRow(view({ number: "1111T" }))!), "Interview languageไทยไทย");
+  assert.equal(text(langRow(view({ number: "2222B" }))!), "Interview languageENไทยEnglish or ไทย");
+  assert.equal(langRow(view({ number: "7700B" })), undefined);
+  assert.equal(langRow(view({ number: "" })), undefined);
+  assert.doesNotMatch(langRow(view({ number: "1111T" }))!, /<(button|input|select)/, "the desk cannot change it");
+});
+
+test("Request: a one-language team gets that button filled and first, the other outlined; both or none stay equal", () => {
+  assert.deepEqual(nowButtons(view({ number: "1111T" })), [["Request · ไทย", "prim"], ["Request · English", "out"]]);
+  assert.match(view({ number: "1111T" }), /class="dk-pair dk-one" role="group" aria-label="Request a judge now/);
+  for (const number of ["2222B", "7700B", ""]) {
+    assert.deepEqual(nowButtons(view({ number })), [["Request · English", "prim"], ["Request · ไทย", "prim"]], number);
+    assert.match(view({ number }), /class="dk-pair" role="group" aria-label="Request a judge now/);
+  }
+});
+
+test("Request now instead on a booked team follows the same order", () => {
+  const booked = team("3333R", "Booked Thai", "p2", ["th"]);
+  const m = renderView(booked, [slotReq("b-3", booked, 3)]);
+  assert.deepEqual(labelled(m, /^Now ·/).map((b) => [b.text, /dk-prim/.test(b.attrs) ? "prim" : "out"]), [["Now · ไทย", "prim"], ["Now · English", "out"]]);
+});
+
+function renderView(t: Team, rs: RequestRow[]) {
+  return renderToStaticMarkup(
+    <AppRouterContext.Provider value={router}>
+      <DeskView
+        online teams={[t]} panels={[panel2]} requests={rs} languages={languages} categories={categories} mode="now" onMode={noop}
+        number={t.number} onNumber={noop} team={t} panel={panel2} existing={rs[0]} message="" onMessage={noop} bookLanguage="en"
+        onBookLanguage={noop} reschedule={null} picked={null} onPick={noop} busy={false} error={null} ok={null} now={NOW}
+        onRequest={noop} onUndo={noop} onBook={noop} onMove={noop} onStartReschedule={noop} onStopReschedule={noop} onCancelBooking={noop}
+      />
+    </AppRouterContext.Provider>,
+  );
+}
+
 /* ---- the wiring, read from source ------------------------------------------------------------------ */
 
 const noComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
@@ -449,7 +492,7 @@ test("the page keeps its behaviour: one PATCH each, the plain scroll, polling, a
   assert.doesNotMatch(page, /smooth|window\.confirm|\bconfirm\(/);
   assert.match(page, /useConfirm\(\)/);
   assert.match(page, /cancelBookingAfterAsking\(ask,/);
-  assert.match(page, /state\.languages\[0\]\.id/, "the booking language defaults to the first");
+  assert.match(page, /bookLanguageFor\(bookChoice, team, state\.languages\[0\]\?\.id/, "the booking language follows the looked-up team");
   assert.match(page, /setReschedule\(null\)/, "the isRescheduling effect drops a stale reschedule");
   assert.doesNotMatch(page, /advance|notes|scores/i, "the desk never advances an interview or reads notes");
 });

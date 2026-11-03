@@ -7,7 +7,7 @@ import { call, useAppState } from "@/components/useAppState";
 import { formatClock } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { DeskView, type DeskMode } from "@/components/desk/DeskView";
-import { cancelBookingAfterAsking } from "@/components/desk/deskLogic";
+import { bookLanguageFor, cancelBookingAfterAsking, type BookChoice } from "@/components/desk/deskLogic";
 import { normalizeTeamNumber } from "@/lib/teamNumber";
 import type { Session } from "@/lib/auth";
 import type { RequestRow, Slot } from "@/lib/types";
@@ -32,7 +32,8 @@ export default function QueuePage() {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [bookLanguage, setBookLanguage] = useState("");
+  /** The desk's own pick in the Book select, kept only for the team it was made on. */
+  const [bookChoice, setBookChoice] = useState<BookChoice | null>(null);
   /** The start of the slot picked in the grid. */
   const [picked, setPicked] = useState<string | null>(null);
   /** A booking being moved to a new time, not cancelled and rebooked from
@@ -47,15 +48,15 @@ export default function QueuePage() {
           router.replace("/queue/login");
           return;
         }
+        // This page offers cancel, move and messages; a coordinator has none of them, so their console is theirs.
+        if (session.role === "coordinator") {
+          router.replace("/coordinator");
+          return;
+        }
         setSession(session);
       })
       .catch(() => router.replace("/queue/login"));
   }, [router]);
-
-  // Default the booking language once the config has arrived.
-  useEffect(() => {
-    if (!bookLanguage && state.languages.length) setBookLanguage(state.languages[0].id);
-  }, [bookLanguage, state.languages]);
 
   const teamByNumber = useMemo(
     () => new Map(state.teams.map((t) => [t.number, t])),
@@ -65,6 +66,7 @@ export default function QueuePage() {
 
   const team = teamByNumber.get(normalizeTeamNumber(number)) ?? null;
   const panel = team?.panel_id ? (panelById.get(team.panel_id) ?? null) : null;
+  const bookLanguage = bookLanguageFor(bookChoice, team, state.languages[0]?.id ?? "");
 
   // What this team already has, so the desk is not the last to know.
   // A live queue entry and a future booking are different problems: the
@@ -84,6 +86,7 @@ export default function QueuePage() {
     setNumber("");
     setMessage("");
     setPicked(null);
+    setBookChoice(null);
   }
 
   /** `bookingId`: turn that booking into the request in place, rather than creating a second one. */
@@ -249,7 +252,7 @@ export default function QueuePage() {
         message={message}
         onMessage={setMessage}
         bookLanguage={bookLanguage}
-        onBookLanguage={setBookLanguage}
+        onBookLanguage={(language) => team && setBookChoice({ teamId: team.id, language })}
         reschedule={isRescheduling ? reschedule : null}
         picked={picked}
         onPick={setPicked}

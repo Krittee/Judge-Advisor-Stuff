@@ -1,0 +1,217 @@
+import { slotKind, slotTime, teamMatches, type SlotKind } from "@/components/desk/deskLogic";
+import { buildSlots, liveRequestFor } from "@/lib/data";
+import { comparePits } from "@/lib/pit";
+import { bookingLanguage } from "@/lib/presets";
+import { STATUS_META } from "@/lib/status";
+import { compareTeamNumbers } from "@/lib/teamNumber";
+import type { PublicPanel, RequestRow, Slot, Team } from "@/lib/types";
+
+/* The coordinator console's decisions, kept apart from how they are drawn
+   (CoordinatorView.tsx, TeamsTab.tsx, SlotsTab.tsx) so they can be run as
+   they are. The coordinator sets languages and puts teams in the queue or
+   on a slot; everything the desk does after that is the desk's. */
+
+/* ---- the two tabs, and the URL that remembers which ---------------------------- */
+
+export type CoordinatorTab = "teams" | "slots";
+
+/** `?tab=slots` is Slots; anything else, or nothing, is Teams. */
+export const tabFrom = (param: string | null): CoordinatorTab => (param === "slots" ? "slots" : "teams");
+
+export const tabHref = (tab: CoordinatorTab): string => (tab === "slots" ? "/coordinator?tab=slots" : "/coordinator");
+
+/* ---- the words the console uses more than once ------------------------------------ */
+
+export const SET_LANGUAGE_LINE = "Set the language first";
+export const NO_PANEL_LINE = "No panel yet — the Judge Advisor assigns one.";
+export const ASK_DESK_LINE = "To change it, ask the queue desk.";
+/** What the server says to a team that already holds a request (api/requests); the bar says it before the server has to. */
+export const ALREADY_BOOKED_LINE = "Already booked — the queue desk can change it.";
+export const CHOOSE_TEAM_LINE = "Choose a team on the Teams tab";
+
+/* ---- language chips -------------------------------------------------------------------- */
+
+/** The list a chip tap asks for: that language added or taken out, in config order. */
+export function toggleLanguage(current: string[], id: string, order: string[]): string[] {
+  const next = current.includes(id) ? current.filter((l) => l !== id) : [...current, id];
+  return order.filter((l) => next.includes(l));
+}
+
+/**
+ * The teams as the screen shows them: a language tapped but not yet saved
+ * already counts, so the chip lights at once and the buttons under the row
+ * follow it. Dropping the entry (a failed save, or the saved list arriving)
+ * is all it takes to go back.
+ */
+export function withPending(teams: Team[], pending: Pending): Team[] {
+  if (!Object.keys(pending).length) return teams;
+  return teams.map((t) => (pending[t.id] ? { ...t, languages: pending[t.id] } : t));
+}
+
+export type Pending = Record<string, string[]>;
+
+/** What a chip tap needs from the page: the write, the pending map, a fresh poll and somewhere to say it failed. */
+export type LanguageSave = {
+  send: (body: { teamId: string; languages: string[] }) => Promise<unknown>;
+  setPending: (update: (pending: Pending) => Pending) => void;
+  refresh: () => Promise<void>;
+  onError: (message: string) => void;
+};
+
+/**
+ * The chip tap: shown at once, saved behind it, put back if the save fails.
+ * Whether it worked or not the pending entry goes in the end (the poll has
+ * brought the saved list, or the old one is the truth again) -- but only the
+ * tap that put it there takes it away, so a second tap on the same team keeps
+ * its own.
+ */
+export async function saveLanguages(teamId: string, next: string[], io: LanguageSave): Promise<void> {
+  io.setPending((p) => ({ ...p, [teamId]: next }));
+  try {
+    await io.send({ teamId, languages: next });
+    await io.refresh();
+  } catch (e) {
+    io.onError((e as Error).message);
+  } finally {
+    io.setPending((p) => {
+      if (p[teamId]?.join() !== next.join()) return p;
+      const { [teamId]: _gone, ...rest } = p;
+      return rest;
+    });
+  }
+}
+
+/* ---- the Teams list ------------------------------------------------------------------------ */
+
+/**
+ * What a team is doing, for its pill: the live request, else the earliest
+ * booking (as everywhere), else the interview it has already had.
+ */
+export function requestOf(teamId: string, requests: RequestRow[]): RequestRow | null {
+  const held = liveRequestFor(teamId, requests);
+  if (held) return held;
+  const done = requests
+    .filter((r) => r.team_id === teamId && r.status === "completed")
+    .sort((a, b) => (b.finished_at ?? b.updated_at).localeCompare(a.finished_at ?? a.updated_at));
+  return done[0] ?? null;
+}
+
+/** "Booked 10:40" for a booking, else the status's short word. */
+export function pillText(request: Pick<RequestRow, "status" | "slot_start">): string {
+  const word = STATUS_META[request.status].short;
+  return request.status === "scheduled" && request.slot_start ? `${word} ${slotTime(request.slot_start)}` : word;
+}
+
+export type TeamFilter = { query: string; division: string; notAskedOnly: boolean };
+
+export type TeamRowData = { team: Team; request: RequestRow | null };
+
+export type TeamList = {
+  /** The rows to draw, in walking order: down the pit rows, then by number. */
+  rows: TeamRowData[];
+  /** Counts over the teams the search and division leave, whether or not "Not asked" is on. */
+  total: number;
+  asked: number;
+  notAsked: number;
+};
+
+export function teamList(teams: Team[], requests: RequestRow[], filter: TeamFilter): TeamList {
+  const inScope = teams.filter((t) => (!filter.division || t.division === filter.division) && teamMatches(t, filter.query));
+  const notAsked = inScope.filter((t) => !t.languages.length).length;
+  const rows = (filter.notAskedOnly ? inScope.filter((t) => !t.languages.length) : inScope)
+    .sort((a, b) => comparePits(a.pit, b.pit) || compareTeamNumbers(a.number, b.number))
+    .map((team) => ({ team, request: requestOf(team.id, requests) }));
+  return { rows, total: inScope.length, asked: inScope.length - notAsked, notAsked };
+}
+
+/* ---- what an opened row offers --------------------------------------------------------------- */
+
+export type RowState =
+  /** Waiting, on the way, interviewing or booked: the queue desk's to change. */
+  | { kind: "held"; request: RequestRow }
+  | { kind: "no-language" }
+  | { kind: "no-panel" }
+  | { kind: "ready"; panel: PublicPanel };
+
+/** A request that has not finished is held; a completed one is history and the team may be asked for again. */
+export function rowState(team: Team, panel: PublicPanel | null, request: RequestRow | null): RowState {
+  if (request && request.status !== "completed") return { kind: "held", request };
+  if (!team.languages.length) return { kind: "no-language" };
+  if (!panel) return { kind: "no-panel" };
+  return { kind: "ready", panel };
+}
+
+/**
+ * The language a slot is booked in: the team's own; for a team that speaks
+ * both, the first of its languages the panel covers (else its first).
+ */
+export function slotLanguage(team: Pick<Team, "languages">, panel: Pick<PublicPanel, "languages">): string {
+  return team.languages.find((l) => panel.languages.includes(l)) ?? bookingLanguage("", team);
+}
+
+/* ---- the Slots tab --------------------------------------------------------------------------- */
+
+/** What the pinned bar is about: nobody yet, somebody who cannot be booked, or somebody who can. */
+export type BookBar =
+  | { kind: "none" }
+  | { kind: "blocked"; team: Team; line: string }
+  | { kind: "ready"; team: Team; panel: PublicPanel; language: string };
+
+export function bookBar(team: Team | null, panel: PublicPanel | null, request: RequestRow | null): BookBar {
+  if (!team) return { kind: "none" };
+  const state = rowState(team, panel, request);
+  switch (state.kind) {
+    case "held":
+      return { kind: "blocked", team, line: ALREADY_BOOKED_LINE };
+    case "no-language":
+      return { kind: "blocked", team, line: SET_LANGUAGE_LINE };
+    case "no-panel":
+      return { kind: "blocked", team, line: NO_PANEL_LINE };
+    default:
+      return { kind: "ready", team, panel: state.panel, language: slotLanguage(team, state.panel) };
+  }
+}
+
+/** The panel the Slots tab shows: the one tapped, else the chosen team's, else the first. */
+export function shownPanel(panels: PublicPanel[], pick: string | null, teamPanelId: string | null): PublicPanel | null {
+  return panels.find((p) => p.id === pick) ?? panels.find((p) => p.id === teamPanelId) ?? panels[0] ?? null;
+}
+
+export type SlotLine = { slot: Slot; kind: SlotKind };
+
+/** Book is live only for a team that can be booked, on its own panel, in a slot that is open. */
+export const canBook = (bar: BookBar, line: SlotLine): boolean =>
+  bar.kind === "ready" && bar.team.panel_id === line.slot.panelId && line.kind === "open";
+
+export type SlotsModel = {
+  panel: PublicPanel | null;
+  /** The panel's whole day, past slots included (noSlotsLeftLine counts them). */
+  slots: Slot[];
+  /** Today's slots still to come: past ones are left out. */
+  lines: SlotLine[];
+  open: number;
+  bar: BookBar;
+  /** The slot picked, only while it can still be booked. */
+  chosen: Slot | null;
+};
+
+export function slotsModel(input: {
+  teams: Team[];
+  panels: PublicPanel[];
+  requests: RequestRow[];
+  chosenId: string | null;
+  panelPick: string | null;
+  picked: string | null;
+  now: number;
+}): SlotsModel {
+  const team = input.teams.find((t) => t.id === input.chosenId) ?? null;
+  const own = team?.panel_id ? (input.panels.find((p) => p.id === team.panel_id) ?? null) : null;
+  const bar = bookBar(team, own, team ? requestOf(team.id, input.requests) : null);
+  const panel = shownPanel(input.panels, input.panelPick, team?.panel_id ?? null);
+  const slots = panel ? buildSlots(panel, input.requests, input.teams) : [];
+
+  const ctx = { teamId: team?.id ?? null, currentStart: null, now: input.now };
+  const lines = slots.map((slot) => ({ slot, kind: slotKind(slot, ctx) })).filter((l) => l.kind !== "past");
+  const chosen = lines.find((l) => l.slot.start === input.picked && canBook(bar, l))?.slot ?? null;
+  return { panel, slots, lines, open: lines.filter((l) => l.kind === "open").length, bar, chosen };
+}

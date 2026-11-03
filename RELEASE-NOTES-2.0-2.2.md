@@ -17,6 +17,224 @@ launch itself.
 
 ---
 
+## Version 2.1.0: Coordinator and team interview language
+
+Branch `claude/v21-coordinator-c9e080` (cut from `version-2.1.0`). Adds a sixth
+role, the **Coordinator**, who walks the pits, and an **interview language** on
+every team (EN, TH or both) that the Judge Advisor, the queue desk and the
+auto-assigner all use. Every change below is local and not pushed.
+
+| Change | Commit | iPhone checked | Status |
+|---|---|---|---|
+| [Coordinator role: code, sign-in door, permissions](#coordinator-role) | `7886537` | Not yet (browser phone size only) | Local, not pushed |
+| [Teams carry an interview language (and an import column)](#team-language) | `a1c1299` | Not needed | Local, not pushed |
+| [Docs: the coordinator code, door and team language](#docs-first-pass) | `3420adb` | Not needed | Local, not pushed |
+| [Coordinator API: set team language, request and book](#coordinator-api) | `d566deb` | Not needed | Local, not pushed |
+| [Auto-assign prefers a panel that speaks the team's language](#language-auto-assign) | `cadd447` | Not needed | Local, not pushed |
+| [Spec: the redesign brief and mocks](#spec) | `cf4a575`, merged as `73e498b` | Not needed | Local, not pushed |
+| [Team language for the Judge Advisor](#language-ja) | `d498aed` | Not yet (browser phone size only) | Local, not pushed |
+| [Team language on the queue desk and the team page](#language-desk-team) | `31c873c` | Not yet (browser phone size only) | Local, not pushed |
+| [Coordinator: no team messages, "Already booked", placeholder avatar](#coordinator-deltas) | `d5aa4c0` | Not yet (browser phone size only) | Local, not pushed |
+| [Coordinator console `/coordinator`: Teams + Slots](#coordinator-console) | `2fe4d72` | Not yet (browser phone size only) | Local, not pushed |
+| [The sixth door, the last docs and these notes](#door-and-docs) | `2ae05d9` | Not yet (browser phone size only) | Local, not pushed |
+| [Review fixes: booked time no longer wraps; coordinator tabs open at the top](#review-fixes) | `ac9a4bf` | Not yet (browser phone size only) | Local, not pushed |
+| [The Coordinator door moves after Queue desk](#door-order) | `aecd28c` | Not yet (browser phone size only) | Local, not pushed |
+
+### Your decisions for 2.1.0
+
+- A coordinator must type a name at sign-in; bookings are recorded under it.
+- Auto-assign prefers a panel that speaks the team's language and falls back to
+  any eligible panel. It never blocks.
+- The team import keeps an optional sixth column for language, although the
+  design spec said import was unchanged. A blank cell never clears a stored language.
+- A language misfit is only ever a caution, never a block.
+- A coordinator cannot cancel, reschedule or move a booking (the queue desk or
+  Judge Advisor does that). They see no team messages, notes, scores,
+  conflicts or flags.
+- Coordinator door sits after Queue desk (user, 2026-11-03), as PROMPT.md says.
+
+### Browser checks
+
+Run by the lead on a copy of the demo data (never `.data/`), with the dev server from a separate worktree at `2fe4d72` and `2ae05d9`, at 375×812 and 1280×860, dark and light. The results are under each entry below. Not checked: a real iPhone; the Postgres migration on a real database.
+
+### Known limits
+
+- The Postgres migration for the language columns is tested only by the static
+  SQL tests. It was not run on a real database in this build.
+- The Coordinator avatar is a placeholder (an empty dashed box) until you supply art.
+
+<a id="coordinator-role"></a>
+### Coordinator role: code, sign-in door, permissions
+
+**Problem / request.** Someone should walk the pits and book or request judges
+for teams without being the queue desk, and without seeing judging material.
+
+**What changed.** A `coordinator` role with its own `COORDINATOR_CODE`, a
+`/coordinator/login` door, and permissions that stop at requesting and booking.
+
+**How it was tested.** Unit and runtime tests only. Browser checks: done. Sign-in at `/coordinator/login` shows the dashed placeholder avatar on the teal band and requires a name. As the coordinator, `/queue` redirects to `/coordinator`.
+
+**Commit and branch.** `7886537` on `claude/v21-coordinator-c9e080`.
+
+<a id="team-language"></a>
+### Teams carry an interview language
+
+**Problem / request.** Some teams interview in Thai, some in English, some in either.
+
+**What changed.** `Team.languages` (config ids in config order; empty means not
+asked), stored in both stores and with a Postgres migration. The team import
+takes an optional sixth column (`EN`, `TH`, `EN/TH`, `EN+TH`, `both`, `Thai`);
+a blank cell keeps the stored value.
+
+**How it was tested.** Storage and import tests, static SQL tests. Browser checks: none of its own; the Teams, desk and team page results are in the entries below.
+
+**Commit and branch.** `a1c1299` on `claude/v21-coordinator-c9e080`.
+
+<a id="docs-first-pass"></a>
+### Docs: the coordinator code, door and team language
+
+**What changed.** README and DEPLOY gained the `COORDINATOR_CODE`, the
+coordinator door and the language paragraphs. **How it was tested.** Read against the code. **Commit.** `3420adb`.
+
+<a id="coordinator-api"></a>
+### Coordinator API: set team language, request and book
+
+**Problem / request.** The coordinator needs a way to act, and nothing more.
+
+**What changed.** `PATCH /api/team-language` (admin and coordinator only);
+`/api/requests` accepts a coordinator; `viewer.canSetTeamLanguage` in `/api/state`.
+
+**How it was tested.** `tests/coordinator.runtime.test.ts` and neighbours. Browser checks: done. As the coordinator, a second POST for 1136 returned 409 "Already booked — the queue desk can change it."; `/api/state` had no messages, conflicts, flags or judges, and `viewer.canSetTeamLanguage` was true.
+
+**Commit and branch.** `d566deb` on `claude/v21-coordinator-c9e080`.
+
+<a id="language-auto-assign"></a>
+### Auto-assign prefers a panel that speaks the team's language
+
+**What changed.** `planAssignments` (`src/lib/roster.ts`) prefers a panel whose
+languages cover the team's and falls back to any eligible one. Both stores use it.
+
+**How it was tested.** Roster logic tests. **Commit and branch.** `cadd447` on `claude/v21-coordinator-c9e080`.
+
+<a id="spec"></a>
+### Spec: the redesign brief and mocks
+
+`design/coordinator-redesign/PROMPT.md` and five static mocks (door phone and
+wide, console, language for the Judge Advisor and for the coordinator).
+`cf4a575`, merged into this branch as `73e498b`.
+
+<a id="language-ja"></a>
+### Team language for the Judge Advisor
+
+**Problem / request.** The Judge Advisor needs to see and set each team's
+language, and to see a panel that does not cover it.
+
+**What changed.** Teams tab: a Language strip that filters (EN, TH, Both, Not
+asked), a Lang column, a caution on a panel that does not cover the team, and an
+English / Thai / Both switch with Clear in the drawer, saved through
+`/api/team-language`. The panel hint names the panels that cover the language;
+a misfit reads "You can keep it." Floor's "Move to panel…" marks an option that
+does not cover the team. Never a block. Files: `src/components/admin/TeamsTab.tsx`,
+`teamsLogic.ts`, `FloorTab.tsx`, `floorLogic.ts`, `src/components/Language.tsx`, `globals.css`.
+
+**How it was tested.** `tests/adminTeams.*`, `adminFloor.logic`, `adminPage.runtime`. Browser checks: done at 1280. The Language strip reads EN 15 · TH 3 · Both 4 · Not asked 2. Team 1129 shows a caution (Thai on the English-only Panel A). The drawer shows English | Thai | Both with Clear, "Covering Thai: none" and "Panel A interviews in English only. You can keep it." Floor's "Move to panel…" for 1129 marks Panel B "EN only" and "Doesn't cover TH", still selectable. Found: the booked time wrapped; fixed in the review-fixes entry.
+
+**Commit and branch.** `d498aed` on `claude/v21-coordinator-c9e080`.
+
+<a id="language-desk-team"></a>
+### Team language on the queue desk and the team page
+
+**Problem / request.** The desk should request in the team's language, and the
+team should see which language their interview is in.
+
+**What changed.** The desk card shows the language read-only; for a
+single-language team the matching request button is the filled one and the other
+is outlined, and for both or not asked the buttons are equal. The Book language
+select defaults to the team's language and keeps the desk's own pick only for
+that team. The team page header says "Interview in Thai" (or English, or English
+or Thai). Files: `src/components/desk/DeskView.tsx`, `deskLogic.ts`,
+`src/components/team/TeamView.tsx`, `src/app/queue/page.tsx`.
+
+**How it was tested.** `tests/deskLogic.test.ts`, `deskPage.runtime`, `teamPage.runtime`. Browser checks: done at 375. Not-asked 1164K shows no tag and equal buttons; Thai-only 1185 shows the "Interview language TH Thai" row, with "Request · Thai" filled and "Request · English" outlined. The team page `/team/1143B` reads "Interview in English or Thai" with EN and TH tags.
+
+**Commit and branch.** `31c873c` on `claude/v21-coordinator-c9e080`.
+
+<a id="coordinator-deltas"></a>
+### Coordinator: no team messages, "Already booked", placeholder avatar
+
+**Problem / request.** A coordinator should not read or write team messages and
+should not change a booking someone else made.
+
+**What changed.** A coordinator reads no team messages and their POST stores
+none. Booking a team that already has a live request returns 409 "Already booked
+— the queue desk can change it." The Activity entry reads "Language for 7700B:
+Thai". The sign-in pass lists the coordinator with an empty dashed avatar.
+Files: `src/app/api/requests/route.ts`, `team-language/route.ts`,
+`src/lib/server-state.ts`, `src/components/SignInForm.tsx`.
+
+**How it was tested.** `tests/coordinator.runtime.test.ts`, `doorPage.runtime`. Browser checks: done. As the coordinator, a second booking of 1136 shows "Already booked — the queue desk can change it." The sign-in placeholder avatar shows on the teal band.
+
+**Commit and branch.** `d5aa4c0` on `claude/v21-coordinator-c9e080`.
+
+<a id="coordinator-console"></a>
+### Coordinator console `/coordinator`: Teams + Slots
+
+**Problem / request.** A phone-first screen for people in the pits.
+
+**What changed.** Teams tab: search, division and "Not asked" filters; EN/TH
+chips save at once and revert on a failed save; a row opens to "Request" in the
+team's language or "Book a time". Slots tab: one panel's day, taken rows
+read-only, Book only on the chosen team's panel, a pinned Booking bar. The tab
+is kept in `?tab=`. A coordinator opening `/queue` is sent here. Files:
+`src/app/coordinator/page.tsx`, `src/components/coordinator/*`, `globals.css`.
+
+**How it was tested.** `tests/coordinatorLogic.test.ts`, `coordinatorPage.runtime.test.tsx`, `mobile.test.mjs`. Browser checks: done at 375, dark and light. Teams: rows, status pills and EN/TH chips render; tapping TH on 1122A saved both languages (confirmed in `/api/state`). A row opens with "Request · English" filled, "Request · Thai" outlined, "Panel A interviews in English" and "Book a time". Not-asked teams show dashed chips, "Ask", disabled buttons and "Set the language first"; the Not asked filter shows 2. Slots: "Book a time" opens `?tab=slots` with team 1136 chosen; picking 3:40 shows "Picked" and the pinned bar "Booking for 1136 · EN" / "Book 3:40". The booking stored a slot request with language "en", created_by "coordinator:Pat Review" and message null, and the slot then shows 1136 read-only with "Booked". Found: the Slots tab opened scrolled past its panel chips; fixed in the review-fixes entry.
+
+**Commit and branch.** `2fe4d72` on `claude/v21-coordinator-c9e080`.
+
+<a id="door-and-docs"></a>
+### The sixth door, the last docs and these notes
+
+**Problem / request.** The front page needed a door for the Coordinator, and the
+docs needed to say what a coordinator can and cannot do.
+
+**What changed.** `/` now has six doors: Coordinator ("Walk the pits: languages
+and bookings", `/coordinator/login`) after Queue desk, with an empty 1.5px
+dashed `--rail` box where the picture will go (a `placeholder` flag on `Door`,
+not `ring: null`). Wide layout is 3 x 2: Team, Judge, Referee / Queue desk,
+Coordinator, Judge Advisor. README: `/coordinator` route row and
+the coordinator rules. DEPLOY: the import step names the fifth (notebook type)
+and sixth (language) columns. Files: `src/components/door/DoorPage.tsx`,
+`src/app/globals.css`, `tests/doorPage.*`, `README.md`, `DEPLOY.md`, this file.
+
+**How it was tested.** `tests/doorPage.runtime.test.tsx` and `doorPage.css.test.mjs`. Browser checks: done at `2ae05d9`, when the Coordinator was last. The phone showed six doors with an empty dashed avatar; at 1280 light the doors laid out 3 × 2. The order was changed after that check (see the entry below), so that check predates the move.
+
+**Commit and branch.** `2ae05d9` on `claude/v21-coordinator-c9e080`.
+
+<a id="review-fixes"></a>
+### Review fixes: booked time no longer wraps; coordinator tabs open at the top
+
+**Problem / request.** Found in the browser checks: the booked time on the JA Teams table wrapped onto two lines since the Lang column was added, and the Coordinator's Slots tab opened scrolled past its panel chips because the Teams tab's scroll position carried over.
+
+**What changed.** `.ja-tm-bk` gets `white-space: nowrap`. The coordinator body (`.co-body`) scrolls back to the top on every tab change. Files: `src/app/globals.css`, `src/components/coordinator/CoordinatorView.tsx`, `tests/coordinatorPage.runtime.test.tsx`.
+
+**How it was tested.** The scroll reset has a source-read test in `coordinatorPage.runtime.test.tsx`. The `nowrap` change has no test. Both were re-checked in the browser at `ac9a4bf`: at 1280 the booked time reads "3:40 PM" on one line and the table still fits without a sideways scroll; on the phone, scrolling Teams down 600px and pressing "Book a time" opens Slots at the top.
+
+**Commit and branch.** `ac9a4bf` on `claude/v21-coordinator-c9e080`.
+
+<a id="door-order"></a>
+### The Coordinator door moves after Queue desk
+
+**Problem / request.** The user decided the Coordinator door goes after Queue desk, not last, as `design/coordinator-redesign/PROMPT.md` says. Wide layout is now Team, Judge, Referee / Queue desk, Coordinator, Judge Advisor.
+
+**What changed.** `DOORS` in `src/components/door/DoorPage.tsx` lists the Coordinator fifth. Files: `src/components/door/DoorPage.tsx`, `tests/doorPage.runtime.test.tsx`, `RELEASE-NOTES-2.0-2.2.md`.
+
+**How it was tested.** `tests/doorPage.runtime.test.tsx` checks the new hrefs, names, lines and card positions. Browser check at `aecd28c` (demo-data copy): at 1280 dark the doors read Team, Judge, Referee / Queue desk, Coordinator, Judge Advisor; on the phone (375, light) the Coordinator's dashed door sits between Queue desk and Judge Advisor.
+
+**Commit and branch.** `aecd28c` on `claude/v21-coordinator-c9e080`.
+
+---
+
 ## 1. Version 2.0: the redesign
 
 Every page was redesigned. Each one was mocked first, as 2–3 directions on

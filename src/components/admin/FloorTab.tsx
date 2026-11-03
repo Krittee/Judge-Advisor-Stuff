@@ -20,6 +20,7 @@ import {
   columnKey,
   conflictNote,
   coverTags,
+  coverWord,
   defaultColumnKey,
   divisionTag,
   gapNote,
@@ -445,30 +446,34 @@ function Card({
               {view === "move" ? (
                 <>
                   <p className="ja-pop-h">Move to panel…</p>
-                  {targets.map((p, i) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className="ja-opt"
-                      autoFocus={i === 0}
-                      disabled={working}
-                      onClick={() => onMove(request, p.id)}
-                    >
-                      <b>{p.name}</b>
-                      {/* The short tag keeps "Panel B" on one line; the full name is still read out. */}
-                      <span className="jg-ptag">
-                        <span aria-hidden="true">{divisionTag(p.division)}</span>
-                        <span className="sr-only">{p.division}</span>
-                      </span>
-                      <span className="ja-tags">
-                        {coverTags(p, languages).map((t) => (
-                          <span key={t.id} className="jg-ptag">
-                            {t.text}
-                          </span>
-                        ))}
-                      </span>
-                    </button>
-                  ))}
+                  {targets.map((p, i) => {
+                    const word = coverWord(team, p, languages);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="ja-opt"
+                        autoFocus={i === 0}
+                        disabled={working}
+                        onClick={() => onMove(request, p.id)}
+                      >
+                        <b>{p.name}</b>
+                        {/* The short tag keeps "Panel B" on one line; the full name is still read out. */}
+                        <span className="jg-ptag">
+                          <span aria-hidden="true">{divisionTag(p.division)}</span>
+                          <span className="sr-only">{p.division}</span>
+                        </span>
+                        <span className="ja-tags">
+                          {coverTags(p, languages).map((t) => (
+                            <span key={t.id} className="jg-ptag">
+                              {t.text}
+                            </span>
+                          ))}
+                        </span>
+                        {word ? <span className="ja-opt-w">{word}</span> : null}
+                      </button>
+                    );
+                  })}
                   <p className="ja-pop-c">Only {team.division} panels without a conflict</p>
                 </>
               ) : (

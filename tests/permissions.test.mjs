@@ -2,7 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 
-import { canAdminister, canAdvance, canCancel, canReadNotes, mayActOnPanel } from "../src/lib/auth";
+import {
+  canAdminister,
+  canAdvance,
+  canCancel,
+  canFlag,
+  canReadFlags,
+  canReadNotes,
+  canRemoveFlag,
+  canSetTeamLanguage,
+  canSetUpRefereeing,
+  mayActOnPanel,
+} from "../src/lib/auth";
 import { ACTION_FROM, STATUSES, TERMINAL_STATUSES, canTransition } from "../src/lib/status";
 
 /* The scope rules in src/lib/auth.ts, run as they are, and a model of the
@@ -16,6 +27,7 @@ const JA = { role: "admin", name: "Krittee" };
 const JUDGE_A = { role: "judge", name: "Dana", panelId: "panel-a", panelName: "Panel A" };
 const JUDGE_C = { role: "judge", name: "Alex", panelId: "panel-c", panelName: "Panel C" };
 const QUEUER = { role: "queuer", name: "Desk" };
+const COORDINATOR = { role: "coordinator", name: "Pat" };
 const TEAM = null;
 
 test("only the Judge Advisor administers", () => {
@@ -57,6 +69,31 @@ test("the queue desk can cancel an early request, and nothing the judges have ta
   for (const s of ["acknowledged", "interviewing", "completed", "cancelled"]) {
     assert.ok(!canCancel(QUEUER, s), `queuer must not cancel a ${s} interview`);
   }
+});
+
+test("a coordinator is refused by every helper that gates staff powers", () => {
+  assert.ok(!canAdminister(COORDINATOR));
+  assert.ok(!canAdvance(COORDINATOR));
+  assert.ok(!canReadNotes(COORDINATOR));
+  assert.ok(!canFlag(COORDINATOR));
+  assert.ok(!canReadFlags(COORDINATOR));
+  assert.ok(!canSetUpRefereeing(COORDINATOR));
+  assert.ok(!canRemoveFlag(COORDINATOR));
+  for (const p of ["panel-a", null]) assert.ok(!mayActOnPanel(COORDINATOR, p));
+  for (const status of STATUSES) assert.ok(!canCancel(COORDINATOR, status), `coordinator must not cancel a ${status} request`);
+});
+
+test("only the Judge Advisor and coordinators set a team's interview language", () => {
+  assert.ok(canSetTeamLanguage(JA));
+  assert.ok(canSetTeamLanguage(COORDINATOR));
+  const others = [
+    JUDGE_A,
+    QUEUER,
+    { role: "referee", name: "Ref" },
+    { role: "referee", name: "Head", head: true },
+    TEAM,
+  ];
+  for (const s of others) assert.ok(!canSetTeamLanguage(s), `${s?.role ?? "no session"} must not set a language`);
 });
 
 test("a team with no login can only read status", () => {
