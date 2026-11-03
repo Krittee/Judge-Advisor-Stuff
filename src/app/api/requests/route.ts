@@ -4,7 +4,7 @@ import { actorLabel, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
 import { bookingLanguage } from "@/lib/presets";
-import { isRealSlot } from "@/lib/data";
+import { isRealSlot, liveRequestFor } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,8 @@ export async function POST(request: Request) {
 
   const teamNumber = normalizeTeamNumber(body.teamNumber);
   const kind = body.kind === "slot" ? "slot" : "queue";
-  const message = String(body.message ?? "").trim().slice(0, 280) || null;
+  // A coordinator cannot read team messages, so they do not write them either.
+  const message = session.role === "coordinator" ? null : String(body.message ?? "").trim().slice(0, 280) || null;
 
   if (!isValidTeamNumber(teamNumber)) {
     return NextResponse.json({ error: "Enter a valid team number." }, { status: 400 });
@@ -41,6 +42,11 @@ export async function POST(request: Request) {
       { error: `Team ${teamNumber} has not been assigned to a judge panel yet.` },
       { status: 409 },
     );
+  }
+
+  // A coordinator only adds bookings; changing one is the queue desk's job.
+  if (session.role === "coordinator" && liveRequestFor(team.id, await store().listRequests())) {
+    return NextResponse.json({ error: "Already booked — the queue desk can change it." }, { status: 409 });
   }
 
   let slotStart: string | null = null;

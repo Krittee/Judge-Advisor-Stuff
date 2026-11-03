@@ -18,15 +18,27 @@ function homeFor(role: Role): string {
 }
 
 /** How each role is named and pictured on the pass. Styles live under `.signin` in globals.css. */
-const ROLES: Record<Role, { label: string; avatar: string; tone: string }> = {
+const ROLES: Record<Role, { label: string; avatar: string | null; tone: string }> = {
   judge: { label: "Judge", avatar: "/avatars/judge.jpg", tone: "r-judge" },
   queuer: { label: "Queue desk", avatar: "/avatars/queue-desk.jpg", tone: "r-desk" },
   admin: { label: "Judge Advisor", avatar: "/avatars/judge-advisor.jpg", tone: "r-ja" },
   referee: { label: "Referee", avatar: "/avatars/referee.jpg", tone: "r-ref" },
-  // Placeholder art (the queue desk's) until the coordinator's own avatar lands.
-  coordinator: { label: "Coordinator", avatar: "/avatars/queue-desk.jpg", tone: "r-desk" },
+  // No picture yet: an empty dashed box stands in (see Avatar).
+  coordinator: { label: "Coordinator", avatar: null, tone: "r-desk" },
 };
-const CREW: Role[] = ["judge", "queuer", "admin"];
+const CREW: Role[] = ["judge", "queuer", "admin", "coordinator"];
+
+/** A role's picture, or the empty dashed box that keeps its place until it has one. */
+function Avatar({ role, size }: { role: Role; size: number }) {
+  const src = ROLES[role].avatar;
+  /* eslint-disable @next/next/no-img-element -- 20 KB static JPEGs; next/image buys nothing here. */
+  return src ? (
+    <img className="si-av" src={src} alt="" width={size} height={size} />
+  ) : (
+    <span className="si-av si-av--ph" aria-hidden="true" />
+  );
+  /* eslint-enable @next/next/no-img-element */
+}
 
 /** What the pass calls someone: the head referee is a referee with a flag, and the same avatar. */
 function labelFor(s: Session): string {
@@ -233,8 +245,7 @@ function Band({ door, checking }: { door?: Role; checking: boolean }) {
         <>
           <div className="si-solo">
             <span className={`si-tile si-tile--solo ${ROLES[door].tone}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- 20 KB static JPEGs; next/image buys nothing here. */}
-              <img className="si-av" src={ROLES[door].avatar} alt="" width={60} height={60} />
+              <Avatar role={door} size={60} />
             </span>
             <span className="si-solo-l">{ROLES[door].label}</span>
           </div>
@@ -245,8 +256,7 @@ function Band({ door, checking }: { door?: Role; checking: boolean }) {
           {CREW.map((role) => (
             <div key={role} className="si-mate">
               <span className={`si-tile ${ROLES[role].tone}`}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="si-av" src={ROLES[role].avatar} alt="" width={44} height={44} />
+                <Avatar role={role} size={44} />
               </span>
               <span className="si-mate-l">{ROLES[role].label}</span>
             </div>
@@ -259,14 +269,13 @@ function Band({ door, checking }: { door?: Role; checking: boolean }) {
 
 /** Shown in place of the form for a moment once the code is accepted. */
 export function Welcome({ session }: { session: Session }) {
-  const { avatar, tone } = ROLES[session.role];
+  const { tone } = ROLES[session.role];
   const label = labelFor(session);
   return (
     <div className={`si-welcome ${tone}`}>
       <div className="si-hero">
         <span className="si-w-tile">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="si-av" src={avatar} alt="" width={128} height={128} />
+          <Avatar role={session.role} size={128} />
         </span>
         <span className="si-stamp" aria-hidden="true">VERIFIED</span>
       </div>

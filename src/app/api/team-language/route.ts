@@ -36,13 +36,13 @@ export async function PATCH(request: Request) {
   try {
     const team = await store().updateTeam(teamId, { languages: next });
     if (next.join() !== was) {
-      const shorts = languages().filter((l) => next.includes(l.id)).map((l) => l.short);
+      const labels = languages().filter((l) => next.includes(l.id)).map((l) => l.label);
       await store().logActivity({
         teamId,
         kind: "setup",
         ...actorParts(session),
         action: "set interview language",
-        detail: `Team ${team.number} · ${shorts.length ? shorts.join(" + ") : "not stated"}`,
+        detail: `Language for ${team.number}: ${labels.length ? labels.join(" and ") : "Not asked"}`,
       });
     }
     return NextResponse.json({ team });

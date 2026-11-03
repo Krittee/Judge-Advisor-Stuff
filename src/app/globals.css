@@ -829,6 +829,7 @@ textarea {
   --si-ja-tint: oklch(0.720 0.140 300 / 0.16);
   --si-ref-tint: oklch(0.760 0.150 55 / 0.15);
   --si-shadow: none;
+  --rail: oklch(0.420 0.016 265);
 
   display: flex;
   min-height: 100dvh;
@@ -855,6 +856,7 @@ textarea {
   --si-desk-tint: oklch(0.560 0.110 185 / 0.10);
   --si-ja-tint: oklch(0.520 0.180 300 / 0.10);
   --si-ref-tint: oklch(0.700 0.170 55 / 0.12);
+  --rail: oklch(0.740 0.012 265);
   --si-shadow: 0 1px 2px oklch(0.225 0.016 265 / 0.05),
     0 18px 40px -24px oklch(0.225 0.016 265 / 0.25);
 }
@@ -953,6 +955,9 @@ body:has(.landing) > .theme-toggle:hover {
 .si-mate-l { font-weight: 600; font-size: 11px; line-height: 1.2; text-align: center; }
 .si-solo-l { font-weight: 600; font-size: 12px; line-height: 1.2; }
 .si-av { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 22%; box-shadow: 0 0 0 2px var(--si-on-band); }
+/* A role with no picture yet: the same box, empty and dashed, no ring or tile fill behind it. */
+.si-av--ph { box-sizing: border-box; border: 1.5px dashed var(--rail); box-shadow: none; }
+.si-tile:has(.si-av--ph) { background: none; }
 
 .si-body { display: flex; flex: 1; min-width: 0; flex-direction: column; padding: 22px 20px 20px; }
 .si-title { margin: 0; font-weight: 700; font-size: 28px; line-height: 1.15; letter-spacing: -0.02em; }

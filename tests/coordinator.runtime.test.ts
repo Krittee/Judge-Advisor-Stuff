@@ -165,7 +165,7 @@ test("setting a language is logged as the Coordinator, and an unchanged value is
   assert.equal(log.length, 2);
   assert.ok(log.every((e) => e.actor_role === "Coordinator" && e.actor === "Pat" && e.kind === "setup" && e.team_id === w.t1.id));
   const details = log.map((e) => e.detail).sort();
-  assert.deepEqual(details, ["Team 1001 · EN + TH", "Team 1001 · not stated"]);
+  assert.deepEqual(details, ["Language for 1001: English and Thai", "Language for 1001: Not asked"]);
   assert.ok(log.every((e) => e.action === "set interview language"));
 });
 
@@ -212,6 +212,37 @@ test("a coordinator can request a judge now and book a slot, recorded as coordin
   assert.equal(booked.body.request.created_by, "coordinator:Pat");
 });
 
+test("a coordinator's message is dropped; the desk's is kept", async () => {
+  const w = await world();
+  const asCoord = await call(COORD, "requests", "POST", { teamNumber: "1001", kind: "queue", message: "hello" });
+  assert.equal(asCoord.status, 200);
+  assert.equal(asCoord.body.request.message, null);
+  const asDesk = await call(QUEUER, "requests", "POST", { teamNumber: "1002", kind: "queue", message: "hello" });
+  assert.equal(asDesk.body.request.message, "hello");
+  assert.equal((await w.db.listRequests()).find((r) => r.team_id === w.t1.id)?.message, null);
+});
+
+test("a coordinator cannot book a team that is already booked; the desk and Judge Advisor still can", async () => {
+  const w = await world();
+  const refused = "Already booked — the queue desk can change it.";
+  // Waiting, then scheduled: both count as booked.
+  for (const existing of [{ kind: "queue" as const }, { kind: "slot" as const, ...slotOf(w.panelA, 12) }]) {
+    await w.db.resetDay();
+    await w.db.createRequest({ teamId: w.t1.id, panelId: w.panelA.id, createdBy: "team", language: "en", ...existing });
+    const held = await snapshot(w);
+    for (const body of [{ kind: "queue" }, { kind: "slot", ...slotOf(w.panelA, 13) }]) {
+      const reply = await call(COORD, "requests", "POST", { teamNumber: "1001", ...body });
+      assert.equal(reply.status, 409, existing.kind);
+      assert.equal(reply.body.error, refused);
+    }
+    assert.equal(await snapshot(w), held);
+    for (const session of [QUEUER, ADMIN]) {
+      const reply = await call(session, "requests", "POST", { teamNumber: "1001", kind: "queue" });
+      assert.notEqual(reply.body.error, refused);
+    }
+  }
+});
+
 test("the booking language: the team's first, else the default; an explicit one wins", async () => {
   const w = await world();
   const ask = async (languages: string[], language?: unknown) => {
@@ -231,7 +262,7 @@ test("the booking language: the team's first, else the default; an explicit one 
 
 /* ===== 4. see the board ================================================== */
 
-test("a coordinator sees every team, slot and request, with messages, and none of the private lists", async () => {
+test("a coordinator sees every team, slot and request, without messages, and none of the private lists", async () => {
   const w = await world();
   await w.db.createRequest({ teamId: w.t1.id, panelId: w.panelA.id, kind: "queue", message: "Needs a ramp", createdBy: "team", language: "en" });
   await w.db.createRequest({ teamId: w.t2.id, panelId: w.panelB.id, kind: "slot", createdBy: "team", language: "en", ...slotOf(w.panelB, 12) });
@@ -249,7 +280,7 @@ test("a coordinator sees every team, slot and request, with messages, and none o
   assert.deepEqual(state.teams.map((t) => t.number).sort(), ["1001", "1002"]);
   assert.equal(state.panels.length, 2);
   assert.equal(state.requests.length, 2);
-  assert.ok(state.requests.some((r) => r.message === "Needs a ramp"));
+  assert.ok(state.requests.every((r) => r.message === null), "a coordinator reads no team messages");
   assert.ok(state.requests.some((r) => r.kind === "slot" && r.slot_start));
   assert.deepEqual([state.conflicts, state.judges, state.flags], [[], [], []]);
 
@@ -258,6 +289,11 @@ test("a coordinator sees every team, slot and request, with messages, and none o
   assert.equal(state.viewer.canSetTeamLanguage, true);
   for (const can of ["canAdminister", "canAdvance", "canReadNotes", "canFlag", "canReadFlags"] as const) {
     assert.equal(state.viewer[can], false, can);
+  }
+  // The desk and the Judge Advisor still read them.
+  for (const session of [QUEUER, ADMIN]) {
+    const rows = (await call(session, "state", "GET")).body.requests as AppState["requests"];
+    assert.ok(rows.some((r) => r.message === "Needs a ramp"), session.role);
   }
   // Only the coordinator and the Judge Advisor are offered the language control.
   for (const [session, expected] of [[ADMIN, true], [QUEUER, false], [REFEREE, false], [null, false]] as const) {

@@ -5,6 +5,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { DoorPage } from "../src/components/door/DoorPage";
+import { Welcome } from "../src/components/SignInForm";
 import { TICKET_ERROR, TeamTicket, ticketTarget } from "../src/components/door/TeamTicket";
 import { TeamNotFound } from "../src/components/team/TeamView";
 import { filterTeamNumberInput } from "../src/lib/teamNumber";
@@ -144,6 +145,13 @@ test("the sign-in pass says 'Back to all doors' and still links to /", () => {
   const src = read("src/components/SignInForm.tsx");
   assert.match(src, /<Link href="\/" className="si-back">[\s\S]*?Back to all doors\s*<\/Link>/);
   assert.ok(!src.includes("Back to team view"));
+});
+
+test("the coordinator is on the crew pass with an empty dashed box instead of a picture", () => {
+  assert.match(read("src/components/SignInForm.tsx"), /const CREW: Role\[\] = \["judge", "queuer", "admin", "coordinator"\]/);
+  const markup = renderToStaticMarkup(<Welcome session={{ role: "coordinator", name: "Pat" }} />);
+  assert.match(markup, /<span class="si-av si-av--ph" aria-hidden="true"><\/span>/);
+  assert.doesNotMatch(markup, /<img/);
 });
 
 test("the top bar brand stays the front door", () => {
