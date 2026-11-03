@@ -31,7 +31,7 @@ const kinds: FlagKind[] = [
 
 const panels = [{ id: "p2", name: "Panel 2", division: "Middle School" }] as unknown as PublicPanel[];
 const team = (number: string, name: string, over: Partial<Team> = {}): Team => ({
-  id: `t-${number}`, number, name, panel_id: null, division: "Middle School", category: "developing", pit: null, created_at: "2026-10-20T08:00:00Z", ...over,
+  id: `t-${number}`, number, name, panel_id: null, division: "Middle School", category: "developing", pit: null, languages: [], created_at: "2026-10-20T08:00:00Z", ...over,
 });
 const rookies = team("1101R", "Rookies");
 const titans = team("9882K", "Torque Titans", { panel_id: "p2", pit: "14" });

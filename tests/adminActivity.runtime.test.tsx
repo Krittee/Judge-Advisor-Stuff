@@ -30,7 +30,7 @@ const flagKinds: AppState["flagKinds"] = [
   { id: "dq", label: "Disqualified", short: "DQ", color: "black", severity: 4, requiresRule: true },
 ];
 const team = (number: string, name: string): Team => ({
-  id: `t-${number}`, number, name, panel_id: "p2", division: "Middle School", category: "developing", pit: null, created_at: "2026-10-20T08:00:00Z",
+  id: `t-${number}`, number, name, panel_id: "p2", division: "Middle School", category: "developing", pit: null, languages: [], created_at: "2026-10-20T08:00:00Z",
 });
 const teams = [team("2011A", "Gear Gremlins"), team("9882K", "Torque Titans"), team("6036D", "Nuts & Bolts")];
 

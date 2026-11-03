@@ -312,6 +312,7 @@ function migrate(data: Data): Data {
   // Languages and panel language cover arrived after the first rosters.
   for (const r of data.requests) r.language ??= defaultLanguage();
   for (const p of data.panels) p.languages ??= [];
+  for (const t of data.teams) t.languages ??= [];
   const fallback = data.panels[0]?.division ?? DEFAULT_DIVISION;
 
   for (const team of data.teams) {
@@ -683,6 +684,7 @@ function upsertTeams(rows: ImportedTeam[]): number {
       if (row.name) existing.name = row.name;
       if (row.pit) existing.pit = row.pit;
       if (row.category) existing.category = row.category;
+      if (row.languages) existing.languages = row.languages;
       // A team that changes division loses its panel only when that panel
       // can't judge the new one (as PATCH /api/admin/teams does).
       if (row.division && row.division !== existing.division) {
@@ -699,6 +701,7 @@ function upsertTeams(rows: ImportedTeam[]): number {
         division: row.division || presetDivisions()[0],
         category: row.category || defaultCategory(),
         pit: row.pit,
+        languages: row.languages ?? [],
         created_at: now,
       });
     }
@@ -1460,6 +1463,14 @@ function demoData(): Data {
   // and tells you nothing about where anyone is standing.
   const perPanel = Math.ceil(names.length / panels.length);
 
+  // Mostly English, a few Thai or both, a couple not stated. Team 4 is Thai
+  // only on Panel A, which covers English only, so a mismatch shows up.
+  const demoLanguages: string[][] = [
+    ["en"], ["en"], ["en"], ["en"], ["th"], ["en"], ["en", "th"], ["en"],
+    ["en"], [], ["en"], ["en"], ["th"], ["en"], ["en"], ["en", "th"],
+    ["en"], ["th"], ["en"], ["en", "th"], ["en"], [], ["en"], ["en"],
+  ];
+
   const teams: Team[] = names.map((name, i) => {
     const panel = panels[Math.min(panels.length - 1, Math.floor(i / perPanel))];
     // Pit codes are a letter and a number: the letter is the row, which
@@ -1475,6 +1486,7 @@ function demoData(): Data {
       // Alternate the two kinds so the colour split shows on first run.
       category: i % 3 === 0 ? "fully-developed" : "developing",
       pit: `${row}${(i % 6) + 1}`,
+      languages: demoLanguages[i % demoLanguages.length],
       created_at: iso(0),
     };
   });

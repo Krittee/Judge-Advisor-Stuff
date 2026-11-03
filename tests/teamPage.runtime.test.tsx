@@ -32,7 +32,7 @@ const languages = [
   { id: "es", label: "Español", short: "ES" },
 ];
 
-const titans: Team = { id: "t-9882K", number: "9882K", name: "Torque Titans", panel_id: "p2", division: "Middle School", category: "developing", pit: "B4", created_at: "2026-10-20T08:00:00Z" };
+const titans: Team = { id: "t-9882K", number: "9882K", name: "Torque Titans", panel_id: "p2", division: "Middle School", category: "developing", pit: "B4", languages: [], created_at: "2026-10-20T08:00:00Z" };
 const loose: Team = { ...titans, id: "t-7700B", number: "7700B", name: "Byte Me", panel_id: null };
 const other = (n: number): Team => ({ ...titans, id: `t-other${n}`, number: `10${n}`, name: `Other ${n}` });
 

@@ -278,6 +278,32 @@ export function resolveLanguage(input: unknown): string {
   return match ? match.id : defaultLanguage();
 }
 
+/**
+ * Read a list of languages out of an array or free text ("EN/TH", "en+th",
+ * "Thai", "both"). Tokens are matched by id, short code or label; "both" and
+ * "all" mean every configured language; anything unrecognised is dropped.
+ * The result is in config order and de-duplicated.
+ */
+export function parseLanguageList(input: unknown): string[] {
+  const configured = languages();
+  const tokens = (Array.isArray(input) ? input : String(input ?? "").split(/[,/+&;\s]+/))
+    .map((t) => String(t).trim().toLowerCase())
+    .filter(Boolean);
+
+  const wanted = new Set<string>();
+  for (const token of tokens) {
+    if (token === "both" || token === "all") {
+      for (const l of configured) wanted.add(l.id);
+      continue;
+    }
+    const match = configured.find(
+      (l) => l.id === token || l.short.toLowerCase() === token || l.label.toLowerCase() === token,
+    );
+    if (match) wanted.add(match.id);
+  }
+  return configured.map((l) => l.id).filter((id) => wanted.has(id));
+}
+
 const CATEGORY_FALLBACK: TeamCategory[] = [
   { id: "developing", label: "Developing", color: "amber", excludesRubrics: [] },
   { id: "fully-developed", label: "Fully Developed", color: "violet", excludesRubrics: [] },

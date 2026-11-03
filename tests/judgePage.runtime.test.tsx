@@ -47,6 +47,7 @@ function team(number: string, name: string, over: Partial<Team> = {}): Team {
     panel_id: "p2",
     division: "Middle School",
     category: "developing",
+    languages: [],
     pit: "14",
     created_at: "2026-10-17T08:00:00Z",
     ...over,

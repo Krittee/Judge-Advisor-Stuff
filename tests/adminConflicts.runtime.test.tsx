@@ -25,7 +25,7 @@ const jordan = judge("j-jordan", "Jordan Kim", null);
 const roster = [dana, priya, lee, tom, jordan];
 
 const team = (number: string, name: string, panel_id: string | null, division = "Middle School"): Team => ({
-  id: `t-${number}`, number, name, panel_id, division, category: "developing", pit: null, created_at: "2026-10-20T08:00:00Z",
+  id: `t-${number}`, number, name, panel_id, division, category: "developing", pit: null, languages: [], created_at: "2026-10-20T08:00:00Z",
 });
 const titans = team("9882K", "Torque Titans", "p1", "High School");
 const byteMe = team("7700B", "Byte Me", null);

@@ -50,7 +50,7 @@ const panels = [
 ];
 
 function team(number: string, name: string, panel_id: string | null, division = "Middle School"): Team {
-  return { id: `t-${number}`, number, name, panel_id, division, category: "developing", pit: null, created_at: "2026-10-17T08:00:00Z" };
+  return { id: `t-${number}`, number, name, panel_id, division, category: "developing", pit: null, languages: [], created_at: "2026-10-17T08:00:00Z" };
 }
 function request(t: Team, status: RequestRow["status"], over: Partial<RequestRow> = {}): RequestRow {
   return {

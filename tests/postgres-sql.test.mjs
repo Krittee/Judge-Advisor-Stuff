@@ -555,6 +555,11 @@ test("migrate() creates the judge roster once, copying the old judge lists with 
   );
 });
 
+test("migrate() adds the team languages column to old databases, and new ones are created with it", () => {
+  assert.ok(migrateBody.includes("alter table teams    add column if not exists languages text[] not null default '{}';"));
+  assert.match(migrateBody, /create table if not exists teams \([^;]*languages\s+text\[\] not null default '\{\}'/);
+});
+
 test("migrate() locks the judges table down like every other table", () => {
   assert.match(migrateBody, /alter table judges\s+enable row level security;/);
 });
@@ -902,7 +907,7 @@ test("a blank name, pit, division or notebook type on a re-import keeps the stor
   answer = () => [];
   await postgresStore.upsertTeams([
     { number: "1001", name: null, pit: null },
-    { number: "1002", name: "Given", pit: "B2", division: "High School", category: "ungraded" },
+    { number: "1002", name: "Given", pit: "B2", division: "High School", category: "ungraded", languages: ["en", "th"] },
   ]);
   const [upsert] = sent(/insert into teams/);
   assert.match(upsert.sql, /pit = coalesce\(excluded\.pit, teams\.pit\)/, "a null pit leaves the stored one");
@@ -920,7 +925,11 @@ test("a blank name, pit, division or notebook type on a re-import keeps the stor
     presetDivisions()[0],
     defaultCategory(),
     blendedDivisions(),
+    [null, "en,th"],
   ]);
+  // A blank languages cell keeps the stored ones; a new team starts with none.
+  assert.match(upsert.sql, /case when t\.languages is null then coalesce\(\(select k\.languages from teams k where k\.number = t\.number\), '\{\}'\)\s+else string_to_array\(t\.languages, ','\) end/);
+  assert.match(upsert.sql, /category = excluded\.category,\s*languages = excluded\.languages/);
   // A division that really changes takes the panel off only when the panel can't judge the new one (divisionsCompatible).
   assert.match(upsert.sql, /when teams\.division is not distinct from excluded\.division then teams\.panel_id/);
   assert.match(upsert.sql, /select 1 from panels p\s+where p\.id = teams\.panel_id\s+and \(p\.division = excluded\.division\s+or excluded\.division = any\(\$8::text\[\]\)\s+or p\.division = any\(\$8::text\[\]\)\)\s+\) then teams\.panel_id\s+else null/);
