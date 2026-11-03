@@ -39,7 +39,7 @@ auto-assigner all use. Every change below is local and not pushed.
 | [The sixth door, the last docs and these notes](#door-and-docs) | `2ae05d9` | Not yet (browser phone size only) | Local, not pushed |
 | [Review fixes: booked time no longer wraps; coordinator tabs open at the top](#review-fixes) | `ac9a4bf` | Not yet (browser phone size only) | Local, not pushed |
 | [The Coordinator door moves after Queue desk](#door-order) | `aecd28c` | Not yet (browser phone size only) | Local, not pushed |
-| [Coordinator avatar](#coordinator-avatar) | (this commit) | Not yet (browser phone size only) | Local, not pushed |
+| [Coordinator avatar](#coordinator-avatar) | `7612f0b` | Not yet (browser phone size only) | Local, not pushed |
 
 ### Your decisions for 2.1.0
 
@@ -240,9 +240,9 @@ and sixth (language) columns. Files: `src/components/door/DoorPage.tsx`,
 
 **What changed.** The user supplied the art, and it replaces the placeholder in all three places. The image was cropped from the supplied picture to the inside of its blue frame and saved at 320 × 320, like the other avatars. The Coordinator door's ring uses the queue desk's teal for now, the same tone as the Coordinator's sign-in pass. Files: `public/avatars/coordinator.jpg`, `src/components/SignInForm.tsx`, `src/components/door/DoorPage.tsx`, `src/components/coordinator/CoordinatorView.tsx`, `src/app/globals.css`, `tests/doorPage.runtime.test.tsx`, `tests/doorPage.css.test.mjs`, `tests/coordinatorPage.runtime.test.tsx`, this file.
 
-**How it was tested.** `tests/doorPage.runtime.test.tsx`, `doorPage.css.test.mjs`, `coordinatorPage.runtime.test.tsx`. Browser checks: not yet.
+**How it was tested.** `tests/doorPage.runtime.test.tsx`, `doorPage.css.test.mjs`, `coordinatorPage.runtime.test.tsx`. Browser check at `7612f0b` (demo-data copy, 375 dark): the picture shows with no frame on the door (teal ring), the sign-in pass and the console top bar.
 
-**Commit and branch.** `(this commit)` on `claude/v21-coordinator-c9e080`. Local, not pushed.
+**Commit and branch.** `7612f0b` on `claude/v21-coordinator-c9e080`. Local, not pushed.
 
 ---
 
