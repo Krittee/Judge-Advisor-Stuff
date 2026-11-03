@@ -829,7 +829,6 @@ textarea {
   --si-ja-tint: oklch(0.720 0.140 300 / 0.16);
   --si-ref-tint: oklch(0.760 0.150 55 / 0.15);
   --si-shadow: none;
-  --rail: oklch(0.420 0.016 265);
 
   display: flex;
   min-height: 100dvh;
@@ -856,7 +855,6 @@ textarea {
   --si-desk-tint: oklch(0.560 0.110 185 / 0.10);
   --si-ja-tint: oklch(0.520 0.180 300 / 0.10);
   --si-ref-tint: oklch(0.700 0.170 55 / 0.12);
-  --rail: oklch(0.740 0.012 265);
   --si-shadow: 0 1px 2px oklch(0.225 0.016 265 / 0.05),
     0 18px 40px -24px oklch(0.225 0.016 265 / 0.25);
 }
@@ -955,9 +953,6 @@ body:has(.landing) > .theme-toggle:hover {
 .si-mate-l { font-weight: 600; font-size: 11px; line-height: 1.2; text-align: center; }
 .si-solo-l { font-weight: 600; font-size: 12px; line-height: 1.2; }
 .si-av { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 22%; box-shadow: 0 0 0 2px var(--si-on-band); }
-/* A role with no picture yet: the same box, empty and dashed, no ring or tile fill behind it. */
-.si-av--ph { box-sizing: border-box; border: 1.5px dashed var(--rail); box-shadow: none; }
-.si-tile:has(.si-av--ph) { background: none; }
 
 .si-body { display: flex; flex: 1; min-width: 0; flex-direction: column; padding: 22px 20px 20px; }
 .si-title { margin: 0; font-weight: 700; font-size: 28px; line-height: 1.15; letter-spacing: -0.02em; }
@@ -1164,11 +1159,8 @@ body:has(.landing) > .theme-toggle { top: 0; }
   /* In srgb, not oklch: oklch takes the short hue arc to the blue-grey surface and the tint turns blue. */
   --dp-done-tint: color-mix(in srgb, var(--done) 22%, var(--surface));
   --dp-done-line: color-mix(in srgb, var(--done) 55%, transparent);
-  /* The Coordinator's empty avatar box: the sign-in pass's --rail, which only .signin defines. */
-  --rail: oklch(0.420 0.016 265);
 }
 :root[data-theme="light"] .doorpage {
-  --rail: oklch(0.740 0.012 265);
   --dp-tint: oklch(0.510 0.160 258 / 0.09);
   --dp-booked-ink: oklch(0.975 0.004 265);
 }
@@ -1203,11 +1195,11 @@ body:has(.landing) > .theme-toggle { top: 0; }
 .dp-av { --s: 48px; display: block; flex: none; width: var(--s); height: var(--s); padding: 2px; border-radius: 25%; background: var(--rc); }
 .dp-av img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 22%; }
 .dp-av--team { padding: 0; background: none; }
-/* The Coordinator's picture is not drawn yet: an empty dashed box of the same size and radius. */
-.dp-av--ph { box-sizing: border-box; padding: 0; border: 1.5px dashed var(--rail); background: none; }
 .dp-gl { display: grid; width: 100%; height: 100%; place-items: center; border-radius: 25%; background: var(--lp-tile); color: var(--ink); }
 .dp-r-judge { --rc: var(--accent); }
 .dp-r-desk { --rc: var(--si-desk); }
+/* The Coordinator wears the queue desk's teal (its sign-in pass does too) until it has a colour of its own. */
+.dp-r-co { --rc: var(--si-desk); }
 .dp-r-ja { --rc: var(--si-ja); }
 .dp-r-ref { --rc: repeating-linear-gradient(135deg, oklch(0.985 0.003 265) 0 4px, oklch(0.180 0.012 265) 4px 8px); }
 
@@ -2151,8 +2143,7 @@ body:has(.judge) > .theme-toggle:hover {
  * language chips a coordinator has lit. A language tag is neutral and "Not
  * asked" is muted. Hover and focus colour changes only, nothing moves.
  * The error and success banners and the caution box are the desk's own
- * (.dk-msg, .dk-caution). --rail is the sign-in pass's, defined here as
- * there because it is not an app-wide token.
+ * (.dk-msg, .dk-caution).
  * ------------------------------------------------------------------ */
 
 .co {
@@ -2163,7 +2154,6 @@ body:has(.judge) > .theme-toggle:hover {
   /* Ink on the booked pill, whose fill is --booked-quiet: the app has no token for it. */
   --co-booked-ink: oklch(0.200 0.014 265);
   --co-ring: color-mix(in srgb, var(--accent) 35%, transparent);
-  --rail: oklch(0.420 0.016 265);
 
   display: flex; height: 100dvh; flex-direction: column; overflow: hidden;
   background: var(--canvas); color: var(--ink);
@@ -2173,7 +2163,6 @@ body:has(.judge) > .theme-toggle:hover {
   --co-field-line: oklch(0.640 0.012 265);
   --co-disabled: oklch(0.915 0.008 265);
   --co-booked-ink: oklch(0.975 0.004 265);
-  --rail: oklch(0.740 0.012 265);
 }
 
 /* A status wears its fill and the ink that clears AA on it, in both themes. */
@@ -2202,8 +2191,9 @@ body:has(.co) > .theme-toggle:hover {
   padding: 0 calc(var(--co-gutter) - 10px) 0 calc(var(--co-gutter) - 2px); border-bottom: 1px solid var(--line); background: var(--canvas);
 }
 .co-who { display: flex; min-width: 0; align-items: center; gap: 10px; }
-/* The desk's avatar box; the picture is not drawn yet, so the empty dashed box (.si-av--ph) fills it. */
+/* The desk's avatar box, with the picture in it (as .dk-av). */
 .co-av { display: block; flex: none; width: 28px; height: 28px; }
+.co-av img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 22%; box-shadow: 0 0 0 2px var(--co-ring); }
 .co-who-t { display: flex; min-width: 0; flex-direction: column; line-height: 1.15; }
 .co-who-t b { font-weight: 700; font-size: 16px; }
 .co-who-t span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-subtle); font-size: 12px; }

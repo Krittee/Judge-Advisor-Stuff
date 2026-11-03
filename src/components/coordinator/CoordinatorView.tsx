@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- a 28 px static avatar; next/image buys nothing here. */
 
 import { useEffect, useRef } from "react";
 import { slotsModel, type CoordinatorTab } from "./coordinatorLogic";
@@ -107,9 +108,8 @@ export function CoordinatorView(p: CoordinatorViewProps) {
     <div className="co">
       <header className="co-top">
         <div className="co-who">
-          {/* No picture yet: the empty dashed box that keeps the avatar's place (the sign-in pass uses it too). */}
           <span className="co-av">
-            <span className="si-av si-av--ph" aria-hidden="true" />
+            <img src="/avatars/coordinator.jpg" alt="" width={28} height={28} />
           </span>
           <span className="co-who-t">
             <b>Coordinator</b>

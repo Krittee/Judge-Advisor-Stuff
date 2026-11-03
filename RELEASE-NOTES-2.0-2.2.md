@@ -39,6 +39,7 @@ auto-assigner all use. Every change below is local and not pushed.
 | [The sixth door, the last docs and these notes](#door-and-docs) | `2ae05d9` | Not yet (browser phone size only) | Local, not pushed |
 | [Review fixes: booked time no longer wraps; coordinator tabs open at the top](#review-fixes) | `ac9a4bf` | Not yet (browser phone size only) | Local, not pushed |
 | [The Coordinator door moves after Queue desk](#door-order) | `aecd28c` | Not yet (browser phone size only) | Local, not pushed |
+| [Coordinator avatar](#coordinator-avatar) | (this commit) | Not yet (browser phone size only) | Local, not pushed |
 
 ### Your decisions for 2.1.0
 
@@ -61,7 +62,6 @@ Run by the lead on a copy of the demo data (never `.data/`), with the dev server
 
 - The Postgres migration for the language columns is tested only by the static
   SQL tests. It was not run on a real database in this build.
-- The Coordinator avatar is a placeholder (an empty dashed box) until you supply art.
 
 <a id="coordinator-role"></a>
 ### Coordinator role: code, sign-in door, permissions
@@ -232,6 +232,17 @@ and sixth (language) columns. Files: `src/components/door/DoorPage.tsx`,
 **How it was tested.** `tests/doorPage.runtime.test.tsx` checks the new hrefs, names, lines and card positions. Browser check at `aecd28c` (demo-data copy): at 1280 dark the doors read Team, Judge, Referee / Queue desk, Coordinator, Judge Advisor; on the phone (375, light) the Coordinator's dashed door sits between Queue desk and Judge Advisor.
 
 **Commit and branch.** `aecd28c` on `claude/v21-coordinator-c9e080`.
+
+<a id="coordinator-avatar"></a>
+### Coordinator avatar
+
+**Problem / request.** The Coordinator had an empty dashed box where the picture goes, on the sign-in pass, the door and the console's top bar.
+
+**What changed.** The user supplied the art, and it replaces the placeholder in all three places. The image was cropped from the supplied picture to the inside of its blue frame and saved at 320 × 320, like the other avatars. The Coordinator door's ring uses the queue desk's teal for now, the same tone as the Coordinator's sign-in pass. Files: `public/avatars/coordinator.jpg`, `src/components/SignInForm.tsx`, `src/components/door/DoorPage.tsx`, `src/components/coordinator/CoordinatorView.tsx`, `src/app/globals.css`, `tests/doorPage.runtime.test.tsx`, `tests/doorPage.css.test.mjs`, `tests/coordinatorPage.runtime.test.tsx`, this file.
+
+**How it was tested.** `tests/doorPage.runtime.test.tsx`, `doorPage.css.test.mjs`, `coordinatorPage.runtime.test.tsx`. Browser checks: not yet.
+
+**Commit and branch.** `(this commit)` on `claude/v21-coordinator-c9e080`. Local, not pushed.
 
 ---
 

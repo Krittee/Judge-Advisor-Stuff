@@ -109,10 +109,9 @@ const rowOf = (m: string, number: string) => {
 
 /* ---- chrome ------------------------------------------------------------------------- */
 
-test("the chrome: an empty dashed avatar box, Coordinator and the name, Live, Sign out, two tabs", () => {
+test("the chrome: the coordinator's picture, Coordinator and the name, Live, Sign out, two tabs", () => {
   const m = view();
-  assert.match(m, /<span class="co-av"><span class="si-av si-av--ph" aria-hidden="true"><\/span><\/span>/);
-  assert.doesNotMatch(m, /<img/, "no picture yet");
+  assert.match(m, /<span class="co-av"><img src="\/avatars\/coordinator\.jpg" alt="" width="28" height="28"\/><\/span>/);
   assert.match(m, /<b>Coordinator<\/b><span>Pat<\/span>/);
   assert.match(m, /<span class="co-live" data-online="true"><i aria-hidden="true"><\/i>Live<\/span>/);
   assert.match(view({ online: false }), />Reconnecting</);
@@ -398,13 +397,13 @@ test("a coordinator who opens the desk is sent to their console", () => {
   assert.match(read("src/app/queue/page.tsx"), /session\.role === "coordinator"\) \{\s*router\.replace\("\/coordinator"\);\s*return;/);
 });
 
-test("the CSS: the console's tokens in both themes, the rail the sign-in pass uses, no motion", () => {
+test("the CSS: the console's tokens in both themes, the avatar ringed in --co-ring, no motion", () => {
   const css = read("src/app/globals.css");
   const start = css.indexOf("Coordinator console (");
   const block = css.slice(css.lastIndexOf("/* ----", start), css.lastIndexOf("/* ----", css.indexOf('Queue desk ("Now / Book"')));
   assert.ok(block.length > 3000, "the block was found");
-  assert.match(block, /^\.co \{[\s\S]*--rail: oklch\(0\.420 0\.016 265\);/m);
-  assert.match(block, /:root\[data-theme="light"\] \.co \{[\s\S]*--rail: oklch\(0\.740 0\.012 265\);/);
+  assert.match(block, /\.co-av img \{[^}]*box-shadow: 0 0 0 2px var\(--co-ring\)/);
+  assert.doesNotMatch(block, /--rail/);
   assert.match(block, /\.co-pc \{[\s\S]*?height: 44px/);
   assert.match(block, /\.co-chip \{[\s\S]*?width: 46px; height: 44px/);
   assert.match(block, /\.co-tabs button \{[\s\S]*?min-height: 64px/);
