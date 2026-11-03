@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { slotsModel, type CoordinatorTab } from "./coordinatorLogic";
 import { BookingBar, SlotsTab } from "./SlotsTab";
 import { TeamsTab } from "./TeamsTab";
@@ -96,6 +97,11 @@ export function CoordinatorView(p: CoordinatorViewProps) {
     picked: p.picked,
     now,
   });
+  const body = useRef<HTMLElement>(null);
+  // A tab opens at its top, not at wherever the other tab was scrolled to.
+  useEffect(() => {
+    if (body.current) body.current.scrollTop = 0;
+  }, [p.tab]);
 
   return (
     <div className="co">
@@ -135,7 +141,7 @@ export function CoordinatorView(p: CoordinatorViewProps) {
         </div>
       ) : null}
 
-      <main className="co-body">{p.tab === "teams" ? <TeamsTab {...p} /> : <SlotsTab {...p} model={model} now={now} />}</main>
+      <main className="co-body" ref={body}>{p.tab === "teams" ? <TeamsTab {...p} /> : <SlotsTab {...p} model={model} now={now} />}</main>
 
       {p.tab === "slots" ? <BookingBar model={model} languages={p.languages} busy={p.busy} onBook={p.onBook} /> : null}
 

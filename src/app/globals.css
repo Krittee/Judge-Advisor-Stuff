@@ -3280,7 +3280,7 @@ body:has(.admin) > .theme-toggle:hover {
   text-align: left; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums;
 }
 .ja-tm-c { color: var(--ink-subtle); }
-.ja-tm-bk { font-weight: 500; font-size: 13px; font-variant-numeric: tabular-nums; }
+.ja-tm-bk { font-weight: 500; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ja-tm-bk.ja-tm-none { color: var(--ink-subtle); font-weight: 400; }
 .ja-tm-fl2 { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 5px 0; }
 .ja-tm-tw .ja-sp { height: 22px; padding: 0 8px; font-size: 11.5px; }

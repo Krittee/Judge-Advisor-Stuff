@@ -377,6 +377,14 @@ test("the tab is in the URL, read with useSearchParams under Suspense and writte
   assert.match(page, /const bookTime[\s\S]*|function bookTime[\s\S]*goTab\("slots"\)/, "Book a time goes to Slots");
 });
 
+test("a tab change scrolls the body back to the top, with no motion", () => {
+  const source = read("src/components/coordinator/CoordinatorView.tsx");
+  assert.match(source, /<main className="co-body" ref=\{body\}>/);
+  assert.match(source, /const body = useRef<HTMLElement>\(null\);/);
+  assert.match(source, /useEffect\(\(\) => \{\s*if \(body\.current\) body\.current\.scrollTop = 0;\s*\}, \[p\.tab\]\);/);
+  assert.doesNotMatch(source, /scrollTo\(|behavior/);
+});
+
 test("who may open it: nobody goes to the coordinator door, the Judge Advisor stays, the rest go home", () => {
   const page = read("src/app/coordinator/page.tsx");
   assert.match(page, /router\.replace\("\/coordinator\/login"\)/);
