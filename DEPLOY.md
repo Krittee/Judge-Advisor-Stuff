@@ -101,6 +101,7 @@ as well:
 | `ADMIN_CODE_3` | Optional third Judge Advisor code. |
 | `ADMIN_CODE_4` | Optional fourth Judge Advisor code. |
 | `QUEUER_CODE` | A code for whoever works the queue desk. |
+| `COORDINATOR_CODE` | A code for the coordinators, who walk the pits. Several can share it; each types their name to sign in. Left unset, coordinators cannot sign in. |
 | `REFEREE_CODE` | A code for the referees, who flag what they see on the field. |
 | `HEAD_REFEREE_CODE` | A code for the head referee, who also sets the program and fields for the event. |
 | `SESSION_SECRET` | A long random string — see below. |
@@ -110,7 +111,7 @@ not need to be memorable and you will never type it again. Something like
 `k3j4h5g6f7d8s9a0q1w2e3r4t5y6u7i8o9p0zxcvb` is fine.
 
 Give each Judge Advisor a different code, and do **not** use `JA2026`,
-`DESK01`, `REF001` or `HREF01` — those are printed in this repository, so
+`DESK01`, `COORD1`, `REF001` or `HREF01` — those are printed in this repository, so
 everyone can read them. Once deployed the app refuses them, and that role simply
 cannot sign in. Keep `HEAD_REFEREE_CODE` different from `REFEREE_CODE`.
 
@@ -188,6 +189,9 @@ All in the browser, at `your-address.vercel.app/admin`:
    ```
    That is number, name, pit, division. The pit is a letter and a number (it
    places the team on the floor plan); a blank division means the first one.
+   An optional sixth column, after the notebook type, sets the interview
+   language: `EN`, `TH`, `EN/TH`, `EN+TH`, `both` or `Thai`. Leave it blank and
+   the stored language stays.
    Or drop an Excel (`.xlsx`) or CSV file straight in — it is read on your own
    computer and never uploaded. Team numbers can include letters, like `9882K`.
    Tick **spread across panels evenly** to share teams out. Re-importing
@@ -208,6 +212,7 @@ A deployed app starts empty — no demo teams to clear.
 | Teams | `your-address.vercel.app/team` (type the team number) |
 | Judges | `your-address.vercel.app/judge/login` + their panel code |
 | Queue desk | `your-address.vercel.app/queue/login` + your `QUEUER_CODE` |
+| Coordinators | `your-address.vercel.app/coordinator/login` + your `COORDINATOR_CODE` |
 | Referees | `your-address.vercel.app/referee/login` + your `REFEREE_CODE` |
 | Head referee | `your-address.vercel.app/referee/login` + your `HEAD_REFEREE_CODE` |
 | Judge Advisors | `your-address.vercel.app/admin/login` + their `ADMIN_CODE…` |

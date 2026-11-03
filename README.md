@@ -52,6 +52,7 @@ cp .env.example .env.local     # then edit the codes
 | `ADMIN_CODE` | `JA2026` | First Judge Advisor. Full control. |
 | `ADMIN_CODE_2`–`ADMIN_CODE_4` | unset | Optional codes for up to three more Judge Advisors. |
 | `QUEUER_CODE` | `DESK01` | Queue desk. Can request or book for teams and change early bookings. |
+| `COORDINATOR_CODE` | `COORD1` | Coordinators, who walk the pits. Can set a team's interview language, request a judge for a team now, or book a slot. Coordinators must enter their name to sign in; bookings are recorded under it. |
 | `REFEREE_CODE` | `REF001` | Referees. Can only flag what they saw on the field. Referees must enter their name to sign in; flags are recorded under it. |
 | `HEAD_REFEREE_CODE` | `HREF01` | The head referee: a referee who can also set the event program and fields and correct or remove filed flags. Keep it different from `REFEREE_CODE`. |
 | `SESSION_SECRET` | insecure key | Signs the login cookie. `openssl rand -base64 32` |
@@ -156,10 +157,15 @@ same refusal.
 |---|:---:|:---:|:---:|:---:|:---:|
 | **Team** (no login) | — | — | — | — | — |
 | **Queue desk** (`QUEUER_CODE`) | any team | — | un-seen only | — | — |
+| **Coordinator** (`COORDINATOR_CODE`) | any team | — | — | — | — |
 | **Judge** (panel code) | — | **own panel** | — | **own panel** | — |
 | **Referee** (`REFEREE_CODE`) | — | — | — | — | — |
 | **Head referee** (`HEAD_REFEREE_CODE`) | — | — | — | — | — |
 | **Judge Advisor** (`ADMIN_CODE`–`ADMIN_CODE_4`) | any | any | any | any | ✅ |
+
+A coordinator also sets a team's interview language, which has no column above.
+A coordinator cannot cancel, reschedule or change a booking, and sees no notes,
+scores, conflicts or referee flags.
 
 A referee sits outside that table: they touch no interview and read no
 judging note. Their one job is the **Referee** section below.
@@ -167,8 +173,8 @@ judging note. Their one job is the **Referee** section below.
 **Declared conflicts are not in the public payload.** A conflict names a judge
 and says how they are connected to a team. The team page and the big board both
 poll `/api/state` with no login, so conflicts go only to the Judge Advisor and,
-for their own panel, to judges. The desk and anonymous viewers get an empty
-list — not a filtered one.
+for their own panel, to judges. The desk, coordinators and anonymous viewers get
+an empty list — not a filtered one.
 
 **"Own panel" is the load-bearing part.** A judge may only advance, read
 or write against teams assigned to the panel whose code they typed. Another
@@ -254,6 +260,11 @@ console and the board, and a `language` column in storage.
 Panels declare what they can cover, in the panel editor of the Judge Advisor
 console. Wherever a panel is shown alongside a request, a line states what it
 interviews in.
+
+The Judge Advisor and the coordinators can both set a team's language. A booking
+takes the team's language by default (the first one, for a team that takes
+both), and auto-assign prefers a panel that covers it, falling back to any
+eligible panel.
 
 **A language a panel cannot cover is flagged, not blocked.** If a team asks for
 Thai and the panel holding them lists only English, the request is still
@@ -712,6 +723,8 @@ for anyone who cannot separate amber from violet.
 
 Set it per team from the dropdown in Admin → Teams, for a whole import at once,
 or per row with a fifth CSV column (which accepts either the label or the id).
+A sixth column after that sets the interview language: `EN`, `TH`, `EN/TH`,
+`EN+TH`, `both` or `Thai`. Leave it blank and the stored language stays.
 Admin → Teams filters by type and counts each one.
 
 **Not on the team's own page.** It is a judging assessment, and the team's page
@@ -850,7 +863,7 @@ tab.
 | `/team` | teams | Enter team number |
 | `/team/1234` | teams | Read-only status: the five-step track and earlier today |
 | `/board` | everyone | Big-screen board. Has a fullscreen button. |
-| `/judge/login`, `/queue/login`, `/referee/login`, `/admin/login` | staff | One sign-in door per role (`/login` still takes any code) |
+| `/judge/login`, `/queue/login`, `/coordinator/login`, `/referee/login`, `/admin/login` | staff | One sign-in door per role (`/login` still takes any code) |
 | `/judge` | judges | Up next, team sheets with both rubrics, nominations |
 | `/queue` | queue desk | Now (request) or Book (slot grid); waiting, booked and all teams |
 | `/referee` | referees | Set the match, flag a team against a rule; the head referee sets up the day |
