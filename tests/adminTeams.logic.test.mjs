@@ -5,12 +5,16 @@ import {
   activeFilters,
   bookSlot,
   cancelBookingNow,
+  coveringHint,
   discardQuestion,
   filterTeams,
   flagPills,
   interviewOf,
   interviewTime,
   isDirty,
+  languageKey,
+  languageStrip,
+  languageText,
   leaveAfterAsking,
   moveBooking,
   moveQuestion,
@@ -19,6 +23,8 @@ import {
   panelCell,
   panelLeft,
   panelLoad,
+  panelMisfit,
+  panelMisfitNote,
   panelOptions,
   removeQuestion,
   removeTeamAfterAsking,
@@ -30,11 +36,13 @@ import {
   resetStatusAfterAsking,
   saveTeamAfterAsking,
   saveTimes,
+  setTeamLanguages,
   startDraft,
   strandedIds,
   teamPatch,
   timesRequestOf,
 } from "../src/components/admin/teamsLogic";
+import { teamFitsPanel } from "../src/components/Language";
 import { formTimes, reachedSteps, readTimes, startTimes, timesLogLine } from "../src/lib/stepTimes";
 
 /* The Judge Advisor Teams tab's decisions, run for real against
@@ -381,7 +389,7 @@ test("a panel, 'Unassigned', or 'no panel left' when every panel that may judge 
 
 test("the filter matches a number or a name, within the division and the notebook type", () => {
   const all = [titans, team("7700B", "Byte Me"), team("1108", "Circuit Breakers", { division: "Elementary School", category: "fully-developed" })];
-  const f = (over) => filterTeams(all, { q: "", division: "", category: "", ...over }).map((t) => t.number);
+  const f = (over) => filterTeams(all, { q: "", division: "", category: "", language: "", ...over }).map((t) => t.number);
   assert.deepEqual(f({}), ["9882K", "7700B", "1108"]);
   assert.deepEqual(f({ q: " byte" }), ["7700B"]);
   assert.deepEqual(f({ q: "98" }), ["9882K"]);
@@ -561,4 +569,97 @@ test("Save times is the set-times action on that request, from the status the dr
   assert.deepEqual(calls, [
     { url: "/api/requests/r9", method: "PATCH", body: { action: "set-times", from: "completed", times: { finished_at: "2026-10-20T03:32:00.000Z" } } },
   ]);
+});
+
+/* ---- interview language ---------------------------------------------------------------- */
+
+const langs = [
+  { id: "en", label: "English", short: "EN" },
+  { id: "th", label: "Thai", short: "TH" },
+];
+const speaking = (number, languages, over = {}) => team(number, number, { languages, ...over });
+const sweep = [
+  speaking("1A", ["en"]),
+  speaking("2A", ["en"], { division: "High School" }),
+  speaking("3A", ["th"]),
+  speaking("4A", ["en", "th"]),
+  speaking("5A", []),
+  speaking("6A", []),
+];
+const noFilters = { q: "", division: "", category: "", language: "" };
+
+test("teamFitsPanel is true when either side has not said, or they share a language", () => {
+  assert.equal(teamFitsPanel([], ["en"]), true);
+  assert.equal(teamFitsPanel(["th"], []), true);
+  assert.equal(teamFitsPanel(["en", "th"], ["th"]), true);
+  assert.equal(teamFitsPanel(["th"], ["en"]), false);
+  assert.equal(teamFitsPanel(["en", "th"], ["fr"]), false);
+});
+
+test("a team counts under its one language, 'both', or 'none'", () => {
+  assert.deepEqual(sweep.map(languageKey), ["en", "en", "th", "both", "none", "none"]);
+});
+
+test("the strip counts EN, TH, Both and Not asked, following the other filters but not its own", () => {
+  const counts = (f) => Object.fromEntries(languageStrip(sweep, { ...noFilters, ...f }, langs).map((c) => [c.label, c.count]));
+  assert.deepEqual(counts({}), { EN: 2, TH: 1, Both: 1, "Not asked": 2 });
+  assert.deepEqual(counts({ division: "High School" }), { EN: 1, TH: 0, Both: 0, "Not asked": 0 });
+  assert.deepEqual(counts({ q: "3a" }), { EN: 0, TH: 1, Both: 0, "Not asked": 0 });
+  assert.deepEqual(counts({ language: "th" }), { EN: 2, TH: 1, Both: 1, "Not asked": 2 }, "pressing one does not zero the rest");
+  assert.deepEqual(languageStrip(sweep, noFilters, langs).map((c) => c.key), ["en", "th", "both", "none"]);
+});
+
+test("the language filter keeps exactly the teams under that button, and clears with an empty value", () => {
+  const f = (language) => filterTeams(sweep, { ...noFilters, language }).map((t) => t.number);
+  assert.deepEqual(f("en"), ["1A", "2A"]);
+  assert.deepEqual(f("th"), ["3A"]);
+  assert.deepEqual(f("both"), ["4A"]);
+  assert.deepEqual(f("none"), ["5A", "6A"]);
+  assert.equal(f("").length, 6);
+});
+
+test("the Lang column reads EN, TH, EN + TH, and nothing when not asked", () => {
+  assert.equal(languageText(["en"], langs), "EN");
+  assert.equal(languageText(["th"], langs), "TH");
+  assert.equal(languageText(["en", "th"], langs), "EN + TH");
+  assert.equal(languageText([], langs), null);
+});
+
+test("a panel that does not cover the team's language is named in the triangle and in the drawer's caution", () => {
+  const english = { name: "Panel 3", languages: ["en"] };
+  assert.equal(panelMisfit({ languages: ["th"] }, english, langs), "Panel 3 doesn't cover Thai");
+  assert.equal(panelMisfitNote({ languages: ["th"] }, english, langs), "Panel 3 interviews in English only. You can keep it.");
+  assert.equal(panelMisfit({ languages: ["en", "th"] }, { name: "Panel 4", languages: ["fr"] }, langs), "Panel 4 doesn't cover English or Thai", "a both-language team names both");
+  assert.equal(panelMisfitNote({ languages: ["th"] }, { name: "Panel 5", languages: ["en", "fr"] }, langs), "Panel 5 interviews in English, fr. You can keep it.");
+  for (const fine of [{ languages: [] }, { languages: ["en"] }, { languages: ["en", "th"] }]) {
+    assert.equal(panelMisfit(fine, english, langs), null);
+    assert.equal(panelMisfitNote(fine, english, langs), null);
+  }
+  assert.equal(panelMisfit({ languages: ["th"] }, { name: "Panel 6", languages: [] }, langs), null, "a panel that has not said is not warned about");
+});
+
+test("the Judge panel hint lists the offered panels that cover the team's language, and says nothing when nobody needs steering", () => {
+  const ps = [
+    { id: "p2", name: "Panel 2", languages: ["en", "th"] },
+    { id: "p3", name: "Panel 3", languages: ["en"] },
+    { id: "p4", name: "Panel 4", languages: [] },
+  ];
+  const opt = (id, blocked = false) => ({ id, blocked });
+  const all = [opt("p2"), opt("p3"), opt("p4")];
+  assert.equal(coveringHint({ languages: ["th"] }, all, ps, langs), "Covering Thai: Panel 2");
+  assert.equal(coveringHint({ languages: ["en"] }, all, ps, langs), null, "every option fits English (Panel 4 has not said)");
+  assert.equal(coveringHint({ languages: [] }, all, ps, langs), null, "not asked");
+  assert.equal(coveringHint({ languages: ["th"] }, [opt("p3"), opt("p4")], ps, langs), "Covering Thai: none");
+  assert.equal(coveringHint({ languages: ["th"] }, [opt("p2", true), opt("p3")], ps, langs), "Covering Thai: none", "a conflicted panel is not offered");
+});
+
+test("setting a language is one PATCH to /api/team-language with the team and the list, and a refusal is thrown", async () => {
+  const { call, calls } = caller();
+  await setTeamLanguages(call, { id: "t-1" }, ["en", "th"]);
+  await setTeamLanguages(call, { id: "t-1" }, []);
+  assert.deepEqual(calls, [
+    { url: "/api/team-language", method: "PATCH", body: { teamId: "t-1", languages: ["en", "th"] } },
+    { url: "/api/team-language", method: "PATCH", body: { teamId: "t-1", languages: [] } },
+  ]);
+  await assert.rejects(setTeamLanguages(caller("Only a coordinator can.").call, { id: "t-1" }, ["en"]), /Only a coordinator can\./);
 });

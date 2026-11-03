@@ -532,7 +532,7 @@ function renderTeams(t: Team, f: FlagRow[], wide = true) {
     <TeamsBoard
       state={{ teams: [t], panels: [], requests: [], conflicts: [], judges: [], flags: f, flagKinds, languages: [], divisions: ["Middle School"], categories: categoryViews } as never}
       wide={wide}
-      filters={{ q: "", division: "", category: "" }}
+      filters={{ q: "", division: "", category: "", language: "" }}
       onFilters={noop}
       onFiltersOpen={noop}
       perPanel={12}

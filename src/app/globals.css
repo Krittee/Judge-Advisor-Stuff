@@ -2586,6 +2586,8 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-opt:hover:not(:disabled), .ja-opt:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--jg-ring); }
 .ja-opt b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 15px; }
 .ja-opt:disabled { opacity: 0.6; }
+.ja-opt { flex-wrap: wrap; padding-block: 6px; }
+.ja-opt-w { flex-basis: 100%; color: var(--caution-quiet); font-weight: 500; font-size: 12.5px; }
 
 /* From 1024px: every panel as a column */
 @media (min-width: 1024px) {
@@ -2948,7 +2950,8 @@ body:has(.admin) > .theme-toggle:hover {
   border-radius: 11px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 12px; box-shadow: 0 0 0 2px var(--canvas);
 }
 
-.ja-tm-aa { display: flex; align-items: flex-end; gap: 10px; }
+.ja-tm-aa { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.ja-tm-aah { flex-basis: 100%; }
 .ja-tm-mpf { display: flex; flex: none; flex-direction: column; gap: 4px; }
 .ja-tm-mpl { color: var(--ink-subtle); font-size: 13px; white-space: nowrap; }
 .ja-tm-mpf .ja-in { width: 76px; padding: 0 8px; text-align: center; font-weight: 500; font-size: 17px; font-variant-numeric: tabular-nums; }
@@ -2972,6 +2975,10 @@ body:has(.admin) > .theme-toggle:hover {
   background: color-mix(in oklch, var(--caution) 12%, transparent); color: var(--caution-quiet);
   box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--caution) 35%, transparent);
 }
+/* The language strip: buttons, so it wraps instead of scrolling, and each is a 44px target on a phone. Pressed is accent chrome, never a status colour. */
+.ja-tm-lgs { flex-wrap: wrap; overflow: visible; }
+.ja-tm-chb { height: 44px; color: var(--ink); }
+.ja-tm-chb[aria-pressed="true"] { background: var(--ja-accent-t); box-shadow: inset 0 0 0 1.5px var(--accent); }
 .ja-tm-rd { display: none; margin: 0 0 0 auto; color: var(--ink-subtle); font-size: 13px; font-variant-numeric: tabular-nums; }
 .ja-tm-help { display: none; margin: 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.45; }
 
@@ -2990,6 +2997,11 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-tm-l1 .ja-tm-nm { font-size: 15px; }
 .ja-tm-l2 { grid-column: 1; overflow: hidden; color: var(--ink-subtle); text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .ja-tm-w { color: var(--caution-quiet); }
+/* Interview language: a neutral tag (language is not a status), and a quiet "Not asked"; the triangle is the caution when the panel does not cover it */
+.ja-tm-lt { display: inline-flex; flex: none; height: 22px; align-items: center; padding: 0 5px; border-radius: 6px; background: var(--surface-2); color: var(--ink-muted); font-weight: 500; font-size: 11px; letter-spacing: 0.03em; white-space: nowrap; }
+.ja-tm-na { color: var(--ink-subtle); font-size: 11px; white-space: nowrap; }
+.ja-tm-lw { display: inline-grid; width: 16px; height: 16px; place-items: center; margin-left: 4px; color: var(--caution-quiet); vertical-align: middle; }
+.ja-tm-lw svg { width: 14px; height: 14px; }
 .ja-tm-d { color: var(--danger-quiet); }
 .ja-tm-lr { display: flex; grid-column: 2; grid-row: 1 / span 2; align-items: center; gap: 8px; }
 .ja-tm-lr svg { color: var(--ink-subtle); }
@@ -3001,6 +3013,7 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-k-pit { width: 34px; }
 .ja-k-nb { width: 100px; }
 .ja-k-dv { width: 32px; }
+.ja-k-lg { width: 64px; }
 .ja-k-pn { width: 104px; }
 .ja-k-bk { width: 52px; }
 .ja-k-iv { width: 94px; }
@@ -3034,6 +3047,16 @@ body:has(.admin) > .theme-toggle:hover {
 }
 
 /* The editor's fields, in the drawer and in the sheet */
+.ja-tm-lgh { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ja-tm-lgh .ja-tm-od { margin-left: 0; color: var(--ink-subtle); }
+.ja-tm-lgh .ja-tm-od:disabled { opacity: 0.5; text-decoration: none; }
+.ja-tm-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 3px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--jg-field); }
+.ja-tm-rd3 { position: relative; display: block; }
+.ja-tm-rd3 input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; }
+.ja-tm-rd3 span { display: flex; height: 38px; align-items: center; justify-content: center; border-radius: 9px; font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 14px; }
+.ja-tm-rd3 input:checked + span { background: var(--accent); color: var(--accent-ink); }
+.ja-tm-rd3 input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ja-tm-rd3 input:disabled + span { opacity: 0.6; }
 .ja-tm-g2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .ja-tm-ro { display: flex; gap: 12px; }
 .ja-tm-ro > div { flex: 1; }
@@ -3114,6 +3137,7 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-tm-ghost { flex: none; height: 36px; border-radius: 10px; font-size: 14px; }
   .ja-tm-chr { flex-wrap: wrap; overflow: visible; }
   .ja-tm-ch { padding: 0 10px; font-size: 12.5px; }
+  .ja-tm-chb { height: 32px; }
   .ja-tm-rd { display: block; }
   .ja-tm-help { display: block; }
 

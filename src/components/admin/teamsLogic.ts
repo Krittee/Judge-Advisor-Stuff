@@ -1,6 +1,7 @@
 import { cancelBookingAfterAsking } from "@/components/desk/deskLogic";
 import { kindCounts, type FlagKind } from "@/components/Flags";
 import type { Ask } from "@/components/judge/logic";
+import { teamFitsPanel } from "@/components/Language";
 import { historyTime, sameEventDay } from "@/components/team/teamLogic";
 import { liveRequestFor } from "@/lib/data";
 import { normalizePit } from "@/lib/pit";
@@ -9,7 +10,7 @@ import { isPanelBlocked, panelBlocks } from "@/lib/roster";
 import { canTransition, STATUS_META, type Status } from "@/lib/status";
 import type { formTimes } from "@/lib/stepTimes";
 import { normalizeTeamNumber } from "@/lib/teamNumber";
-import type { ConflictRow, FlagRow, JudgeRow, PublicPanel, RequestRow, Slot, Team } from "@/lib/types";
+import type { AppState, ConflictRow, FlagRow, JudgeRow, PublicPanel, RequestRow, Slot, Team } from "@/lib/types";
 import { strandedTeams } from "./conflictsLogic";
 import { allowedPanels } from "./floorLogic";
 
@@ -24,17 +25,68 @@ export type Call = (url: string, options: { method?: string; body?: unknown }) =
 
 /* ---- the list -------------------------------------------------------------- */
 
-export type Filters = { q: string; division: string; category: string };
+export type Filters = { q: string; division: string; category: string; language: string };
 
-/** The teams the filters leave: a number or name containing the text, in the division and the notebook type chosen. */
+/** The teams the filters leave: a number or name containing the text, in the division, notebook type and interview language chosen. */
 export function filterTeams(teams: Team[], f: Filters): Team[] {
   const q = f.q.trim().toLowerCase();
   return teams.filter((t) => {
     if (f.division && t.division !== f.division) return false;
     if (f.category && t.category !== f.category) return false;
+    if (f.language && languageKey(t) !== f.language) return false;
     return !q || t.number.toLowerCase().includes(q) || t.name.toLowerCase().includes(q);
   });
 }
+
+/* ---- interview language ---------------------------------------------------- */
+
+type Languages = AppState["languages"];
+const labelOf = (id: string, languages: Languages) => languages.find((l) => l.id === id)?.label ?? id;
+
+/** Which strip button a team counts under: its one language's id, "both", or "none" (not asked). */
+export const languageKey = (t: Pick<Team, "languages">): string => (t.languages.length > 1 ? "both" : (t.languages[0] ?? "none"));
+
+/**
+ * The language strip: a button per language, then Both and Not asked, with how many teams each holds.
+ * Counts follow the other filters but not the language one, so the numbers stay put while one is pressed.
+ */
+export function languageStrip(teams: Team[], f: Filters, languages: Languages): { key: string; label: string; count: number }[] {
+  const held = filterTeams(teams, { ...f, language: "" });
+  const chips = [...languages.map((l) => ({ key: l.id, label: l.short })), { key: "both", label: "Both" }, { key: "none", label: "Not asked" }];
+  return chips.map((c) => ({ ...c, count: held.filter((t) => languageKey(t) === c.key).length }));
+}
+
+/** The Lang column: "EN", "TH", "EN + TH"; null when not asked. */
+export const languageText = (ids: string[], languages: Languages): string | null =>
+  ids.length ? ids.map((id) => languages.find((l) => l.id === id)?.short ?? id).join(" + ") : null;
+
+/** The triangle's label: "Panel 3 doesn't cover English" (a team asking for both says "English or Thai"). Null when the panel fits. */
+export function panelMisfit(team: Pick<Team, "languages">, panel: Pick<PublicPanel, "name" | "languages">, languages: Languages): string | null {
+  if (teamFitsPanel(team.languages, panel.languages)) return null;
+  return `${panel.name} doesn't cover ${team.languages.map((id) => labelOf(id, languages)).join(" or ")}`;
+}
+
+/** The drawer's caution under the panel select: "Panel 3 interviews in English only. You can keep it." Null when the panel fits. */
+export function panelMisfitNote(team: Pick<Team, "languages">, panel: Pick<PublicPanel, "name" | "languages">, languages: Languages): string | null {
+  if (teamFitsPanel(team.languages, panel.languages)) return null;
+  const covers = panel.languages.map((id) => labelOf(id, languages)).join(", ");
+  return `${panel.name} interviews in ${covers}${panel.languages.length === 1 ? " only" : ""}. You can keep it.`;
+}
+
+/**
+ * The Judge panel hint's tail: "Covering English: Panel 2" -- the panels the select offers (not conflicted)
+ * that say they cover the team's language. Null when the team has not been asked or every option fits anyway.
+ */
+export function coveringHint(team: Pick<Team, "languages">, options: { id: string; blocked: boolean }[], panels: PublicPanel[], languages: Languages): string | null {
+  const offered = options.flatMap((o) => (o.blocked ? [] : panels.filter((p) => p.id === o.id)));
+  if (!team.languages.length || offered.every((p) => teamFitsPanel(team.languages, p.languages))) return null;
+  const covering = offered.filter((p) => p.languages.length && teamFitsPanel(team.languages, p.languages));
+  return `Covering ${team.languages.map((id) => labelOf(id, languages)).join(" or ")}: ${covering.map((p) => p.name).join(", ") || "none"}`;
+}
+
+/** The drawer's switch writes at once, as the Interview controls do. */
+export const setTeamLanguages = (call: Call, team: Pick<Team, "id">, languages: string[]) =>
+  call("/api/team-language", { method: "PATCH", body: { teamId: team.id, languages } });
 
 /** How many of the two selects are set: the badge on a phone's Filters button. */
 export const activeFilters = (f: Filters): number => (f.division ? 1 : 0) + (f.category ? 1 : 0);
@@ -243,6 +295,7 @@ export async function resetStatusAfterAsking(ask: Ask, call: Call, team: Pick<Te
  * said no to the question, or the server refused (its words land above Save changes).
  */
 export type InterviewActions = {
+  language: (team: Team, languages: string[]) => Promise<boolean>;
   request: (team: Team, language: string) => Promise<boolean>;
   book: (team: Team, slot: Slot, language: string) => Promise<boolean>;
   move: (booking: RequestRow, slot: Slot) => Promise<boolean>;

@@ -16,7 +16,7 @@ import type { AppState, ConflictRow, FlagRow, JudgeRow, PublicPanel, RequestRow,
    adminTeams.logic.test.mjs and the wiring is read from source at the foot. */
 
 const noop = () => {};
-const noInterview = { request: async () => false, book: async () => false, move: async () => false, cancel: async () => false, times: async () => false };
+const noInterview = { language: async () => false, request: async () => false, book: async () => false, move: async () => false, cancel: async () => false, times: async () => false };
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const text = (markup: string) => markup.replace(/<[^>]+>/g, "");
 
@@ -94,6 +94,7 @@ function board(
     q?: string;
     division?: string;
     category?: string;
+    language?: string;
     state?: Partial<AppState>;
     filtersOpen?: boolean;
     error?: string | null;
@@ -104,7 +105,7 @@ function board(
     <TeamsBoard
       state={{ ...slice, ...over.state }}
       wide={over.wide ?? true}
-      filters={{ q: over.q ?? "", division: over.division ?? "", category: over.category ?? "" }}
+      filters={{ q: over.q ?? "", division: over.division ?? "", category: over.category ?? "", language: over.language ?? "" }}
       onFilters={noop}
       filtersOpen={over.filtersOpen}
       onFiltersOpen={noop}
@@ -139,7 +140,7 @@ test("the table has the mock's nine columns, and every row is a button that name
   assert.match(m, /<caption class="sr-only">Teams<\/caption>/);
   assert.deepEqual(
     [...m.matchAll(/<th scope="col"[^>]*>(.*?)<\/th>/g)].map((x) => x[1]),
-    ["Team", "Name", "Pit", "Notebook", "Div", "Panel", "Booked", "Interview", "Flags"],
+    ["Team", "Name", "Pit", "Notebook", "Div", "Lang", "Panel", "Booked", "Interview", "Flags"],
   );
   for (const t of teams) {
     assert.match(m, new RegExp(`<button type="button" class="ja-tm-rb" aria-label="Edit ${t.number} ${t.name}">${t.number}</button>`));
@@ -151,7 +152,7 @@ test("the table has the mock's nine columns, and every row is a button that name
 test("a row carries pit, notebook, division, panel, booked time, status pill and flag pills in severity colours", () => {
   const m = board();
   const row = rowOf(m, "9882K");
-  assert.match(text(row), /9882KTorque TitansB4DevelopingMSPanel 2—RequestingMinor ×1Warning ×1/);
+  assert.match(text(row), /9882KTorque TitansB4DevelopingMSNot askedPanel 2—RequestingMinor ×1Warning ×1/);
   assert.match(row, /<span class="jg-sc jg-s-requested">Requesting<\/span>/);
   // The Referee tab's pill, not caution: each severity wears the colours the config gives it.
   assert.ok(row.includes(`class="ja-sp ${pillClass("orange")}"`), "Minor is the config's orange");
@@ -159,7 +160,7 @@ test("a row carries pit, notebook, division, panel, booked time, status pill and
   assert.ok(rowOf(m, "3141P").includes(`class="ja-sp ${pillClass("black")}" title="Disqualified">DQ ×1</span>`));
   // A booked slot shows its time and the Booked pill; a team with nothing shows dashes.
   assert.match(rowOf(m, "4410C"), /ja-tm-bk">\d{1,2}:\d{2}[^<]*<\/span>[\s\S]*jg-s-scheduled">Booked/);
-  assert.match(text(rowOf(m, "5150Z")), /5150ZSparkyC7Fully DevelopedMS/);
+  assert.match(text(rowOf(m, "5150Z")), /5150ZSparkyC7Fully DevelopedMSNot asked/);
   assert.doesNotMatch(rowOf(m, "5150Z"), /jg-sc|ja-sp/);
 });
 
@@ -194,7 +195,7 @@ test("filter box, Division and Notebook selects, Max per panel 1-40 and the help
   assert.deepEqual(optionsOf(selectOf(m, "dv")), [["", "All divisions"], ["High School", "High School"], ["Middle School", "Middle School"], ["Elementary School", "Elementary School"]]);
   assert.deepEqual(optionsOf(selectOf(m, "nb")).map((o) => o[1]), ["All notebooks", "Developing", "Fully Developed", "Ungraded"]);
   assert.match(m, /type="number" min="1" max="40" value="12"/);
-  assert.match(m, /Select a team to edit its number, name, pit, panel and notebook\./);
+  assert.match(m, /Select a team to edit its number, name, pit, language, panel and notebook\./);
   assert.match(text(m), /6 teams · 4 panels/);
 });
 
@@ -203,7 +204,7 @@ test("auto-assign counts the filtered unassigned teams and is disabled at 0", ()
   // Byte Me and Sparky have no panel.
   assert.match(button(board()), /Auto-assign 2 unassigned/);
   assert.doesNotMatch(button(board()), /disabled/);
-  assert.match(button(board()), /title="Assigns within each division and skips conflicted panels\."/);
+  assert.match(button(board()), /title="Assigns within each division, skips conflicted panels and matches language where it can\."/);
   assert.match(button(board({ division: "High School" })), /Auto-assign 0 unassigned/);
   assert.match(button(board({ division: "High School" })), /disabled/);
 });
@@ -353,7 +354,7 @@ test("on a phone the rows are compact two-line buttons, and the roster is a list
   assert.doesNotMatch(m, /<table/);
   assert.match(m, /<ul class="ja-tm-ll" aria-label="Teams">/);
   const row = m.match(/<button type="button" class="ja-tm-lrow" aria-label="Edit 9882K Torque Titans">[\s\S]*?<\/button>/)?.[0] ?? "";
-  assert.match(text(row), /9882KTorque TitansPit B4 · Developing · MS · Panel 2Requesting/);
+  assert.match(text(row), /9882KTorque TitansNot askedPit B4 · Developing · MS · Panel 2Requesting/);
   assert.match(row, /jg-s-requested/);
   assert.match(text(m.match(/aria-label="Edit 7700B Byte Me"[\s\S]*?<\/button>/)?.[0] ?? ""), /Pit C2 · Developing · MS · unassigned/);
   assert.match(text(m.match(/aria-label="Edit 5150Z Sparky"[\s\S]*?<\/button>/)?.[0] ?? ""), /Pit C7 · Fully Developed · MS · no panel left/);
@@ -436,6 +437,105 @@ test("when storage is not reachable the CLOSED row turns danger and says so", ()
   const open = panelView({ open: true, health: { ok: false, error: "connection refused" } });
   assert.match(open, /<p class="ja-err" role="alert"><b>Storage is not reachable\.<\/b> connection refused<\/p>/);
   assert.match(open, /Reset the day/, "the resets are still there");
+});
+
+/* ---- interview language ------------------------------------------------------------------- */
+
+// Torque Titans asked for Thai (Panel 2 is English only here), Byte Me for both, Sparky for English.
+const speakers = teams.map((t) => (t === titans ? { ...t, languages: ["th"] } : t === byteMe ? { ...t, languages: ["en", "th"], panel_id: "p3" } : t === sparky ? { ...t, languages: ["en"] } : t));
+const asked = (picked: Team | null, over: Parameters<typeof board>[0] = {}) =>
+  board({ ...over, picked, state: { teams: speakers, ...over.state } });
+
+test("the count strip: Language, then EN, TH, Both and Not asked as aria-pressed buttons with their counts", () => {
+  const strip = (m: string) => m.match(/<div class="ja-tm-chr ja-tm-lgs" role="group" aria-label="Filter by interview language">[\s\S]*?<\/div>/)?.[0] ?? "";
+  const m = strip(asked(null));
+  assert.match(text(m), /LanguageEN1TH1Both1Not asked3/);
+  assert.equal(m.match(/<button type="button" class="ja-tm-ch ja-tm-chb" aria-pressed="false">/g)?.length, 4);
+  // The pressed one is marked; the numbers follow the other filters but not the language one.
+  const pressed = strip(asked(null, { language: "th" }));
+  assert.match(pressed, /aria-pressed="true">TH<b>1<\/b>/);
+  assert.equal(pressed.match(/aria-pressed="true"/g)?.length, 1);
+  assert.match(text(pressed), /EN1TH1Both1Not asked3/);
+  assert.match(text(strip(asked(null, { division: "High School" }))), /EN0TH0Both0Not asked1/);
+  // And it filters the table.
+  const rows = (language: string) => [...asked(null, { language }).matchAll(/aria-label="Edit (\w+) /g)].map((x) => x[1]);
+  assert.deepEqual(rows("th"), ["9882K"]);
+  assert.deepEqual(rows("both"), ["7700B"]);
+  assert.equal(rows("none").length, 3);
+});
+
+test("the Lang column: a neutral tag, muted 'Not asked', and a caution triangle on the panel that does not cover it", () => {
+  const m = asked(null);
+  assert.match(rowOf(m, "9882K"), /<td><span class="ja-tm-lt"><span class="sr-only">Interview language: <\/span>TH<\/span><\/td>/);
+  assert.match(rowOf(m, "7700B"), /ja-tm-lt"><span class="sr-only">Interview language: <\/span>EN \+ TH<\/span>/);
+  assert.match(rowOf(m, "2011A"), /<span class="ja-tm-na">Not asked<\/span>/);
+  // Panel 2 is English only: Thai and both-language-on-Panel-3 (also English only) are flagged; English and not-asked are not.
+  assert.match(rowOf(m, "9882K"), /Panel 2<span class="ja-tm-lw" role="img" aria-label="Panel 2 doesn&#x27;t cover Thai"/);
+  assert.match(rowOf(m, "7700B"), /<td>Panel 3<\/td>/, "shares English: fits");
+  assert.doesNotMatch(rowOf(m, "2011A"), /ja-tm-lw/);
+  assert.doesNotMatch(rowOf(m, "7700B"), /ja-tm-lw/);
+  assert.match(rowOf(asked(null, { state: { teams: speakers.map((t) => (t.id === byteMe.id ? { ...t, panel_id: "p4", division: "Elementary School", languages: ["th"] } : t)) } }), "7700B"), /aria-label="Panel 4 doesn&#x27;t cover Thai"/);
+  assert.match(m, /<th scope="col" title="Interview language">Lang<\/th>/);
+});
+
+test("the phone list puts the tag on the team's row and the triangle with the panel", () => {
+  const m = asked(null, { wide: false });
+  assert.match(m, /9882K<\/b><span class="ja-tm-nm">Torque Titans<\/span><span class="ja-tm-lt">/);
+  assert.match(m, / · Panel 2<\/span><span class="ja-tm-lw" role="img" aria-label="Panel 2 doesn&#x27;t cover Thai"/);
+});
+
+test("the drawer's Interview language is a radiogroup English | Thai | Both above Judge panel, with a quiet Clear", () => {
+  const d = drawer(asked(titans));
+  const group = d.match(/<div class="ja-tm-seg" role="radiogroup" aria-labelledby="([^"]+)">[\s\S]*?<\/div>/);
+  assert.ok(group, "a radiogroup");
+  assert.match(d, new RegExp(`id="${group![1]}">Interview language</span>`), "named by its label");
+  assert.deepEqual([...group![0].matchAll(/<input type="radio" name="[^"]+"[^>]*? value="([^"]+)"\/><span>([^<]+)<\/span>/g)].map((x) => [x[1], x[2]]), [["en", "English"], ["th", "Thai"], ["both", "Both"]]);
+  assert.match(group![0], /checked="" value="th"/, "Thai asked for");
+  assert.equal(group![0].match(/checked=""/g)?.length, 1);
+  assert.match(d, /<button type="button" class="ja-tm-od">Clear<\/button>/);
+  assert.ok(d.indexOf("Interview language") < d.indexOf("Judge panel"));
+  // Both is checked for a both-language team; nothing is, and Clear is off, for a team not asked.
+  assert.match(drawer(asked(byteMe)), /checked="" value="both"/);
+  const none = drawer(asked(gremlins));
+  assert.doesNotMatch(none, /checked=""/);
+  assert.match(none, /<button type="button" class="ja-tm-od" disabled="">Clear<\/button>/);
+  assert.match(none, /None selected means not asked yet\./);
+  // The phone's edit sheet has the same radiogroup in the same place.
+  const sh = sheet(asked(titans, { wide: false }));
+  assert.match(sh, /role="radiogroup"/);
+  assert.ok(sh.indexOf("Interview language") < sh.indexOf("Judge panel"));
+});
+
+test("Judge panel: 'Covering Thai: …' in the hint and a caution line ending 'You can keep it.' when the chosen panel doesn't fit", () => {
+  const thaiPanels = panels.map((p) => (p.id === "p3" ? { ...p, languages: ["en", "th"] } : p));
+  const d = drawer(asked(titans, { state: { panels: thaiPanels } }));
+  assert.match(d, /MS panels without a conflict\. Covering Thai: Panel 3\.<\/p>/);
+  assert.match(d, /<div class="jg-caution" role="note">[\s\S]*?<p>Panel 2 interviews in English only\. You can keep it\.<\/p>/);
+  // Saving is never blocked by it.
+  assert.ok(d.includes('<button type="submit" class="ja-prim" disabled="">Save changes'), "Save is off only because nothing changed, not because of the warning");
+  // A fitting panel: no caution. An English team: every option fits, so no hint.
+  assert.doesNotMatch(drawer(asked(sparky)), /Covering|You can keep it/);
+  assert.doesNotMatch(drawer(asked(gremlins)), /Covering|You can keep it/);
+});
+
+test("auto-assign says it matches language where it can", () => {
+  assert.match(asked(null), /<span class="ja-hint ja-tm-aah">Matches language where it can\.<\/span>/);
+});
+
+test("the drawer's language choices go through the logic function at once, not Save changes, with Clear sending []", () => {
+  assert.ok(tab.includes("language: (t, languages) => run(() => setTeamLanguages(call, t, languages))"));
+  assert.ok(tab.includes("interview.language(team, c.ids)") && tab.includes("interview.language(team, [])"));
+  assert.ok(!/api\/team-language/.test(tab), "the URL lives in teamsLogic");
+});
+
+test("the strip and the language switch are styled in the Teams block from tokens, with 44px phone targets", () => {
+  const css = read("src/app/globals.css");
+  const block = css.slice(css.indexOf("/* @ja-block teams */"), css.indexOf("/* @ja-block eventdata */"));
+  assert.match(block, /\.ja-tm-lgs \{ flex-wrap: wrap;/);
+  assert.match(block, /\.ja-tm-chb \{ height: 44px;/);
+  assert.match(block, /\.ja-tm-chb\[aria-pressed="true"\] \{[^}]*var\(--accent\)/);
+  assert.match(block, /\.ja-tm-lt \{[^}]*var\(--surface-2\)/);
+  assert.match(block, /\.ja-tm-rd3 input:checked \+ span \{ background: var\(--accent\)/);
 });
 
 /* ---- wiring, read from source ------------------------------------------------------------- */

@@ -17,17 +17,23 @@ import {
   activeFilters,
   bookSlot,
   cancelBookingNow,
+  coveringHint,
   filterTeams,
   flagPills,
   interviewOf,
   interviewTime,
   isDirty,
+  languageKey,
+  languageStrip,
+  languageText,
   leaveAfterAsking,
   moveBooking,
   notebookCounts,
   openInRefereeAfterAsking,
   panelCell,
   panelLoad,
+  panelMisfit,
+  panelMisfitNote,
   panelOptions,
   removeTeamAfterAsking,
   requestBlocker,
@@ -36,6 +42,7 @@ import {
   resetStatusAfterAsking,
   saveTeamAfterAsking,
   saveTimes,
+  setTeamLanguages,
   startDraft,
   strandedIds,
   timesRequestOf,
@@ -113,7 +120,7 @@ export function TeamsTab({
 }) {
   const wide = useWide();
   const { ask, dialog } = useConfirm();
-  const [filters, setFilters] = useState<Filters>({ q: "", division: "", category: "" });
+  const [filters, setFilters] = useState<Filters>({ q: "", division: "", category: "", language: "" });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [perPanel, setPerPanel] = useState(10);
   const [autoBusy, setAutoBusy] = useState(false);
@@ -202,6 +209,7 @@ export function TeamsTab({
   }
 
   const interview: InterviewActions = {
+    language: (t, languages) => run(() => setTeamLanguages(call, t, languages)),
     request: (t, language) => run(() => requestNow(call, t, language)),
     book: (t, slot, language) => run(() => bookSlot(call, t, slot, language)),
     move: (booking, slot) => run(() => moveBooking(call, booking, slot)),
@@ -467,12 +475,13 @@ export function TeamsBoard({
             <button
               type="button"
               className="ja-tm-ghost"
-              title="Assigns within each division and skips conflicted panels."
+              title="Assigns within each division, skips conflicted panels and matches language where it can."
               disabled={autoBusy || !unassigned}
               onClick={onAutoAssign}
             >
               Auto-assign {unassigned} unassigned
             </button>
+            <span className="ja-hint ja-tm-aah">Matches language where it can.</span>
           </div>
 
           <div className="ja-tm-chr" role="group" aria-label="Notebook counts">
@@ -500,9 +509,24 @@ export function TeamsBoard({
               </span>
             ) : null}
           </div>
+          <div className="ja-tm-chr ja-tm-lgs" role="group" aria-label="Filter by interview language">
+            <span className="ja-tm-cl">Language</span>
+            {languageStrip(teams, filters, state.languages).map(({ key, label, count }) => (
+              <button
+                key={key}
+                type="button"
+                className="ja-tm-ch ja-tm-chb"
+                aria-pressed={filters.language === key}
+                onClick={() => onFilters({ ...filters, language: filters.language === key ? "" : key })}
+              >
+                {label}
+                <b>{count}</b>
+              </button>
+            ))}
+          </div>
         </section>
 
-        <p className="ja-tm-help">Select a team to edit its number, name, pit, panel and notebook.</p>
+        <p className="ja-tm-help">Select a team to edit its number, name, pit, language, panel and notebook.</p>
 
         {!shown.length ? (
           <p className="ja-empty">No teams match. Use the Import tab to add your roster.</p>
@@ -514,6 +538,7 @@ export function TeamsBoard({
             flags={flags}
             flagKinds={flagKinds}
             stranded={stranded}
+            languages={state.languages}
             categoryLabel={categoryLabel}
             pickedId={pickedId}
             onPick={onPick}
@@ -525,6 +550,7 @@ export function TeamsBoard({
             panels={panels}
             requests={requests}
             stranded={stranded}
+            languages={state.languages}
             categoryLabel={categoryLabel}
             pickedId={pickedId}
             onPick={onPick}
@@ -611,6 +637,7 @@ type RosterProps = {
   panels: Slice["panels"];
   requests: Slice["requests"];
   stranded: Set<string>;
+  languages: Slice["languages"];
   categoryLabel: (id: string) => string;
   pickedId: string | null;
   onPick: (id: string) => void;
@@ -618,7 +645,7 @@ type RosterProps = {
 };
 
 /** ≥1024px: a read-only table. The row is the button; a click anywhere on it opens the drawer. */
-function TeamTable({ shown, panels, requests, flags, flagKinds, stranded, categoryLabel, pickedId, onPick, rowRef }: RosterProps & { flags: Slice["flags"]; flagKinds: Slice["flagKinds"] }) {
+function TeamTable({ shown, panels, requests, flags, flagKinds, stranded, languages, categoryLabel, pickedId, onPick, rowRef }: RosterProps & { flags: Slice["flags"]; flagKinds: Slice["flagKinds"] }) {
   return (
     <div className="ja-tm-tw">
       <table>
@@ -629,6 +656,7 @@ function TeamTable({ shown, panels, requests, flags, flagKinds, stranded, catego
           <col className="ja-k-pit ja-tm-lo" />
           <col className="ja-k-nb ja-tm-lo" />
           <col className="ja-k-dv ja-tm-lo" />
+          <col className="ja-k-lg" />
           <col className="ja-k-pn" />
           <col className="ja-k-bk ja-tm-lo" />
           <col className="ja-k-iv" />
@@ -641,6 +669,7 @@ function TeamTable({ shown, panels, requests, flags, flagKinds, stranded, catego
             <th scope="col" className="ja-tm-lo">Pit</th>
             <th scope="col" className="ja-tm-lo">Notebook</th>
             <th scope="col" className="ja-tm-lo">Div</th>
+            <th scope="col" title="Interview language">Lang</th>
             <th scope="col">Panel</th>
             <th scope="col" className="ja-tm-lo">Booked</th>
             <th scope="col">Interview</th>
@@ -671,7 +700,11 @@ function TeamTable({ shown, panels, requests, flags, flagKinds, stranded, catego
                 <td className="ja-tm-lo">{categoryLabel(team.category)}</td>
                 <td className="ja-tm-c ja-tm-lo">{divisionTag(team.division)}</td>
                 <td>
+                  <LangText team={team} languages={languages} />
+                </td>
+                <td>
                   <PanelText cell={panelCell(team, panels, stranded)} />
+                  <PanelMisfit team={team} panels={panels} languages={languages} />
                 </td>
                 <td className="ja-tm-lo">
                   <span className={bookedAt ? "ja-tm-bk" : "ja-tm-bk ja-tm-none"}>{formatClock(bookedAt)}</span>
@@ -695,6 +728,30 @@ function TeamTable({ shown, panels, requests, flags, flagKinds, stranded, catego
   );
 }
 
+/** The team's interview language: a neutral tag, or a quiet "Not asked" (not a warning by itself). */
+function LangText({ team, languages }: { team: Team; languages: Slice["languages"] }) {
+  const text = languageText(team.languages, languages);
+  return text ? (
+    <span className="ja-tm-lt">
+      <span className="sr-only">Interview language: </span>
+      {text}
+    </span>
+  ) : (
+    <span className="ja-tm-na">Not asked</span>
+  );
+}
+
+/** A caution triangle beside the panel the team holds when that panel does not cover its language. */
+function PanelMisfit({ team, panels, languages }: { team: Team; panels: Slice["panels"]; languages: Slice["languages"] }) {
+  const panel = panels.find((p) => p.id === team.panel_id);
+  const label = panel ? panelMisfit(team, panel, languages) : null;
+  return label ? (
+    <span className="ja-tm-lw" role="img" aria-label={label} title={label}>
+      <WarnIcon />
+    </span>
+  ) : null;
+}
+
 function PanelText({ cell }: { cell: ReturnType<typeof panelCell> }) {
   return cell.kind === "panel" ? (
     <>{cell.name}</>
@@ -706,7 +763,7 @@ function PanelText({ cell }: { cell: ReturnType<typeof panelCell> }) {
 }
 
 /** <1024px: compact two-line rows, each a button. */
-function TeamList({ shown, panels, requests, stranded, categoryLabel, pickedId, onPick, rowRef }: RosterProps) {
+function TeamList({ shown, panels, requests, stranded, languages, categoryLabel, pickedId, onPick, rowRef }: RosterProps) {
   return (
     <ul className="ja-tm-ll" aria-label="Teams">
       {shown.map((team) => {
@@ -738,6 +795,7 @@ function TeamList({ shown, panels, requests, stranded, categoryLabel, pickedId, 
               <span className="ja-tm-l1">
                 <b>{team.number}</b>
                 <span className="ja-tm-nm">{team.name}</span>
+                <LangText team={team} languages={languages} />
               </span>
               <span className="ja-tm-l2">
                 {parts.map((p, i) => (
@@ -746,6 +804,7 @@ function TeamList({ shown, panels, requests, stranded, categoryLabel, pickedId, 
                     {p}
                   </span>
                 ))}
+                <PanelMisfit team={team} panels={panels} languages={languages} />
               </span>
               <span className="ja-tm-lr">
                 {request ? <StatusPill status={request.status} short /> : null}
@@ -931,6 +990,14 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, bu
   const options = panelOptions(team, state.panels, state.conflicts, state.judges, draft.division);
   // A panel the new division cannot use is no longer in the list: the select reads "— none —", which is what Save will do (after asking).
   const panelShown = options.some((o) => o.id === draft.panelId) ? draft.panelId : "";
+  const chosen = state.panels.find((p) => p.id === panelShown);
+  const misfitNote = chosen ? panelMisfitNote(team, chosen, state.languages) : null;
+  const covering = coveringHint(team, options, state.panels, state.languages);
+  // English | Thai | Both: one per configured language, and "Both" is all of them.
+  const langChoices = [
+    ...state.languages.map((l) => ({ key: l.id, label: l.label, ids: [l.id] })),
+    { key: "both", label: "Both", ids: state.languages.map((l) => l.id) },
+  ];
   const divisions = state.divisions.includes(draft.division) ? state.divisions : [...state.divisions, draft.division];
 
   return (
@@ -1014,6 +1081,34 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, bu
       </div>
 
       <div className="ja-fl">
+        <div className="ja-tm-lgh">
+          <span className="ja-lab" id={`${uid}-lgl`}>
+            Interview language
+          </span>
+          {/* Not part of Save: choosing one applies at once, like the Interview controls. */}
+          <button type="button" className="ja-tm-od" disabled={busy || !team.languages.length} onClick={() => void interview.language(team, [])}>
+            Clear
+          </button>
+        </div>
+        <div className="ja-tm-seg" role="radiogroup" aria-labelledby={`${uid}-lgl`}>
+          {langChoices.map((c) => (
+            <label key={c.key} className="ja-tm-rd3">
+              <input
+                type="radio"
+                name={`${uid}-lg`}
+                value={c.key}
+                checked={languageKey(team) === c.key}
+                disabled={busy}
+                onChange={() => void interview.language(team, c.ids)}
+              />
+              <span>{c.label}</span>
+            </label>
+          ))}
+        </div>
+        <p className="ja-hint">Used when assigning panels. None selected means not asked yet.</p>
+      </div>
+
+      <div className="ja-fl">
         <label className="ja-lab" htmlFor={`${uid}-pn`}>
           Judge panel
         </label>
@@ -1030,7 +1125,16 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, bu
           </select>
           <ChevronDown />
         </div>
-        <p className="ja-hint">{divisionTag(draft.division)} panels without a conflict</p>
+        <p className="ja-hint">
+          {divisionTag(draft.division)} panels without a conflict
+          {covering ? `. ${covering}.` : ""}
+        </p>
+        {misfitNote ? (
+          <div className="jg-caution" role="note">
+            <WarnIcon />
+            <p>{misfitNote}</p>
+          </div>
+        ) : null}
       </div>
 
       <div className="ja-fl">

@@ -500,6 +500,18 @@ test("Move to panel… lists only panels in the team's division without a confli
   assert.doesNotMatch(conflicted, /ja-opt/);
 });
 
+test("Move to panel… words 'Doesn't cover TH' on an option that cannot interview the team, and still lists it", () => {
+  const move = (languages: string[]) =>
+    cardOf(board({ teams: teams.map((t) => (t === titans ? { ...t, languages } : t)), menu: { id: "r-9882K", view: "move" } }), "9882K");
+  // Torque Titans is on Panel 2; Panel 3 is the other Middle School panel and covers English only.
+  const thai = move(["th"]);
+  assert.match(thai, /<button type="button" class="ja-opt"[^>]*><b>Panel 3<\/b>[\s\S]*?<span class="jg-ptag">EN only<\/span>[\s\S]*?<span class="ja-opt-w">Doesn&#x27;t cover TH<\/span><\/button>/);
+  assert.doesNotMatch(move(["en"]), /ja-opt-w/, "English fits");
+  assert.doesNotMatch(move([]), /ja-opt-w/, "not asked is never a misfit");
+  assert.match(move(["en", "th"]), /ja-opt/, "a team asking for both fits an English panel and is not warned");
+  assert.doesNotMatch(move(["en", "th"]), /ja-opt-w/);
+});
+
 test("Move to panel… honours a judge's conflict through the panel the judge is on, and lifts it when the judge is off that panel", () => {
   const move = (b: Parameters<typeof board>[0]) =>
     cardOf(board({ ...b, menu: { id: "r-5150Z", view: "move" } }), "5150Z").match(/<div class="ja-pop"[\s\S]*?<\/div><\/div>/)?.[0] ?? "";
