@@ -46,6 +46,14 @@ export function teamFitsPanel(team: string[], panel: string[]): boolean {
   return languageFit({ languages: team }, { languages: panel }) !== "mismatch";
 }
 
+/** "English", "Thai" or "English or Thai": the labels of the ids we run, in the order given. */
+export function languageNames(ids: string[], languages: Language[]): string {
+  return ids
+    .map((id) => languages.find((l) => l.id === id)?.label)
+    .filter(Boolean)
+    .join(" or ");
+}
+
 /**
  * What this panel can interview in.
  *

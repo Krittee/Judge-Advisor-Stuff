@@ -3,6 +3,7 @@ import type { PanelLoad } from "@/components/SlotPicker";
 import { clockParts } from "@/components/team/teamLogic";
 import { formatClock } from "@/components/ui";
 import { liveRequestFor } from "@/lib/data";
+import { bookingLanguage } from "@/lib/presets";
 import type { Status } from "@/lib/status";
 import { compareTeamNumbers, normalizeTeamNumber } from "@/lib/teamNumber";
 import type { PublicPanel, RequestRow, Slot, Team } from "@/lib/types";
@@ -67,6 +68,44 @@ export function busyText(load: PanelLoad): string {
   if (load.waiting) parts.push(`${load.waiting} waiting`);
   if (load.interviewing) parts.push(`${load.interviewing} in interview`);
   return parts.length ? parts.join(" · ") : "free now";
+}
+
+/* ---- interview language ---------------------------------------------------------- */
+
+/**
+ * The request buttons for a team, in order. A team that has said exactly one
+ * language gets that button first and filled, the other outlined after it;
+ * a team with both languages, none, or one we do not run gets equal buttons
+ * in config order. The desk reads the team's language, it never sets it.
+ */
+export function requestOrder(
+  team: { languages: string[] } | null,
+  languages: { id: string }[],
+): { id: string; primary: boolean }[] {
+  const known = languages.filter((l) => team?.languages.includes(l.id));
+  if (known.length !== 1) return languages.map((l) => ({ id: l.id, primary: true }));
+  const one = known[0].id;
+  return [
+    { id: one, primary: true },
+    ...languages.filter((l) => l.id !== one).map((l) => ({ id: l.id, primary: false })),
+  ];
+}
+
+/** What the desk picked in the Book language select, and for which team. */
+export type BookChoice = { teamId: string; language: string };
+
+/**
+ * The language the Book select shows: the desk's own pick while it is still the
+ * same team, else the team's first language (else the event default). Derived
+ * rather than stored so a different team re-defaults without an effect.
+ */
+export function bookLanguageFor(
+  choice: BookChoice | null,
+  team: (Pick<Team, "id"> & { languages: string[] }) | null,
+  fallback: string,
+): string {
+  if (!team) return fallback;
+  return choice && choice.teamId === team.id ? choice.language : bookingLanguage("", team);
 }
 
 /* ---- the slot grid ------------------------------------------------------------- */

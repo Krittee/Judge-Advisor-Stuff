@@ -4,8 +4,8 @@
 
 import { useMemo } from "react";
 import { CautionIcon, DeskSlots } from "./DeskSlots";
-import { busyText, lookupState, nextFreeStart, slotKind, teamList, TONE } from "./deskLogic";
-import { LanguageCover, LanguageTag, type Language } from "@/components/Language";
+import { busyText, lookupState, nextFreeStart, requestOrder, slotKind, teamList, TONE } from "./deskLogic";
+import { LanguageCover, LanguageTag, languageNames, type Language } from "@/components/Language";
 import { SignOutButton } from "@/components/judging";
 import { panelLoad } from "@/components/SlotPicker";
 import { Elapsed, formatClock } from "@/components/ui";
@@ -126,18 +126,31 @@ export function DeskView(p: DeskViewProps) {
   const notFound = state.kind === "not-found";
   const canRequest = Boolean(team && panel) && state.kind === "ready";
   const category = team ? (p.categories.find((c) => c.id === team.category)?.label ?? team.category) : "";
+  const teamLanguage = team ? languageNames(team.languages, languages) : "";
   const nextFree = nextFreeStart(slots, now);
   const load = panel ? panelLoad(panel.id, p.requests) : null;
 
-  const requestButtons = (disabled: boolean) => (
-    <div className="dk-pair" role="group" aria-label="Request a judge now, by interview language">
-      {languages.map((l) => (
-        <button key={l.id} type="button" className="dk-prim dk-lg" disabled={disabled} onClick={() => p.onRequest(l.id)}>
-          {`Request · ${l.label}`}
-        </button>
-      ))}
-    </div>
-  );
+  /** One button per language; a team that said one language gets it first and filled (requestOrder). */
+  const langPair = (verb: string, aria: string, disabled: boolean) => {
+    const order = requestOrder(team, languages);
+    return (
+      <div className={`dk-pair${order.some((o) => !o.primary) ? " dk-one" : ""}`} role="group" aria-label={aria}>
+        {order.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            className={`${o.primary ? "dk-prim" : "dk-out"} dk-lg`}
+            disabled={disabled}
+            onClick={() => p.onRequest(o.id)}
+          >
+            {`${verb} · ${languages.find((l) => l.id === o.id)?.label ?? o.id}`}
+          </button>
+        ))}
+      </div>
+    );
+  };
+  const requestButtons = (disabled: boolean) =>
+    langPair("Request", "Request a judge now, by interview language", disabled);
 
   const noteInput = (id: string) => (
     <input
@@ -249,6 +262,21 @@ export function DeskView(p: DeskViewProps) {
           ) : null}
         </div>
 
+        {/* What the team asked for, read-only: only the coordinator and the Judge Advisor can change it. */}
+        {team && teamLanguage ? (
+          <div className="dk-lrow">
+            <span>Interview language</span>
+            <span className="dk-lrt">
+              <span className="dk-lts">
+                {team.languages.map((id) => (
+                  <LanguageTag key={id} language={id} languages={languages} />
+                ))}
+              </span>
+              {teamLanguage}
+            </span>
+          </div>
+        ) : null}
+
         {p.error ? (
           <p className="dk-msg dk-msg--err" role="alert">
             {p.error}
@@ -294,13 +322,7 @@ export function DeskView(p: DeskViewProps) {
                 <button type="button" className="dk-out" disabled={busy} onClick={() => p.onStartReschedule(state.booking, team.number)}>
                   Reschedule
                 </button>
-                <div className="dk-pair" role="group" aria-label="Request now instead, by interview language">
-                  {languages.map((l) => (
-                    <button key={l.id} type="button" className="dk-prim dk-lg" disabled={busy} onClick={() => p.onRequest(l.id)}>
-                      {`Now · ${l.label}`}
-                    </button>
-                  ))}
-                </div>
+                {langPair("Now", "Request now instead, by interview language", busy)}
               </>
             ) : (
               <div className="dk-pair dk-rq" role="group" aria-label="What to do with the booking">

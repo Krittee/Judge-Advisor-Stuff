@@ -3,11 +3,13 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 
 import {
+  bookLanguageFor,
   busyText,
   cancelBookingAfterAsking,
   cancelBookingPrompt,
   lookupState,
   nextFreeStart,
+  requestOrder,
   slotGrid,
   slotKind,
   teamList,
@@ -279,4 +281,28 @@ test("teamList: pairs each team with its live request, else its booking, else nu
   const rows = teamList(input, [done, later, live], "");
   assert.deepEqual(rows.map((r) => r.request?.id ?? null), [later.id, live.id, null, null]);
   assert.deepEqual(input, roll, "the roster passed in is left as it was");
+});
+
+/* ---- interview language ---- */
+
+const en = { id: "en" }, th = { id: "th" };
+
+test("requestOrder: one language goes first and filled; both, none, unknown or no team stay equal", () => {
+  assert.deepEqual(requestOrder({ languages: ["th"] }, [en, th]), [{ id: "th", primary: true }, { id: "en", primary: false }]);
+  assert.deepEqual(requestOrder({ languages: ["en"] }, [en, th]), [{ id: "en", primary: true }, { id: "th", primary: false }]);
+  const equal = [{ id: "en", primary: true }, { id: "th", primary: true }];
+  assert.deepEqual(requestOrder({ languages: ["en", "th"] }, [en, th]), equal);
+  assert.deepEqual(requestOrder({ languages: [] }, [en, th]), equal);
+  assert.deepEqual(requestOrder({ languages: ["fr"] }, [en, th]), equal);
+  assert.deepEqual(requestOrder(null, [en, th]), equal);
+});
+
+test("bookLanguageFor: the team's first language, the desk's pick only for the same team", () => {
+  const thai = { id: "t1", languages: ["th"] }, none = { id: "t2", languages: [] as string[] };
+  assert.equal(bookLanguageFor(null, thai, "en"), "th");
+  assert.equal(bookLanguageFor(null, none, "en"), "en", "today's default when not asked");
+  assert.equal(bookLanguageFor({ teamId: "t1", language: "en" }, thai, "en"), "en", "a choice for this team stands");
+  assert.equal(bookLanguageFor({ teamId: "t1", language: "en" }, none, "en"), "en");
+  assert.equal(bookLanguageFor({ teamId: "t2", language: "en" }, thai, "en"), "th", "a pick for another team re-defaults");
+  assert.equal(bookLanguageFor({ teamId: "t1", language: "th" }, null, "en"), "en", "no team, the fallback");
 });
