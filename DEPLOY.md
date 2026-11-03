@@ -189,9 +189,10 @@ All in the browser, at `your-address.vercel.app/admin`:
    ```
    That is number, name, pit, division. The pit is a letter and a number (it
    places the team on the floor plan); a blank division means the first one.
-   An optional sixth column, after the notebook type, sets the interview
-   language: `EN`, `TH`, `EN/TH`, `EN+TH`, `both` or `Thai`. Leave it blank and
-   the stored language stays.
+   An optional fifth column is the notebook type (Developing, Fully Developed
+   or Ungraded; see the README's notebook-type paragraph), and an optional
+   sixth sets the interview language: `EN`, `TH`, `EN/TH`, `EN+TH`, `both` or
+   `Thai`. Leave it blank and the stored language stays.
    Or drop an Excel (`.xlsx`) or CSV file straight in — it is read on your own
    computer and never uploaded. Team numbers can include letters, like `9882K`.
    Tick **spread across panels evenly** to share teams out. Re-importing

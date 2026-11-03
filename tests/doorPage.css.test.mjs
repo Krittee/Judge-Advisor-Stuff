@@ -123,6 +123,12 @@ test("each sample tile class pairs the fill and the ink the test above measures,
   assert.equal(pageRule("light").match(/--dp-booked-ink: ([^;]+);/)[1], ruleBody(/^:root\[data-theme="light"\] \.board \{/m).match(/--bd-booked-ink: ([^;]+);/)[1]);
 });
 
+test("the Coordinator's empty avatar box is a 1.5px dashed --rail, defined for both themes", () => {
+  assert.match(bare, /\.dp-av--ph \{[^}]*border: 1\.5px dashed var\(--rail\)[^}]*background: none/);
+  assert.deepEqual(token(pageRule("dark"), "rail"), [0.42, 0.016, 265]);
+  assert.deepEqual(token(pageRule("light"), "rail"), [0.74, 0.012, 265]);
+});
+
 /* ---- the block ---------------------------------------------------------------------- */
 
 const start = css.lastIndexOf("/*", css.indexOf('Door page ("/"'));
@@ -161,11 +167,11 @@ test("touch targets: doors 64px or more, the board link 56px, the back link 44px
   assert.match(css, /\.lp-back \{[^}]*min-height: 44px/);
 });
 
-test("layout: tiles go 3 + 2 on a phone and one row of five from 1024px; doors one column then a row of five", () => {
+test("layout: tiles go 3 + 2 on a phone and one row of five from 1024px; doors one column then 3 x 2", () => {
   assert.match(bare, /\.dp-sg \{[^}]*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/);
   assert.match(bare, /\.dp-tl:nth-child\(n\+4\) \{ grid-column: span 3; \}/);
   const wide = bare.slice(bare.indexOf("@media (min-width: 1024px)"));
   assert.match(wide, /\.dp-sg \{[^}]*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
-  assert.match(wide, /\.dp-doors \{ flex-direction: row;/);
+  assert.match(wide, /\.dp-doors \{ display: grid; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); gap: 36px 16px;/);
   assert.match(bare, /\.dp-doors \{ display: flex; flex-direction: column;/);
 });

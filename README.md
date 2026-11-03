@@ -164,8 +164,11 @@ same refusal.
 | **Judge Advisor** (`ADMIN_CODE`–`ADMIN_CODE_4`) | any | any | any | any | ✅ |
 
 A coordinator also sets a team's interview language, which has no column above.
-A coordinator cannot cancel, reschedule or change a booking, and sees no notes,
-scores, conflicts or referee flags.
+A coordinator only adds: they can request a judge or book a time for a team that
+has no live request, and for a team that already has one they get "Already
+booked — the queue desk can change it." They cannot cancel, reschedule or move a
+booking (the queue desk or Judge Advisor does that), and they see no team
+messages, notes, scores, conflicts or referee flags.
 
 A referee sits outside that table: they touch no interview and read no
 judging note. Their one job is the **Referee** section below.
@@ -866,6 +869,7 @@ tab.
 | `/judge/login`, `/queue/login`, `/coordinator/login`, `/referee/login`, `/admin/login` | staff | One sign-in door per role (`/login` still takes any code) |
 | `/judge` | judges | Up next, team sheets with both rubrics, nominations |
 | `/queue` | queue desk | Now (request) or Book (slot grid); waiting, booked and all teams |
+| `/coordinator` | coordinators | Teams (set the interview language, request a judge) and Slots (book a time) |
 | `/referee` | referees | Set the match, flag a team against a rule; the head referee sets up the day |
 | `/admin` | you | Floor · Referee · Teams · Panels · Conflicts · Import · Scores · Awards · Activity |
 
