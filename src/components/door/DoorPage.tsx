@@ -21,8 +21,8 @@ const DOORS: Door[] = [
   { name: "Judge", line: "Panel code from your Judge Advisor", href: "/judge/login", ring: "judge", avatar: "judge" },
   { name: "Referee", line: "Referees and the head referee", href: "/referee/login", ring: "ref", avatar: "referee" },
   { name: "Queue desk", line: "Check teams in and book times", href: "/queue/login", ring: "desk", avatar: "queue-desk" },
-  { name: "Judge Advisor", line: "Runs judging for the event", href: "/admin/login", ring: "ja", avatar: "judge-advisor" },
   { name: "Coordinator", line: "Walk the pits: languages and bookings", href: "/coordinator/login", ring: "co", placeholder: true },
+  { name: "Judge Advisor", line: "Runs judging for the event", href: "/admin/login", ring: "ja", avatar: "judge-advisor" },
 ];
 
 /** One sample team in each colour a tile can wear on the board, in the order a visit happens. */

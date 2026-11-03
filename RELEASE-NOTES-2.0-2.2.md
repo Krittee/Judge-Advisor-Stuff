@@ -38,6 +38,7 @@ auto-assigner all use. Every change below is local and not pushed.
 | [Coordinator console `/coordinator`: Teams + Slots](#coordinator-console) | `2fe4d72` | Not yet (browser phone size only) | Local, not pushed |
 | [The sixth door, the last docs and these notes](#door-and-docs) | `2ae05d9` | Not yet (browser phone size only) | Local, not pushed |
 | [Review fixes: booked time no longer wraps; coordinator tabs open at the top](#review-fixes) | `ac9a4bf` | Not yet (browser phone size only) | Local, not pushed |
+| [The Coordinator door moves after Queue desk](#door-order) | (this commit) | Not yet (browser phone size only) | Local, not pushed |
 
 ### Your decisions for 2.1.0
 
@@ -50,6 +51,7 @@ auto-assigner all use. Every change below is local and not pushed.
 - A coordinator cannot cancel, reschedule or move a booking (the queue desk or
   Judge Advisor does that). They see no team messages, notes, scores,
   conflicts or flags.
+- Coordinator door sits after Queue desk (user, 2026-11-03), as PROMPT.md says.
 
 ### Browser checks
 
@@ -60,7 +62,6 @@ Run by the lead on a copy of the demo data (never `.data/`), with the dev server
 - The Postgres migration for the language columns is tested only by the static
   SQL tests. It was not run on a real database in this build.
 - The Coordinator avatar is a placeholder (an empty dashed box) until you supply art.
-- Open point for you to confirm: the Coordinator door is last, as in the chosen wide mock. `design/coordinator-redesign/PROMPT.md` says "after Queue desk".
 
 <a id="coordinator-role"></a>
 ### Coordinator role: code, sign-in door, permissions
@@ -198,14 +199,15 @@ is kept in `?tab=`. A coordinator opening `/queue` is sent here. Files:
 docs needed to say what a coordinator can and cannot do.
 
 **What changed.** `/` now has six doors: Coordinator ("Walk the pits: languages
-and bookings", `/coordinator/login`) after Judge Advisor, with an empty 1.5px
+and bookings", `/coordinator/login`) after Queue desk, with an empty 1.5px
 dashed `--rail` box where the picture will go (a `placeholder` flag on `Door`,
-not `ring: null`). Wide layout is 3 x 2. README: `/coordinator` route row and
+not `ring: null`). Wide layout is 3 x 2: Team, Judge, Referee / Queue desk,
+Coordinator, Judge Advisor. README: `/coordinator` route row and
 the coordinator rules. DEPLOY: the import step names the fifth (notebook type)
 and sixth (language) columns. Files: `src/components/door/DoorPage.tsx`,
 `src/app/globals.css`, `tests/doorPage.*`, `README.md`, `DEPLOY.md`, this file.
 
-**How it was tested.** `tests/doorPage.runtime.test.tsx` and `doorPage.css.test.mjs`. Browser checks: done. The phone shows six doors, with the Coordinator last and an empty dashed avatar; at 1280 light the doors lay out 3 × 2.
+**How it was tested.** `tests/doorPage.runtime.test.tsx` and `doorPage.css.test.mjs`. Browser checks: done at `2ae05d9`, when the Coordinator was last. The phone showed six doors with an empty dashed avatar; at 1280 light the doors laid out 3 × 2. The order was changed after that check (see the entry below), so that check predates the move.
 
 **Commit and branch.** `2ae05d9` on `claude/v21-coordinator-c9e080`.
 
@@ -219,6 +221,17 @@ and sixth (language) columns. Files: `src/components/door/DoorPage.tsx`,
 **How it was tested.** The scroll reset has a source-read test in `coordinatorPage.runtime.test.tsx`. The `nowrap` change has no test. Both were re-checked in the browser at `ac9a4bf`: at 1280 the booked time reads "3:40 PM" on one line and the table still fits without a sideways scroll; on the phone, scrolling Teams down 600px and pressing "Book a time" opens Slots at the top.
 
 **Commit and branch.** `ac9a4bf` on `claude/v21-coordinator-c9e080`.
+
+<a id="door-order"></a>
+### The Coordinator door moves after Queue desk
+
+**Problem / request.** The user decided the Coordinator door goes after Queue desk, not last, as `design/coordinator-redesign/PROMPT.md` says. Wide layout is now Team, Judge, Referee / Queue desk, Coordinator, Judge Advisor.
+
+**What changed.** `DOORS` in `src/components/door/DoorPage.tsx` lists the Coordinator fifth. Files: `src/components/door/DoorPage.tsx`, `tests/doorPage.runtime.test.tsx`, `RELEASE-NOTES-2.0-2.2.md`.
+
+**How it was tested.** `tests/doorPage.runtime.test.tsx` checks the new hrefs, names, lines and card positions. Browser check at the new order: not done yet.
+
+**Commit and branch.** (this commit) on `claude/v21-coordinator-c9e080`.
 
 ---
 

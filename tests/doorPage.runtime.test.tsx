@@ -24,17 +24,17 @@ const door = renderToStaticMarkup(<DoorPage />);
 const hrefs = [...door.matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
 
 test("/: six doors in order, each a link to its sign-in", () => {
-  assert.deepEqual(hrefs.slice(0, 6), ["/team", "/judge/login", "/referee/login", "/queue/login", "/admin/login", "/coordinator/login"]);
+  assert.deepEqual(hrefs.slice(0, 6), ["/team", "/judge/login", "/referee/login", "/queue/login", "/coordinator/login", "/admin/login"]);
   const names = [...door.matchAll(/<span class="dp-dt">([^<]+)<\/span>/g)].map((m) => m[1]);
-  assert.deepEqual(names, ["Team", "Judge", "Referee", "Queue desk", "Judge Advisor", "Coordinator"]);
+  assert.deepEqual(names, ["Team", "Judge", "Referee", "Queue desk", "Coordinator", "Judge Advisor"]);
   const lines = [...door.matchAll(/<span class="dp-s">([^<]+)<\/span>/g)].map((m) => m[1]);
   assert.deepEqual(lines.slice(0, 6), [
     "Check your judging status",
     "Panel code from your Judge Advisor",
     "Referees and the head referee",
     "Check teams in and book times",
-    "Runs judging for the event",
     "Walk the pits: languages and bookings",
+    "Runs judging for the event",
   ]);
 });
 
@@ -59,15 +59,15 @@ test("/: the Team door has a ticket glyph and a caption, no avatar; the others r
   assert.ok(!/<img/.test(cards[0]));
   assert.match(cards[0], /aria-describedby="dp-cap"/);
   assert.match(door, /<p class="dp-cap" id="dp-cap">Opens the team ticket<\/p>/);
-  const rings = [
-    ["judge", "judge"], ["referee", "ref"], ["queue-desk", "desk"], ["judge-advisor", "ja"],
+  const rings: [string, string, number][] = [
+    ["judge", "judge", 1],["referee", "ref", 2], ["queue-desk", "desk", 3], ["judge-advisor", "ja", 5],
   ];
-  rings.forEach(([file, ring], i) => {
-    assert.match(cards[i + 1], new RegExp(`dp-r-${ring}"><img src="/avatars/${file}\\.jpg" alt=""`));
+  rings.forEach(([file, ring, i]) => {
+    assert.match(cards[i], new RegExp(`dp-r-${ring}"><img src="/avatars/${file}\\.jpg" alt=""`));
   });
   // The Coordinator: an empty, decorative dashed box; no picture, no ticket caption.
-  assert.match(cards[5], /<span class="dp-av dp-av--ph" aria-hidden="true"><\/span>/);
-  assert.ok(!/<img|aria-describedby/.test(cards[5]));
+  assert.match(cards[4], /<span class="dp-av dp-av--ph" aria-hidden="true"><\/span>/);
+  assert.ok(!/<img|aria-describedby/.test(cards[4]));
   assert.equal([...door.matchAll(/class="dp-cap"/g)].length, 1);
 });
 
