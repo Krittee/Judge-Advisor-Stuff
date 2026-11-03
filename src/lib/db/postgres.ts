@@ -17,7 +17,7 @@ import { randomPanelCode } from "../panelCode";
 import { readActivity, type StoredActivity } from "../activity";
 import { blendedDivisions, defaultCategory, divisionsCompatible, presetDivisions, presetPanels } from "../presets";
 import { hasNearbyBooking } from "../data";
-import { isPanelBlocked, judgeKey, panelBlocks } from "../roster";
+import { judgeKey, panelBlocks, planAssignments } from "../roster";
 import {
   StoreError,
   STALE_STATUS_MESSAGE,
@@ -1084,25 +1084,7 @@ export const postgresStore: Store = {
     // A panel that must stay away from a team is not a candidate for it.
     const blocks = panelBlocks(await this.listConflicts(), await this.listJudges());
 
-    const assignments: { teamId: string; panelId: string }[] = [];
-    for (const team of pending) {
-      // The hard wall: only panels this team's division may be judged by,
-      // and a blended team clears it against every panel (see
-      // divisionsCompatible) rather than needing a panel created in the
-      // blended division before it can be judged at all.
-      // and never one with a declared conflict.
-      const eligible = panels.filter(
-        (p) => divisionsCompatible(team.division, p.division) && !isPanelBlocked(blocks, p.id, team.id),
-      );
-      const target = eligible
-        .map((p) => ({ id: p.id, count: load.get(p.id) ?? 0 }))
-        .filter((p) => p.count < perPanel)
-        .sort((a, b) => a.count - b.count)[0];
-      if (!target) continue; // no room left in this team's division
-
-      load.set(target.id, target.count + 1);
-      assignments.push({ teamId: team.id, panelId: target.id });
-    }
+    const assignments = planAssignments(pending, panels, load, perPanel, blocks);
 
     if (assignments.length) {
       await query(

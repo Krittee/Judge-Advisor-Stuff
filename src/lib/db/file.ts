@@ -28,7 +28,7 @@ import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
 import { divisionsCompatible } from "../presets";
 import { hasNearbyBooking } from "../data";
-import { isPanelBlocked, judgeKey, panelBlocks } from "../roster";
+import { judgeKey, panelBlocks, planAssignments } from "../roster";
 import {
   bookingDefaults,
   DEFAULT_DIVISION,
@@ -786,30 +786,15 @@ function autoAssignTeams(perPanel: number, includeAssigned = false, division?: s
   // A panel that must stay away from a team is not a candidate for it.
   const blocks = panelBlocks(state().conflicts, state().judges);
 
-  let assigned = 0;
-  for (const team of pending) {
-    // The hard wall: only panels this team's division may be judged by,
-    // and never one with a declared conflict. A blended team clears the
-    // wall against every panel (see divisionsCompatible) -- without that
-    // it matches only a panel created in the blended division, and if the
-    // event never made one it is skipped here and silently goes unjudged.
-    const eligible = panels.filter(
-      (p) => divisionsCompatible(team.division, p.division) && !isPanelBlocked(blocks, p.id, team.id),
-    );
-    const target = eligible
-      .map((p) => ({ id: p.id, count: load.get(p.id) ?? 0 }))
-      .filter((p) => p.count < perPanel)
-      .sort((a, b) => a.count - b.count)[0];
-    if (!target) continue; // no room left in this team's division
-
-    load.set(target.id, target.count + 1);
-    const row = state().teams.find((t) => t.id === team.id)!;
-    row.panel_id = target.id;
-    assigned++;
+  // The walls (division, conflicts, perPanel) and the language preference
+  // live in planAssignments, shared with the Postgres store.
+  const plan = planAssignments(pending, panels, load, perPanel, blocks);
+  for (const { teamId, panelId } of plan) {
+    state().teams.find((t) => t.id === teamId)!.panel_id = panelId;
   }
 
   save();
-  return assigned;
+  return plan.length;
 }
 
 /* ------------------------------------------------------------------ *

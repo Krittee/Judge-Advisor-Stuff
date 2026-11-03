@@ -1,7 +1,7 @@
 import presetFile from "../../config/event.json";
 import { normalizePanelCode } from "./panelCode";
 import { getRuleset, type MatchType } from "./rules";
-import type { AwardView } from "./types";
+import type { AwardView, Panel, Team } from "./types";
 
 /**
  * Preset panels, read from config/event.json.
@@ -105,6 +105,19 @@ export function divisionsCompatible(teamDivision: string, panelDivision: string)
   if (teamDivision === panelDivision) return true;
   const blended = blendedDivisions();
   return blended.includes(teamDivision) || blended.includes(panelDivision);
+}
+
+/**
+ * How well a panel's languages fit a team's. Advisory only: nothing
+ * refuses an assignment on it, the way the Floor tab's language gap only
+ * warns. Either side empty means "not stated", which is not a mismatch.
+ */
+export function languageFit(
+  team: Pick<Team, "languages">,
+  panel: Pick<Panel, "languages">,
+): "match" | "unstated" | "mismatch" {
+  if (!team.languages.length || !panel.languages.length) return "unstated";
+  return team.languages.some((l) => panel.languages.includes(l)) ? "match" : "mismatch";
 }
 
 /* ------------------------------------------------------------------ *

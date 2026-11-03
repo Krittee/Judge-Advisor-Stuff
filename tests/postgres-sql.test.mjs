@@ -873,7 +873,7 @@ test("auto-assign does not choose the panel a conflicted judge sits on, and does
   const panel = (id) => ({ id, name: id, division: "Division 1", sort_order: 1, languages: [], judges: [], created_at: new Date() });
   const rowsFor = (judgePanel) => (sql) => {
     if (sql.includes("from panels p")) return [panel("pA"), panel("pB")];
-    if (sql === "select * from teams") return [{ id: "t1", number: "1001", name: "Hawks", panel_id: null, division: "Division 1", category: "developing", pit: null, created_at: new Date() }];
+    if (sql === "select * from teams") return [{ id: "t1", number: "1001", name: "Hawks", panel_id: null, division: "Division 1", category: "developing", pit: null, languages: [], created_at: new Date() }];
     if (sql === "select * from conflicts") return [{ id: "c1", panel_id: null, judge_id: "j1", team_id: "t1" }];
     if (sql.startsWith(`select ${JUDGE_COLUMNS} from judges`)) return [judgeRow({ panel_id: judgePanel })];
     return [];

@@ -1,4 +1,5 @@
-import type { ConflictRow, JudgeRow, Team } from "./types";
+import { divisionsCompatible, languageFit } from "./presets";
+import type { ConflictRow, JudgeRow, Panel, Team } from "./types";
 
 /**
  * The one rule for "may this panel meet this team?", and the judge roster
@@ -63,4 +64,48 @@ export const judgeKey = (name: string): string => name.trim().toLowerCase();
 export function blockedAndAssigned(panelId: string, blocks: PanelBlock[], teams: Team[]): Team[] {
   const blocked = blockedTeams(blocks, panelId);
   return teams.filter((t) => t.panel_id === panelId && blocked.has(t.id));
+}
+
+/**
+ * Who goes on which panel for auto-assign: the one pick both stores run,
+ * so file and Postgres cannot drift. `load` is how many teams each panel
+ * already holds (it is not changed here).
+ *
+ * The walls are the division, conflicts and perPanel. Inside them a panel
+ * that speaks the team's language is preferred, then one that states none,
+ * then a mismatch -- advisory, so a team still takes a mismatched panel
+ * rather than go unassigned. Within a rank the emptiest panel wins.
+ * Teams whose language the fewest panels cover go first, so a Thai-only
+ * team is not crowded out of the one Thai panel by teams that could go
+ * anywhere. With no languages stated this is the plain emptiest-first deal.
+ */
+export function planAssignments(
+  teams: Pick<Team, "id" | "division" | "languages">[],
+  panels: Pick<Panel, "id" | "division" | "languages">[],
+  load: Map<string, number>,
+  perPanel: number,
+  blocks: PanelBlock[],
+): { teamId: string; panelId: string }[] {
+  const left = new Map(load);
+  const eligibleFor = (t: (typeof teams)[number]) =>
+    panels.filter((p) => divisionsCompatible(t.division, p.division) && !isPanelBlocked(blocks, p.id, t.id));
+  // Array.prototype.sort is stable, so equal keys keep their given order.
+  const scarcity = (t: (typeof teams)[number]) => {
+    const matching = eligibleFor(t).filter((p) => languageFit(t, p) === "match").length;
+    return t.languages.length && matching ? matching : Number.MAX_SAFE_INTEGER;
+  };
+  const rank = { match: 0, unstated: 1, mismatch: 2 };
+
+  const plan: { teamId: string; panelId: string }[] = [];
+  for (const team of [...teams].sort((a, b) => scarcity(a) - scarcity(b))) {
+    const target = eligibleFor(team)
+      .map((p) => ({ id: p.id, count: left.get(p.id) ?? 0, rank: rank[languageFit(team, p)] }))
+      .filter((p) => p.count < perPanel)
+      .sort((a, b) => a.rank - b.rank || a.count - b.count)[0];
+    if (!target) continue; // no room left in this team's division
+
+    left.set(target.id, target.count + 1);
+    plan.push({ teamId: team.id, panelId: target.id });
+  }
+  return plan;
 }
