@@ -143,7 +143,7 @@ export function DeskView(p: DeskViewProps) {
             disabled={disabled}
             onClick={() => p.onRequest(o.id)}
           >
-            {`${verb} · ${languages.find((l) => l.id === o.id)?.label ?? o.id}`}
+            {`${verb} · ${languageNames([o.id], languages)}`}
           </button>
         ))}
       </div>
@@ -266,13 +266,11 @@ export function DeskView(p: DeskViewProps) {
         {team && teamLanguage ? (
           <div className="dk-lrow">
             <span>Interview language</span>
-            <span className="dk-lrt">
-              <span className="dk-lts">
-                {team.languages.map((id) => (
-                  <LanguageTag key={id} language={id} languages={languages} />
-                ))}
-              </span>
-              {teamLanguage}
+            <span className="dk-lts">
+              {team.languages.map((id) => (
+                <LanguageTag key={id} language={id} languages={languages} />
+              ))}
+              <span className="sr-only">{teamLanguage}</span>
             </span>
           </div>
         ) : null}

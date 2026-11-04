@@ -2392,7 +2392,6 @@ body:has(.desk, .co) > .theme-toggle:hover {
   display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 0 14px;
   border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink-subtle); font-size: 14px;
 }
-.dk-lrt { display: flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 500; }
 .dk-lts { display: inline-flex; gap: 4px; }
 .dk-lt, .dk-lts { color: var(--ink-subtle); }
 .dk-cover { margin: 6px 0 0; color: var(--ink-subtle); font-size: 12.5px; }

@@ -20,7 +20,6 @@ import {
   columnKey,
   conflictNote,
   coverTags,
-  coverWord,
   defaultColumnKey,
   divisionTag,
   gapNote,
@@ -31,6 +30,7 @@ import {
   type FloorCard,
   type FloorColumn,
 } from "./floorLogic";
+import { misfit } from "./teamsLogic";
 
 /** The card whose "⋯" popover is open, and which of its two views it shows. */
 export type FloorMenu = { id: string; view: "root" | "move" };
@@ -447,7 +447,7 @@ function Card({
                 <>
                   <p className="ja-pop-h">Move to panel…</p>
                   {targets.map((p, i) => {
-                    const word = coverWord(team, p, languages);
+                    const word = misfit(team, p, languages, true);
                     return (
                       <button
                         key={p.id}

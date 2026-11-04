@@ -9,7 +9,6 @@ import {
   rowState,
   saveLanguages,
   shownPanel,
-  slotLanguage,
   slotsModel,
   tabFrom,
   tabHref,
@@ -18,7 +17,7 @@ import {
   withPending,
   type Pending,
 } from "../src/components/coordinator/coordinatorLogic";
-import { slotTime } from "../src/components/desk/deskLogic";
+import { bookLanguageFor, slotTime } from "../src/components/desk/deskLogic";
 import type { PublicPanel, RequestRow, Team } from "../src/lib/types";
 
 /* The coordinator console's decisions, run for real against
@@ -195,19 +194,11 @@ test("row state: held beats everything; then no language; then no panel; else re
 
 /* ---- the booking language --------------------------------------------------------------------- */
 
-test("a slot is booked in the team's language", () => {
-  assert.equal(slotLanguage({ languages: ["th"] }, p3), "th");
-  assert.equal(slotLanguage({ languages: ["en"] }, p2), "en");
-  assert.equal(slotLanguage({ languages: ["en"] }, p3), "en", "a panel that does not cover it is only a caution, not a switch");
-});
-
-test("a team that speaks both is booked in the first of its languages the panel covers", () => {
-  const both = { languages: ["en", "th"] };
-  assert.equal(slotLanguage(both, panel("p3", { languages: ["th"] })), "th", "Thai-only panel");
-  assert.equal(slotLanguage(both, panel("p2", { languages: ["en"] })), "en", "English-only panel");
-  assert.equal(slotLanguage(both, panel("p4", { languages: ["en", "th"] })), "en", "covers both: the team's first");
-  assert.equal(slotLanguage(both, panel("p5", { languages: [] })), "en", "panel has not said: the team's first");
-  assert.equal(slotLanguage({ languages: ["th", "en"] }, panel("p6", { languages: ["xx"] })), "th", "covers neither: the team's first");
+test("a bilingual team on a Thai-only panel is booked in Thai by both the desk and the coordinator", () => {
+  const t = team("7700B", { languages: ["en", "th"] });
+  const thaiOnly = panel("p3", { languages: ["th"] });
+  assert.equal(bookLanguageFor(null, t, "en", thaiOnly), "th");
+  assert.deepEqual(bookBar(t, thaiOnly, null), { kind: "ready", team: t, panel: thaiOnly, language: "th" });
 });
 
 /* ---- the Slots tab ---------------------------------------------------------------------------------- */

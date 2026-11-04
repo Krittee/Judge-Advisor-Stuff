@@ -18,7 +18,6 @@ import {
   activeFilters,
   bookSlot,
   cancelBookingNow,
-  coveringHint,
   filterTeams,
   flagPills,
   interviewOf,
@@ -27,13 +26,12 @@ import {
   languageKey,
   languageStrip,
   leaveAfterAsking,
+  misfit,
   moveBooking,
   notebookCounts,
   openInRefereeAfterAsking,
   panelCell,
   panelLoad,
-  panelMisfit,
-  panelMisfitNote,
   panelOptions,
   removeTeamAfterAsking,
   requestBlocker,
@@ -745,7 +743,8 @@ function LangText({ team, languages }: { team: Team; languages: Slice["languages
 /** A caution triangle beside the panel the team holds when that panel does not cover its language. */
 function PanelMisfit({ team, panels, languages }: { team: Team; panels: Slice["panels"]; languages: Slice["languages"] }) {
   const panel = panels.find((p) => p.id === team.panel_id);
-  const label = panel ? panelMisfit(team, panel, languages) : null;
+  const m = panel ? misfit(team, panel, languages) : null;
+  const label = panel && m ? `${panel.name}: ${m}` : null;
   return label ? (
     <span className="ja-tm-lw" role="img" aria-label={label} title={label}>
       <WarnIcon />
@@ -992,8 +991,7 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, bu
   // A panel the new division cannot use is no longer in the list: the select reads "— none —", which is what Save will do (after asking).
   const panelShown = options.some((o) => o.id === draft.panelId) ? draft.panelId : "";
   const chosen = state.panels.find((p) => p.id === panelShown);
-  const misfitNote = chosen ? panelMisfitNote(team, chosen, state.languages) : null;
-  const covering = coveringHint(team, options, state.panels, state.languages);
+  const misfitNote = chosen ? misfit(team, chosen, state.languages) : null;
   // English | Thai | Both: one per configured language, and "Both" is all of them.
   const langChoices = [
     ...state.languages.map((l) => ({ key: l.id, label: l.label, ids: [l.id] })),
@@ -1126,14 +1124,11 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, bu
           </select>
           <ChevronDown />
         </div>
-        <p className="ja-hint">
-          {divisionTag(draft.division)} panels without a conflict
-          {covering ? `. ${covering}.` : ""}
-        </p>
+        <p className="ja-hint">{divisionTag(draft.division)} panels without a conflict</p>
         {misfitNote ? (
           <div className="jg-caution" role="note">
             <WarnIcon />
-            <p>{misfitNote}</p>
+            <p>{`${misfitNote}. You can keep it.`}</p>
           </div>
         ) : null}
       </div>

@@ -141,14 +141,6 @@ export function rowState(team: Team, panel: PublicPanel | null, request: Request
   return { kind: "ready", panel };
 }
 
-/**
- * The language a slot is booked in: the team's own; for a team that speaks
- * both, the first of its languages the panel covers (else its first).
- */
-export function slotLanguage(team: Pick<Team, "languages">, panel: Pick<PublicPanel, "languages">): string {
-  return team.languages.find((l) => panel.languages.includes(l)) ?? bookingLanguage("", team);
-}
-
 /* ---- the Slots tab --------------------------------------------------------------------------- */
 
 /** What the pinned bar is about: nobody yet, somebody who cannot be booked, or somebody who can. */
@@ -168,7 +160,7 @@ export function bookBar(team: Team | null, panel: PublicPanel | null, request: R
     case "no-panel":
       return { kind: "blocked", team, line: NO_PANEL_LINE };
     default:
-      return { kind: "ready", team, panel: state.panel, language: slotLanguage(team, state.panel) };
+      return { kind: "ready", team, panel: state.panel, language: bookingLanguage(undefined, team, state.panel) };
   }
 }
 

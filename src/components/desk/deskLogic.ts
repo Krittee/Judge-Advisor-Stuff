@@ -96,16 +96,17 @@ export type BookChoice = { teamId: string; language: string };
 
 /**
  * The language the Book select shows: the desk's own pick while it is still the
- * same team, else the team's first language (else the event default). Derived
+ * same team, else `bookingLanguage` for the team on its panel. Derived
  * rather than stored so a different team re-defaults without an effect.
  */
 export function bookLanguageFor(
   choice: BookChoice | null,
   team: (Pick<Team, "id"> & { languages: string[] }) | null,
   fallback: string,
+  panel?: Pick<PublicPanel, "languages"> | null,
 ): string {
   if (!team) return fallback;
-  return choice && choice.teamId === team.id ? choice.language : bookingLanguage("", team);
+  return choice && choice.teamId === team.id ? choice.language : bookingLanguage("", team, panel);
 }
 
 /* ---- the slot grid ------------------------------------------------------------- */

@@ -178,11 +178,12 @@ function StatusPanel({
             <circle cx="12" cy="12" r="9" />
             <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
           </svg>
-          <span>{`Interview in ${teamLanguage}`}</span>
+          <span>Interview in</span>
           <span className="tp-lts">
             {team.languages.map((id) => (
               <LanguageTag key={id} language={id} languages={languages} />
             ))}
+            <span className="sr-only">{teamLanguage}</span>
           </span>
         </p>
       ) : null}

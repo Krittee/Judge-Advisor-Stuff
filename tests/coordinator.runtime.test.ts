@@ -258,6 +258,8 @@ test("the booking language: the team's first, else the default; an explicit one 
   assert.equal(await ask(["en"], "th"), "th", "an explicit language wins");
   assert.equal(await ask(["th"], ""), "th", "a blank one is not an answer");
   assert.equal(await ask(["th"], "klingon"), "th", "nor is one we do not know");
+  await w.db.updatePanel(w.panelA.id, { languages: ["th"] });
+  assert.equal(await ask(["en", "th"]), "th", "the first the team's panel covers");
 });
 
 /* ===== 4. see the board ================================================== */

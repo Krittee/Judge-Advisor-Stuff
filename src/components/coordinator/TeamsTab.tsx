@@ -4,7 +4,7 @@ import { teamList, pillText, rowState, ASK_DESK_LINE, NO_PANEL_LINE, SET_LANGUAG
 import type { CoordinatorViewProps } from "./CoordinatorView";
 import { requestOrder, TONE } from "@/components/desk/deskLogic";
 import { divisionTag } from "@/components/admin/floorLogic";
-import { LanguageCover } from "@/components/Language";
+import { LanguageCover, languageNames } from "@/components/Language";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
 import type { RequestRow } from "@/lib/types";
 
@@ -35,7 +35,6 @@ export function TeamsTab(p: CoordinatorViewProps) {
   });
   const order = p.languages.map((l) => l.id);
   const panelById = new Map(p.panels.map((x) => [x.id, x]));
-  const languageLabel = (id: string) => p.languages.find((l) => l.id === id)?.label ?? id;
 
   return (
     <>
@@ -153,7 +152,7 @@ export function TeamsTab(p: CoordinatorViewProps) {
                           disabled={!ready || p.busy}
                           onClick={() => p.onRequest(team, o.id)}
                         >
-                          Request · {languageLabel(o.id)}
+                          Request · {languageNames([o.id], p.languages)}
                         </button>
                       ))}
                       {state.kind === "ready" ? (

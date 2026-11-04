@@ -297,13 +297,23 @@ export function resolveLanguage(input: unknown): string {
 
 /**
  * The language a new booking is made in: one the caller names and we
- * recognise, else the first language the team can be interviewed in, else
- * the event default. Blank or unrecognised counts as "not named", so a
- * coordinator who set a team to Thai gets a Thai booking without picking it
- * again. Shared with the booking screens so they preselect the same choice.
+ * recognise, else the first of the team's languages the panel covers, else the
+ * team's first language, else the event default. Blank or unrecognised counts
+ * as "not named", so a coordinator who set a team to Thai gets a Thai booking
+ * without picking it again. A panel that has not said what it covers (or is
+ * not known) changes nothing. The one rule every booking path uses.
  */
-export function bookingLanguage(input: unknown, team: { languages: string[] }): string {
-  return findLanguage(input)?.id ?? team.languages[0] ?? defaultLanguage();
+export function bookingLanguage(
+  input: unknown,
+  team: { languages: string[] },
+  panel?: { languages: string[] } | null,
+): string {
+  return (
+    findLanguage(input)?.id ??
+    team.languages.find((l) => panel?.languages.includes(l)) ??
+    team.languages[0] ??
+    defaultLanguage()
+  );
 }
 
 /**
@@ -324,9 +334,7 @@ export function parseLanguageList(input: unknown): string[] {
       for (const l of configured) wanted.add(l.id);
       continue;
     }
-    const match = configured.find(
-      (l) => l.id === token || l.short.toLowerCase() === token || l.label.toLowerCase() === token,
-    );
+    const match = findLanguage(token);
     if (match) wanted.add(match.id);
   }
   return configured.map((l) => l.id).filter((id) => wanted.has(id));

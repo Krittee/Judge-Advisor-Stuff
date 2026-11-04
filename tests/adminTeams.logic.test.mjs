@@ -5,7 +5,6 @@ import {
   activeFilters,
   bookSlot,
   cancelBookingNow,
-  coveringHint,
   discardQuestion,
   filterTeams,
   flagPills,
@@ -15,6 +14,7 @@ import {
   languageKey,
   languageStrip,
   leaveAfterAsking,
+  misfit,
   moveBooking,
   moveQuestion,
   notebookCounts,
@@ -22,8 +22,6 @@ import {
   panelCell,
   panelLeft,
   panelLoad,
-  panelMisfit,
-  panelMisfitNote,
   panelOptions,
   removeQuestion,
   removeTeamAfterAsking,
@@ -41,7 +39,6 @@ import {
   teamPatch,
   timesRequestOf,
 } from "../src/components/admin/teamsLogic";
-import { teamFitsPanel } from "../src/components/Language";
 import { formTimes, reachedSteps, readTimes, startTimes, timesLogLine } from "../src/lib/stepTimes";
 
 /* The Judge Advisor Teams tab's decisions, run for real against
@@ -587,14 +584,6 @@ const sweep = [
 ];
 const noFilters = { q: "", division: "", category: "", language: "" };
 
-test("teamFitsPanel is true when either side has not said, or they share a language", () => {
-  assert.equal(teamFitsPanel([], ["en"]), true);
-  assert.equal(teamFitsPanel(["th"], []), true);
-  assert.equal(teamFitsPanel(["en", "th"], ["th"]), true);
-  assert.equal(teamFitsPanel(["th"], ["en"]), false);
-  assert.equal(teamFitsPanel(["en", "th"], ["fr"]), false);
-});
-
 test("a team counts under its one language, 'both', or 'none'", () => {
   assert.deepEqual(sweep.map(languageKey), ["en", "en", "th", "both", "none", "none"]);
 });
@@ -617,32 +606,13 @@ test("the language filter keeps exactly the teams under that button, and clears 
   assert.equal(f("").length, 6);
 });
 
-test("a panel that does not cover the team's language is named in the triangle and in the drawer's caution", () => {
-  const english = { name: "Panel 3", languages: ["en"] };
-  assert.equal(panelMisfit({ languages: ["th"] }, english, langs), "Panel 3 doesn't cover Thai");
-  assert.equal(panelMisfitNote({ languages: ["th"] }, english, langs), "Panel 3 interviews in English only. You can keep it.");
-  assert.equal(panelMisfit({ languages: ["en", "th"] }, { name: "Panel 4", languages: ["fr"] }, langs), "Panel 4 doesn't cover English or Thai", "a both-language team names both");
-  assert.equal(panelMisfitNote({ languages: ["th"] }, { name: "Panel 5", languages: ["en", "fr"] }, langs), "Panel 5 interviews in English, fr. You can keep it.");
-  for (const fine of [{ languages: [] }, { languages: ["en"] }, { languages: ["en", "th"] }]) {
-    assert.equal(panelMisfit(fine, english, langs), null);
-    assert.equal(panelMisfitNote(fine, english, langs), null);
-  }
-  assert.equal(panelMisfit({ languages: ["th"] }, { name: "Panel 6", languages: [] }, langs), null, "a panel that has not said is not warned about");
-});
-
-test("the Judge panel hint lists the offered panels that cover the team's language, and says nothing when nobody needs steering", () => {
-  const ps = [
-    { id: "p2", name: "Panel 2", languages: ["en", "th"] },
-    { id: "p3", name: "Panel 3", languages: ["en"] },
-    { id: "p4", name: "Panel 4", languages: [] },
-  ];
-  const opt = (id, blocked = false) => ({ id, blocked });
-  const all = [opt("p2"), opt("p3"), opt("p4")];
-  assert.equal(coveringHint({ languages: ["th"] }, all, ps, langs), "Covering Thai: Panel 2");
-  assert.equal(coveringHint({ languages: ["en"] }, all, ps, langs), null, "every option fits English (Panel 4 has not said)");
-  assert.equal(coveringHint({ languages: [] }, all, ps, langs), null, "not asked");
-  assert.equal(coveringHint({ languages: ["th"] }, [opt("p3"), opt("p4")], ps, langs), "Covering Thai: none");
-  assert.equal(coveringHint({ languages: ["th"] }, [opt("p2", true), opt("p3")], ps, langs), "Covering Thai: none", "a conflicted panel is not offered");
+test("misfit words what a panel lacks for a team, only when none of the team's languages is covered", () => {
+  assert.equal(misfit({ languages: ["th"] }, { languages: ["en"] }, langs), "Doesn't cover Thai");
+  assert.equal(misfit({ languages: ["th"] }, { languages: ["en"] }, langs, true), "Doesn't cover TH", "short codes");
+  assert.equal(misfit({ languages: ["en", "th"] }, { languages: ["fr"] }, langs), "Doesn't cover English or Thai", "a both-language team names both");
+  assert.equal(misfit({ languages: ["en", "th"] }, { languages: ["en"] }, langs), null);
+  assert.equal(misfit({ languages: [] }, { languages: ["en"] }, langs), null, "not asked");
+  assert.equal(misfit({ languages: ["th"] }, { languages: [] }, langs), null, "the panel has not said");
 });
 
 test("setting a language is one PATCH to /api/team-language with the team and the list, and a refusal is thrown", async () => {

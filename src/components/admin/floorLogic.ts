@@ -1,5 +1,5 @@
 import { primaryAction } from "@/components/judge/logic";
-import { hasLanguageGap, teamFitsPanel } from "@/components/Language";
+import { hasLanguageGap } from "@/components/Language";
 import { liveRequestFor } from "@/lib/data";
 import { divisionsCompatible } from "@/lib/presets";
 import type { Status } from "@/lib/status";
@@ -183,16 +183,6 @@ export function coverTags(
     id,
     text: panel.languages.length === 1 ? `${short(id)} only` : short(id),
   }));
-}
-
-/** "Doesn't cover TH": the caution word on a "Move to panel…" option that cannot interview the team in any language it asked for. Null when it fits. */
-export function coverWord(
-  team: Pick<Team, "languages">,
-  panel: Pick<PublicPanel, "languages">,
-  languages: AppState["languages"],
-): string | null {
-  if (teamFitsPanel(team.languages, panel.languages)) return null;
-  return `Doesn't cover ${team.languages.map((id) => languages.find((l) => l.id === id)?.short ?? id).join(" or ")}`;
 }
 
 /** "Panel 3 interviews in English only — this team asked for Thai." */
