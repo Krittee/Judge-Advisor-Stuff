@@ -40,7 +40,7 @@ auto-assigner all use. Every change below is local and not pushed.
 | [Review fixes: booked time no longer wraps; coordinator tabs open at the top](#review-fixes) | `ac9a4bf` | Not yet (browser phone size only) | Local, not pushed |
 | [The Coordinator door moves after Queue desk](#door-order) | `aecd28c` | Not yet (browser phone size only) | Local, not pushed |
 | [Coordinator avatar](#coordinator-avatar) | `7612f0b` | Not yet (browser phone size only) | Local, not pushed |
-| [Over-engineering audit fixes (all 15)](#audit-fixes) | `df61a87`..`76252b5` | Not yet (browser phone size only) | Local, not pushed |
+| [Over-engineering audit fixes (all 15)](#audit-fixes) | `df61a87`..`f1b04e4` | Not yet (browser phone size only) | Local, not pushed |
 
 ### Your decisions for 2.1.0
 
@@ -261,12 +261,13 @@ and sixth (language) columns. Files: `src/components/door/DoorPage.tsx`,
 - Desk card and team page: the language shows as tags only. The full names are kept for screen readers.
 - Auto-assign: the button's title is back to its pre-2.1 words, and the language hint is shown only as visible text.
 - Coordinator render tests that repeated the logic tests were removed.
+- Follow-up (`f1b04e4`): a disabled coordinator chip no longer lights up on hover, the desk's caution box uses the shared `WarnIcon`, and `languageNames` moved to `presets.ts` so the server's activity line uses it too, with the same words.
 
 Net: about −220 src/CSS lines and −157 test lines.
 
 **How it was tested.** `npm test` 1689 pass, 1 skip, 0 fail (down from 1704 because duplicated tests were removed). `tsc --noEmit`, `eslint src tests` and `next build` are clean. Browser check on a fresh demo-data copy, at 375 and 1280, light and dark: `/coordinator` (a chip saves; on the Slots tab an EN+TH team on the EN-only Panel A shows EN), the queue desk (tags only), `/team/1129`, the JA Teams tab and drawer ("Doesn't cover Thai. You can keep it."), and the Floor. The check found the clipped TH tag, which `76252b5` fixes.
 
-**Commit and branch.** `df61a87`..`76252b5` on `claude/v21-audit-fixes-4ac63c` (cut from `claude/v21-coordinator-c9e080` at `4e59854`). Local, not pushed.
+**Commit and branch.** `df61a87`..`76252b5`, then `f1b04e4`, on `claude/v21-audit-fixes-4ac63c` (cut from `claude/v21-coordinator-c9e080` at `4e59854`). Local, not pushed.
 
 ---
 
