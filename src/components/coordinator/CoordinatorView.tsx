@@ -24,7 +24,6 @@ export type CoordinatorViewProps = {
   /** The coordinator's name, under "Coordinator". */
   name?: string;
   online: boolean;
-  /** With any language tapped but not yet saved already applied (withPending). */
   teams: Team[];
   panels: PublicPanel[];
   requests: RequestRow[];

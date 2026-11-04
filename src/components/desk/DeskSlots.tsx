@@ -6,7 +6,7 @@ import { clockParts } from "@/components/team/teamLogic";
 import type { PublicPanel, Slot } from "@/lib/types";
 import { slotGrid, slotTime, type SlotKind } from "./deskLogic";
 
-export function CautionIcon() {
+function CautionIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01" />
@@ -14,11 +14,21 @@ export function CautionIcon() {
   );
 }
 
-function Check() {
+export function Check() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M5 12.5l4.5 4.5L19 7.5" />
     </svg>
+  );
+}
+
+/** A note box with the caution mark: what the desk says when something needs doing first. */
+export function Caution({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="dk-caution" role="note">
+      <CautionIcon />
+      <p>{children}</p>
+    </div>
   );
 }
 
@@ -75,13 +85,10 @@ export function DeskSlots({
 
   if (!slots.length) {
     return (
-      <div className="dk-caution" role="note">
-        <CautionIcon />
-        <p>
-          <strong>{panel.name} has no bookable times set up yet.</strong> Use Request now instead,
-          or ask the Judge Advisor to add times (Panels → {panel.name} → Booking slots).
-        </p>
-      </div>
+      <Caution>
+        <strong>{panel.name} has no bookable times set up yet.</strong> Use Request now instead,
+        or ask the Judge Advisor to add times (Panels → {panel.name} → Booking slots).
+      </Caution>
     );
   }
 
@@ -102,10 +109,7 @@ export function DeskSlots({
       </div>
 
       {grid.open === 0 ? (
-        <div className="dk-caution" role="note">
-          <CautionIcon />
-          <p>{noSlotsLeftLine(slots, now)}</p>
-        </div>
+        <Caution>{noSlotsLeftLine(slots, now)}</Caution>
       ) : (
         <div className="dk-slots" role="group" aria-labelledby={labelId}>
           {grid.rows.map((row) => {

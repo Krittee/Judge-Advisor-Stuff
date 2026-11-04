@@ -126,6 +126,7 @@ export function TeamsTab(p: CoordinatorViewProps) {
                       type="button"
                       className="co-chip"
                       aria-pressed={team.languages.includes(l.id)}
+                      disabled={p.busy}
                       onClick={() => p.onLanguages(team, toggleLanguage(team.languages, l.id, order))}
                     >
                       <span aria-hidden="true">{l.short}</span>

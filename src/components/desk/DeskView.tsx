@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- a 28 px static avatar; next/image buys nothing here. */
 
 import { useMemo } from "react";
-import { CautionIcon, DeskSlots } from "./DeskSlots";
+import { Caution, DeskSlots } from "./DeskSlots";
 import { busyText, lookupState, nextFreeStart, requestOrder, slotKind, teamList, TONE } from "./deskLogic";
 import { LanguageCover, LanguageTag, languageNames, type Language } from "@/components/Language";
 import { SignOutButton } from "@/components/judging";
@@ -70,15 +70,6 @@ export type DeskViewProps = {
   /** Cancel the booking being moved. The page asks first. */
   onCancelBooking: () => void;
 };
-
-function Caution({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="dk-caution" role="note">
-      <CautionIcon />
-      <p>{children}</p>
-    </div>
-  );
-}
 
 export function DeskView(p: DeskViewProps) {
   const { team, panel, existing, reschedule, languages, busy } = p;

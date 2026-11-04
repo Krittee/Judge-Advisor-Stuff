@@ -7,17 +7,13 @@ import {
   pillText,
   requestOf,
   rowState,
-  saveLanguages,
-  shownPanel,
   slotsModel,
   tabFrom,
-  tabHref,
   teamList,
   toggleLanguage,
-  withPending,
-  type Pending,
 } from "../src/components/coordinator/coordinatorLogic";
 import { bookLanguageFor, slotTime } from "../src/components/desk/deskLogic";
+import { bookingLanguage } from "../src/lib/presets";
 import type { PublicPanel, RequestRow, Team } from "../src/lib/types";
 
 /* The coordinator console's decisions, run for real against
@@ -51,69 +47,6 @@ test("toggleLanguage adds or removes one language and keeps the config order", (
   assert.deepEqual(toggleLanguage(["th"], "en", ORDER), ["en", "th"], "EN lit after TH is still EN, TH");
   assert.deepEqual(toggleLanguage(["en", "th"], "en", ORDER), ["th"]);
   assert.deepEqual(toggleLanguage(["th"], "th", ORDER), [], "the last one off is 'not asked' again");
-});
-
-test("withPending shows an unsaved tap at once, without touching the real list", () => {
-  const a = team("1111A", { languages: [] });
-  const b = team("2222B");
-  const teams = [a, b];
-  const shown = withPending(teams, { [a.id]: ["en"] });
-  assert.deepEqual(shown.map((t) => t.languages), [["en"], ["th"]]);
-  assert.deepEqual(a.languages, [], "the state from the server is not edited");
-  assert.equal(withPending(teams, {}), teams, "nothing pending, nothing copied");
-  assert.deepEqual(withPending(teams, { [b.id]: [] })[1].languages, [], "an empty list is a tap too (back to not asked)");
-});
-
-/** A fake page: the pending map it holds, and the calls the save makes. */
-function harness(send: () => Promise<unknown>) {
-  const seen: Pending[] = [];
-  let pending: Pending = {};
-  const errors: string[] = [];
-  const log: string[] = [];
-  return {
-    seen, errors, log,
-    get pending() { return pending; },
-    io: {
-      send: async (body: { teamId: string; languages: string[] }) => { log.push(`send ${body.teamId} ${body.languages.join("+")}`); return send(); },
-      setPending: (update: (p: Pending) => Pending) => { pending = update(pending); seen.push(pending); },
-      refresh: async () => { log.push("refresh"); },
-      onError: (m: string) => errors.push(m),
-    },
-  };
-}
-
-test("a chip tap is shown before the save answers, and is dropped once it has", async () => {
-  let release!: () => void;
-  const h = harness(() => new Promise<void>((r) => (release = r)));
-  const run = saveLanguages("t1", ["th"], h.io);
-  assert.deepEqual(h.pending, { t1: ["th"] }, "lit at once, while the request is still out");
-  assert.deepEqual(h.log, ["send t1 th"]);
-  release();
-  await run;
-  assert.deepEqual(h.log, ["send t1 th", "refresh"], "the poll comes after the write");
-  assert.deepEqual(h.pending, {}, "the saved list arrived with the poll");
-  assert.deepEqual(h.errors, []);
-});
-
-test("a failed save puts the chip back and says why", async () => {
-  const h = harness(() => Promise.reject(new Error("Only a coordinator or the Judge Advisor can set a team's interview language.")));
-  await saveLanguages("t1", ["en", "th"], h.io);
-  assert.deepEqual(h.pending, {}, "the chip is back to what the server holds");
-  assert.deepEqual(h.errors, ["Only a coordinator or the Judge Advisor can set a team's interview language."]);
-  assert.ok(!h.log.includes("refresh"), "no poll for a write that did not happen");
-});
-
-test("an earlier save finishing does not take away a later tap on the same team", async () => {
-  const releases: (() => void)[] = [];
-  const h = harness(() => new Promise<void>((r) => releases.push(r)));
-  const first = saveLanguages("t1", ["en"], h.io);
-  const second = saveLanguages("t1", ["en", "th"], h.io);
-  releases[0]();
-  await first;
-  assert.deepEqual(h.pending, { t1: ["en", "th"] }, "the second tap still shows");
-  releases[1]();
-  await second;
-  assert.deepEqual(h.pending, {});
 });
 
 /* ---- the Teams list ------------------------------------------------------------------------ */
@@ -198,27 +131,18 @@ test("a bilingual team on a Thai-only panel is booked in Thai by both the desk a
   const t = team("7700B", { languages: ["en", "th"] });
   const thaiOnly = panel("p3", { languages: ["th"] });
   assert.equal(bookLanguageFor(null, t, "en", thaiOnly), "th");
-  assert.deepEqual(bookBar(t, thaiOnly, null), { kind: "ready", team: t, panel: thaiOnly, language: "th" });
+  assert.equal(bookingLanguage(undefined, t, thaiOnly), "th", "the Slots tab's bar sends this one");
 });
 
 /* ---- the Slots tab ---------------------------------------------------------------------------------- */
 
-test("the panel shown is the one tapped, else the chosen team's, else the first", () => {
-  const panels = [p2, p3, panel("p4")];
-  assert.equal(shownPanel(panels, "p4", "p3")?.id, "p4");
-  assert.equal(shownPanel(panels, null, "p3")?.id, "p3");
-  assert.equal(shownPanel(panels, null, null)?.id, "p2");
-  assert.equal(shownPanel(panels, "gone", null)?.id, "p2", "a panel that no longer exists is not shown");
-  assert.equal(shownPanel([], null, null), null);
-});
-
 test("the pinned bar: nobody, somebody who cannot be booked (and why), somebody who can", () => {
   const t = team("7700B");
   assert.deepEqual(bookBar(null, null, null), { kind: "none" });
-  assert.deepEqual(bookBar(t, p3, req(t, "scheduled")), { kind: "blocked", team: t, line: "Already booked — the queue desk can change it." });
-  assert.deepEqual(bookBar(team("5150Z", { languages: [] }), p3, null), { kind: "blocked", team: team("5150Z", { languages: [] }), line: "Set the language first" });
-  assert.deepEqual(bookBar(t, null, null), { kind: "blocked", team: t, line: "No panel yet — the Judge Advisor assigns one." });
-  assert.deepEqual(bookBar(t, p3, null), { kind: "ready", team: t, panel: p3, language: "th" });
+  assert.deepEqual(bookBar(t, p3, req(t, "scheduled")).kind, "held");
+  assert.deepEqual(bookBar(team("5150Z", { languages: [] }), p3, null).kind, "no-language");
+  assert.deepEqual(bookBar(t, null, null).kind, "no-panel");
+  assert.deepEqual(bookBar(t, p3, null), { kind: "ready", team: t, panel: p3 });
 });
 
 const NOW = BASE + 30 * 60_000; // the first slot (10:00-10:20) is over
@@ -257,6 +181,7 @@ test("Book is live only for a chosen team, on its own panel, in an open slot", (
   const nobody = model({ chosenId: null });
   assert.deepEqual(nobody.bar, { kind: "none" });
   assert.equal(nobody.panel?.id, "p2", "no team chosen: the first panel");
+  assert.equal(model({ chosenId: null, panelPick: "gone" }).panel?.id, "p2", "a panel that no longer exists is not shown");
   assert.ok(nobody.lines.every((l) => !canBook(nobody.bar, l)));
 });
 
@@ -281,19 +206,16 @@ test("the picked slot counts only while it can still be booked", () => {
 test("a chosen team that has since been booked cannot book again", () => {
   const mine = team("7700B");
   const m = model({ requests: [booking(mine, 4)], picked: at(3) });
-  assert.equal(m.bar.kind, "blocked");
+  assert.equal(m.bar.kind, "held");
   assert.equal(m.chosen, null);
   assert.ok(m.lines.every((l) => !canBook(m.bar, l)));
 });
 
 /* ---- the tab in the URL --------------------------------------------------------------------------------- */
 
-test("?tab=slots is Slots; anything else is Teams; each tab has its address", () => {
+test("?tab=slots is Slots; anything else is Teams", () => {
   assert.equal(tabFrom("slots"), "slots");
   assert.equal(tabFrom("teams"), "teams");
   assert.equal(tabFrom(null), "teams");
   assert.equal(tabFrom("SLOTS"), "teams");
-  assert.equal(tabHref("slots"), "/coordinator?tab=slots");
-  assert.equal(tabHref("teams"), "/coordinator");
-  for (const tab of ["teams", "slots"] as const) assert.equal(tabFrom(new URL(tabHref(tab), "http://x").searchParams.get("tab")), tab, "a reload lands where it was");
 });

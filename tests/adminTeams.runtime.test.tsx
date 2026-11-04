@@ -204,7 +204,8 @@ test("auto-assign counts the filtered unassigned teams and is disabled at 0", ()
   // Byte Me and Sparky have no panel.
   assert.match(button(board()), /Auto-assign 2 unassigned/);
   assert.doesNotMatch(button(board()), /disabled/);
-  assert.match(button(board()), /title="Assigns within each division, skips conflicted panels and matches language where it can\."/);
+  assert.match(button(board()), /title="Assigns within each division and skips conflicted panels\."/);
+  assert.match(board(), /<span class="ja-hint ja-tm-aah">Matches language where it can\.<\/span>/);
   assert.match(button(board({ division: "High School" })), /Auto-assign 0 unassigned/);
   assert.match(button(board({ division: "High School" })), /disabled/);
 });

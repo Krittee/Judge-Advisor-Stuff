@@ -313,8 +313,6 @@ export type ViewerCapabilities = {
   canFlag: boolean;
   /** May read what referees have flagged. */
   canReadFlags: boolean;
-  /** May set a team's interview language (EN, TH or both). */
-  canSetTeamLanguage: boolean;
 };
 
 export type Slot = {

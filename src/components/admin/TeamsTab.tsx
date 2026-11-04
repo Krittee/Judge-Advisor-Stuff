@@ -473,7 +473,7 @@ export function TeamsBoard({
             <button
               type="button"
               className="ja-tm-ghost"
-              title="Assigns within each division, skips conflicted panels and matches language where it can."
+              title="Assigns within each division and skips conflicted panels."
               disabled={autoBusy || !unassigned}
               onClick={onAutoAssign}
             >
