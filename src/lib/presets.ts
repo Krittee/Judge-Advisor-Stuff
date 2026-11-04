@@ -277,6 +277,23 @@ export function defaultLanguage(): string {
   return languages()[0].id;
 }
 
+/**
+ * "English", "Thai" or "English or Thai": the labels (or short codes) of the ids
+ * we run, in the order given, an unknown id as itself.
+ */
+export function languageNames(
+  ids: string[],
+  languages: Language[],
+  { short = false, sep = " or " }: { short?: boolean; sep?: string } = {},
+): string {
+  return ids
+    .map((id) => {
+      const found = languages.find((l) => l.id === id);
+      return found ? (short ? found.short : found.label) : id;
+    })
+    .join(sep);
+}
+
 /** The configured language that free text names, by id, short code or label; undefined when none. */
 function findLanguage(input: unknown): Language | undefined {
   const wanted = String(input ?? "").trim().toLowerCase();

@@ -4,6 +4,7 @@ import type { Language } from "@/lib/presets";
 import type { PublicPanel } from "@/lib/types";
 
 export type { Language };
+export { languageNames } from "@/lib/presets";
 
 /** The language an interview will run in, as a small outlined tag in the colour around it. */
 export function LanguageTag({ language, languages }: { language: string; languages: Language[] }) {
@@ -26,23 +27,6 @@ export function LanguageTag({ language, languages }: { language: string; languag
  */
 export function hasLanguageGap(covers: string[], asking?: string): boolean {
   return !!asking && covers.length > 0 && !covers.includes(asking);
-}
-
-/**
- * "English", "Thai" or "English or Thai": the labels (or short codes) of the ids
- * we run, in the order given, an unknown id as itself.
- */
-export function languageNames(
-  ids: string[],
-  languages: Language[],
-  { short = false, sep = " or " }: { short?: boolean; sep?: string } = {},
-): string {
-  return ids
-    .map((id) => {
-      const found = languages.find((l) => l.id === id);
-      return found ? (short ? found.short : found.label) : id;
-    })
-    .join(sep);
 }
 
 /**

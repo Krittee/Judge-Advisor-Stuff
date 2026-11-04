@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { actorParts } from "@/lib/activity";
 import { canSetTeamLanguage, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
-import { languages, parseLanguageList } from "@/lib/presets";
+import { languageNames, languages, parseLanguageList } from "@/lib/presets";
 
 export const dynamic = "force-dynamic";
 
@@ -36,13 +36,12 @@ export async function PATCH(request: Request) {
   try {
     const team = await store().updateTeam(teamId, { languages: next });
     if (next.join() !== was) {
-      const labels = languages().filter((l) => next.includes(l.id)).map((l) => l.label);
       await store().logActivity({
         teamId,
         kind: "setup",
         ...actorParts(session),
         action: "set interview language",
-        detail: `Language for ${team.number}: ${labels.length ? labels.join(" and ") : "Not asked"}`,
+        detail: `Language for ${team.number}: ${languageNames(next, languages(), { sep: " and " }) || "Not asked"}`,
       });
     }
     return NextResponse.json({ team });

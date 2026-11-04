@@ -2205,7 +2205,7 @@ body:has(.judge) > .theme-toggle:hover {
 .co-tgl, .co-chip, .co-pc, .co-bk {
   border: 1.5px solid var(--dk-field-line); border-radius: 12px; background: transparent; color: var(--ink); font-weight: 600; font-size: 15px;
 }
-.co-tgl:hover, .co-chip:hover, .co-pc:hover, .co-bk:hover:not(:disabled) { border-color: var(--accent); }
+:where(.co-tgl, .co-chip, .co-pc, .co-bk):hover:not(:disabled) { border-color: var(--accent); }
 .co-tgl[aria-pressed="true"], .co-chip[aria-pressed="true"], .co-pc[aria-pressed="true"], .co-bk[aria-pressed="true"] {
   border-color: var(--accent); background: var(--accent); color: var(--accent-ink);
 }

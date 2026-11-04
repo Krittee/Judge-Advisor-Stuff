@@ -2,17 +2,10 @@
 
 import { useId } from "react";
 import { noSlotsLeftLine, TOO_CLOSE_TITLE, takenTitle } from "@/components/SlotPicker";
+import { WarnIcon } from "@/components/judge/parts";
 import { clockParts } from "@/components/team/teamLogic";
 import type { PublicPanel, Slot } from "@/lib/types";
 import { slotGrid, slotTime, type SlotKind } from "./deskLogic";
-
-function CautionIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01" />
-    </svg>
-  );
-}
 
 export function Check() {
   return (
@@ -26,7 +19,7 @@ export function Check() {
 export function Caution({ children }: { children: React.ReactNode }) {
   return (
     <div className="dk-caution" role="note">
-      <CautionIcon />
+      <WarnIcon />
       <p>{children}</p>
     </div>
   );
