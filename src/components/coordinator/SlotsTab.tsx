@@ -36,7 +36,7 @@ function Caution({ children }: { children: React.ReactNode }) {
 export function SlotsTab(p: CoordinatorViewProps & { model: SlotsModel; now: number }) {
   const { model } = p;
   const { panel, bar, chosen } = model;
-  if (!panel) return <p className="co-empty">No panels yet — the Judge Advisor sets them up.</p>;
+  if (!panel) return <p className="dk-empty">No panels yet — the Judge Advisor sets them up.</p>;
 
   const teamById = new Map(p.teams.map((t) => [t.id, t]));
 
@@ -177,7 +177,7 @@ export function BookingBar({
       </div>
       <button
         type="button"
-        className="co-prim"
+        className="dk-prim dk-lg"
         disabled={busy || bar.kind !== "ready" || !chosen}
         onClick={() => bar.kind === "ready" && chosen && onBook(bar.team, chosen, bar.language)}
       >

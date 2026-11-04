@@ -14,7 +14,6 @@ import {
   isDirty,
   languageKey,
   languageStrip,
-  languageText,
   leaveAfterAsking,
   moveBooking,
   moveQuestion,
@@ -616,13 +615,6 @@ test("the language filter keeps exactly the teams under that button, and clears 
   assert.deepEqual(f("both"), ["4A"]);
   assert.deepEqual(f("none"), ["5A", "6A"]);
   assert.equal(f("").length, 6);
-});
-
-test("the Lang column reads EN, TH, EN + TH, and nothing when not asked", () => {
-  assert.equal(languageText(["en"], langs), "EN");
-  assert.equal(languageText(["th"], langs), "TH");
-  assert.equal(languageText(["en", "th"], langs), "EN + TH");
-  assert.equal(languageText([], langs), null);
 });
 
 test("a panel that does not cover the team's language is named in the triangle and in the drawer's caution", () => {

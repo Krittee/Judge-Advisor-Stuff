@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { LanguageTag } from "@/components/Language";
 import { ChevronDown, ChevronRight, CloseIcon, StatusPill, WarnIcon } from "@/components/judge/parts";
 import { call } from "@/components/useAppState";
 import { formatClock } from "@/components/ui";
@@ -25,7 +26,6 @@ import {
   isDirty,
   languageKey,
   languageStrip,
-  languageText,
   leaveAfterAsking,
   moveBooking,
   notebookCounts,
@@ -730,11 +730,12 @@ function TeamTable({ shown, panels, requests, flags, flagKinds, stranded, langua
 
 /** The team's interview language: a neutral tag, or a quiet "Not asked" (not a warning by itself). */
 function LangText({ team, languages }: { team: Team; languages: Slice["languages"] }) {
-  const text = languageText(team.languages, languages);
-  return text ? (
+  return team.languages.length ? (
     <span className="ja-tm-lt">
       <span className="sr-only">Interview language: </span>
-      {text}
+      {team.languages.map((id) => (
+        <LanguageTag key={id} language={id} languages={languages} />
+      ))}
     </span>
   ) : (
     <span className="ja-tm-na">Not asked</span>

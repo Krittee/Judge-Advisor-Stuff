@@ -5,24 +5,15 @@ import type { PublicPanel } from "@/lib/types";
 
 export type { Language };
 
-/** The language an interview will run in, as a small tag. */
-export function LanguageTag({
-  language,
-  languages,
-  size = "sm",
-}: {
-  language: string;
-  languages: Language[];
-  size?: "sm" | "md";
-}) {
+/** The language an interview will run in, as a small outlined tag in the colour around it. */
+export function LanguageTag({ language, languages }: { language: string; languages: Language[] }) {
   const found = languages.find((l) => l.id === language);
   if (!found) return null;
 
-  const pad = size === "md" ? "px-2.5 py-1 text-xs" : "px-2 py-0.5 text-[11px]";
   return (
     <span
       title={found.label}
-      className={`inline-block whitespace-nowrap rounded-md bg-surface-2 font-semibold tracking-wide text-ink-muted ${pad}`}
+      className="inline-flex h-6 items-center whitespace-nowrap rounded-md border border-current/45 px-2 text-xs font-semibold tracking-[0.04em]"
     >
       {found.short}
     </span>

@@ -111,9 +111,9 @@ const rowOf = (m: string, number: string) => {
 
 test("the chrome: the coordinator's picture, Coordinator and the name, Live, Sign out, two tabs", () => {
   const m = view();
-  assert.match(m, /<span class="co-av"><img src="\/avatars\/coordinator\.jpg" alt="" width="28" height="28"\/><\/span>/);
+  assert.match(m, /<span class="dk-av"><img src="\/avatars\/coordinator\.jpg" alt="" width="28" height="28"\/><\/span>/);
   assert.match(m, /<b>Coordinator<\/b><span>Pat<\/span>/);
-  assert.match(m, /<span class="co-live" data-online="true"><i aria-hidden="true"><\/i>Live<\/span>/);
+  assert.match(m, /<span class="dk-live" data-online="true"><i aria-hidden="true"><\/i>Live<\/span>/);
   assert.match(view({ online: false }), />Reconnecting</);
   assert.match(m, /Sign out/);
   assert.match(m, /<nav class="co-tabs" aria-label="Coordinator sections">/);
@@ -152,11 +152,11 @@ test("rows run in pit order and each has number, name, division, pit and a pill"
   const numbers = [...m.matchAll(/<li class="co-card"[^>]*>[\s\S]*?<b>([^<]+)<\/b>/g)].map((x) => x[1]);
   assert.deepEqual(numbers, ["2011A", "1234A", "4410C", "9882K", "7700B", "5150Z", "8123N", "5555H"]);
   assert.match(text(rowOf(m, "2011A")), /^2011AGear GremlinsMS · Pit A3Interviewing/);
-  assert.match(rowOf(m, "2011A"), /class="co-sc co-s-active">Interviewing</);
-  assert.match(rowOf(m, "1234A"), /class="co-sc co-s-done">Complete</);
-  assert.match(rowOf(m, "4410C"), /class="co-sc co-s-waiting">Requesting</);
-  assert.match(rowOf(m, "5555H"), new RegExp(`class="co-sc co-s-booked">Booked ${slotTime(slotAt(3))}<`));
-  assert.doesNotMatch(rowOf(m, "7700B"), /co-sc/, "no request, no pill");
+  assert.match(rowOf(m, "2011A"), /class="dk-sc dk-s-active">Interviewing</);
+  assert.match(rowOf(m, "1234A"), /class="dk-sc dk-s-done">Complete</);
+  assert.match(rowOf(m, "4410C"), /class="dk-sc dk-s-waiting">Requesting</);
+  assert.match(rowOf(m, "5555H"), new RegExp(`class="dk-sc dk-s-booked">Booked ${slotTime(slotAt(3))}<`));
+  assert.doesNotMatch(rowOf(m, "7700B"), /dk-sc/, "no request, no pill");
 });
 
 test("the language chips: EN and TH, lit by what the team has, in a labelled group", () => {
@@ -209,7 +209,7 @@ test("an opened ready row: the team's language is the filled button, the other o
   const m = rowOf(view({ openId: byte.id }), "7700B");
   const xp = m.slice(m.indexOf('class="co-xp"'));
   assert.deepEqual(
-    buttons(xp).map((b) => [b.text, /co-prim/.test(b.attrs) ? "primary" : /co-out/.test(b.attrs) ? "outlined" : "text", b.disabled]),
+    buttons(xp).map((b) => [b.text, /dk-prim/.test(b.attrs) ? "primary" : /dk-out/.test(b.attrs) ? "outlined" : "text", b.disabled]),
     [["Request · Thai", "primary", false], ["Request · English", "outlined", false], ["Book a time", "text", false]],
   );
   assert.match(text(xp), /Panel 3 interviews in Thai/);
@@ -217,7 +217,7 @@ test("an opened ready row: the team's language is the filled button, the other o
   const both = team("3333B", "Both Tongues", { languages: ["en", "th"] });
   const bothTongues = rowOf(view({ openId: both.id, teams: [...teams, both] }), "3333B");
   assert.deepEqual(
-    buttons(bothTongues.slice(bothTongues.indexOf('class="co-xp"'))).filter((b) => /^Request/.test(b.text)).map((b) => [b.text, /co-prim/.test(b.attrs)]),
+    buttons(bothTongues.slice(bothTongues.indexOf('class="co-xp"'))).filter((b) => /^Request/.test(b.text)).map((b) => [b.text, /dk-prim/.test(b.attrs)]),
     [["Request · English", true], ["Request · Thai", true]],
     "a team with both gets equal buttons, as on the desk",
   );
@@ -241,7 +241,7 @@ test("an opened row that is waiting, on the way, interviewing or booked: no butt
     const m = rowOf(view({ openId: who.id }), who.number);
     const xp = m.slice(m.indexOf('class="co-xp"'));
     assert.equal(buttons(xp).length, 0, `${who.number}: no buttons at all`);
-    assert.match(xp, new RegExp(`<p class="co-held"><span class="co-sc [^"]*">${pill}</span><span>To change it, ask the queue desk\\.</span></p>`));
+    assert.match(xp, new RegExp(`<p class="co-held"><span class="dk-sc [^"]*">${pill}</span><span>To change it, ask the queue desk\\.</span></p>`));
   }
 });
 
@@ -281,7 +281,7 @@ test("past slots are left out; a taken slot reads the team and its status, read-
   assert.ok(!rows.some((r) => text(r).startsWith(slotTime(slotAt(0)))), "10:00 is not drawn");
   const taken = rows.find((r) => r.includes("<b>5555H</b>"))!;
   assert.match(text(taken), new RegExp(`^${slotTime(slotAt(3))}5555HHigh FivesBooked$`));
-  assert.match(taken, /co-sc co-s-booked/);
+  assert.match(taken, /dk-sc dk-s-booked/);
   assert.equal(buttons(taken).length, 0, "no Book, no cancel, no move");
 });
 
@@ -397,21 +397,21 @@ test("a coordinator who opens the desk is sent to their console", () => {
   assert.match(read("src/app/queue/page.tsx"), /session\.role === "coordinator"\) \{\s*router\.replace\("\/coordinator"\);\s*return;/);
 });
 
-test("the CSS: the console's tokens in both themes, the avatar ringed in --co-ring, no motion", () => {
+test("the CSS: the console's tokens in both themes, the avatar ringed in --dk-ring, no motion", () => {
   const css = read("src/app/globals.css");
   const start = css.indexOf("Coordinator console (");
   const block = css.slice(css.lastIndexOf("/* ----", start), css.lastIndexOf("/* ----", css.indexOf('Queue desk ("Now / Book"')));
   assert.ok(block.length > 3000, "the block was found");
-  assert.match(block, /\.co-av img \{[^}]*box-shadow: 0 0 0 2px var\(--co-ring\)/);
+  assert.match(block, /\.co \.dk-av img \{[^}]*box-shadow: 0 0 0 2px var\(--dk-ring\)/);
   assert.doesNotMatch(block, /--rail/);
   assert.match(block, /\.co-pc \{[\s\S]*?height: 44px/);
   assert.match(block, /\.co-chip \{[\s\S]*?width: 46px; height: 44px/);
   assert.match(block, /\.co-tabs button \{[\s\S]*?min-height: 64px/);
   assert.doesNotMatch(block.replace(/\/\*[\s\S]*?\*\//g, ""), /@keyframes|animation|transition|(?<!over)scroll-behavior/);
   // The pills wear the desk's pairs; the desk's own test measures them.
-  const desk = css.match(/:root\[data-theme="light"\] \.desk \{[\s\S]*?--dk-booked-ink: ([^;]+);/)![1];
-  assert.match(block, new RegExp(`:root\\[data-theme="light"\\] \\.co \\{[\\s\\S]*?--co-booked-ink: ${desk.replace(/[().]/g, "\\$&")};`));
-  for (const tone of ["booked", "waiting", "enroute", "active", "done"]) assert.ok(block.includes(`.co .co-s-${tone} {`), tone);
+  assert.ok(css.includes(".desk, .co {\n  --dk-gutter"), "the desk's tokens cover the console");
+  assert.ok(css.includes(':root[data-theme="light"] .desk, :root[data-theme="light"] .co {'), "and in the light theme");
+  for (const tone of ["booked", "waiting", "enroute", "active", "done"]) assert.ok(css.includes(`:is(.desk, .co) .dk-s-${tone} {`), tone);
 });
 
 test("every page a person opens is covered by the browser checks list", () => {

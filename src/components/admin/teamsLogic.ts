@@ -56,10 +56,6 @@ export function languageStrip(teams: Team[], f: Filters, languages: Languages): 
   return chips.map((c) => ({ ...c, count: held.filter((t) => languageKey(t) === c.key).length }));
 }
 
-/** The Lang column: "EN", "TH", "EN + TH"; null when not asked. */
-export const languageText = (ids: string[], languages: Languages): string | null =>
-  ids.length ? ids.map((id) => languages.find((l) => l.id === id)?.short ?? id).join(" + ") : null;
-
 /** The triangle's label: "Panel 3 doesn't cover English" (a team asking for both says "English or Thai"). Null when the panel fits. */
 export function panelMisfit(team: Pick<Team, "languages">, panel: Pick<PublicPanel, "name" | "languages">, languages: Languages): string | null {
   if (teamFitsPanel(team.languages, panel.languages)) return null;

@@ -466,8 +466,8 @@ test("the count strip: Language, then EN, TH, Both and Not asked as aria-pressed
 
 test("the Lang column: a neutral tag, muted 'Not asked', and a caution triangle on the panel that does not cover it", () => {
   const m = asked(null);
-  assert.match(rowOf(m, "9882K"), /<td><span class="ja-tm-lt"><span class="sr-only">Interview language: <\/span>TH<\/span><\/td>/);
-  assert.match(rowOf(m, "7700B"), /ja-tm-lt"><span class="sr-only">Interview language: <\/span>EN \+ TH<\/span>/);
+  assert.match(rowOf(m, "9882K"), /<td><span class="ja-tm-lt"><span class="sr-only">Interview language: <\/span><span title="Thai"[^>]*>TH<\/span><\/span><\/td>/);
+  assert.match(rowOf(m, "7700B"), /ja-tm-lt"><span class="sr-only">Interview language: <\/span><span title="English"[^>]*>EN<\/span><span title="Thai"[^>]*>TH<\/span><\/span>/);
   assert.match(rowOf(m, "2011A"), /<span class="ja-tm-na">Not asked<\/span>/);
   // Panel 2 is English only: Thai and both-language-on-Panel-3 (also English only) are flagged; English and not-asked are not.
   assert.match(rowOf(m, "9882K"), /Panel 2<span class="ja-tm-lw" role="img" aria-label="Panel 2 doesn&#x27;t cover Thai"/);
@@ -534,7 +534,7 @@ test("the strip and the language switch are styled in the Teams block from token
   assert.match(block, /\.ja-tm-lgs \{ flex-wrap: wrap;/);
   assert.match(block, /\.ja-tm-chb \{ height: 44px;/);
   assert.match(block, /\.ja-tm-chb\[aria-pressed="true"\] \{[^}]*var\(--accent\)/);
-  assert.match(block, /\.ja-tm-lt \{[^}]*var\(--surface-2\)/);
+  assert.match(block, /\.ja-tm-lt \{[^}]*var\(--ink-muted\)/);
   assert.match(block, /\.ja-tm-rd3 input:checked \+ span \{ background: var\(--accent\)/);
 });
 

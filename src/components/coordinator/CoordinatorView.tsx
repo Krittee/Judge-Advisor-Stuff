@@ -107,18 +107,18 @@ export function CoordinatorView(p: CoordinatorViewProps) {
   return (
     <div className="co">
       <header className="co-top">
-        <div className="co-who">
-          <span className="co-av">
+        <div className="dk-who">
+          <span className="dk-av">
             <img src="/avatars/coordinator.jpg" alt="" width={28} height={28} />
           </span>
-          <span className="co-who-t">
+          <span className="dk-who-t">
             <b>Coordinator</b>
             {p.name ? <span>{p.name}</span> : null}
           </span>
         </div>
         {/* Room for the theme toggle, which docks into the top-right corner here. */}
-        <div className="co-top-r">
-          <span className="co-live" data-online={p.online}>
+        <div className="dk-top-r">
+          <span className="dk-live" data-online={p.online}>
             <i aria-hidden="true" />
             {p.online ? "Live" : "Reconnecting"}
           </span>
