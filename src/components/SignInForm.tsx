@@ -18,26 +18,19 @@ export function homeFor(role: Role): string {
 }
 
 /** How each role is named and pictured on the pass. Styles live under `.signin` in globals.css. */
-const ROLES: Record<Role, { label: string; avatar: string | null; tone: string }> = {
+const ROLES: Record<Role, { label: string; avatar: string; tone: string }> = {
   judge: { label: "Judge", avatar: "/avatars/judge.jpg", tone: "r-judge" },
   queuer: { label: "Queue desk", avatar: "/avatars/queue-desk.jpg", tone: "r-desk" },
   admin: { label: "Judge Advisor", avatar: "/avatars/judge-advisor.jpg", tone: "r-ja" },
   referee: { label: "Referee", avatar: "/avatars/referee.jpg", tone: "r-ref" },
-  // No picture yet: an empty dashed box stands in (see Avatar).
-  coordinator: { label: "Coordinator", avatar: null, tone: "r-desk" },
+  coordinator: { label: "Coordinator", avatar: "/avatars/coordinator.jpg", tone: "r-desk" },
 };
 const CREW: Role[] = ["judge", "queuer", "admin", "coordinator"];
 
-/** A role's picture, or the empty dashed box that keeps its place until it has one. */
+/** A role's picture. */
 function Avatar({ role, size }: { role: Role; size: number }) {
-  const src = ROLES[role].avatar;
-  /* eslint-disable @next/next/no-img-element -- 20 KB static JPEGs; next/image buys nothing here. */
-  return src ? (
-    <img className="si-av" src={src} alt="" width={size} height={size} />
-  ) : (
-    <span className="si-av si-av--ph" aria-hidden="true" />
-  );
-  /* eslint-enable @next/next/no-img-element */
+  /* eslint-disable-next-line @next/next/no-img-element -- 20 KB static JPEGs; next/image buys nothing here. */
+  return <img className="si-av" src={ROLES[role].avatar} alt="" width={size} height={size} />;
 }
 
 /** What the pass calls someone: the head referee is a referee with a flag, and the same avatar. */

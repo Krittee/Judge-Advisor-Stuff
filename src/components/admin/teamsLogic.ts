@@ -1,11 +1,11 @@
 import { cancelBookingAfterAsking } from "@/components/desk/deskLogic";
 import { kindCounts, type FlagKind } from "@/components/Flags";
 import type { Ask } from "@/components/judge/logic";
-import { teamFitsPanel } from "@/components/Language";
+import { languageNames } from "@/components/Language";
 import { historyTime, sameEventDay } from "@/components/team/teamLogic";
 import { liveRequestFor } from "@/lib/data";
 import { normalizePit } from "@/lib/pit";
-import { divisionsCompatible } from "@/lib/presets";
+import { divisionsCompatible, languageFit } from "@/lib/presets";
 import { isPanelBlocked, panelBlocks } from "@/lib/roster";
 import { canTransition, STATUS_META, type Status } from "@/lib/status";
 import type { formTimes } from "@/lib/stepTimes";
@@ -41,7 +41,6 @@ export function filterTeams(teams: Team[], f: Filters): Team[] {
 /* ---- interview language ---------------------------------------------------- */
 
 type Languages = AppState["languages"];
-const labelOf = (id: string, languages: Languages) => languages.find((l) => l.id === id)?.label ?? id;
 
 /** Which strip button a team counts under: its one language's id, "both", or "none" (not asked). */
 export const languageKey = (t: Pick<Team, "languages">): string => (t.languages.length > 1 ? "both" : (t.languages[0] ?? "none"));
@@ -56,32 +55,18 @@ export function languageStrip(teams: Team[], f: Filters, languages: Languages): 
   return chips.map((c) => ({ ...c, count: held.filter((t) => languageKey(t) === c.key).length }));
 }
 
-/** The Lang column: "EN", "TH", "EN + TH"; null when not asked. */
-export const languageText = (ids: string[], languages: Languages): string | null =>
-  ids.length ? ids.map((id) => languages.find((l) => l.id === id)?.short ?? id).join(" + ") : null;
-
-/** The triangle's label: "Panel 3 doesn't cover English" (a team asking for both says "English or Thai"). Null when the panel fits. */
-export function panelMisfit(team: Pick<Team, "languages">, panel: Pick<PublicPanel, "name" | "languages">, languages: Languages): string | null {
-  if (teamFitsPanel(team.languages, panel.languages)) return null;
-  return `${panel.name} doesn't cover ${team.languages.map((id) => labelOf(id, languages)).join(" or ")}`;
-}
-
-/** The drawer's caution under the panel select: "Panel 3 interviews in English only. You can keep it." Null when the panel fits. */
-export function panelMisfitNote(team: Pick<Team, "languages">, panel: Pick<PublicPanel, "name" | "languages">, languages: Languages): string | null {
-  if (teamFitsPanel(team.languages, panel.languages)) return null;
-  const covers = panel.languages.map((id) => labelOf(id, languages)).join(", ");
-  return `${panel.name} interviews in ${covers}${panel.languages.length === 1 ? " only" : ""}. You can keep it.`;
-}
-
 /**
- * The Judge panel hint's tail: "Covering English: Panel 2" -- the panels the select offers (not conflicted)
- * that say they cover the team's language. Null when the team has not been asked or every option fits anyway.
+ * "Doesn't cover English": what to say when `panel` cannot interview the team in any language it asked
+ * for (`short` gives "Doesn't cover TH"). Every surface shows the panel's name beside it. Null when it fits.
  */
-export function coveringHint(team: Pick<Team, "languages">, options: { id: string; blocked: boolean }[], panels: PublicPanel[], languages: Languages): string | null {
-  const offered = options.flatMap((o) => (o.blocked ? [] : panels.filter((p) => p.id === o.id)));
-  if (!team.languages.length || offered.every((p) => teamFitsPanel(team.languages, p.languages))) return null;
-  const covering = offered.filter((p) => p.languages.length && teamFitsPanel(team.languages, p.languages));
-  return `Covering ${team.languages.map((id) => labelOf(id, languages)).join(" or ")}: ${covering.map((p) => p.name).join(", ") || "none"}`;
+export function misfit(
+  team: Pick<Team, "languages">,
+  panel: Pick<PublicPanel, "languages">,
+  languages: Languages,
+  short = false,
+): string | null {
+  if (languageFit(team, panel) !== "mismatch") return null;
+  return `Doesn't cover ${languageNames(team.languages, languages, { short })}`;
 }
 
 /** The drawer's switch writes at once, as the Interview controls do. */

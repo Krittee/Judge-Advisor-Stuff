@@ -1,28 +1,20 @@
 "use client";
 
-import { languageFit, type Language } from "@/lib/presets";
+import type { Language } from "@/lib/presets";
 import type { PublicPanel } from "@/lib/types";
 
 export type { Language };
+export { languageNames } from "@/lib/presets";
 
-/** The language an interview will run in, as a small tag. */
-export function LanguageTag({
-  language,
-  languages,
-  size = "sm",
-}: {
-  language: string;
-  languages: Language[];
-  size?: "sm" | "md";
-}) {
+/** The language an interview will run in, as a small outlined tag in the colour around it. */
+export function LanguageTag({ language, languages }: { language: string; languages: Language[] }) {
   const found = languages.find((l) => l.id === language);
   if (!found) return null;
 
-  const pad = size === "md" ? "px-2.5 py-1 text-xs" : "px-2 py-0.5 text-[11px]";
   return (
     <span
       title={found.label}
-      className={`inline-block whitespace-nowrap rounded-md bg-surface-2 font-semibold tracking-wide text-ink-muted ${pad}`}
+      className="inline-flex h-6 items-center whitespace-nowrap rounded-md border border-current/45 px-2 text-xs font-semibold tracking-[0.04em]"
     >
       {found.short}
     </span>
@@ -35,23 +27,6 @@ export function LanguageTag({
  */
 export function hasLanguageGap(covers: string[], asking?: string): boolean {
   return !!asking && covers.length > 0 && !covers.includes(asking);
-}
-
-/**
- * Whether a team's language list fits a panel's: true when either side has not
- * said, or they share one. A misfit is flagged, never blocked. One rule, the
- * same one auto-assign uses (`languageFit`).
- */
-export function teamFitsPanel(team: string[], panel: string[]): boolean {
-  return languageFit({ languages: team }, { languages: panel }) !== "mismatch";
-}
-
-/** "English", "Thai" or "English or Thai": the labels of the ids we run, in the order given. */
-export function languageNames(ids: string[], languages: Language[]): string {
-  return ids
-    .map((id) => languages.find((l) => l.id === id)?.label)
-    .filter(Boolean)
-    .join(" or ");
 }
 
 /**

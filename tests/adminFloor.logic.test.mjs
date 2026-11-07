@@ -11,7 +11,6 @@ import {
   columnKey,
   conflictNote,
   coverTags,
-  coverWord,
   defaultColumnKey,
   gapNote,
   loadLine,
@@ -299,10 +298,3 @@ test("the phone chip is spoken as the panel, its teams, who is waiting and any l
   assert.equal(chipSpeech({ panel: p1, cards: [] }, languages), "Panel 1, 0 teams");
 });
 
-test("coverWord words what a panel lacks for a team, only when none of the team's languages is covered", () => {
-  assert.equal(coverWord({ languages: ["th"] }, { languages: ["en"] }, languages), "Doesn't cover TH");
-  assert.equal(coverWord({ languages: ["en", "th"] }, { languages: ["fr"] }, languages), "Doesn't cover EN or TH");
-  assert.equal(coverWord({ languages: ["en", "th"] }, { languages: ["en"] }, languages), null);
-  assert.equal(coverWord({ languages: [] }, { languages: ["en"] }, languages), null, "not asked");
-  assert.equal(coverWord({ languages: ["th"] }, { languages: [] }, languages), null, "the panel has not said");
-});

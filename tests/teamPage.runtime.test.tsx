@@ -79,9 +79,11 @@ function view(over: Partial<TeamViewProps> = {}) {
 
 test("the header card says which language the interview runs in; nothing when not asked", () => {
   const line = (languages: string[]) => panelOf(view({ team: { ...titans, languages } })).match(/<p class="tp-pan-lang">[\s\S]*?<\/p>/)?.[0];
-  assert.equal(text(line(["en"])!), "Interview in EnglishEN");
-  assert.equal(text(line(["es"])!), "Interview in EspañolES");
-  assert.equal(text(line(["en", "es"])!), "Interview in English or EspañolENES");
+  // The tags are what shows; the spelled-out names are only for screen readers.
+  assert.equal(text(line(["en"])!), "Interview inENEnglish");
+  assert.equal(text(line(["es"])!), "Interview inESEspañol");
+  assert.equal(text(line(["en", "es"])!), "Interview inENESEnglish or Español");
+  assert.match(line(["en", "es"])!, /<span class="sr-only">English or Español<\/span>/);
   assert.equal(line([]), undefined);
 });
 

@@ -214,7 +214,7 @@ function token(body: string, name: string) {
 for (const theme of ["dark", "light"]) {
   test(`${theme}: the ink on every desk status chip clears AA 4.5:1`, () => {
     const app = ruleBody(theme === "dark" ? /^:root,\n:root\[data-theme="dark"\] \{/m : /^:root\[data-theme="light"\] \{/m);
-    const page = ruleBody(theme === "dark" ? /^\.desk \{/m : /^:root\[data-theme="light"\] \.desk \{/m);
+    const page = ruleBody(theme === "dark" ? /^\.desk, \.co \{/m : /^:root\[data-theme="light"\] \.desk, :root\[data-theme="light"\] \.co \{/m);
     // The same pairs the .dk-s-* classes make.
     const pairs = {
       booked: [token(app, "booked-quiet"), token(page, "dk-booked-ink")],
@@ -235,7 +235,7 @@ for (const theme of ["dark", "light"]) {
 test("each status class pairs the fill and the ink the test above measures", () => {
   const pairs = { booked: ["booked-quiet", "dk-booked-ink"], waiting: ["waiting", "waiting-ink"], enroute: ["enroute", "enroute-ink"], active: ["active", "active-ink"], done: ["done", "done-ink"] };
   for (const [tone, [fill, ink]] of Object.entries(pairs)) {
-    assert.ok(css.includes(`.desk .dk-s-${tone} { --c: var(--${fill}); --ci: var(--${ink}); }`), `.dk-s-${tone} no longer uses --${fill} with --${ink}`);
+    assert.ok(css.includes(`:is(.desk, .co) .dk-s-${tone} { --c: var(--${fill}); --ci: var(--${ink}); }`), `.dk-s-${tone} no longer uses --${fill} with --${ink}`);
   }
 });
 
@@ -248,7 +248,7 @@ test("the desk's CSS sits after the judge console block and has no motion", () =
   const bare = block.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.doesNotMatch(bare, /@keyframes|animation|transition|scroll-behavior/);
   const classes = new Set([...bare.matchAll(/\.([a-z][\w-]*)/g)].map((m) => m[1]));
-  const stray = [...classes].filter((c) => !/^(dk-|desk$|theme-toggle$|text-ink-faint$)/.test(c));
+  const stray = [...classes].filter((c) => !/^(dk-|desk$|co$|theme-toggle$|text-ink-faint$)/.test(c));
   assert.deepEqual(stray, [], "every class in the block is the desk's own");
 });
 

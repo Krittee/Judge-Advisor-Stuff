@@ -52,6 +52,8 @@ export async function POST(request: Request) {
   let slotStart: string | null = null;
   let slotEnd: string | null = null;
 
+  const panel = (await store().listPanels()).find((p) => p.id === team.panel_id);
+
   if (kind === "slot") {
     const start = new Date(String(body.slotStart ?? ""));
     const end = new Date(String(body.slotEnd ?? ""));
@@ -64,7 +66,6 @@ export async function POST(request: Request) {
     // while the panel was re-timed would otherwise book a slot that no
     // longer exists, landing across two real ones — an overlap the
     // one-team-per-start-time rule cannot see.
-    const panel = (await store().listPanels()).find((p) => p.id === team.panel_id);
     if (!panel) {
       return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
     }
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
       createdBy: actorLabel(session),
       slotStart,
       slotEnd,
-      language: bookingLanguage(body.language, team),
+      language: bookingLanguage(body.language, team, panel),
     });
 
     await store().logActivity({

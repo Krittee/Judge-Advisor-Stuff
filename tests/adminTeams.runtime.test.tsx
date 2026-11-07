@@ -204,7 +204,8 @@ test("auto-assign counts the filtered unassigned teams and is disabled at 0", ()
   // Byte Me and Sparky have no panel.
   assert.match(button(board()), /Auto-assign 2 unassigned/);
   assert.doesNotMatch(button(board()), /disabled/);
-  assert.match(button(board()), /title="Assigns within each division, skips conflicted panels and matches language where it can\."/);
+  assert.match(button(board()), /title="Assigns within each division and skips conflicted panels\."/);
+  assert.match(board(), /<span class="ja-hint ja-tm-aah">Matches language where it can\.<\/span>/);
   assert.match(button(board({ division: "High School" })), /Auto-assign 0 unassigned/);
   assert.match(button(board({ division: "High School" })), /disabled/);
 });
@@ -466,22 +467,22 @@ test("the count strip: Language, then EN, TH, Both and Not asked as aria-pressed
 
 test("the Lang column: a neutral tag, muted 'Not asked', and a caution triangle on the panel that does not cover it", () => {
   const m = asked(null);
-  assert.match(rowOf(m, "9882K"), /<td><span class="ja-tm-lt"><span class="sr-only">Interview language: <\/span>TH<\/span><\/td>/);
-  assert.match(rowOf(m, "7700B"), /ja-tm-lt"><span class="sr-only">Interview language: <\/span>EN \+ TH<\/span>/);
+  assert.match(rowOf(m, "9882K"), /<td><span class="ja-tm-lt"><span class="sr-only">Interview language: <\/span><span title="Thai"[^>]*>TH<\/span><\/span><\/td>/);
+  assert.match(rowOf(m, "7700B"), /ja-tm-lt"><span class="sr-only">Interview language: <\/span><span title="English"[^>]*>EN<\/span><span title="Thai"[^>]*>TH<\/span><\/span>/);
   assert.match(rowOf(m, "2011A"), /<span class="ja-tm-na">Not asked<\/span>/);
   // Panel 2 is English only: Thai and both-language-on-Panel-3 (also English only) are flagged; English and not-asked are not.
-  assert.match(rowOf(m, "9882K"), /Panel 2<span class="ja-tm-lw" role="img" aria-label="Panel 2 doesn&#x27;t cover Thai"/);
+  assert.match(rowOf(m, "9882K"), /Panel 2<span class="ja-tm-lw" role="img" aria-label="Panel 2: Doesn&#x27;t cover Thai"/);
   assert.match(rowOf(m, "7700B"), /<td>Panel 3<\/td>/, "shares English: fits");
   assert.doesNotMatch(rowOf(m, "2011A"), /ja-tm-lw/);
   assert.doesNotMatch(rowOf(m, "7700B"), /ja-tm-lw/);
-  assert.match(rowOf(asked(null, { state: { teams: speakers.map((t) => (t.id === byteMe.id ? { ...t, panel_id: "p4", division: "Elementary School", languages: ["th"] } : t)) } }), "7700B"), /aria-label="Panel 4 doesn&#x27;t cover Thai"/);
+  assert.match(rowOf(asked(null, { state: { teams: speakers.map((t) => (t.id === byteMe.id ? { ...t, panel_id: "p4", division: "Elementary School", languages: ["th"] } : t)) } }), "7700B"), /aria-label="Panel 4: Doesn&#x27;t cover Thai"/);
   assert.match(m, /<th scope="col" title="Interview language">Lang<\/th>/);
 });
 
 test("the phone list puts the tag on the team's row and the triangle with the panel", () => {
   const m = asked(null, { wide: false });
   assert.match(m, /9882K<\/b><span class="ja-tm-nm">Torque Titans<\/span><span class="ja-tm-lt">/);
-  assert.match(m, / · Panel 2<\/span><span class="ja-tm-lw" role="img" aria-label="Panel 2 doesn&#x27;t cover Thai"/);
+  assert.match(m, / · Panel 2<\/span><span class="ja-tm-lw" role="img" aria-label="Panel 2: Doesn&#x27;t cover Thai"/);
 });
 
 test("the drawer's Interview language is a radiogroup English | Thai | Both above Judge panel, with a quiet Clear", () => {
@@ -506,14 +507,14 @@ test("the drawer's Interview language is a radiogroup English | Thai | Both abov
   assert.ok(sh.indexOf("Interview language") < sh.indexOf("Judge panel"));
 });
 
-test("Judge panel: 'Covering Thai: …' in the hint and a caution line ending 'You can keep it.' when the chosen panel doesn't fit", () => {
+test("Judge panel: a caution line 'Doesn't cover Thai. You can keep it.' when the chosen panel doesn't fit", () => {
   const thaiPanels = panels.map((p) => (p.id === "p3" ? { ...p, languages: ["en", "th"] } : p));
   const d = drawer(asked(titans, { state: { panels: thaiPanels } }));
-  assert.match(d, /MS panels without a conflict\. Covering Thai: Panel 3\.<\/p>/);
-  assert.match(d, /<div class="jg-caution" role="note">[\s\S]*?<p>Panel 2 interviews in English only\. You can keep it\.<\/p>/);
+  assert.match(d, /<p class="ja-hint">MS panels without a conflict<\/p>/);
+  assert.match(d, /<div class="jg-caution" role="note">[\s\S]*?<p>Doesn&#x27;t cover Thai\. You can keep it\.<\/p>/);
   // Saving is never blocked by it.
   assert.ok(d.includes('<button type="submit" class="ja-prim" disabled="">Save changes'), "Save is off only because nothing changed, not because of the warning");
-  // A fitting panel: no caution. An English team: every option fits, so no hint.
+  // A fitting panel: no caution. An English team: every option fits.
   assert.doesNotMatch(drawer(asked(sparky)), /Covering|You can keep it/);
   assert.doesNotMatch(drawer(asked(gremlins)), /Covering|You can keep it/);
 });
@@ -534,7 +535,7 @@ test("the strip and the language switch are styled in the Teams block from token
   assert.match(block, /\.ja-tm-lgs \{ flex-wrap: wrap;/);
   assert.match(block, /\.ja-tm-chb \{ height: 44px;/);
   assert.match(block, /\.ja-tm-chb\[aria-pressed="true"\] \{[^}]*var\(--accent\)/);
-  assert.match(block, /\.ja-tm-lt \{[^}]*var\(--surface-2\)/);
+  assert.match(block, /\.ja-tm-lt \{[^}]*var\(--ink-muted\)/);
   assert.match(block, /\.ja-tm-rd3 input:checked \+ span \{ background: var\(--accent\)/);
 });
 

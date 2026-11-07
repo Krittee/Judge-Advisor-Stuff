@@ -1,31 +1,15 @@
 "use client";
 
-import { canBook, CHOOSE_TEAM_LINE, type SlotsModel } from "./coordinatorLogic";
+import { canBook, NO_PANEL_LINE, SET_LANGUAGE_LINE, type SlotsModel } from "./coordinatorLogic";
 import type { CoordinatorViewProps } from "./CoordinatorView";
 import { Info, Pill } from "./TeamsTab";
 import { divisionTag } from "@/components/admin/floorLogic";
-import { CautionIcon } from "@/components/desk/DeskSlots";
+import { Caution, Check } from "@/components/desk/DeskSlots";
 import { slotTime } from "@/components/desk/deskLogic";
 import { LanguageCover, LanguageTag, type Language } from "@/components/Language";
 import { noSlotsLeftLine, TOO_CLOSE_TITLE, takenTitle } from "@/components/SlotPicker";
+import { bookingLanguage } from "@/lib/presets";
 import type { Slot, Team } from "@/lib/types";
-
-function Check() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M5 12.5l4.5 4.5L19 7.5" />
-    </svg>
-  );
-}
-
-function Caution({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="dk-caution" role="note">
-      <CautionIcon />
-      <p>{children}</p>
-    </div>
-  );
-}
 
 /**
  * One panel's day: a row per slot still to come. A taken slot reads who has
@@ -36,7 +20,7 @@ function Caution({ children }: { children: React.ReactNode }) {
 export function SlotsTab(p: CoordinatorViewProps & { model: SlotsModel; now: number }) {
   const { model } = p;
   const { panel, bar, chosen } = model;
-  if (!panel) return <p className="co-empty">No panels yet — the Judge Advisor sets them up.</p>;
+  if (!panel) return <p className="dk-empty">No panels yet — the Judge Advisor sets them up.</p>;
 
   const teamById = new Map(p.teams.map((t) => [t.id, t]));
 
@@ -149,13 +133,14 @@ export function BookingBar({
 }) {
   const { bar, chosen } = model;
   const ready = bar.kind === "ready";
+  const language = bar.kind === "ready" ? bookingLanguage(undefined, bar.team, bar.panel) : "";
   const label = ready ? (chosen ? `Book ${slotTime(chosen.start)}` : "Book · pick a time") : "Book";
 
   return (
     <div className="co-pinb" role="group" aria-label="Booking">
       <div className="co-pb-l">
         {bar.kind === "none" ? (
-          <span>{CHOOSE_TEAM_LINE}</span>
+          <span>Choose a team on the Teams tab</span>
         ) : (
           <>
             <span>Booking for</span>
@@ -163,23 +148,25 @@ export function BookingBar({
             {bar.kind === "ready" ? (
               <>
                 <span className="co-lts">
-                  <LanguageTag language={bar.language} languages={languages} />
+                  <LanguageTag language={language} languages={languages} />
                 </span>
                 <span className="co-pb-s">
-                  <LanguageCover panel={bar.panel} languages={languages} asking={bar.language} />
+                  <LanguageCover panel={bar.panel} languages={languages} asking={language} />
                 </span>
               </>
             ) : (
-              <span className="co-pb-s">{bar.line}</span>
+              <span className="co-pb-s">
+                {bar.kind === "held" ? "Already booked — the queue desk can change it." : bar.kind === "no-language" ? SET_LANGUAGE_LINE : NO_PANEL_LINE}
+              </span>
             )}
           </>
         )}
       </div>
       <button
         type="button"
-        className="co-prim"
+        className="dk-prim dk-lg"
         disabled={busy || bar.kind !== "ready" || !chosen}
-        onClick={() => bar.kind === "ready" && chosen && onBook(bar.team, chosen, bar.language)}
+        onClick={() => bar.kind === "ready" && chosen && onBook(bar.team, chosen, language)}
       >
         {label}
       </button>

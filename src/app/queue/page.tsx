@@ -66,7 +66,7 @@ export default function QueuePage() {
 
   const team = teamByNumber.get(normalizeTeamNumber(number)) ?? null;
   const panel = team?.panel_id ? (panelById.get(team.panel_id) ?? null) : null;
-  const bookLanguage = bookLanguageFor(bookChoice, team, state.languages[0]?.id ?? "");
+  const bookLanguage = bookLanguageFor(bookChoice, team, state.languages[0]?.id ?? "", panel);
 
   // What this team already has, so the desk is not the last to know.
   // A live queue entry and a future booking are different problems: the

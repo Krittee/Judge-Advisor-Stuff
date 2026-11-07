@@ -258,6 +258,8 @@ test("the booking language: the team's first, else the default; an explicit one 
   assert.equal(await ask(["en"], "th"), "th", "an explicit language wins");
   assert.equal(await ask(["th"], ""), "th", "a blank one is not an answer");
   assert.equal(await ask(["th"], "klingon"), "th", "nor is one we do not know");
+  await w.db.updatePanel(w.panelA.id, { languages: ["th"] });
+  assert.equal(await ask(["en", "th"]), "th", "the first the team's panel covers");
 });
 
 /* ===== 4. see the board ================================================== */
@@ -286,7 +288,6 @@ test("a coordinator sees every team, slot and request, without messages, and non
 
   assert.equal(state.viewer.role, "coordinator");
   assert.equal(state.viewer.name, "Pat");
-  assert.equal(state.viewer.canSetTeamLanguage, true);
   for (const can of ["canAdminister", "canAdvance", "canReadNotes", "canFlag", "canReadFlags"] as const) {
     assert.equal(state.viewer[can], false, can);
   }
@@ -294,10 +295,6 @@ test("a coordinator sees every team, slot and request, without messages, and non
   for (const session of [QUEUER, ADMIN]) {
     const rows = (await call(session, "state", "GET")).body.requests as AppState["requests"];
     assert.ok(rows.some((r) => r.message === "Needs a ramp"), session.role);
-  }
-  // Only the coordinator and the Judge Advisor are offered the language control.
-  for (const [session, expected] of [[ADMIN, true], [QUEUER, false], [REFEREE, false], [null, false]] as const) {
-    assert.equal((await call(session, "state", "GET")).body.viewer.canSetTeamLanguage, expected);
   }
 });
 

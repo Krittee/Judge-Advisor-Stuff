@@ -52,7 +52,7 @@ test("/: titled 'Who are you?', with no team-number input and no staff rows", ()
   assert.ok(!/What the colours mean<\/h2>/.test(door), "the old separate colour card is gone");
 });
 
-test("/: the Team door has a ticket glyph and a caption, no avatar; the others ring theirs; the Coordinator's box is empty", () => {
+test("/: the Team door has a ticket glyph and a caption, no avatar; the others, the Coordinator included, ring theirs", () => {
   const cards = [...door.matchAll(/<a class="dp-card"[^>]*>[\s\S]*?<\/a>/g)].map((m) => m[0]);
   assert.equal(cards.length, 6);
   assert.match(cards[0], /dp-av--team/);
@@ -60,14 +60,13 @@ test("/: the Team door has a ticket glyph and a caption, no avatar; the others r
   assert.match(cards[0], /aria-describedby="dp-cap"/);
   assert.match(door, /<p class="dp-cap" id="dp-cap">Opens the team ticket<\/p>/);
   const rings: [string, string, number][] = [
-    ["judge", "judge", 1],["referee", "ref", 2], ["queue-desk", "desk", 3], ["judge-advisor", "ja", 5],
+    ["judge", "judge", 1],["referee", "ref", 2], ["queue-desk", "desk", 3], ["coordinator", "co", 4], ["judge-advisor", "ja", 5],
   ];
   rings.forEach(([file, ring, i]) => {
     assert.match(cards[i], new RegExp(`dp-r-${ring}"><img src="/avatars/${file}\\.jpg" alt=""`));
   });
-  // The Coordinator: an empty, decorative dashed box; no picture, no ticket caption.
-  assert.match(cards[4], /<span class="dp-av dp-av--ph" aria-hidden="true"><\/span>/);
-  assert.ok(!/<img|aria-describedby/.test(cards[4]));
+  // The Coordinator's card has no ticket caption, like the others with a ring.
+  assert.ok(!/aria-describedby/.test(cards[4]));
   assert.equal([...door.matchAll(/class="dp-cap"/g)].length, 1);
 });
 
@@ -152,11 +151,11 @@ test("the sign-in pass says 'Back to all doors' and still links to /", () => {
   assert.ok(!src.includes("Back to team view"));
 });
 
-test("the coordinator is on the crew pass with an empty dashed box instead of a picture", () => {
+test("the coordinator is on the crew pass with its own picture", () => {
   assert.match(read("src/components/SignInForm.tsx"), /const CREW: Role\[\] = \["judge", "queuer", "admin", "coordinator"\]/);
   const markup = renderToStaticMarkup(<Welcome session={{ role: "coordinator", name: "Pat" }} />);
-  assert.match(markup, /<span class="si-av si-av--ph" aria-hidden="true"><\/span>/);
-  assert.doesNotMatch(markup, /<img/);
+  assert.match(markup, /<img class="si-av" src="\/avatars\/coordinator\.jpg" alt="" width="128" height="128"\/>/);
+  assert.doesNotMatch(markup, /si-av--ph/);
 });
 
 test("the top bar brand stays the front door", () => {

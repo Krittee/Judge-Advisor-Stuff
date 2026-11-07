@@ -123,10 +123,9 @@ test("each sample tile class pairs the fill and the ink the test above measures,
   assert.equal(pageRule("light").match(/--dp-booked-ink: ([^;]+);/)[1], ruleBody(/^:root\[data-theme="light"\] \.board \{/m).match(/--bd-booked-ink: ([^;]+);/)[1]);
 });
 
-test("the Coordinator's empty avatar box is a 1.5px dashed --rail, defined for both themes", () => {
-  assert.match(bare, /\.dp-av--ph \{[^}]*border: 1\.5px dashed var\(--rail\)[^}]*background: none/);
-  assert.deepEqual(token(pageRule("dark"), "rail"), [0.42, 0.016, 265]);
-  assert.deepEqual(token(pageRule("light"), "rail"), [0.74, 0.012, 265]);
+test("the Coordinator's ring is the queue desk's teal, not a blank ring", () => {
+  assert.match(bare, /\.dp-r-desk \{ --rc: var\(--si-desk\); \}/);
+  assert.match(bare, /\.dp-r-co \{ --rc: var\(--si-desk\); \}/);
 });
 
 /* ---- the block ---------------------------------------------------------------------- */

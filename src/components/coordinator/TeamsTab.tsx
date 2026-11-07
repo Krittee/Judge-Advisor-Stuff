@@ -4,13 +4,13 @@ import { teamList, pillText, rowState, ASK_DESK_LINE, NO_PANEL_LINE, SET_LANGUAG
 import type { CoordinatorViewProps } from "./CoordinatorView";
 import { requestOrder, TONE } from "@/components/desk/deskLogic";
 import { divisionTag } from "@/components/admin/floorLogic";
-import { LanguageCover } from "@/components/Language";
+import { LanguageCover, languageNames } from "@/components/Language";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
 import type { RequestRow } from "@/lib/types";
 
 /** The status pill: the same fill and ink pairs the board and the desk use. */
 export function Pill({ request }: { request: Pick<RequestRow, "status" | "slot_start"> }) {
-  return <span className={`co-sc co-s-${TONE[request.status]}`}>{pillText(request)}</span>;
+  return <span className={`dk-sc dk-s-${TONE[request.status]}`}>{pillText(request)}</span>;
 }
 
 export function Info() {
@@ -35,7 +35,6 @@ export function TeamsTab(p: CoordinatorViewProps) {
   });
   const order = p.languages.map((l) => l.id);
   const panelById = new Map(p.panels.map((x) => [x.id, x]));
-  const languageLabel = (id: string) => p.languages.find((l) => l.id === id)?.label ?? id;
 
   return (
     <>
@@ -49,7 +48,7 @@ export function TeamsTab(p: CoordinatorViewProps) {
         </svg>
         <input
           id="co-q"
-          className="co-input"
+          className="dk-input"
           type="text"
           value={p.query}
           onChange={(e) => p.onQuery(filterTeamNumberInput(e.target.value))}
@@ -62,11 +61,11 @@ export function TeamsTab(p: CoordinatorViewProps) {
       </div>
 
       <div className="co-frow">
-        <div className="co-selw">
+        <div className="dk-selw">
           <label className="sr-only" htmlFor="co-div">
             Division
           </label>
-          <select id="co-div" className="co-input co-sel" value={p.division} onChange={(e) => p.onDivision(e.target.value)}>
+          <select id="co-div" className="dk-input dk-sel" value={p.division} onChange={(e) => p.onDivision(e.target.value)}>
             <option value="">All divisions</option>
             {p.divisions.map((d) => (
               <option key={d} value={d}>
@@ -127,6 +126,7 @@ export function TeamsTab(p: CoordinatorViewProps) {
                       type="button"
                       className="co-chip"
                       aria-pressed={team.languages.includes(l.id)}
+                      disabled={p.busy}
                       onClick={() => p.onLanguages(team, toggleLanguage(team.languages, l.id, order))}
                     >
                       <span aria-hidden="true">{l.short}</span>
@@ -149,19 +149,19 @@ export function TeamsTab(p: CoordinatorViewProps) {
                         <button
                           key={o.id}
                           type="button"
-                          className={o.primary ? "co-prim" : "co-out"}
+                          className={o.primary ? "dk-prim dk-lg" : "dk-out"}
                           disabled={!ready || p.busy}
                           onClick={() => p.onRequest(team, o.id)}
                         >
-                          Request · {languageLabel(o.id)}
+                          Request · {languageNames([o.id], p.languages)}
                         </button>
                       ))}
                       {state.kind === "ready" ? (
-                        <div className="co-cover">
+                        <div className="dk-cover">
                           <LanguageCover panel={state.panel} languages={p.languages} />
                         </div>
                       ) : (
-                        <p className="co-cover">{state.kind === "no-language" ? SET_LANGUAGE_LINE : NO_PANEL_LINE}</p>
+                        <p className="dk-cover">{state.kind === "no-language" ? SET_LANGUAGE_LINE : NO_PANEL_LINE}</p>
                       )}
                       <button type="button" className="co-txb" disabled={!ready} onClick={() => p.onBookTime(team)}>
                         Book a time
@@ -177,7 +177,7 @@ export function TeamsTab(p: CoordinatorViewProps) {
           );
         })}
         {!rows.length ? (
-          <li className="co-empty">
+          <li className="dk-empty">
             {p.query
               ? `No team matches ${normalizeTeamNumber(p.query)}.`
               : p.notAskedOnly

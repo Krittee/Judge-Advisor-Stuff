@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- a 28 px static avatar; next/image buys nothing here. */
 
 import { useMemo } from "react";
-import { CautionIcon, DeskSlots } from "./DeskSlots";
+import { Caution, DeskSlots } from "./DeskSlots";
 import { busyText, lookupState, nextFreeStart, requestOrder, slotKind, teamList, TONE } from "./deskLogic";
 import { LanguageCover, LanguageTag, languageNames, type Language } from "@/components/Language";
 import { SignOutButton } from "@/components/judging";
@@ -71,15 +71,6 @@ export type DeskViewProps = {
   onCancelBooking: () => void;
 };
 
-function Caution({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="dk-caution" role="note">
-      <CautionIcon />
-      <p>{children}</p>
-    </div>
-  );
-}
-
 export function DeskView(p: DeskViewProps) {
   const { team, panel, existing, reschedule, languages, busy } = p;
   const now = p.now ?? Date.now();
@@ -143,7 +134,7 @@ export function DeskView(p: DeskViewProps) {
             disabled={disabled}
             onClick={() => p.onRequest(o.id)}
           >
-            {`${verb} · ${languages.find((l) => l.id === o.id)?.label ?? o.id}`}
+            {`${verb} · ${languageNames([o.id], languages)}`}
           </button>
         ))}
       </div>
@@ -266,13 +257,11 @@ export function DeskView(p: DeskViewProps) {
         {team && teamLanguage ? (
           <div className="dk-lrow">
             <span>Interview language</span>
-            <span className="dk-lrt">
-              <span className="dk-lts">
-                {team.languages.map((id) => (
-                  <LanguageTag key={id} language={id} languages={languages} />
-                ))}
-              </span>
-              {teamLanguage}
+            <span className="dk-lts">
+              {team.languages.map((id) => (
+                <LanguageTag key={id} language={id} languages={languages} />
+              ))}
+              <span className="sr-only">{teamLanguage}</span>
             </span>
           </div>
         ) : null}

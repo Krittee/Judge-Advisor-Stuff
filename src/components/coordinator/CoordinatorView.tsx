@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- a 28 px static avatar; next/image buys nothing here. */
 
 import { useEffect, useRef } from "react";
 import { slotsModel, type CoordinatorTab } from "./coordinatorLogic";
@@ -23,7 +24,6 @@ export type CoordinatorViewProps = {
   /** The coordinator's name, under "Coordinator". */
   name?: string;
   online: boolean;
-  /** With any language tapped but not yet saved already applied (withPending). */
   teams: Team[];
   panels: PublicPanel[];
   requests: RequestRow[];
@@ -106,19 +106,18 @@ export function CoordinatorView(p: CoordinatorViewProps) {
   return (
     <div className="co">
       <header className="co-top">
-        <div className="co-who">
-          {/* No picture yet: the empty dashed box that keeps the avatar's place (the sign-in pass uses it too). */}
-          <span className="co-av">
-            <span className="si-av si-av--ph" aria-hidden="true" />
+        <div className="dk-who">
+          <span className="dk-av">
+            <img src="/avatars/coordinator.jpg" alt="" width={28} height={28} />
           </span>
-          <span className="co-who-t">
+          <span className="dk-who-t">
             <b>Coordinator</b>
             {p.name ? <span>{p.name}</span> : null}
           </span>
         </div>
         {/* Room for the theme toggle, which docks into the top-right corner here. */}
-        <div className="co-top-r">
-          <span className="co-live" data-online={p.online}>
+        <div className="dk-top-r">
+          <span className="dk-live" data-online={p.online}>
             <i aria-hidden="true" />
             {p.online ? "Live" : "Reconnecting"}
           </span>

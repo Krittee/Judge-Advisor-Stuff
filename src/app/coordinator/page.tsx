@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { call, useAppState } from "@/components/useAppState";
 import { formatClock } from "@/components/ui";
 import { CoordinatorView } from "@/components/coordinator/CoordinatorView";
-import { saveLanguages, tabFrom, tabHref, withPending, type CoordinatorTab, type Pending } from "@/components/coordinator/coordinatorLogic";
+import { tabFrom, type CoordinatorTab } from "@/components/coordinator/coordinatorLogic";
 import { homeFor } from "@/components/SignInForm";
 import type { Session } from "@/lib/auth";
 import type { Slot, Team } from "@/lib/types";
@@ -43,8 +43,6 @@ function Coordinator() {
   const [chosenId, setChosenId] = useState<string | null>(null);
   const [panelPick, setPanelPick] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
-  /** Languages tapped and sent but not yet confirmed, by team: the chip shows them at once. */
-  const [pending, setPending] = useState<Pending>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
@@ -66,8 +64,6 @@ function Coordinator() {
       .catch(() => router.replace("/coordinator/login"));
   }, [router]);
 
-  const teams = useMemo(() => withPending(state.teams, pending), [state.teams, pending]);
-
   const clearNotes = () => {
     setError(null);
     setOk(null);
@@ -75,38 +71,22 @@ function Coordinator() {
 
   function goTab(next: CoordinatorTab) {
     clearNotes();
-    router.replace(tabHref(next));
+    router.replace(next === "slots" ? "/coordinator?tab=slots" : "/coordinator");
   }
 
   /**
-   * A poll already under way may have started before the write landed and
-   * answer with the old value; asking twice means one began after it, so a
-   * chip does not fall back for a moment before settling.
+   * One write: busy while it is out, then one poll. `done` is what the banner
+   * says; `after` runs only if the server accepted it. A chip lights when the
+   * poll brings the saved list, as in the Judge Advisor's drawer.
    */
-  async function refreshAfterWrite() {
-    await refresh();
-    await refresh();
-  }
-
-  const saveTeamLanguages = (team: Team, next: string[]) => {
-    clearNotes();
-    return saveLanguages(team.id, next, {
-      send: (body) => call("/api/team-language", { method: "PATCH", body }),
-      setPending,
-      refresh: refreshAfterWrite,
-      onError: setError,
-    });
-  };
-
-  /** `done` is what the banner says; `after` runs only if the server accepted it. */
-  async function submit(body: Record<string, unknown>, done: string, after: () => void) {
+  async function run(write: () => Promise<unknown>, done?: string, after?: () => void) {
     setBusy(true);
     clearNotes();
     try {
-      await call("/api/requests", { body });
-      setOk(done);
-      after();
-      await refreshAfterWrite();
+      await write();
+      if (done) setOk(done);
+      after?.();
+      await refresh();
     } catch (e) {
       // The server's own words, e.g. "Already booked — the queue desk can change it."
       setError((e as Error).message);
@@ -114,6 +94,11 @@ function Coordinator() {
       setBusy(false);
     }
   }
+
+  const saveTeamLanguages = (team: Team, languages: string[]) =>
+    run(() => call("/api/team-language", { method: "PATCH", body: { teamId: team.id, languages } }));
+
+  const submit = (body: Record<string, unknown>, done: string, after: () => void) => run(() => call("/api/requests", { body }), done, after);
 
   const request = (team: Team, language: string) =>
     submit({ teamNumber: team.number, kind: "queue", language }, `Team ${team.number} added to the queue.`, () => setOpenId(null));
@@ -143,7 +128,7 @@ function Coordinator() {
     <CoordinatorView
       name={session?.name}
       online={online}
-      teams={teams}
+      teams={state.teams}
       panels={state.panels}
       requests={state.requests}
       languages={state.languages}

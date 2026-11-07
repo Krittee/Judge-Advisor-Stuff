@@ -43,3 +43,16 @@ test("a booking uses the language named, else the team's first, else the event d
   assert.equal(bookingLanguage("klingon", { languages: ["th"] }), "th");
   assert.equal(bookingLanguage(undefined, { languages: [] }), "en");
 });
+
+test("a booking on a panel uses the first of the team's languages the panel covers", () => {
+  assert.equal(bookingLanguage(undefined, { languages: ["th"] }, { languages: ["th"] }), "th");
+  assert.equal(bookingLanguage(undefined, { languages: ["en"] }, { languages: ["th"] }), "en", "a panel that does not cover it is only a caution, not a switch");
+  const both = { languages: ["en", "th"] };
+  assert.equal(bookingLanguage(undefined, both, { languages: ["th"] }), "th", "Thai-only panel");
+  assert.equal(bookingLanguage(undefined, both, { languages: ["en"] }), "en", "English-only panel");
+  assert.equal(bookingLanguage(undefined, both, { languages: ["en", "th"] }), "en", "covers both: the team's first");
+  assert.equal(bookingLanguage(undefined, both, { languages: [] }), "en", "panel has not said: the team's first");
+  assert.equal(bookingLanguage(undefined, both, null), "en", "no panel: the team's first");
+  assert.equal(bookingLanguage(undefined, { languages: ["th", "en"] }, { languages: ["xx"] }), "th", "covers neither: the team's first");
+  assert.equal(bookingLanguage("en", both, { languages: ["th"] }), "en", "an explicit language still wins");
+});

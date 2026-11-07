@@ -16,7 +16,6 @@ import {
   canFlag,
   canReadFlags,
   canReadNotes,
-  canSetTeamLanguage,
   type Session,
 } from "./auth";
 import type { AppState, ViewerCapabilities } from "./types";
@@ -209,6 +208,5 @@ function describeViewer(session: Session | null, division: string | null): Viewe
     canFlag: canFlag(session),
     canReadFlags: canReadFlags(session),
     canAdminister: canAdminister(session),
-    canSetTeamLanguage: canSetTeamLanguage(session),
   };
 }
