@@ -52,11 +52,11 @@ test("/: titled 'Who are you?', with no team-number input and no staff rows", ()
   assert.ok(!/What the colours mean<\/h2>/.test(door), "the old separate colour card is gone");
 });
 
-test("/: the Team door has a ticket glyph and a caption, no avatar; the others, the Coordinator included, ring theirs", () => {
+test("/: the Team door has the team picture with no ring and a caption; the others, the Coordinator included, ring theirs", () => {
   const cards = [...door.matchAll(/<a class="dp-card"[^>]*>[\s\S]*?<\/a>/g)].map((m) => m[0]);
   assert.equal(cards.length, 6);
-  assert.match(cards[0], /dp-av--team/);
-  assert.ok(!/<img/.test(cards[0]));
+  assert.match(cards[0], /<span class="dp-av dp-av--team"><img src="\/avatars\/team\.jpg" alt=""/);
+  assert.ok(!/dp-r-/.test(cards[0]), "the Team door has no ring");
   assert.match(cards[0], /aria-describedby="dp-cap"/);
   assert.match(door, /<p class="dp-cap" id="dp-cap">Opens the team ticket<\/p>/);
   const rings: [string, string, number][] = [

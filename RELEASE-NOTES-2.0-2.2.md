@@ -40,6 +40,7 @@ auto-assigner all use. Every change below is local and not pushed.
 | [Review fixes: booked time no longer wraps; coordinator tabs open at the top](#review-fixes) | `ac9a4bf` | Not yet (browser phone size only) | Local, not pushed |
 | [The Coordinator door moves after Queue desk](#door-order) | `aecd28c` | Not yet (browser phone size only) | Local, not pushed |
 | [Coordinator avatar](#coordinator-avatar) | `7612f0b` | Not yet (browser phone size only) | Local, not pushed |
+| [Team door picture](#team-door-picture) | (this commit) | Not yet (browser phone size only) | Local, not pushed |
 
 ### Your decisions for 2.1.0
 
@@ -243,6 +244,17 @@ and sixth (language) columns. Files: `src/components/door/DoorPage.tsx`,
 **How it was tested.** `tests/doorPage.runtime.test.tsx`, `doorPage.css.test.mjs`, `coordinatorPage.runtime.test.tsx`. Browser check at `7612f0b` (demo-data copy, 375 dark): the picture shows with no frame on the door (teal ring), the sign-in pass and the console top bar.
 
 **Commit and branch.** `7612f0b` on `claude/v21-coordinator-c9e080`. Local, not pushed.
+
+<a id="team-door-picture"></a>
+### Team door picture
+
+**Problem / request.** The Team door showed a ticket glyph where the other doors show a picture.
+
+**What changed.** The user supplied the art, and it replaces the ticket glyph on the Team door. The image was cropped from the supplied picture to the inside of its blue frame and saved at 320 × 320, like the other avatars. No ring, as before. The "Opens the team ticket" caption is unchanged. Files: `public/avatars/team.jpg`, `src/components/door/DoorPage.tsx`, `src/app/globals.css`, `tests/doorPage.runtime.test.tsx`, this file.
+
+**How it was tested.** `tests/doorPage.runtime.test.tsx` checks the Team card has the picture, no ring, and its caption. Unit and runtime tests only. Browser check: not yet (browser phone size only).
+
+**Commit and branch.** `(this commit)` on `claude/v21-coordinator-c9e080`. Local, not pushed.
 
 ---
 
