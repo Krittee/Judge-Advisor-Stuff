@@ -1195,7 +1195,6 @@ body:has(.landing) > .theme-toggle { top: 0; }
 .dp-av { --s: 48px; display: block; flex: none; width: var(--s); height: var(--s); padding: 2px; border-radius: 25%; background: var(--rc); }
 .dp-av img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 22%; }
 .dp-av--team { padding: 0; background: none; }
-.dp-gl { display: grid; width: 100%; height: 100%; place-items: center; border-radius: 25%; background: var(--lp-tile); color: var(--ink); }
 .dp-r-judge { --rc: var(--accent); }
 .dp-r-desk { --rc: var(--si-desk); }
 /* The Coordinator wears the queue desk's teal (its sign-in pass does too) until it has a colour of its own. */
