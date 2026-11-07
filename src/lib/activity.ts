@@ -12,7 +12,7 @@ export type StoredActivity = Omit<ActivityRow, "kind" | "actor_role" | "team_num
 };
 
 /** How the old "role:Name" labels name the role on screen. */
-const ROLE_NAMES = { admin: "Judge Advisor", queuer: "Front desk", referee: "Referee" } as const;
+const ROLE_NAMES = { admin: "Judge Advisor", queuer: "Front desk", referee: "Referee", coordinator: "Coordinator" } as const;
 
 /** Who is acting, as a new entry stores it: the plain name and the role they acted in. */
 export function actorParts(s: Session | null): { actor: string; actorRole: string } {
@@ -25,7 +25,7 @@ export function actorParts(s: Session | null): { actor: string; actorRole: strin
 /** An old actor label ("admin:Alex", "Priya (Panel 2)", "team") as a name and a role. */
 export function splitActor(label: string): { actor: string; role: string | null } {
   if (label === "team") return { actor: label, role: "Team" };
-  const prefixed = /^(admin|queuer|referee):(.*)$/s.exec(label);
+  const prefixed = /^(admin|queuer|referee|coordinator):(.*)$/s.exec(label);
   if (prefixed) return { actor: prefixed[2], role: ROLE_NAMES[prefixed[1] as keyof typeof ROLE_NAMES] };
   const onPanel = /^(.*) \(([^()]+)\)$/s.exec(label);
   return onPanel ? { actor: onPanel[1], role: onPanel[2] } : { actor: label, role: null };

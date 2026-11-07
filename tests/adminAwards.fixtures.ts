@@ -10,7 +10,7 @@ import type { AppState, AwardView, NominationRow, Team, WinnerRow } from "../src
 export const awards: AwardView[] = configAwards();
 
 export const team = (number: string, name: string, over: Partial<Team> = {}): Team => ({
-  id: `t-${number}`, number, name, panel_id: "p2", division: "Middle School", category: "developing", pit: null, created_at: "2026-10-20T08:00:00Z", ...over,
+  id: `t-${number}`, number, name, panel_id: "p2", division: "Middle School", category: "developing", pit: null, languages: [], created_at: "2026-10-20T08:00:00Z", ...over,
 });
 
 export const panels = [

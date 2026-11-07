@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Coordinator · B · Teams + Slots</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Fira+Sans:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+button,input,select{font:inherit;color:inherit}
+.jq{color-scheme:dark;--stage:oklch(0.130 0.010 265);--canvas:oklch(0.165 0.012 265);--surface:oklch(0.205 0.014 265);--surface-2:oklch(0.250 0.016 265);--ink:oklch(0.955 0.005 265);--muted:oklch(0.670 0.013 265);--line:oklch(0.320 0.016 265);--accent:oklch(0.680 0.140 258);--accent-hover:oklch(0.730 0.125 258);--on-accent:oklch(0.165 0.012 265);--ring:oklch(0.680 0.140 258 / 0.35);--field:oklch(0.180 0.013 265);--field-line:oklch(0.520 0.014 265);--desk:oklch(0.740 0.110 185);--waiting:oklch(0.735 0.185 58);--waiting-ink:oklch(0.240 0.060 58);--enroute:oklch(0.720 0.140 232);--enroute-ink:oklch(0.220 0.050 232);--active:oklch(0.680 0.170 300);--active-ink:oklch(0.220 0.060 300);--done:oklch(0.745 0.140 158);--done-ink:oklch(0.225 0.055 158);--booked:oklch(0.330 0.020 265);--booked-ink:oklch(0.860 0.012 265);--booked-line:oklch(0.440 0.020 265);--waiting-r:oklch(0.735 0.185 58 / 0.45);--caution-bg:oklch(0.790 0.150 82 / 0.12);--caution-line:oklch(0.790 0.150 82 / 0.35);--caution-ink:oklch(0.840 0.100 82);--warn:oklch(0.790 0.150 82);position:relative;box-sizing:border-box;width:790px;height:1120px;overflow:hidden;display:flex;gap:40px;align-items:flex-start;padding:16px 0 20px;background:var(--stage);color:var(--ink);font-family:'Fira Sans',system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.jq[data-theme="light"]{color-scheme:light;--stage:oklch(0.925 0.006 265);--canvas:oklch(0.968 0.005 265);--surface:oklch(0.995 0.002 265);--surface-2:oklch(0.935 0.008 265);--ink:oklch(0.225 0.016 265);--muted:oklch(0.500 0.014 265);--line:oklch(0.885 0.010 265);--accent:oklch(0.510 0.160 258);--accent-hover:oklch(0.455 0.160 258);--on-accent:oklch(0.995 0.002 265);--ring:oklch(0.510 0.160 258 / 0.25);--field:oklch(0.995 0.002 265);--field-line:oklch(0.640 0.012 265);--desk:oklch(0.560 0.110 185);--waiting:oklch(0.700 0.180 52);--waiting-ink:oklch(0.200 0.050 52);--enroute:oklch(0.745 0.120 232);--enroute-ink:oklch(0.200 0.040 232);--active:oklch(0.680 0.170 300);--active-ink:oklch(0.170 0.050 300);--done:oklch(0.735 0.135 158);--done-ink:oklch(0.200 0.050 158);--booked:oklch(0.430 0.016 265);--booked-ink:oklch(0.975 0.004 265);--booked-line:oklch(0.430 0.016 265);--waiting-r:oklch(0.700 0.180 52 / 0.55);--caution-bg:oklch(0.790 0.150 82 / 0.18);--caution-line:oklch(0.620 0.130 78 / 0.5);--caution-ink:oklch(0.420 0.090 70);--warn:oklch(0.600 0.140 75)}
+.jq *,.jq *::before,.jq *::after{box-sizing:border-box}
+:where(.jq) :is(h1,h2,h3,p,ul){margin:0;padding:0}
+:where(.jq) ul{list-style:none}
+.jq :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.col{flex:none;width:375px;display:flex;flex-direction:column;gap:6px}
+.col .col2{display:flex;flex-direction:column;gap:6px}
+.col .col2+.col2{margin-top:8px}
+.cap{height:22px;font-size:12px;line-height:22px;color:var(--muted)}
+.scr{position:relative;display:flex;flex-direction:column;width:375px;overflow:hidden;background:var(--canvas);border:1px solid var(--line);border-radius:24px}
+.top{flex:none;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 6px 0 14px}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.ph{flex:none;width:40px;height:40px;border:1.5px dashed var(--line);border-radius:10px}
+.av{flex:none;width:40px;height:40px;display:block}
+.av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:22%;box-shadow:0 0 0 2px var(--desk)}
+.who-t{display:flex;flex-direction:column;line-height:1.15}
+.who-t b{font-family:Archivo,sans-serif;font-weight:700;font-size:16px}
+.who-t span{font-size:12px;color:var(--muted)}
+.top-r{display:flex;align-items:center;gap:2px}
+.live{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--done)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--done)}
+.signout{min-height:44px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:14px;text-decoration:underline;cursor:pointer}
+.rule{flex:none;height:1px;background:var(--line)}
+.body{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:12px 16px 14px}
+.body>*{flex:none}
+.input{display:block;height:48px;width:100%;margin:0;border:1.5px solid var(--field-line);border-radius:12px;background:var(--field);color:var(--ink);padding:0 14px;font-family:inherit;font-size:16px}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.input::placeholder{color:var(--muted);opacity:1}
+.big{height:52px;padding:0 16px;font-family:Archivo,sans-serif;font-weight:700;font-size:32px;letter-spacing:.08em;text-transform:uppercase}
+.srch{position:relative}
+.srch svg{position:absolute;left:14px;top:16px;pointer-events:none;color:var(--muted)}
+.srch .input{padding-left:40px;-webkit-appearance:none;appearance:none}
+.selw{position:relative;flex:1;min-width:0}
+.sel{appearance:none;-webkit-appearance:none;padding-right:38px;cursor:pointer}
+.selw svg{position:absolute;right:12px;top:17px;pointer-events:none;color:var(--muted)}
+.frow{display:flex;gap:8px}
+.tgl{flex:none;display:inline-flex;align-items:center;gap:8px;height:48px;padding:0 14px;border:1.5px solid var(--field-line);border-radius:12px;background:var(--field);color:var(--ink);font-size:15px;font-weight:500;cursor:pointer;white-space:nowrap}
+.tgl b{font-family:Archivo,sans-serif;font-weight:600;font-variant-numeric:tabular-nums}
+.tgl[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.sum{font-size:13px;color:var(--muted)}
+.tl{display:flex;flex-direction:column;gap:6px}
+.trow{display:grid;grid-template-columns:minmax(0,1fr) 28px 98px;align-items:center;column-gap:6px;min-height:68px;padding:12px 8px 12px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.tt{display:flex;flex-direction:column;gap:3px;min-width:0;line-height:1.25}
+.t1{display:flex;align-items:baseline;gap:8px;min-width:0}
+.t1 b{flex:none;font-family:Archivo,sans-serif;font-weight:700;font-size:20px}
+.t1 .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.t2{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.ask{font-size:12px;font-weight:500;color:var(--muted);text-align:right}
+.lg{display:flex;gap:6px}
+.lc{display:inline-flex;align-items:center;justify-content:center;flex:none;width:46px;height:44px;padding:0;border:1.5px solid var(--field-line);border-radius:12px;background:transparent;color:var(--muted);font-family:Archivo,sans-serif;font-weight:600;font-size:15px;letter-spacing:.02em;cursor:pointer}
+.lc[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.lg.none .lc{border-style:dashed;border-color:var(--muted)}
+.sc{display:inline-flex;align-items:center;justify-content:center;flex:none;height:24px;padding:0 10px;border-radius:999px;background:var(--c);border:1px solid var(--cb,var(--c));color:var(--ci);font-size:12px;font-weight:500;white-space:nowrap;font-variant-numeric:tabular-nums}
+.s-waiting{--c:var(--waiting);--ci:var(--waiting-ink)}
+.s-enroute{--c:var(--enroute);--ci:var(--enroute-ink)}
+.s-active{--c:var(--active);--ci:var(--active-ink)}
+.s-booked{--c:var(--booked);--ci:var(--booked-ink);--cb:var(--booked-line)}
+.lt{display:inline-flex;align-items:center;height:24px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--ink);font-family:Archivo,sans-serif;font-weight:600;font-size:12px;letter-spacing:.04em}
+.lts{display:inline-flex;gap:4px}
+.mbar{flex:none;height:64px;display:flex;align-items:center;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.seg{flex:1;display:flex;gap:4px;padding:4px;border-radius:14px;background:var(--field);border:1.5px solid var(--line)}
+.seg button{flex:1;min-width:0;height:44px;padding:0;border:0;border-radius:10px;background:transparent;font-family:Archivo,sans-serif;font-weight:600;font-size:16px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.lab{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 6px;font-weight:500;font-size:15px;line-height:1.3}
+.tline{display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:14px;line-height:1.35;color:var(--muted)}
+.tline b{font-weight:500;color:var(--ink)}
+.lrow{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-size:14px;color:var(--muted)}
+.lrow .rt{display:flex;align-items:center;gap:8px;color:var(--ink);font-weight:500}
+.prim{display:block;width:100%;height:56px;border:0;border-radius:12px;background:var(--accent);color:var(--on-accent);font-family:Archivo,sans-serif;font-weight:700;font-size:18px;cursor:pointer}
+.out{display:block;width:100%;height:52px;border:1.5px solid var(--field-line);border-radius:12px;background:transparent;color:var(--ink);font-family:Archivo,sans-serif;font-weight:600;font-size:17px;cursor:pointer}
+.cover{margin-top:6px;font-size:12.5px;color:var(--muted)}
+.s-done{--c:var(--done);--ci:var(--done-ink)}
+.scr{height:1056px}
+.tx{border:1.5px solid var(--accent);border-radius:14px;background:var(--surface)}
+.tx .trow{border:0;background:transparent;border-radius:12px}
+.xp{display:flex;flex-direction:column;gap:8px;padding:12px 12px 8px;border-top:1px solid var(--line)}
+.xp .cover{margin:-2px 0 0}
+.txb{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:44px;padding:0 8px;border:0;border-radius:10px;background:transparent;color:var(--accent);font-size:15px;font-weight:500;cursor:pointer}
+.ro{display:flex;align-items:flex-start;gap:8px;font-size:13px;line-height:1.4;color:var(--muted)}
+.ro svg{flex:none;margin-top:2px}
+.tabs{flex:none;display:grid;grid-template-columns:1fr 1fr;height:64px;background:var(--surface);border-top:1px solid var(--line)}
+.tabs button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:56px;min-height:56px;padding:0;border:0;background:transparent;color:var(--muted);font-size:12.5px;font-weight:500;cursor:pointer}
+.tabs button[aria-current="page"]{color:var(--accent)}
+.tabs button[aria-current="page"]::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--accent)}
+.pcs{display:flex;gap:8px}
+.pc{flex:1;min-width:0;height:44px;padding:0;border:1.5px solid var(--field-line);border-radius:12px;background:transparent;color:var(--ink);font-family:Archivo,sans-serif;font-weight:600;font-size:15px;cursor:pointer}
+.pc[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.gh{display:flex;align-items:center;gap:8px;min-height:32px}
+.gh h2{font-family:Archivo,sans-serif;font-weight:700;font-size:18px;line-height:1.2}
+.gh .cnt{margin-left:auto;font-size:13px;color:var(--muted)}
+.sl{display:flex;flex-direction:column;gap:6px}
+.srow{display:grid;grid-template-columns:52px minmax(0,1fr) auto;align-items:center;column-gap:8px;min-height:52px;padding:4px 6px 4px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.srow.pk{border:1.5px solid var(--accent);padding:3.5px 5.5px 3.5px 11.5px}
+.st{font-family:Archivo,sans-serif;font-weight:600;font-size:17px;font-variant-numeric:tabular-nums}
+.sh{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.sh b{font-family:Archivo,sans-serif;font-weight:700;font-size:20px;line-height:1.2}
+.sh span{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.so{font-size:14px;color:var(--muted)}
+.bk{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:84px;height:44px;padding:0 14px;border:1.5px solid var(--field-line);border-radius:12px;background:transparent;color:var(--ink);font-family:Archivo,sans-serif;font-weight:600;font-size:15px;cursor:pointer}
+.bk[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.pinb{flex:none;display:flex;flex-direction:column;gap:8px;padding:10px 16px;background:var(--surface);border-top:1px solid var(--line)}
+.pb-l{display:flex;align-items:center;gap:8px;min-height:24px;font-size:14px;color:var(--muted)}
+.pb-l b{font-family:Archivo,sans-serif;font-weight:700;font-size:17px;color:var(--ink)}
+.pb-s{margin-left:auto;font-size:12.5px}
+.spacer{flex:1;min-height:0}
+</style>
+</helmet>
+<div class="jq" data-theme="{{theme}}">
+<section class="col" aria-label="Teams tab">
+<p class="cap">Coordinator · Teams tab, one row open</p>
+<div class="scr">
+<header class="top">
+<div class="who"><span class="ph" aria-hidden="true"></span><span class="who-t"><b>Coordinator</b><span>VEX IQ · V5RC</span></span></div>
+<div class="top-r"><span class="live"><i aria-hidden="true"></i>Live</span><button type="button" class="signout">Sign out</button></div>
+</header>
+<div class="rule" aria-hidden="true"></div>
+<div class="body" style="flex:1">
+<div class="srch"><label class="sr" for="co-q">Find a team by number or name</label><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg><input id="co-q" class="input" type="text" placeholder="Team number or name" autocomplete="off"></div>
+<div class="frow"><div class="selw"><label class="sr" for="co-div">Division</label><select id="co-div" class="input sel"><option value="" selected="selected">All divisions</option><option value="ES">ES</option><option value="MS">MS</option><option value="HS">HS</option><option value="BLN">BLN</option></select><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></div><button type="button" class="tgl" aria-pressed="false">Not asked <b>1</b></button></div>
+<p class="sum">6 teams · 5 asked · 1 not asked yet</p>
+<ul class="tl" aria-label="Teams">
+<li class="trow"><div class="tt"><span class="t1"><b>2011A</b><span class="nm">Gear Gremlins</span></span><span class="t2"><span>MS · Pit A3</span><span class="sc s-active">Interviewing</span></span></div><span class="ask"></span><div class="lg" role="group" aria-label="Interview language for 2011A"><button type="button" class="lc" aria-pressed="true"><span aria-hidden="true">EN</span><span class="sr">English</span></button><button type="button" class="lc" aria-pressed="true"><span aria-hidden="true">TH</span><span class="sr">Thai</span></button></div></li>
+<li class="trow"><div class="tt"><span class="t1"><b>1234A</b><span class="nm">Circuit Breakers</span></span><span class="t2"><span>MS · Pit A6</span><span class="sc s-done">Done</span></span></div><span class="ask"></span><div class="lg" role="group" aria-label="Interview language for 1234A"><button type="button" class="lc" aria-pressed="false"><span aria-hidden="true">EN</span><span class="sr">English</span></button><button type="button" class="lc" aria-pressed="true"><span aria-hidden="true">TH</span><span class="sr">Thai</span></button></div></li>
+<li class="trow"><div class="tt"><span class="t1"><b>4410C</b><span class="nm">Robo Rangers</span></span><span class="t2"><span>MS · Pit A9</span><span class="sc s-waiting">Waiting</span></span></div><span class="ask"></span><div class="lg" role="group" aria-label="Interview language for 4410C"><button type="button" class="lc" aria-pressed="false"><span aria-hidden="true">EN</span><span class="sr">English</span></button><button type="button" class="lc" aria-pressed="true"><span aria-hidden="true">TH</span><span class="sr">Thai</span></button></div></li>
+<li class="trow"><div class="tt"><span class="t1"><b>9882K</b><span class="nm">Torque Titans</span></span><span class="t2"><span>MS · Pit B4</span><span class="sc s-waiting">Waiting</span></span></div><span class="ask"></span><div class="lg" role="group" aria-label="Interview language for 9882K"><button type="button" class="lc" aria-pressed="true"><span aria-hidden="true">EN</span><span class="sr">English</span></button><button type="button" class="lc" aria-pressed="false"><span aria-hidden="true">TH</span><span class="sr">Thai</span></button></div></li>
+<li class="tx"><div class="trow"><div class="tt"><span class="t1"><b>7700B</b><span class="nm">Byte Me</span></span><span class="t2"><span>MS · Pit C2</span></span></div><span class="ask"></span><div class="lg" role="group" aria-label="Interview language for 7700B"><button type="button" class="lc" aria-pressed="false"><span aria-hidden="true">EN</span><span class="sr">English</span></button><button type="button" class="lc" aria-pressed="true"><span aria-hidden="true">TH</span><span class="sr">Thai</span></button></div></div>
+<div class="xp" role="group" aria-label="Actions for 7700B">
+<button type="button" class="prim">Request · Thai</button>
+<button type="button" class="out">Request · English</button>
+<p class="cover">Panel 3 interviews in Thai</p>
+<button type="button" class="txb">Book a time<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+</div></li>
+<li class="trow"><div class="tt"><span class="t1"><b>5150Z</b><span class="nm">Sparky</span></span><span class="t2"><span>MS · Pit C7</span></span></div><span class="ask">Ask</span><div class="lg none" role="group" aria-label="Interview language for 5150Z, not asked yet"><button type="button" class="lc" aria-pressed="false"><span aria-hidden="true">EN</span><span class="sr">English</span></button><button type="button" class="lc" aria-pressed="false"><span aria-hidden="true">TH</span><span class="sr">Thai</span></button></div></li>
+</ul>
+<p class="ro"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg><span>Teams with a booking or waiting show here read-only. To change it, ask the queue desk.</span></p>
+</div>
+<nav class="tabs" aria-label="Coordinator sections"><button type="button" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 19c0-3.2 2.6-5.5 6-5.5s6 2.3 6 5.5"></path><circle cx="17" cy="9" r="2.4"></circle><path d="M17.5 14c2.2.3 3.5 2 3.5 4.5"></path></svg><span>Teams</span></button><button type="button"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg><span>Slots</span></button></nav>
+</div>
+</section>
+<section class="col" aria-label="Slots tab">
+<p class="cap">Coordinator · Slots tab, Panel 3 for 7700B</p>
+<div class="scr">
+<header class="top">
+<div class="who"><span class="ph" aria-hidden="true"></span><span class="who-t"><b>Coordinator</b><span>VEX IQ · V5RC</span></span></div>
+<div class="top-r"><span class="live"><i aria-hidden="true"></i>Live</span><button type="button" class="signout">Sign out</button></div>
+</header>
+<div class="rule" aria-hidden="true"></div>
+<div class="body" style="flex:1">
+<div class="pcs" role="group" aria-label="Panel"><button type="button" class="pc" aria-pressed="false">Panel 1</button><button type="button" class="pc" aria-pressed="false">Panel 2</button><button type="button" class="pc" aria-pressed="true">Panel 3</button><button type="button" class="pc" aria-pressed="false">Panel 4</button></div>
+<section aria-labelledby="g-h" style="display:flex;flex-direction:column;gap:10px">
+<div class="gh"><h2 id="g-h">Panel 3 · MS</h2><span class="lts"><span class="lt">TH</span></span><span class="cnt">7 of 11 open</span></div>
+<ul class="sl" aria-label="Panel 3 time slots, 20 minutes each">
+<li class="srow"><span class="st">09:40</span><span class="sh"><b>1234A</b><span>Circuit Breakers</span></span><span class="sc s-done">Done</span></li>
+<li class="srow"><span class="st">10:00</span><span class="sh"><b>2011A</b><span>Gear Gremlins</span></span><span class="sc s-active">Interviewing</span></li>
+<li class="srow"><span class="st">10:20</span><span class="sh"><b>4410C</b><span>Robo Rangers</span></span><span class="sc s-waiting">Waiting</span></li>
+<li class="srow pk"><span class="st">10:40</span><span class="so">Open</span><button type="button" class="bk" aria-pressed="true" aria-label="Book 10:40"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Picked</button></li>
+<li class="srow"><span class="st">11:00</span><span class="sh"><b>5555H</b><span>High Fives</span></span><span class="sc s-booked">Booked</span></li>
+<li class="srow"><span class="st">11:20</span><span class="so">Open</span><button type="button" class="bk" aria-pressed="false" aria-label="Book 11:20">Book</button></li>
+<li class="srow"><span class="st">11:40</span><span class="so">Open</span><button type="button" class="bk" aria-pressed="false" aria-label="Book 11:40">Book</button></li>
+<li class="srow"><span class="st">12:00</span><span class="so">Open</span><button type="button" class="bk" aria-pressed="false" aria-label="Book 12:00">Book</button></li>
+<li class="srow"><span class="st">12:20</span><span class="so">Open</span><button type="button" class="bk" aria-pressed="false" aria-label="Book 12:20">Book</button></li>
+<li class="srow"><span class="st">12:40</span><span class="so">Open</span><button type="button" class="bk" aria-pressed="false" aria-label="Book 12:40">Book</button></li>
+<li class="srow"><span class="st">13:00</span><span class="so">Open</span><button type="button" class="bk" aria-pressed="false" aria-label="Book 13:00">Book</button></li>
+</ul>
+<p class="ro"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg><span>Booked slots show here read-only. To change one, ask the queue desk.</span></p>
+</section>
+<div class="spacer" aria-hidden="true"></div>
+</div>
+<div class="pinb" role="group" aria-label="Booking">
+<p class="pb-l"><span>Booking for</span><b>7700B</b><span class="lt">TH</span><span class="pb-s">Panel 3 interviews in Thai</span></p>
+<button type="button" class="prim lg">Book 10:40</button>
+</div>
+<nav class="tabs" aria-label="Coordinator sections"><button type="button"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 19c0-3.2 2.6-5.5 6-5.5s6 2.3 6 5.5"></path><circle cx="17" cy="9" r="2.4"></circle><path d="M17.5 14c2.2.3 3.5 2 3.5 4.5"></path></svg><span>Teams</span></button><button type="button" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg><span>Slots</span></button></nav>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"select","options":["dark","light"],"default":"dark"},"$preview":{"width":790,"height":1120}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { theme: this.props.theme ?? 'dark' };
+  }
+}
+</script>
+</body>
+</html>

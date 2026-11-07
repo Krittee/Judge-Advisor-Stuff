@@ -3,27 +3,28 @@ import { actorParts } from "@/lib/activity";
 import { actorLabel, getSession } from "@/lib/auth";
 import { store, StoreError } from "@/lib/db";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
-import { resolveLanguage } from "@/lib/presets";
-import { isRealSlot } from "@/lib/data";
+import { bookingLanguage } from "@/lib/presets";
+import { isRealSlot, liveRequestFor } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
 /**
- * The queue desk or Judge Advisor creates a request when a team asks in person.
+ * The queue desk, a coordinator or the Judge Advisor creates a request when a team asks in person.
  *
  * kind = 'queue' -> walk-up, goes straight to orange.
  * kind = 'slot'  -> books a future slot, sits at 'scheduled' until its time.
  */
 export async function POST(request: Request) {
   const session = await getSession();
-  if (session?.role !== "queuer" && session?.role !== "admin") {
-    return NextResponse.json({ error: "Only the queue desk or Judge Advisor can create requests." }, { status: 403 });
+  if (session?.role !== "queuer" && session?.role !== "admin" && session?.role !== "coordinator") {
+    return NextResponse.json({ error: "Only the queue desk, a coordinator or the Judge Advisor can create requests." }, { status: 403 });
   }
   const body = await request.json().catch(() => ({}));
 
   const teamNumber = normalizeTeamNumber(body.teamNumber);
   const kind = body.kind === "slot" ? "slot" : "queue";
-  const message = String(body.message ?? "").trim().slice(0, 280) || null;
+  // A coordinator cannot read team messages, so they do not write them either.
+  const message = session.role === "coordinator" ? null : String(body.message ?? "").trim().slice(0, 280) || null;
 
   if (!isValidTeamNumber(teamNumber)) {
     return NextResponse.json({ error: "Enter a valid team number." }, { status: 400 });
@@ -43,8 +44,15 @@ export async function POST(request: Request) {
     );
   }
 
+  // A coordinator only adds bookings; changing one is the queue desk's job.
+  if (session.role === "coordinator" && liveRequestFor(team.id, await store().listRequests())) {
+    return NextResponse.json({ error: "Already booked — the queue desk can change it." }, { status: 409 });
+  }
+
   let slotStart: string | null = null;
   let slotEnd: string | null = null;
+
+  const panel = (await store().listPanels()).find((p) => p.id === team.panel_id);
 
   if (kind === "slot") {
     const start = new Date(String(body.slotStart ?? ""));
@@ -58,7 +66,6 @@ export async function POST(request: Request) {
     // while the panel was re-timed would otherwise book a slot that no
     // longer exists, landing across two real ones — an overlap the
     // one-team-per-start-time rule cannot see.
-    const panel = (await store().listPanels()).find((p) => p.id === team.panel_id);
     if (!panel) {
       return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
     }
@@ -93,7 +100,7 @@ export async function POST(request: Request) {
       createdBy: actorLabel(session),
       slotStart,
       slotEnd,
-      language: resolveLanguage(body.language),
+      language: bookingLanguage(body.language, team, panel),
     });
 
     await store().logActivity({

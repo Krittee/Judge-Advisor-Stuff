@@ -116,6 +116,7 @@ const team = (id: string, panel_id: string | null): Team => ({
   division: "Middle School",
   category: "developing",
   pit: null,
+  languages: [],
   created_at: "2026-10-20T08:00:00.000Z",
 });
 

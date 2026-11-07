@@ -11,6 +11,7 @@ test("a new entry stores the plain name and the role it acted in", () => {
   assert.deepEqual(actorParts({ role: "admin", name: "Alex" }), { actor: "Alex", actorRole: "Judge Advisor" });
   assert.deepEqual(actorParts({ role: "queuer", name: "Sam" }), { actor: "Sam", actorRole: "Front desk" });
   assert.deepEqual(actorParts({ role: "referee", name: "Jordan" }), { actor: "Jordan", actorRole: "Referee" });
+  assert.deepEqual(actorParts({ role: "coordinator", name: "Pat" }), { actor: "Pat", actorRole: "Coordinator" });
   assert.deepEqual(
     actorParts({ role: "referee", name: "Dana", head: true }),
     { actor: "Dana", actorRole: "Head referee" },
@@ -28,6 +29,7 @@ test("old actor labels split into a name and a role: role:Name, Name (Panel N), 
   assert.deepEqual(splitActor("admin:Alex"), { actor: "Alex", role: "Judge Advisor" });
   assert.deepEqual(splitActor("queuer:Sam"), { actor: "Sam", role: "Front desk" });
   assert.deepEqual(splitActor("referee:Jordan"), { actor: "Jordan", role: "Referee" });
+  assert.deepEqual(splitActor("coordinator:Pat"), { actor: "Pat", role: "Coordinator" });
   assert.deepEqual(splitActor("Priya Nair (Panel 2)"), { actor: "Priya Nair", role: "Panel 2" });
   assert.deepEqual(splitActor("team"), { actor: "team", role: "Team" });
 

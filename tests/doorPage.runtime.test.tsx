@@ -5,6 +5,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { DoorPage } from "../src/components/door/DoorPage";
+import { Welcome } from "../src/components/SignInForm";
 import { TICKET_ERROR, TeamTicket, ticketTarget } from "../src/components/door/TeamTicket";
 import { TeamNotFound } from "../src/components/team/TeamView";
 import { filterTeamNumberInput } from "../src/lib/teamNumber";
@@ -22,22 +23,23 @@ const text = (markup: string) => markup.replace(/<[^>]+>/g, "");
 const door = renderToStaticMarkup(<DoorPage />);
 const hrefs = [...door.matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
 
-test("/: five doors in order, each a link to its sign-in", () => {
-  assert.deepEqual(hrefs.slice(0, 5), ["/team", "/judge/login", "/referee/login", "/queue/login", "/admin/login"]);
+test("/: six doors in order, each a link to its sign-in", () => {
+  assert.deepEqual(hrefs.slice(0, 6), ["/team", "/judge/login", "/referee/login", "/queue/login", "/coordinator/login", "/admin/login"]);
   const names = [...door.matchAll(/<span class="dp-dt">([^<]+)<\/span>/g)].map((m) => m[1]);
-  assert.deepEqual(names, ["Team", "Judge", "Referee", "Queue desk", "Judge Advisor"]);
+  assert.deepEqual(names, ["Team", "Judge", "Referee", "Queue desk", "Coordinator", "Judge Advisor"]);
   const lines = [...door.matchAll(/<span class="dp-s">([^<]+)<\/span>/g)].map((m) => m[1]);
-  assert.deepEqual(lines.slice(0, 5), [
+  assert.deepEqual(lines.slice(0, 6), [
     "Check your judging status",
     "Panel code from your Judge Advisor",
     "Referees and the head referee",
     "Check teams in and book times",
+    "Walk the pits: languages and bookings",
     "Runs judging for the event",
   ]);
 });
 
 test("/: the Live board is the one other link, and /login is not linked", () => {
-  assert.deepEqual(hrefs.slice(5), ["/board"]);
+  assert.deepEqual(hrefs.slice(6), ["/board"]);
   assert.ok(!hrefs.includes("/login"));
   assert.match(door, /<a class="dp-board" href="\/board">/);
   assert.match(door, /Live board<span class="dp-pill">LIVE<\/span>/);
@@ -50,19 +52,22 @@ test("/: titled 'Who are you?', with no team-number input and no staff rows", ()
   assert.ok(!/What the colours mean<\/h2>/.test(door), "the old separate colour card is gone");
 });
 
-test("/: the Team door has a ticket glyph and a caption, no avatar; the others ring theirs", () => {
+test("/: the Team door has the team picture with no ring and a caption; the others, the Coordinator included, ring theirs", () => {
   const cards = [...door.matchAll(/<a class="dp-card"[^>]*>[\s\S]*?<\/a>/g)].map((m) => m[0]);
-  assert.equal(cards.length, 5);
-  assert.match(cards[0], /dp-av--team/);
-  assert.ok(!/<img/.test(cards[0]));
+  assert.equal(cards.length, 6);
+  assert.match(cards[0], /<span class="dp-av dp-av--team"><img src="\/avatars\/team\.jpg" alt=""/);
+  assert.ok(!/dp-r-/.test(cards[0]), "the Team door has no ring");
   assert.match(cards[0], /aria-describedby="dp-cap"/);
   assert.match(door, /<p class="dp-cap" id="dp-cap">Opens the team ticket<\/p>/);
-  const rings = [
-    ["judge", "judge"], ["referee", "ref"], ["queue-desk", "desk"], ["judge-advisor", "ja"],
+  const rings: [string, string, number][] = [
+    ["judge", "judge", 1],["referee", "ref", 2], ["queue-desk", "desk", 3], ["coordinator", "co", 4], ["judge-advisor", "ja", 5],
   ];
-  rings.forEach(([file, ring], i) => {
-    assert.match(cards[i + 1], new RegExp(`dp-r-${ring}"><img src="/avatars/${file}\\.jpg" alt=""`));
+  rings.forEach(([file, ring, i]) => {
+    assert.match(cards[i], new RegExp(`dp-r-${ring}"><img src="/avatars/${file}\\.jpg" alt=""`));
   });
+  // The Coordinator's card has no ticket caption, like the others with a ring.
+  assert.ok(!/aria-describedby/.test(cards[4]));
+  assert.equal([...door.matchAll(/class="dp-cap"/g)].length, 1);
 });
 
 test("/: the Live board card holds five sample tiles for 1234A, as one key group", () => {
@@ -144,6 +149,13 @@ test("the sign-in pass says 'Back to all doors' and still links to /", () => {
   const src = read("src/components/SignInForm.tsx");
   assert.match(src, /<Link href="\/" className="si-back">[\s\S]*?Back to all doors\s*<\/Link>/);
   assert.ok(!src.includes("Back to team view"));
+});
+
+test("the coordinator is on the crew pass with its own picture", () => {
+  assert.match(read("src/components/SignInForm.tsx"), /const CREW: Role\[\] = \["judge", "queuer", "admin", "coordinator"\]/);
+  const markup = renderToStaticMarkup(<Welcome session={{ role: "coordinator", name: "Pat" }} />);
+  assert.match(markup, /<img class="si-av" src="\/avatars\/coordinator\.jpg" alt="" width="128" height="128"\/>/);
+  assert.doesNotMatch(markup, /si-av--ph/);
 });
 
 test("the top bar brand stays the front door", () => {

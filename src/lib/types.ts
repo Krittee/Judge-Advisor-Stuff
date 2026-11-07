@@ -27,6 +27,12 @@ export type Team = {
   /** Which of the two kinds of team this is. See config/event.json. */
   category: string;
   pit: string | null;
+  /**
+   * Language ids (see config/event.json) this team can be interviewed in.
+   * Empty means not stated yet. Set by the Judge Advisor or a coordinator;
+   * the Judge Advisor matches it to the languages panels cover.
+   */
+  languages: string[];
   created_at: string;
 };
 
@@ -293,7 +299,7 @@ export type AppState = {
 };
 
 export type ViewerCapabilities = {
-  role: "team" | "queuer" | "judge" | "referee" | "admin";
+  role: "team" | "queuer" | "judge" | "referee" | "admin" | "coordinator";
   name: string | null;
   /** Set for a judge: the only panel they may act on. */
   panelId: string | null;

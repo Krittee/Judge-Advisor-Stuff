@@ -32,7 +32,7 @@ const languages = [
   { id: "es", label: "Español", short: "ES" },
 ];
 
-const titans: Team = { id: "t-9882K", number: "9882K", name: "Torque Titans", panel_id: "p2", division: "Middle School", category: "developing", pit: "B4", created_at: "2026-10-20T08:00:00Z" };
+const titans: Team = { id: "t-9882K", number: "9882K", name: "Torque Titans", panel_id: "p2", division: "Middle School", category: "developing", pit: "B4", languages: [], created_at: "2026-10-20T08:00:00Z" };
 const loose: Team = { ...titans, id: "t-7700B", number: "7700B", name: "Byte Me", panel_id: null };
 const other = (n: number): Team => ({ ...titans, id: `t-other${n}`, number: `10${n}`, name: `Other ${n}` });
 
@@ -76,6 +76,16 @@ function view(over: Partial<TeamViewProps> = {}) {
     />,
   );
 }
+
+test("the header card says which language the interview runs in; nothing when not asked", () => {
+  const line = (languages: string[]) => panelOf(view({ team: { ...titans, languages } })).match(/<p class="tp-pan-lang">[\s\S]*?<\/p>/)?.[0];
+  // The tags are what shows; the spelled-out names are only for screen readers.
+  assert.equal(text(line(["en"])!), "Interview inENEnglish");
+  assert.equal(text(line(["es"])!), "Interview inESEspañol");
+  assert.equal(text(line(["en", "es"])!), "Interview inENESEnglish or Español");
+  assert.match(line(["en", "es"])!, /<span class="sr-only">English or Español<\/span>/);
+  assert.equal(line([]), undefined);
+});
 
 const booked = req({ status: "scheduled", kind: "slot", slot_start: slotAt(2), slot_end: slotAt(3) });
 const panelOf = (m: string) => m.match(/<section class="tp-pan [^"]*"[\s\S]*?<\/section>/)?.[0] ?? "";

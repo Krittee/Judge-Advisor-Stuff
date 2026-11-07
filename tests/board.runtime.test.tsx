@@ -23,7 +23,7 @@ const categories = [
 
 const team = (number: string, over: Partial<Team> = {}): Team => ({
   id: `t-${number}`, number, name: `Team ${number}`, panel_id: "p1", division: "Middle School",
-  category: "developing", pit: null, created_at: "2026-10-20T08:00:00Z", ...over,
+  category: "developing", pit: null, languages: [], created_at: "2026-10-20T08:00:00Z", ...over,
 });
 
 const panel: PublicPanel = {

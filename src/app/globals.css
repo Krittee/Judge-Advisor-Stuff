@@ -1176,7 +1176,7 @@ body:has(.landing) > .theme-toggle { top: 0; }
 .dp-title { margin: 0; font-weight: 700; font-size: 28px; line-height: 1.1; letter-spacing: -0.02em; }
 .dp-intro { margin: 6px 0 0; color: var(--ink-subtle); font-size: 15px; line-height: 1.4; }
 
-/* ---- the five doors ---- */
+/* ---- the six doors ---- */
 .dp-doors { display: flex; flex-direction: column; gap: 8px; }
 .dp-cell { position: relative; }
 .dp-card {
@@ -1195,9 +1195,10 @@ body:has(.landing) > .theme-toggle { top: 0; }
 .dp-av { --s: 48px; display: block; flex: none; width: var(--s); height: var(--s); padding: 2px; border-radius: 25%; background: var(--rc); }
 .dp-av img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 22%; }
 .dp-av--team { padding: 0; background: none; }
-.dp-gl { display: grid; width: 100%; height: 100%; place-items: center; border-radius: 25%; background: var(--lp-tile); color: var(--ink); }
 .dp-r-judge { --rc: var(--accent); }
 .dp-r-desk { --rc: var(--si-desk); }
+/* The Coordinator wears the queue desk's teal (its sign-in pass does too) until it has a colour of its own. */
+.dp-r-co { --rc: var(--si-desk); }
 .dp-r-ja { --rc: var(--si-ja); }
 .dp-r-ref { --rc: repeating-linear-gradient(135deg, oklch(0.985 0.003 265) 0 4px, oklch(0.180 0.012 265) 4px 8px); }
 
@@ -1240,9 +1241,10 @@ body:has(.landing) > .theme-toggle { top: 0; }
   .dp-head { margin: 0 0 28px; text-align: center; }
   .dp-title { font-size: 40px; }
   .dp-intro { margin-top: 8px; font-size: 17px; }
-  .dp-doors { flex-direction: row; gap: 16px; }
-  .dp-cell { flex: 1; min-width: 0; }
-  .dp-card { min-height: 248px; flex-direction: column; align-items: center; gap: 0; padding: 22px 16px 16px; text-align: center; }
+  /* 3 x 2; the row gap leaves room for the Team door's caption under its card. */
+  .dp-doors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px 16px; }
+  .dp-cell { min-width: 0; }
+  .dp-card { height: 100%; min-height: 220px; flex-direction: column; align-items: center; gap: 0; padding: 22px 16px 16px; text-align: center; }
   .dp-av { --s: 72px; }
   .dp-rt { flex: 1 0 auto; margin-top: 16px; }
   .dp-dt { font-size: 19px; }
@@ -1357,6 +1359,10 @@ body:has(.teampage) > .theme-toggle:hover {
 .tp-pan-cap { margin: 8px 0 0; font-size: 15px; line-height: 1.4; }
 .tp-pan-foot { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid color-mix(in oklch, currentColor 35%, transparent); font-size: 15px; line-height: 1.4; }
 .tp-pan-foot b { font-weight: 600; }
+/* The tags borrow the panel's own ink so they read on every status colour. */
+.tp-pan-lang { display: flex; align-items: center; gap: 8px; min-height: 28px; margin: 8px 0 0; font-size: 15px; line-height: 1.4; }
+.tp-pan-lang svg { flex: none; }
+.tp-lts { display: inline-flex; gap: 4px; }
 .tp-pan-foot span { display: block; }
 .tp-pan--idle .tp-pan-foot--none { color: var(--caution-quiet); }
 
@@ -2123,6 +2129,151 @@ body:has(.judge) > .theme-toggle:hover {
 }
 
 /* ------------------------------------------------------------------ *
+ * Coordinator console ("Teams + Slots", design/coordinator-redesign/, direction B)
+ *
+ * A phone app shell like the referee's: the page never scrolls, so the top
+ * bar, the pinned Book bar and the tab bar stay put around .co-body. Colour
+ * is signal: status fills only on status pills (--c is the fill, --ci the
+ * ink on it), caution for warnings, accent for interactive chrome and the
+ * language chips a coordinator has lit. A language tag is neutral and "Not
+ * asked" is muted. Hover and focus colour changes only, nothing moves.
+ * It shares the desk's tokens and its input, button, pill, avatar and top-bar
+ * classes (.dk-*, see the desk block below), and its banners and caution box
+ * (.dk-msg, .dk-caution).
+ * ------------------------------------------------------------------ */
+
+.co {
+  --co-gutter: max(16px, calc((100vw - 32rem) / 2));
+
+  display: flex; height: 100dvh; flex-direction: column; overflow: hidden;
+  background: var(--canvas); color: var(--ink);
+}
+
+.co .dk-input, .co-tgl b, .co-t1 b, .co-chip, .co-pc, .co-gh h2, .co-st, .co-sh b, .co-bk, .co-pb-l b {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Chrome */
+.co-top {
+  display: flex; flex: none; height: 52px; align-items: center; justify-content: space-between;
+  padding: 0 calc(var(--co-gutter) - 10px) 0 calc(var(--co-gutter) - 2px); border-bottom: 1px solid var(--line); background: var(--canvas);
+}
+/* The desk's avatar, ringed in the accent instead of the desk's teal. */
+.co .dk-av img { box-shadow: 0 0 0 2px var(--dk-ring); }
+
+.co-msgs { display: flex; flex: none; flex-direction: column; gap: 8px; padding: 10px var(--co-gutter) 0; }
+
+.co-body {
+  display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 10px;
+  padding: 12px var(--co-gutter) 14px; overflow-y: auto; overscroll-behavior: contain;
+}
+.co-body > * { flex: none; }
+
+.co-pinb {
+  display: flex; flex: none; flex-direction: column; gap: 8px; padding: 10px var(--co-gutter);
+  background: var(--surface); border-top: 1px solid var(--line);
+}
+.co-pb-l { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 24px; color: var(--ink-subtle); font-size: 14px; }
+.co-pb-l b { color: var(--ink); font-weight: 700; font-size: 17px; }
+.co-pb-s { margin-left: auto; font-size: 12.5px; }
+.co-pb-s p { margin: 0; font-size: 12.5px; }
+.co-pb-s p.text-ink-faint { color: var(--ink-subtle); }
+
+.co-tabs {
+  display: grid; flex: none; grid-template-columns: 1fr 1fr; padding: 0 calc(var(--co-gutter) - 16px) env(safe-area-inset-bottom);
+  background: var(--surface); border-top: 1px solid var(--line);
+}
+.co-tabs button {
+  position: relative; display: flex; min-width: 56px; min-height: 64px; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  padding: 0; background: transparent; color: var(--ink-subtle); font-weight: 500; font-size: 12.5px;
+}
+.co-tabs button:hover { color: var(--ink); }
+.co-tabs button[aria-current="page"] { color: var(--accent); }
+.co-tabs button[aria-current="page"]::before {
+  content: ""; position: absolute; top: -1px; right: 30%; left: 30%; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent);
+}
+
+/* Teams: search, division, "Not asked" */
+.co-srch { position: relative; }
+.co-srch svg { position: absolute; top: 16px; left: 14px; color: var(--ink-subtle); pointer-events: none; }
+.co-srch .dk-input { padding-left: 40px; -webkit-appearance: none; appearance: none; }
+.co-frow { display: flex; gap: 8px; }
+.co .dk-selw { flex: 1; min-width: 0; }
+.co .dk-selw svg { top: 17px; }
+/* The pressable controls (Not asked, language chips, panel switcher, Book) share the border, hover and pressed colours; each class adds its size. */
+.co-tgl, .co-chip, .co-pc, .co-bk {
+  border: 1.5px solid var(--dk-field-line); border-radius: 12px; background: transparent; color: var(--ink); font-weight: 600; font-size: 15px;
+}
+:where(.co-tgl, .co-chip, .co-pc, .co-bk):hover:not(:disabled) { border-color: var(--accent); }
+.co-tgl[aria-pressed="true"], .co-chip[aria-pressed="true"], .co-pc[aria-pressed="true"], .co-bk[aria-pressed="true"] {
+  border-color: var(--accent); background: var(--accent); color: var(--accent-ink);
+}
+.co-tgl {
+  display: inline-flex; flex: none; height: 48px; align-items: center; gap: 8px; padding: 0 14px;
+  background: var(--dk-field); font-weight: 500; white-space: nowrap;
+}
+.co-tgl b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.co-sum { margin: 0; color: var(--ink-subtle); font-size: 13px; }
+
+/* Teams: a row each, opened in place */
+.co-tl, .co-sl { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.co-card { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.co-card[data-open="true"] { border-color: var(--accent); box-shadow: 0 0 0 0.5px var(--accent); }
+.co-trow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 6px; min-height: 68px; padding: 12px 8px 12px 12px; }
+.co-tt { display: flex; min-width: 0; min-height: 44px; align-items: center; gap: 6px; padding: 0; background: transparent; color: inherit; text-align: left; }
+.co-tx { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; line-height: 1.25; }
+.co-t1 { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
+.co-t1 b { flex: none; font-weight: 700; font-size: 20px; }
+.co-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.co-t2 { display: flex; align-items: center; gap: 8px; color: var(--ink-subtle); font-size: 12.5px; white-space: nowrap; }
+.co-ask { flex: none; width: 28px; color: var(--ink-subtle); text-align: right; font-weight: 500; font-size: 12px; }
+.co-chips { display: flex; gap: 6px; }
+.co-chip {
+  display: inline-flex; flex: none; width: 46px; height: 44px; align-items: center; justify-content: center; padding: 0;
+  color: var(--ink-subtle); letter-spacing: 0.02em;
+}
+.co-chips.none .co-chip { border-style: dashed; border-color: var(--ink-subtle); }
+
+.co-xp { display: flex; flex-direction: column; gap: 8px; padding: 12px 12px 8px; border-top: 1px solid var(--line); }
+.co .dk-cover { margin: -2px 0 0; }
+.co-txb {
+  display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; gap: 6px; padding: 0 8px;
+  border-radius: 10px; background: transparent; color: var(--accent); font-weight: 500; font-size: 15px;
+}
+.co-txb:disabled { color: var(--ink-subtle); opacity: 0.6; }
+.co-held { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.4; }
+.co-ro { display: flex; align-items: flex-start; gap: 8px; margin: 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.4; }
+.co-ro svg { flex: none; margin-top: 2px; }
+
+/* A language tag is neutral: LanguageTag draws it in the ink around it. */
+.co-lts { display: inline-flex; gap: 4px; color: var(--ink); }
+
+/* Slots: the panel switcher, then one panel's day */
+.co-pcs { display: flex; flex-wrap: wrap; gap: 8px; }
+.co-pc {
+  flex: 1 1 72px; min-width: 0; height: 44px; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.co-grp { display: flex; flex-direction: column; gap: 10px; }
+.co-gh { display: flex; min-height: 32px; align-items: center; gap: 8px; }
+.co-gh h2 { margin: 0; font-weight: 700; font-size: 18px; line-height: 1.2; }
+.co-cnt { margin-left: auto; color: var(--ink-subtle); font-size: 13px; }
+.co-srow {
+  display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; column-gap: 8px; min-height: 52px;
+  padding: 4px 6px 4px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+}
+.co-srow[data-picked="true"] { border-color: var(--accent); box-shadow: 0 0 0 0.5px var(--accent); }
+.co-st { font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; }
+.co-sh { display: flex; min-width: 0; flex-direction: column; line-height: 1.2; }
+.co-sh b { font-weight: 700; font-size: 20px; line-height: 1.2; }
+.co-sh span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-subtle); font-size: 12.5px; }
+.co-so { color: var(--ink-subtle); font-size: 14px; }
+.co-bk {
+  display: inline-flex; min-width: 84px; height: 44px; align-items: center; justify-content: center; gap: 6px; padding: 0 14px;
+}
+.co-bk:disabled { opacity: 0.5; }
+.co-bk[aria-pressed="true"] { opacity: 1; }
+
+/* ------------------------------------------------------------------ *
  * Queue desk ("Now / Book", design/queue-redesign/, direction B)
  *
  * A phone page: the top bar and the Now | Book bar stay pinned while the
@@ -2136,7 +2287,7 @@ body:has(.judge) > .theme-toggle:hover {
  * rings the avatar. Hover and focus colour changes only, nothing moves.
  * ------------------------------------------------------------------ */
 
-.desk {
+.desk, .co {
   --dk-gutter: max(16px, calc((100vw - 32rem) / 2));
   --dk-desk: oklch(0.740 0.110 185);
   --dk-field: oklch(0.180 0.013 265);
@@ -2148,11 +2299,12 @@ body:has(.judge) > .theme-toggle:hover {
   --dk-tint: color-mix(in oklch, var(--accent) 14%, transparent);
   --dk-tint-line: color-mix(in oklch, var(--accent) 45%, transparent);
   --dk-danger-ring: color-mix(in oklch, var(--danger-quiet) 25%, transparent);
-
+}
+.desk {
   display: flex; min-height: 100dvh; flex-direction: column;
   background: var(--canvas); color: var(--ink);
 }
-:root[data-theme="light"] .desk {
+:root[data-theme="light"] .desk, :root[data-theme="light"] .co {
   --dk-desk: oklch(0.520 0.105 185);
   --dk-field: oklch(0.995 0.002 265);
   --dk-field-line: oklch(0.640 0.012 265);
@@ -2161,22 +2313,22 @@ body:has(.judge) > .theme-toggle:hover {
 }
 
 /* A status wears its fill and the ink that clears AA on it, in both themes. */
-.desk .dk-s-booked { --c: var(--booked-quiet); --ci: var(--dk-booked-ink); }
-.desk .dk-s-waiting { --c: var(--waiting); --ci: var(--waiting-ink); }
-.desk .dk-s-enroute { --c: var(--enroute); --ci: var(--enroute-ink); }
-.desk .dk-s-active { --c: var(--active); --ci: var(--active-ink); }
-.desk .dk-s-done { --c: var(--done); --ci: var(--done-ink); }
+:is(.desk, .co) .dk-s-booked { --c: var(--booked-quiet); --ci: var(--dk-booked-ink); }
+:is(.desk, .co) .dk-s-waiting { --c: var(--waiting); --ci: var(--waiting-ink); }
+:is(.desk, .co) .dk-s-enroute { --c: var(--enroute); --ci: var(--enroute-ink); }
+:is(.desk, .co) .dk-s-active { --c: var(--active); --ci: var(--active-ink); }
+:is(.desk, .co) .dk-s-done { --c: var(--done); --ci: var(--done-ink); }
 
 .dk-who-t b, .dk-big, .dk-seg button, .dk-prim, .dk-out, .dk-slot b, .dk-q1 b, .dk-mv b {
   font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* The app's one floating theme toggle, docked into the top bar's corner as on the judge console. */
-body:has(.desk) > .theme-toggle {
+body:has(.desk, .co) > .theme-toggle {
   top: 4px; right: 6px; bottom: auto; width: 44px; height: 44px;
   border: 0; border-radius: 12px; background: transparent; box-shadow: none; color: var(--ink-subtle);
 }
-body:has(.desk) > .theme-toggle:hover {
+body:has(.desk, .co) > .theme-toggle:hover {
   transform: none; color: var(--ink); background: color-mix(in oklch, var(--accent) 12%, transparent);
 }
 
@@ -2235,6 +2387,12 @@ body:has(.desk) > .theme-toggle:hover {
 .dk-two { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 10px; }
 .dk-tline { display: flex; flex-direction: column; gap: 2px; margin: 8px 0 0; color: var(--ink-subtle); font-size: 14px; line-height: 1.35; }
 .dk-tline b { color: var(--ink); font-weight: 500; }
+.dk-lrow {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink-subtle); font-size: 14px;
+}
+.dk-lts { display: inline-flex; gap: 4px; }
+.dk-lt, .dk-lts { color: var(--ink-subtle); }
 .dk-cover { margin: 6px 0 0; color: var(--ink-subtle); font-size: 12.5px; }
 .dk-cover p { margin: 0; font-size: 12.5px; }
 .dk-cover p.text-ink-faint { color: var(--ink-subtle); }
@@ -2263,6 +2421,7 @@ body:has(.desk) > .theme-toggle:hover {
 .dk-out:disabled { opacity: 0.5; }
 .dk-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
 .dk-pair .dk-prim, .dk-pair .dk-out { height: 56px; padding: 0 4px; font-size: 16px; }
+.dk-pair.dk-one { grid-template-columns: minmax(0, 1fr); }
 .dk-pair.dk-rq { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
 .dk-quiet { flex: none; min-height: 44px; padding: 0 8px; background: transparent; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
 .dk-quiet:hover:not(:disabled) { color: var(--ink); }
@@ -2298,11 +2457,6 @@ body:has(.desk) > .theme-toggle:hover {
   font-weight: 500; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums;
 }
 .dk-tm { min-width: 50px; }
-/* LanguageTag's own markup, drawn as the mock's outlined tag */
-.dk-lt > span {
-  display: inline-flex; height: 24px; align-items: center; padding: 0 7px; border: 1px solid var(--line); border-radius: 6px;
-  background: transparent; color: var(--ink-subtle); font-weight: 500; font-size: 12px; letter-spacing: 0.04em;
-}
 
 /* Slots: one row per hour, the hour on the left and the slots in fixed columns */
 .dk-slots { display: flex; flex-direction: column; gap: 8px; }
@@ -2586,6 +2740,8 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-opt:hover:not(:disabled), .ja-opt:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--jg-ring); }
 .ja-opt b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 15px; }
 .ja-opt:disabled { opacity: 0.6; }
+.ja-opt { flex-wrap: wrap; padding-block: 6px; }
+.ja-opt-w { flex-basis: 100%; color: var(--caution-quiet); font-weight: 500; font-size: 12.5px; }
 
 /* From 1024px: every panel as a column */
 @media (min-width: 1024px) {
@@ -2948,7 +3104,8 @@ body:has(.admin) > .theme-toggle:hover {
   border-radius: 11px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 12px; box-shadow: 0 0 0 2px var(--canvas);
 }
 
-.ja-tm-aa { display: flex; align-items: flex-end; gap: 10px; }
+.ja-tm-aa { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.ja-tm-aah { flex-basis: 100%; }
 .ja-tm-mpf { display: flex; flex: none; flex-direction: column; gap: 4px; }
 .ja-tm-mpl { color: var(--ink-subtle); font-size: 13px; white-space: nowrap; }
 .ja-tm-mpf .ja-in { width: 76px; padding: 0 8px; text-align: center; font-weight: 500; font-size: 17px; font-variant-numeric: tabular-nums; }
@@ -2972,6 +3129,10 @@ body:has(.admin) > .theme-toggle:hover {
   background: color-mix(in oklch, var(--caution) 12%, transparent); color: var(--caution-quiet);
   box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--caution) 35%, transparent);
 }
+/* The language strip: buttons, so it wraps instead of scrolling, and each is a 44px target on a phone. Pressed is accent chrome, never a status colour. */
+.ja-tm-lgs { flex-wrap: wrap; overflow: visible; }
+.ja-tm-chb { height: 44px; color: var(--ink); }
+.ja-tm-chb[aria-pressed="true"] { background: var(--ja-accent-t); box-shadow: inset 0 0 0 1.5px var(--accent); }
 .ja-tm-rd { display: none; margin: 0 0 0 auto; color: var(--ink-subtle); font-size: 13px; font-variant-numeric: tabular-nums; }
 .ja-tm-help { display: none; margin: 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.45; }
 
@@ -2990,6 +3151,11 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-tm-l1 .ja-tm-nm { font-size: 15px; }
 .ja-tm-l2 { grid-column: 1; overflow: hidden; color: var(--ink-subtle); text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .ja-tm-w { color: var(--caution-quiet); }
+/* Interview language: a neutral tag (language is not a status), and a quiet "Not asked"; the triangle is the caution when the panel does not cover it */
+.ja-tm-lt { display: inline-flex; flex: none; gap: 4px; color: var(--ink-muted); }
+.ja-tm-na { color: var(--ink-subtle); font-size: 11px; white-space: nowrap; }
+.ja-tm-lw { display: inline-grid; width: 16px; height: 16px; place-items: center; margin-left: 4px; color: var(--caution-quiet); vertical-align: middle; }
+.ja-tm-lw svg { width: 14px; height: 14px; }
 .ja-tm-d { color: var(--danger-quiet); }
 .ja-tm-lr { display: flex; grid-column: 2; grid-row: 1 / span 2; align-items: center; gap: 8px; }
 .ja-tm-lr svg { color: var(--ink-subtle); }
@@ -3001,6 +3167,7 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-k-pit { width: 34px; }
 .ja-k-nb { width: 100px; }
 .ja-k-dv { width: 32px; }
+.ja-k-lg { width: 84px; }
 .ja-k-pn { width: 104px; }
 .ja-k-bk { width: 52px; }
 .ja-k-iv { width: 94px; }
@@ -3021,7 +3188,7 @@ body:has(.admin) > .theme-toggle:hover {
   text-align: left; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums;
 }
 .ja-tm-c { color: var(--ink-subtle); }
-.ja-tm-bk { font-weight: 500; font-size: 13px; font-variant-numeric: tabular-nums; }
+.ja-tm-bk { font-weight: 500; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ja-tm-bk.ja-tm-none { color: var(--ink-subtle); font-weight: 400; }
 .ja-tm-fl2 { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 5px 0; }
 .ja-tm-tw .ja-sp { height: 22px; padding: 0 8px; font-size: 11.5px; }
@@ -3034,6 +3201,16 @@ body:has(.admin) > .theme-toggle:hover {
 }
 
 /* The editor's fields, in the drawer and in the sheet */
+.ja-tm-lgh { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ja-tm-lgh .ja-tm-od { margin-left: 0; color: var(--ink-subtle); }
+.ja-tm-lgh .ja-tm-od:disabled { opacity: 0.5; text-decoration: none; }
+.ja-tm-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 3px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--jg-field); }
+.ja-tm-rd3 { position: relative; display: block; }
+.ja-tm-rd3 input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; }
+.ja-tm-rd3 span { display: flex; height: 38px; align-items: center; justify-content: center; border-radius: 9px; font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 14px; }
+.ja-tm-rd3 input:checked + span { background: var(--accent); color: var(--accent-ink); }
+.ja-tm-rd3 input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ja-tm-rd3 input:disabled + span { opacity: 0.6; }
 .ja-tm-g2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .ja-tm-ro { display: flex; gap: 12px; }
 .ja-tm-ro > div { flex: 1; }
@@ -3114,6 +3291,7 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-tm-ghost { flex: none; height: 36px; border-radius: 10px; font-size: 14px; }
   .ja-tm-chr { flex-wrap: wrap; overflow: visible; }
   .ja-tm-ch { padding: 0 10px; font-size: 12.5px; }
+  .ja-tm-chb { height: 32px; }
   .ja-tm-rd { display: block; }
   .ja-tm-help { display: block; }
 

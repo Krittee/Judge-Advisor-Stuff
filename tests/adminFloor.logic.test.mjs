@@ -297,3 +297,4 @@ test("the phone chip is spoken as the panel, its teams, who is waiting and any l
   assert.equal(chipSpeech({ panel: p3, cards }, languages), "Panel 3, 2 teams, 1 waiting, ไทย (Thai) not covered");
   assert.equal(chipSpeech({ panel: p1, cards: [] }, languages), "Panel 1, 0 teams");
 });
+

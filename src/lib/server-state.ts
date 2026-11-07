@@ -30,6 +30,10 @@ import type { AppState, ViewerCapabilities } from "./types";
  *   judge   their own division only — the wall applies to what they can
  *           see, not only to what they can touch
  *   queuer  everything, including the notes teams leave for judges
+ *   coordinator
+ *           what the queue desk sees, minus the notes teams leave: they book
+ *           for a team and set its language, and read no messages. No
+ *           conflicts, roster or flags.
  *   referee everything the board shows, minus those notes — a referee
  *           files flags; nothing about their job involves what a team
  *           wrote to its judges
@@ -122,7 +126,9 @@ export async function loadState(session: Session | null): Promise<AppState> {
   // business being readable by the other 119 teams polling this -- nor by
   // a referee, who is signed in but has no part in an interview. It goes
   // to the people who run one: the judges and Judge Advisor, and the desk
-  // that may have typed it in on a team's behalf.
+  // that may have typed it in on a team's behalf -- the queue desk. A
+  // coordinator books for teams in the pits but reads no messages, like a
+  // referee.
   const includeMessages = canAdvance(session) || session?.role === "queuer";
 
   // Who created, acknowledged and interviewed a request, and how it came

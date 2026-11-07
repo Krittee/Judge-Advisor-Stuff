@@ -186,6 +186,8 @@ export function backLinkFor(role: string): { href: string; label: string } {
       return { href: "/judge", label: "My panel" };
     case "referee":
       return { href: "/referee", label: "Referee" };
+    case "coordinator":
+      return { href: "/coordinator", label: "Coordinator" };
     default:
       return { href: "/", label: "Home" };
   }

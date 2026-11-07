@@ -6,17 +6,21 @@ import { STATUS_META, type Status } from "@/lib/status";
 /**
  * The front door: one card per role, then the Live board with the colour
  * key drawn as sample tiles inside it. Styles live under `.doorpage` in
- * globals.css ("Five doors", design/door-redesign/).
+ * globals.css ("Five doors" + the Coordinator, design/door-redesign/).
  */
 
 type Door = { name: string; line: string; href: string; ring: string | null; avatar?: string };
 
-/** Most people first. The Team door has no avatar and no ring: it opens the ticket. */
+/**
+ * Most people first. The Team door has the team picture but no ring: it opens the ticket.
+ * The Coordinator door is not the Team door, so it has a ring and gets no ticket caption.
+ */
 const DOORS: Door[] = [
-  { name: "Team", line: "Check your judging status", href: "/team", ring: null },
+  { name: "Team", line: "Check your judging status", href: "/team", ring: null, avatar: "team" },
   { name: "Judge", line: "Panel code from your Judge Advisor", href: "/judge/login", ring: "judge", avatar: "judge" },
   { name: "Referee", line: "Referees and the head referee", href: "/referee/login", ring: "ref", avatar: "referee" },
   { name: "Queue desk", line: "Check teams in and book times", href: "/queue/login", ring: "desk", avatar: "queue-desk" },
+  { name: "Coordinator", line: "Walk the pits: languages and bookings", href: "/coordinator/login", ring: "co", avatar: "coordinator" },
   { name: "Judge Advisor", line: "Runs judging for the event", href: "/admin/login", ring: "ja", avatar: "judge-advisor" },
 ];
 
@@ -57,16 +61,10 @@ export function DoorPage() {
               <li key={d.href} className="dp-cell">
                 <Link href={d.href} className="dp-card" aria-describedby={d.ring ? undefined : "dp-cap"}>
                   {d.avatar ? (
-                    <span className={`dp-av dp-r-${d.ring}`}>
+                    <span className={d.ring ? `dp-av dp-r-${d.ring}` : "dp-av dp-av--team"}>
                       <img src={`/avatars/${d.avatar}.jpg`} alt="" width={48} height={48} />
                     </span>
-                  ) : (
-                    <span className="dp-av dp-av--team">
-                      <span className="dp-gl">
-                        <TicketGlyph />
-                      </span>
-                    </span>
-                  )}
+                  ) : null}
                   <span className="dp-rt">
                     <span className="dp-dt">{d.name}</span>
                     <span className="dp-s">{d.line}</span>
@@ -113,15 +111,6 @@ export function DoorPage() {
         </div>
       </main>
     </div>
-  );
-}
-
-function TicketGlyph() {
-  return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z" />
-      <path d="M14.5 7.5v9" strokeDasharray="2 2.4" />
-    </svg>
   );
 }
 

@@ -49,7 +49,7 @@ const raj = judge("j-raj", "Raj Patel", "p4");
 const roster = [jordan, alex, dana, sam, priya, lee, tom, ana, mei, raj];
 
 const team = (number: string, name: string, panel_id: string | null): Team => ({
-  id: `t-${number}`, number, name, panel_id, division: "Middle School", category: "developing", pit: null, created_at: "2026-10-20T08:00:00Z",
+  id: `t-${number}`, number, name, panel_id, division: "Middle School", category: "developing", pit: null, languages: [], created_at: "2026-10-20T08:00:00Z",
 });
 const titans = team("9882K", "Torque Titans", "p3");
 const byteMe = team("7700B", "Byte Me", "p3");

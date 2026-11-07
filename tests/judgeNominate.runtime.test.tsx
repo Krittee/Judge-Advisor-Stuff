@@ -38,6 +38,7 @@ const team = (number: string, name: string): Team => ({
   division: "Middle School",
   category: "developing",
   pit: "22",
+  languages: [],
   created_at: "2026-10-17T08:00:00Z",
 });
 const request = (t: Team, status: RequestRow["status"], over: Partial<RequestRow> = {}): RequestRow => ({

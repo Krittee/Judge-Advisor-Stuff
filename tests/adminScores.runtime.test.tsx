@@ -45,7 +45,7 @@ const panels = [
 ] as AppState["panels"];
 
 const team = (number: string, name: string, over: Partial<Team> = {}): Team => ({
-  id: `t-${number}`, number, name, panel_id: "p2", division: "Middle School", category: "developing", pit: null, created_at: "2026-10-20T08:00:00Z", ...over,
+  id: `t-${number}`, number, name, panel_id: "p2", division: "Middle School", category: "developing", pit: null, languages: [], created_at: "2026-10-20T08:00:00Z", ...over,
 });
 /** Every criterion of a rubric marked by `mark(sectionIndex)` (each team's notebook is out of 64, its interview out of 12). */
 function marked(t: Team, rubric: (typeof rubricList)[number], mark: (section: number) => number): ScoreRow {
@@ -532,7 +532,7 @@ function renderTeams(t: Team, f: FlagRow[], wide = true) {
     <TeamsBoard
       state={{ teams: [t], panels: [], requests: [], conflicts: [], judges: [], flags: f, flagKinds, languages: [], divisions: ["Middle School"], categories: categoryViews } as never}
       wide={wide}
-      filters={{ q: "", division: "", category: "" }}
+      filters={{ q: "", division: "", category: "", language: "" }}
       onFilters={noop}
       onFiltersOpen={noop}
       perPanel={12}
