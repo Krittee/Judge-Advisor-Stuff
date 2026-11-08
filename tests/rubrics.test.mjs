@@ -212,7 +212,7 @@ function resolveCategory(input) {
 test("the notebook classifications are the three the event uses", () => {
   assert.deepEqual(
     categories.map((c) => c.label),
-    ["Developing", "Fully Developed", "Ungraded"],
+    ["Ungraded", "Developing", "Fully Developed"],
   );
 });
 
