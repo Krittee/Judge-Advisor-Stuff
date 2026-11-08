@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Local, not pushed |
 | 2026-10-31 | [Blended division shows as BLN](#blended-division-shows-as-bln-2026-10-31) | `600a5e8` | Not needed | Local, not pushed |
 | 2026-10-31 | [Judging Board: colour key above Unassigned](#judging-board-colour-key-above-unassigned-2026-10-31) | `4a001a8` | Not needed | Local, not pushed |
 | 2026-10-31 | [Team page: a way back, and no details strip](#team-page-a-way-back-and-no-details-strip-2026-10-31) | `be78288` | Not yet | Local, not pushed |
@@ -12,6 +13,38 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Local, not pushed |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Local, not pushed |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Local, not pushed |
+
+---
+
+## New teams start Ungraded (2026-11-08)
+
+### Problem / request
+
+The user: "If the engineering notebook is set to developing when imported I want it to be ungraded at first". The default notebook type is the first entry of `teamCategories`, which was Developing, so a new team, or an import row with a blank notebook cell, was classed Developing. The user chose: only new teams get the new default; an explicit "Developing" in the sheet stays Developing; existing teams are unchanged.
+
+### What changed
+
+- `config/event.json`: `ungraded` moved to the top of `teamCategories`, so the order is now ungraded, developing, fully-developed. Nothing else in the file changed.
+- `tests/adminImport.route.runtime.test.ts`: the "a new team gets the default notebook type" expectation is now `ungraded` (was `developing`).
+- `tests/rubrics.test.mjs`: the classification-list test expects the config order, Ungraded, Developing, Fully Developed (was Developing, Fully Developed, Ungraded).
+- `src/components/board/boardLogic.ts`, `tests/board.logic.test.mjs`: two comments no longer say the config lists Developing first. The board picks notebook markers by id, so Ungraded stays a hollow ring.
+
+No app code changed. A re-import with a blank notebook cell still keeps the team's stored type, because `fallbackCategory` is null there. The Postgres column default `'developing'` in `src/lib/db/postgres.ts` is untouched: the app always supplies a category, so that default never applies.
+
+### How it was tested
+
+- `npm test`: before the change, 2 failures (the two expectations above). After it, 1690 tests, 1689 pass, 0 fail, 1 skipped (the same skip as before).
+- `npx tsc --noEmit -p .`: clean, no errors.
+- `npx eslint src tests`: clean, no problems.
+- Not checked in the browser: no dev server or build was run.
+
+### Commit and branch
+
+- Change: `3b9d670` on `claude/event-judge-booking-app-kcprxn`.
+
+### Status
+
+Committed locally. NOT pushed or deployed. The 32 teams already on the live site keep their stored type.
 
 ---
 
