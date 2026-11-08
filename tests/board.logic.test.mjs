@@ -92,7 +92,7 @@ test("groupByPanel: every team once, the best request wins, Unassigned last, can
 });
 
 test("notebook marker: the three known ids by meaning, wherever the config lists them", () => {
-  // config/event.json lists developing first: position alone would draw it filled.
+  // Listed with developing first: position alone would draw it filled.
   const cats = [{ id: "developing" }, { id: "fully-developed" }, { id: "ungraded" }];
   assert.equal(notebookMarker("fully-developed", cats), "full");
   assert.equal(notebookMarker("developing", cats), "half");

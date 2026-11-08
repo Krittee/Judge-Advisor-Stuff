@@ -107,8 +107,8 @@ export type Marker = "full" | "half" | "hollow";
    any id the board does not know by name. */
 const MARKER_ORDER: Marker[] = ["full", "half", "hollow"];
 
-/* By meaning where it is known: config/event.json lists Developing first, so
-   position alone would draw it filled. */
+/* By meaning where it is known, so the shapes don't follow the order
+   config/event.json happens to list them in. */
 const MARKER_BY_ID: Record<string, Marker> = {
   "fully-developed": "full",
   developing: "half",

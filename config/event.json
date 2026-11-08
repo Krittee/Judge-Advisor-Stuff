@@ -81,6 +81,14 @@
   ],
   "teamCategories": [
     {
+      "id": "ungraded",
+      "label": "Ungraded",
+      "color": "zinc",
+      "excludesRubrics": [
+        "notebook"
+      ]
+    },
+    {
       "id": "developing",
       "label": "Developing",
       "color": "amber"
@@ -89,14 +97,6 @@
       "id": "fully-developed",
       "label": "Fully Developed",
       "color": "violet"
-    },
-    {
-      "id": "ungraded",
-      "label": "Ungraded",
-      "color": "zinc",
-      "excludesRubrics": [
-        "notebook"
-      ]
     }
   ],
   "awards": [

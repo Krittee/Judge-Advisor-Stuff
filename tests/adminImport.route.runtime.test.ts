@@ -212,7 +212,7 @@ test("re-importing with no notebook, division or pit column keeps each stored te
   assert.equal(teams["1234"].category, "ungraded", "no fifth column: the notebook type stays");
   assert.equal(teams["1234"].division, MS, "no fourth column: the division stays");
   assert.equal(teams["1234"].pit, "A1", "no third column: the pit stays");
-  assert.equal(teams["5678"].category, "developing", "a new team gets the default notebook type");
+  assert.equal(teams["5678"].category, "ungraded", "a new team gets the default notebook type");
   assert.equal(teams["5678"].division, ES, "the first configured division");
   assert.equal(teams["5678"].pit, null);
 });
