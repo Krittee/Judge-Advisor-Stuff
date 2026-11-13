@@ -4,7 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `COMMIT` | Not yet | Local, not pushed |
+| 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `259cabb` | Not yet | Local, not pushed |
 | 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Local, not pushed |
 | 2026-10-31 | [Blended division shows as BLN](#blended-division-shows-as-bln-2026-10-31) | `600a5e8` | Not needed | Local, not pushed |
 | 2026-10-31 | [Judging Board: colour key above Unassigned](#judging-board-colour-key-above-unassigned-2026-10-31) | `4a001a8` | Not needed | Local, not pushed |
@@ -45,7 +45,7 @@ It was not the iOS 100vh issue: the shell already uses `100dvh`. Only the Coordi
 
 ### Commit and branch
 
-- Change: `COMMIT` on `claude/co-scroll-fix-59d632`.
+- Change: `259cabb` on `claude/co-scroll-fix-59d632`.
 
 ### Status
 
