@@ -5,7 +5,7 @@ import { noSlotsLeftLine, TOO_CLOSE_TITLE, takenTitle } from "@/components/SlotP
 import { WarnIcon } from "@/components/judge/parts";
 import { clockParts } from "@/components/team/teamLogic";
 import type { PublicPanel, Slot } from "@/lib/types";
-import { slotGrid, slotTime, type SlotKind } from "./deskLogic";
+import { hourRowColumns, isWideGrid, slotGrid, slotTime, type SlotKind } from "./deskLogic";
 
 export function Check() {
   return (
@@ -112,7 +112,8 @@ export function DeskSlots({
       {grid.open === 0 ? (
         <Caution>{noSlotsLeftLine(slots, now)}</Caution>
       ) : (
-        <div className="dk-slots" role="group" aria-labelledby={labelId}>
+        <div className={`dk-slots${isWideGrid(grid.columns) ? " dk-slots--wide" : ""}`} role="group" aria-labelledby={labelId}>
+          <div className="dk-slots-in">
           {grid.days.map((day) => (
             <Fragment key={day.day}>
               {grid.showDayHeadings ? (
@@ -127,7 +128,7 @@ export function DeskSlots({
                   <Fragment key={row.hourStart}>
                     <div
                       className="dk-hrow"
-                      style={{ gridTemplateColumns: `56px repeat(${grid.columns}, minmax(0, 1fr))` }}
+                      style={{ gridTemplateColumns: hourRowColumns(grid.columns) }}
                     >
                       <h3>
                         {hour.time}
@@ -184,6 +185,7 @@ export function DeskSlots({
               })}
             </Fragment>
           ))}
+          </div>
         </div>
       )}
     </div>

@@ -180,20 +180,28 @@ export type SlotGrid = {
   open: number;
 };
 
-const MAX_COLUMNS = 4;
+/** Past this many columns the grid is wider than a phone and scrolls sideways as one block. */
+const WIDE_FROM = 5;
+
+/** The grid-template-columns of an hour row: the hour label, then one column per slot position. */
+export function hourRowColumns(columns: number): string {
+  return `56px repeat(${columns}, minmax(${columns >= WIDE_FROM ? "52px" : "0"}, 1fr))`;
+}
+
+/** True when the grid has more columns than fit a phone without scrolling. */
+export const isWideGrid = (columns: number) => columns >= WIDE_FROM;
 
 /**
  * One row per hour, past slots left out, grouped by the panel's days. A slot
  * sits in the column its minute falls in (a 20-minute panel has :00 :20 :40),
- * so the columns line up from hour to hour. Slots shorter than 15 minutes would
- * need more than MAX_COLUMNS, so they just fill the row from the left and wrap.
+ * so the columns line up from hour to hour, and an hour is always one line
+ * however short the slots are (the grid scrolls sideways instead of wrapping).
  * A day's break row is kept only while slots still show on both sides of it.
  */
 export function slotGrid(slots: Slot[], panel: SlotFields, ctx: SlotContext): SlotGrid {
   const slotMinutes = panel.slot_minutes;
   const perHour = Math.max(1, Math.ceil(60 / Math.max(1, slotMinutes)));
-  const aligned = perHour <= MAX_COLUMNS;
-  const columns = Math.min(perHour, MAX_COLUMNS);
+  const columns = perHour;
 
   const panelDay = panelDays(panel);
   const days: GridDay[] = panelDay.map((d, i) => ({
@@ -229,12 +237,7 @@ export function slotGrid(slots: Slot[], panel: SlotFields, ctx: SlotContext): Sl
       byHour[i].set(hour, row);
       day.rows.push(row);
     }
-    const n = row.cells.length;
-    row.cells.push(
-      aligned
-        ? { slot, kind, column: Math.floor(at.getMinutes() / slotMinutes) % columns, row: 0 }
-        : { slot, kind, column: n % columns, row: Math.floor(n / columns) },
-    );
+    row.cells.push({ slot, kind, column: Math.floor(at.getMinutes() / slotMinutes) % columns, row: 0 });
 
     if (brk.break_from && brk.break_to) {
       if (at.getTime() < new Date(brk.break_from).getTime()) around[i].before = slot;

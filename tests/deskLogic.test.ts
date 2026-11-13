@@ -7,6 +7,8 @@ import {
   busyText,
   cancelBookingAfterAsking,
   cancelBookingPrompt,
+  hourRowColumns,
+  isWideGrid,
   lookupState,
   nextFreeStart,
   requestOrder,
@@ -141,6 +143,42 @@ test("the grid has a row per hour, no past slots, and counts what is open of wha
   assert.ok(grid.rows.length >= 2 && grid.rows.every((r) => r.cells.length <= 3), "at most three to an hour");
   const columns = grid.rows.flatMap((r) => r.cells.map((c) => c.column));
   assert.ok(columns.every((c) => c >= 0 && c < 3));
+});
+
+test("short slots stay on one line per hour: 12-minute gives five columns, 5-minute gives twelve", () => {
+  const base = Date.parse("2099-01-01T10:00:00.000Z");
+  const make = (minutes: number, hours: number): { slots: Slot[]; grid: ReturnType<typeof slotGrid> } => {
+    const slots = Array.from({ length: Math.ceil((hours * 60) / minutes) }, (_, i): Slot => ({
+      ...slot(0), start: new Date(base + i * minutes * 60_000).toISOString(), end: new Date(base + (i + 1) * minutes * 60_000).toISOString(),
+    }));
+    const grid = slotGrid(slots, { slot_start_at: slots[0].start, slot_minutes: minutes, slot_count: slots.length }, { teamId: null, currentStart: null, now: base - 60_000 });
+    return { slots, grid };
+  };
+  const twelve = make(12, 2).grid;
+  assert.equal(twelve.columns, 5);
+  assert.equal(twelve.rows.length, 2);
+  for (const r of twelve.rows) {
+    assert.equal(r.cells.length, 5);
+    assert.ok(r.cells.every((c) => c.row === 0), "never a second line");
+    assert.deepEqual(r.cells.map((c) => c.column), [0, 1, 2, 3, 4]);
+    assert.deepEqual(r.cells.map((c) => new Date(c.slot.start).getMinutes()), [0, 12, 24, 36, 48]);
+  }
+  const five = make(5, 2).grid;
+  assert.equal(five.columns, 12);
+  assert.ok(five.rows.every((r) => r.cells.length === 12 && r.cells.every((c, i) => c.row === 0 && c.column === i)));
+  // 15 and 20 minutes are as they were.
+  const fifteen = make(15, 1).grid;
+  assert.deepEqual([fifteen.columns, fifteen.rows[0].cells.map((c) => c.column)], [4, [0, 1, 2, 3]]);
+  const twenty = make(20, 1).grid;
+  assert.deepEqual([twenty.columns, twenty.rows[0].cells.map((c) => c.column)], [3, [0, 1, 2]]);
+});
+
+test("the hour row template is unchanged up to four columns and gets a 52px minimum past that", () => {
+  assert.equal(hourRowColumns(3), "56px repeat(3, minmax(0, 1fr))");
+  assert.equal(hourRowColumns(4), "56px repeat(4, minmax(0, 1fr))");
+  assert.equal(hourRowColumns(5), "56px repeat(5, minmax(52px, 1fr))");
+  assert.equal(hourRowColumns(12), "56px repeat(12, minmax(52px, 1fr))");
+  assert.deepEqual([4, 5].map(isWideGrid), [false, true]);
 });
 
 /* ---- cancelling a booking, asked first ------------------------------------------------ */

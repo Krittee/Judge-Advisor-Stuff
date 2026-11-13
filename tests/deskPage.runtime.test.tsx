@@ -324,6 +324,15 @@ test("each slot state renders as specified, and only open slots are enabled", ()
   assert.equal(cells(grid({ disabled: true })).filter((x) => !x.disabled).length, 0, "busy turns the open ones off too");
 });
 
+test("more than four columns scroll sideways as one block; four or fewer keep the plain template", () => {
+  const wide = grid();
+  assert.match(wide, /class="dk-slots dk-slots--wide"/);
+  assert.match(wide, /grid-template-columns:56px repeat\(6, minmax\(52px, 1fr\)\)/);
+  const narrow = grid({ panel: { ...gridPanel, slot_minutes: 20 }, slots: buildSlots({ ...gridPanel, slot_minutes: 20 }, [], gTeams) });
+  assert.match(narrow, /class="dk-slots"/);
+  assert.match(narrow, /grid-template-columns:56px repeat\(3, minmax\(0, 1fr\)\)/);
+});
+
 test("slots have no status colour", () => {
   const m = grid({ picked: at(7) });
   assert.doesNotMatch(m, /dk-s-|bg-(waiting|enroute|active|done)/);

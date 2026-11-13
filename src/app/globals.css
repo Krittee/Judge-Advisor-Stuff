@@ -2464,7 +2464,14 @@ body:has(.desk, .co) > .theme-toggle:hover {
 .dk-tm { min-width: 50px; }
 
 /* Slots: one row per hour, the hour on the left and the slots in fixed columns */
-.dk-slots { display: flex; flex-direction: column; gap: 8px; }
+.dk-slots-in { display: flex; flex-direction: column; gap: 8px; }
+/* More than four columns (slots under 15 min): still one line per hour, the whole grid scrolls sideways. */
+.dk-slots--wide { container-type: inline-size; overflow-x: auto; padding: 3px; margin: -3px; }
+.dk-slots--wide .dk-slots-in { width: max-content; min-width: 100%; }
+.dk-slots--wide .dk-dh, .dk-slots--wide .dk-brk { position: sticky; left: 0; width: 100cqw; }
+.dk-slots--wide .dk-hrow > h3 { grid-column: 1 / -1; width: 56px; position: sticky; left: 0; z-index: 1; background: var(--surface); }
+.dk-slots--wide .dk-slot b { gap: 2px; font-size: 14px; }
+.dk-slots--wide .dk-slot b svg { width: 12px; height: 12px; }
 .dk-hrow { display: grid; align-items: center; gap: 8px; }
 .dk-hrow > h3 { grid-column: 1; grid-row: 1; margin: 0; color: var(--ink-subtle); font-weight: 500; font-size: 12px; letter-spacing: 0.04em; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .dk-hrow > h3 small { display: block; font-size: 11px; letter-spacing: 0; }
