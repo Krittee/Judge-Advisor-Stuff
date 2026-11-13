@@ -1024,9 +1024,10 @@ body:has(.landing) > .theme-toggle:hover {
   .si-stage { flex-direction: row; align-items: center; justify-content: center; padding: 0 32px 56px; }
   .si-pwrap { flex: none; width: 100%; max-width: 780px; min-height: 572px; margin: 0; }
   .si-pass { flex-direction: row; }
-  .si-band { width: 240px; min-height: 0; justify-content: space-between; gap: 0; padding: 36px 28px 28px; }
+  .si-band { container-type: inline-size; width: 240px; min-height: 0; justify-content: space-between; gap: 0; padding: 36px 28px 28px; }
   .si-band-top { display: contents; }
-  .si-role { order: 2; text-align: left; font-size: 26px; letter-spacing: 0.2em; }
+  /* The band is a fixed width, so the word shrinks only when its longest word would not fit, at about 1em per letter. */
+  .si-role { order: 2; text-align: left; font-size: min(26px, 100cqi / var(--si-letters, 7)); letter-spacing: 0.2em; }
   .si-crew { flex-direction: column; gap: 12px; }
   .si-mate { flex: none; flex-direction: row; justify-content: flex-start; gap: 14px; }
   .si-solo { align-items: flex-start; gap: 10px; }
