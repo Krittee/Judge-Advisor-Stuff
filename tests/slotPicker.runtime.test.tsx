@@ -22,7 +22,7 @@ const booked = { teamId: "t", teamNumber: "1111A", status: "scheduled" as const 
 test("when every remaining slot has already passed, the line says so, not that they are taken", () => {
   assert.equal(
     noSlotsLeftLine([slot(-3), slot(-2)], now),
-    "No slots left today — the rest have already passed",
+    "No slots left — the rest have already passed",
   );
 });
 

@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { call, useAppState } from "@/components/useAppState";
-import { formatClock } from "@/components/ui";
+import { slotLabel } from "@/components/ui";
 import { CoordinatorView } from "@/components/coordinator/CoordinatorView";
 import { tabFrom, type CoordinatorTab } from "@/components/coordinator/coordinatorLogic";
 import { homeFor } from "@/components/SignInForm";
@@ -106,7 +106,7 @@ function Coordinator() {
   const book = (team: Team, slot: Slot, language: string) =>
     submit(
       { teamNumber: team.number, kind: "slot", language, slotStart: slot.start, slotEnd: slot.end },
-      `Team ${team.number} booked for ${formatClock(slot.start)}.`,
+      `Team ${team.number} booked for ${slotLabel(slot.start)}.`,
       () => {
         setPicked(null);
         setChosenId(null);

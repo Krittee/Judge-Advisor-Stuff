@@ -5,7 +5,7 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { LanguageTag } from "@/components/Language";
 import { ChevronDown, ChevronRight, CloseIcon, StatusPill, WarnIcon } from "@/components/judge/parts";
 import { call } from "@/components/useAppState";
-import { formatClock } from "@/components/ui";
+import { formatClock, slotLabel } from "@/components/ui";
 import { liveRequestFor } from "@/lib/data";
 import { STATUS_META, type Status } from "@/lib/status";
 import { reachedSteps } from "@/lib/stepTimes";
@@ -1185,7 +1185,7 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, bu
             >
               Cancel booking
             </button>
-            <p className="ja-hint">Asks first. Frees the {formatClock(booking.slot_start)} slot.</p>
+            <p className="ja-hint">Asks first. Frees the {slotLabel(booking.slot_start)} slot.</p>
           </div>
         ) : null}
         {!live ? (

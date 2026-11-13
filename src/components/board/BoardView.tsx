@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { STATUS_META } from "@/lib/status";
 import { PitMap, StatusSwatches } from "@/components/PitMap";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { formatClock } from "@/components/ui";
+import { slotLabel } from "@/components/ui";
 import type { AppState, TeamCategoryView } from "@/lib/types";
 import {
   backLinkFor,
@@ -241,7 +241,7 @@ function TileView({ tile, categories, first }: { tile: TileData; categories: Tea
   const reserve = big
     ? 4 // "NN min" at the wait's size, which --bd-tf names for this tile
     : tile.slotStart
-      ? formatClock(tile.slotStart).length + 1
+      ? slotLabel(tile.slotStart).length + 1
       : tile.since && status && status !== "completed"
         ? ELAPSED_CHARS
         : 0;

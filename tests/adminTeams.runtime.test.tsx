@@ -671,7 +671,7 @@ test("with no panel, or a panel change not yet saved, both are off and the drawe
 test("a booking: its time with Change time under it, Cancel booking (asks first) in the Interview row, and no Request or Book", () => {
   const d = drawer(board({ picked: rangers }));
   assert.match(d, /<span class="ja-lab">Booked<\/span><span class="ja-tm-bk">\d{1,2}:\d{2}[^<]*<\/span><button type="button" class="ja-tm-od ja-tm-ts" aria-expanded="false">Change time<\/button>/);
-  assert.match(d, /<button type="button" class="ja-tm-rmb">Cancel booking<\/button><p class="ja-hint">Asks first\. Frees the \d{1,2}:\d{2}[^<]*slot\.<\/p>/);
+  assert.match(d, /<button type="button" class="ja-tm-rmb">Cancel booking<\/button><p class="ja-hint">Asks first\. Frees the (?:[A-Z][a-z]{2} )?\d{1,2}:\d{2}[^<]*slot\.<\/p>/);
   assert.match(d, /jg-s-scheduled">Booked/);
   assert.match(d, /Reset to…/, "the override stays as it was");
   assert.doesNotMatch(d, /Request ·|Book a time|dk-slot|>Times</, "a booking has reached no step yet");

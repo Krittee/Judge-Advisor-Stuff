@@ -6,7 +6,7 @@ import { FlagSummary } from "@/components/Flags";
 import { cancelAfterAsking } from "@/components/judge/logic";
 import { Dot, StatusPill, WarnIcon } from "@/components/judge/parts";
 import { hasLanguageGap } from "@/components/Language";
-import { Banner, formatClock, formatMinutes } from "@/components/ui";
+import { Banner, formatMinutes, slotLabel } from "@/components/ui";
 import { call } from "@/components/useAppState";
 import { minutesSince } from "@/lib/judgeQueue";
 import { STATUS_META, type Status } from "@/lib/status";
@@ -378,7 +378,7 @@ function Card({
       <div className="ja-c2">
         <StatusPill status={status} short />
         {status === "scheduled" ? (
-          <span className="ja-ctm">{formatClock(request.slot_start)}</span>
+          <span className="ja-ctm">{slotLabel(request.slot_start)}</span>
         ) : since ? (
           <span className={`ja-ctm${status === "requested" ? " ja-wt" : ""}`}>
             {formatMinutes(minutesSince(since, now))}

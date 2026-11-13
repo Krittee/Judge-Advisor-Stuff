@@ -18,7 +18,7 @@ import {
   slotsToday,
   teamMeta,
 } from "../src/components/judge/logic";
-import { formatClock, formatMinutes } from "../src/components/ui";
+import { formatClock, formatMinutes, slotLabel } from "../src/components/ui";
 import { minutesSince, waitingAlert } from "../src/lib/judgeQueue";
 
 /* The judge console's decisions, run for real against
@@ -143,8 +143,8 @@ test("the cancel confirm says what is being cancelled and what happens", () => {
   assert.equal(cancelCopy(team, { status: "acknowledged", slot_start: null }).question, "Cancel 1136's request? They leave the queue.");
   assert.equal(cancelCopy(team, { status: "interviewing", slot_start: null }).question, "Cancel 1136's interview? It ends without being completed.");
   const booked = cancelCopy(team, { status: "scheduled", slot_start });
-  assert.equal(booked.question, `Cancel 1136's ${formatClock(slot_start)} booking? The slot opens up.`);
-  assert.match(booked.question, /^Cancel 1136's \d{1,2}:40.* booking\?/);
+  assert.equal(booked.question, `Cancel 1136's ${slotLabel(slot_start)} booking? The slot opens up.`);
+  assert.match(booked.question, /^Cancel 1136's (?:[A-Z][a-z]{2} )?\d{1,2}:40.* booking\?/);
   assert.equal(cancelCopy(team, { status: "scheduled", slot_start: null }).question, "Cancel 1136's booking? The slot opens up.");
   // The confirming button names the same thing.
   assert.deepEqual(

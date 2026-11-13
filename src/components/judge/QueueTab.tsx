@@ -2,7 +2,7 @@
 
 import { Fragment } from "react";
 import { FlagSummary } from "@/components/Flags";
-import { formatClock, formatMinutes } from "@/components/ui";
+import { formatMinutes, slotLabel } from "@/components/ui";
 import { groupQueue, minutesSince, pickHero, waitingAlert, type QueueCard } from "@/lib/judgeQueue";
 import { STATUS_META } from "@/lib/status";
 import type { AppState, AwardView, FlagRow, NominationRow, RequestRow, Team } from "@/lib/types";
@@ -255,7 +255,7 @@ function heroWhen(request: RequestRow, now: number): React.ReactNode {
     const due = dueText(request.slot_start, now);
     return (
       <>
-        <b>{formatClock(request.slot_start)}</b>
+        <b>{slotLabel(request.slot_start)}</b>
         {due ? ` · ${due}` : ""}
       </>
     );
@@ -454,7 +454,7 @@ function Row({
           <span className="jg-q2">{line}</span>
         </span>
         {status === "scheduled" && request?.slot_start ? (
-          <span className="jg-sc jg-s-scheduled">{formatClock(request.slot_start)}</span>
+          <span className="jg-sc jg-s-scheduled">{slotLabel(request.slot_start)}</span>
         ) : null}
         {advanceable ? null : <ChevronRight />}
       </button>

@@ -8,7 +8,7 @@ import { busyText, lookupState, nextFreeStart, requestOrder, slotKind, teamList,
 import { LanguageCover, LanguageTag, languageNames, type Language } from "@/components/Language";
 import { SignOutButton } from "@/components/judging";
 import { panelLoad } from "@/components/SlotPicker";
-import { Elapsed, formatClock } from "@/components/ui";
+import { Elapsed, slotLabel } from "@/components/ui";
 import { buildSlots } from "@/lib/data";
 import { STATUS_META } from "@/lib/status";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
@@ -195,7 +195,7 @@ export function DeskView(p: DeskViewProps) {
               <path d="M7 7h11l-3-3M17 17H6l3 3" />
             </svg>
             <p>
-              Moving <b>{team?.number}</b> from <b>{formatClock(moving.slot_start)}</b>
+              Moving <b>{team?.number}</b> from <b>{slotLabel(moving.slot_start)}</b>
             </p>
             <button type="button" className="dk-quiet" onClick={p.onStopReschedule}>
               Stop
@@ -236,7 +236,7 @@ export function DeskView(p: DeskViewProps) {
                   {nextFree ? (
                     <>
                       {" "}
-                      · next free <b>{formatClock(nextFree)}</b>
+                      · next free <b>{slotLabel(nextFree)}</b>
                     </>
                   ) : null}
                 </span>
@@ -303,7 +303,7 @@ export function DeskView(p: DeskViewProps) {
         {state.kind === "booked" && !moving && team ? (
           <section className="dk-ex">
             <Caution>
-              Booked for {formatClock(state.booking.slot_start)} on{" "}
+              Booked for {slotLabel(state.booking.slot_start)} on{" "}
               {panelById.get(state.booking.panel_id ?? "")?.name ?? panel?.name ?? "a panel"}.
             </Caution>
             {languages.length > 1 ? (
@@ -323,7 +323,7 @@ export function DeskView(p: DeskViewProps) {
                 </button>
               </div>
             )}
-            <p className="dk-cap">Requesting now frees their {formatClock(state.booking.slot_start)} slot.</p>
+            <p className="dk-cap">Requesting now frees their {slotLabel(state.booking.slot_start)} slot.</p>
           </section>
         ) : null}
 
@@ -398,7 +398,7 @@ export function DeskView(p: DeskViewProps) {
             <DeskSlots panel={panel} slots={slots} teamId={team.id} picked={p.picked} disabled={busy} onPick={(s) => p.onPick(s.start)} now={now} />
             <div className="dk-pin">
               <button type="button" className="dk-prim dk-lg" disabled={busy || !chosen} onClick={() => chosen && p.onBook(chosen)}>
-                {chosen ? `Book ${formatClock(chosen.start)} · ${team.number}` : "Book · pick a time"}
+                {chosen ? `Book ${slotLabel(chosen.start)} · ${team.number}` : "Book · pick a time"}
               </button>
             </div>
           </>
@@ -475,7 +475,7 @@ export function DeskView(p: DeskViewProps) {
                 return (
                   <li key={r.id} className="dk-qrow">
                     <div className="dk-qmain">
-                      <span className="dk-sc dk-s-booked dk-tm">{formatClock(r.slot_start)}</span>
+                      <span className="dk-sc dk-s-booked dk-tm">{slotLabel(r.slot_start)}</span>
                       <span className="dk-qt">
                         <span className="dk-q1">
                           <b>{t.number}</b>
@@ -533,7 +533,7 @@ export function DeskView(p: DeskViewProps) {
                             <span className={pn ? undefined : "dk-np"}>{pn ?? "No panel"}</span>
                             {r ? (
                               r.status === "scheduled" ? (
-                                <span className="dk-sc dk-s-booked dk-tm">{formatClock(r.slot_start)}</span>
+                                <span className="dk-sc dk-s-booked dk-tm">{slotLabel(r.slot_start)}</span>
                               ) : (
                                 <span className={`dk-sc dk-s-${TONE[r.status]}`}>{STATUS_META[r.status].label}</span>
                               )
@@ -557,7 +557,7 @@ export function DeskView(p: DeskViewProps) {
       {moving && team ? (
         <div className="dk-abar">
           <button type="button" className="dk-prim dk-lg" disabled={busy || !chosen} onClick={() => chosen && p.onMove(chosen)}>
-            {chosen ? `Move to ${formatClock(chosen.start)}` : "Move · pick a time"}
+            {chosen ? `Move to ${slotLabel(chosen.start)}` : "Move · pick a time"}
           </button>
           <div className="dk-sub">
             <button type="button" className="dk-quiet dk-dg" disabled={busy} onClick={p.onCancelBooking}>

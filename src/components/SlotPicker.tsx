@@ -36,7 +36,7 @@ export function panelLoad(panelId: string, requests: RequestRow[]): PanelLoad {
 export function noSlotsLeftLine(slots: Slot[], now: number): string {
   const ended = (s: Slot) => new Date(s.end).getTime() <= now;
   const passed = slots.filter((s) => ended(s) && !s.takenBy).length;
-  if (passed === slots.length) return "No slots left today — the rest have already passed";
+  if (passed === slots.length) return "No slots left — the rest have already passed";
   if (passed === 0) return `All ${slots.length} slots are taken — nothing left to book`;
   return `No slots left — ${slots.length - passed} taken, ${passed} already passed`;
 }

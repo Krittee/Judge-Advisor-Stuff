@@ -15,7 +15,9 @@ import {
   teamList,
   teamMatches,
 } from "../src/components/desk/deskLogic";
-import { formatClock } from "../src/components/ui";
+import { slotLabel } from "../src/components/ui";
+import { buildSlots } from "../src/lib/data";
+import { bangkokClock } from "../src/lib/stepTimes";
 import { filterTeamNumberInput } from "../src/lib/teamNumber";
 import type { PublicPanel, RequestRow, Slot, Team } from "../src/lib/types";
 
@@ -131,7 +133,7 @@ test("the grid has a row per hour, no past slots, and counts what is open of wha
   const at = (i: number): Slot => ({ ...slot(0), start: new Date(base + i * 20 * 60_000).toISOString(), end: new Date(base + (i + 1) * 20 * 60_000).toISOString() });
   const slots = [at(0), at(1), at(2), at(3), at(4), at(5)];
   slots[3] = { ...slots[3], takenBy: held("x") };
-  const grid = slotGrid(slots, 20, { teamId: null, currentStart: null, now: base + 45 * 60_000 });
+  const grid = slotGrid(slots, { slot_start_at: slots[0].start, slot_minutes: 20, slot_count: 6 }, { teamId: null, currentStart: null, now: base + 45 * 60_000 });
   assert.equal(grid.shown, 4, "slots 0 and 1 are over");
   assert.equal(grid.open, 3);
   assert.equal(grid.columns, 3);
@@ -161,7 +163,7 @@ test("the question names the team and the time, and the buttons read 'Cancel boo
   );
   assert.equal(did, false);
   assert.equal(sent, 0, "a declined cancel sends nothing");
-  assert.deepEqual(asked, [[`Cancel 4410C's ${formatClock(booking.slot_start)} booking?`, { confirmLabel: "Cancel booking", cancelLabel: "Keep it", danger: true }]]);
+  assert.deepEqual(asked, [[`Cancel 4410C's ${slotLabel(booking.slot_start)} booking?`, { confirmLabel: "Cancel booking", cancelLabel: "Keep it", danger: true }]]);
   assert.equal(cancelBookingPrompt("4410C", booking.slot_start), asked[0][0]);
 });
 
@@ -305,4 +307,59 @@ test("bookLanguageFor: the team's first language, the desk's pick only for the s
   assert.equal(bookLanguageFor({ teamId: "t1", language: "en" }, none, "en"), "en");
   assert.equal(bookLanguageFor({ teamId: "t2", language: "en" }, thai, "en"), "th", "a pick for another team re-defaults");
   assert.equal(bookLanguageFor({ teamId: "t1", language: "th" }, null, "en"), "en", "no team, the fallback");
+});
+
+/* ---- day headings and the break row ------------------------------------------------------ */
+
+const TWO_DAYS = {
+  id: "p-two",
+  slot_start_at: "2026-11-21T10:00:00+07:00",
+  slot_minutes: 15,
+  slot_count: 32,
+  slot_days: [
+    { open_at: "2026-11-21T10:00:00+07:00", end_at: "2026-11-21T16:00:00+07:00", break_from: "2026-11-21T12:00:00+07:00", break_to: "2026-11-21T13:00:00+07:00" },
+    { open_at: "2026-11-22T09:00:00+07:00", end_at: "2026-11-22T12:00:00+07:00", break_from: null, break_to: null },
+  ],
+};
+const twoDaySlots = buildSlots(TWO_DAYS, [], []);
+const gridAt = (iso: string) => slotGrid(twoDaySlots, TWO_DAYS, { teamId: null, currentStart: null, now: Date.parse(iso) });
+
+test("two days: a heading per day, the break after the 11:00 row, Day 2 with 12 open", () => {
+  const g = gridAt("2026-11-21T11:00:00+07:00");
+  assert.equal(g.showDayHeadings, true);
+  assert.deepEqual(g.days.map((d) => d.label), ["Day 1 · Sat 21 Nov", "Day 2 · Sun 22 Nov"]);
+  assert.deepEqual(g.days.map((d) => d.day), [1, 2]);
+  assert.deepEqual(g.days.map((d) => d.open), [16, 12]);
+  const [d1, d2] = g.days;
+  assert.equal(d1.breakLabel, "12:00–13:00 · Break");
+  assert.equal(bangkokClock(d1.breakAfterHour!), "11:00");
+  assert.equal(d2.breakLabel, null);
+  assert.equal(d2.breakAfterHour, null);
+  assert.equal(g.open, 28);
+  assert.equal(g.rows.length, d1.rows.length + d2.rows.length, "the flat rows are still every row");
+});
+
+test("after Day 1 is over only Day 2 shows, still called Day 2, headings still on", () => {
+  const g = gridAt("2026-11-21T17:00:00+07:00");
+  assert.equal(g.showDayHeadings, true);
+  assert.deepEqual(g.days.map((d) => d.label), ["Day 2 · Sun 22 Nov"]);
+  assert.equal(g.days[0].day, 2);
+});
+
+test("no break row once the morning has passed: nothing remains before it", () => {
+  const g = gridAt("2026-11-21T12:30:00+07:00");
+  assert.equal(g.days[0].breakLabel, null);
+  assert.equal(g.days[0].breakAfterHour, null);
+  assert.equal(g.days[0].open, 12);
+});
+
+test("a one-day legacy panel has no headings and the rows it always had", () => {
+  const legacy = { id: "p-old", slot_start_at: "2026-11-21T10:00:00+07:00", slot_minutes: 20, slot_count: 6, slot_days: [] };
+  const slots = buildSlots(legacy, [], []);
+  const g = slotGrid(slots, legacy, { teamId: null, currentStart: null, now: Date.parse("2026-11-21T09:00:00+07:00") });
+  assert.equal(g.showDayHeadings, false);
+  assert.equal(g.days.length, 1);
+  assert.deepEqual(g.days[0].rows, g.rows);
+  assert.equal(g.days[0].breakLabel, null);
+  assert.equal(g.shown, 6);
 });

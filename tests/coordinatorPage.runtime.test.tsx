@@ -304,7 +304,7 @@ test("a panel with no times, or none left, says so instead of an empty list", ()
   assert.match(text(none), /Panel 4 has no bookable times set up yet\./);
   assert.equal(slotRows(none).length, 0);
   const over = slots({ now: BASE + 99 * 20 * 60_000 });
-  assert.match(text(over), /No slots left today — the rest have already passed/);
+  assert.match(text(over), /No slots left — the rest have already passed/);
   assert.equal(slotRows(over).length, 0);
 });
 

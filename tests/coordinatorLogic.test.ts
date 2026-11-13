@@ -219,3 +219,20 @@ test("?tab=slots is Slots; anything else is Teams", () => {
   assert.equal(tabFrom(null), "teams");
   assert.equal(tabFrom("SLOTS"), "teams");
 });
+
+test("the model carries the same day headings and break as the desk grid", () => {
+  const two = panel("p3", {
+    slot_start_at: "2026-11-21T10:00:00+07:00", slot_minutes: 15, slot_count: 32,
+    slot_days: [
+      { open_at: "2026-11-21T10:00:00+07:00", end_at: "2026-11-21T16:00:00+07:00", break_from: "2026-11-21T12:00:00+07:00", break_to: "2026-11-21T13:00:00+07:00" },
+      { open_at: "2026-11-22T09:00:00+07:00", end_at: "2026-11-22T12:00:00+07:00", break_from: null, break_to: null },
+    ],
+  });
+  const m = model({ panels: [p2, two], now: Date.parse("2026-11-21T11:00:00+07:00") });
+  assert.equal(m.showDayHeadings, true);
+  assert.deepEqual(m.days.map((d) => [d.label, d.open]), [["Day 1 · Sat 21 Nov", 16], ["Day 2 · Sun 22 Nov", 12]]);
+  assert.equal(m.days[0].breakLabel, "12:00–13:00 · Break");
+  assert.equal(m.open, 28);
+  assert.equal(m.lines.length, m.days.flatMap((d) => d.rows.flatMap((r) => r.cells)).length);
+  assert.equal(model().showDayHeadings, false, "a one-day panel has none");
+});

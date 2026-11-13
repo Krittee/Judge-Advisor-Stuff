@@ -8,7 +8,7 @@ import { DeskSlots } from "../src/components/desk/DeskSlots";
 import { DeskView, type DeskViewProps } from "../src/components/desk/DeskView";
 import { slotTime } from "../src/components/desk/deskLogic";
 import { noSlotsLeftLine } from "../src/components/SlotPicker";
-import { formatClock } from "../src/components/ui";
+import { slotLabel } from "../src/components/ui";
 import { buildSlots } from "../src/lib/data";
 import type { PublicPanel, RequestRow, Team } from "../src/lib/types";
 
@@ -129,7 +129,7 @@ test("the chrome: avatar, Queue desk and the desk person's name, Live, Sign out,
 test("the lookup line: name, category, pit, then panel, division, how busy and the next free time", () => {
   const m = view();
   const line = text(m.match(/<p class="dk-tline">[\s\S]*?<\/p>/)![0]);
-  const free = formatClock(buildSlots(panel2, requests, teams).find((s) => !s.takenBy && !s.blocked)!.start);
+  const free = slotLabel(buildSlots(panel2, requests, teams).find((s) => !s.takenBy && !s.blocked)!.start);
   assert.equal(line, `Byte Me · Developing · Pit 22Panel 2 · Middle School · 1 waiting · next free ${free}`);
 });
 
@@ -196,9 +196,9 @@ test("already waiting: a status chip with the wait, the caution, no Request butt
 
 test("already booked with one language: Reschedule and Request now instead, and what it frees", () => {
   const m = view({ number: "4410C", languages: [languages[0]] });
-  assert.match(m, new RegExp(`Booked for ${formatClock(slotAt(2))} on Panel 2\\.`));
+  assert.match(m, new RegExp(`Booked for ${slotLabel(slotAt(2))} on Panel 2\\.`));
   assert.deepEqual(buttons(m).filter((b) => /^(Reschedule|Request now instead)$/.test(b.text)).map((b) => b.text), ["Reschedule", "Request now instead"]);
-  assert.match(text(m), new RegExp(`Requesting now frees their ${formatClock(slotAt(2))} slot\\.`));
+  assert.match(text(m), new RegExp(`Requesting now frees their ${slotLabel(slotAt(2))} slot\\.`));
   assert.match(m, /dk-out[^>]*>Reschedule/);
 });
 
@@ -230,7 +230,7 @@ test("Book: language and note side by side, the panel's grid inline, and a Book 
   assert.deepEqual(off.map((b) => [b.text, b.disabled]), [["Book · pick a time", true]]);
 
   const on = primary(view({ mode: "book", picked: open }), /^Book/);
-  assert.deepEqual(on.map((b) => [b.text, b.disabled]), [[`Book ${formatClock(open)} · 7700B`, false]]);
+  assert.deepEqual(on.map((b) => [b.text, b.disabled]), [[`Book ${slotLabel(open)} · 7700B`, false]]);
 
   // A slot someone has taken since is not a choice.
   const gone = primary(view({ mode: "book", picked: slotAt(4) }), /^Book/);
@@ -250,7 +250,7 @@ test("Book: Booked later rows have a time chip and Reschedule, and no Cancel any
   const m = view({ mode: "book", number: "" });
   const rows = m.match(/<li class="dk-qrow">[\s\S]*?<\/li>/g)!;
   assert.equal(rows.length, 2);
-  assert.match(rows[0], new RegExp(`<span class="dk-sc dk-s-booked dk-tm">${formatClock(slotAt(2)).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</span>`));
+  assert.match(rows[0], new RegExp(`<span class="dk-sc dk-s-booked dk-tm">${slotLabel(slotAt(2)).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</span>`));
   for (const row of rows) {
     assert.match(row, /aria-label="Reschedule \w+"/);
     assert.doesNotMatch(text(row), /ancel/);
@@ -264,7 +264,7 @@ test("Book: Booked later rows have a time chip and Reschedule, and no Cancel any
 
 test("rescheduling: a Moving bar with Stop, the grid with the current slot, and Move / Cancel booking pinned", () => {
   const m = view({ mode: "book", number: "4410C", reschedule: roboBooking, picked: slotAt(5) });
-  assert.match(text(m), new RegExp(`Moving 4410C from ${formatClock(slotAt(2))}`));
+  assert.match(text(m), new RegExp(`Moving 4410C from ${slotLabel(slotAt(2))}`));
   assert.equal(labelled(m, /^Stop$/).length, 1);
   assert.match(m, /<p class="dk-cover">Language and note stay as booked\.<\/p>/);
   assert.doesNotMatch(m, /dk-lang|dk-bnote/, "language and note stay as booked");
@@ -273,7 +273,7 @@ test("rescheduling: a Moving bar with Stop, the grid with the current slot, and 
   assert.equal(cur.length, 1);
   assert.ok(cur[0].disabled && /aria-current="true"/.test(cur[0].attrs));
   const bar = m.match(/<div class="dk-abar">[\s\S]*<\/div>$/)![0];
-  assert.deepEqual(buttons(bar).map((b) => [b.text, b.disabled]), [[`Move to ${formatClock(slotAt(5))}`, false], ["Cancel booking", false]]);
+  assert.deepEqual(buttons(bar).map((b) => [b.text, b.disabled]), [[`Move to ${slotLabel(slotAt(5))}`, false], ["Cancel booking", false]]);
   assert.match(bar, /class="dk-quiet dk-dg"/);
   assert.match(text(bar), /Asks first/);
   assert.deepEqual(labelled(view({ mode: "book", number: "4410C", reschedule: roboBooking }), /^Move/).map((b) => b.disabled), [true]);
@@ -363,7 +363,7 @@ test("no slots set up and none left each say so, in place of the grid", () => {
 
   const past = buildSlots({ ...gridPanel, slot_start_at: "2000-01-01T10:00:00.000Z", slot_count: 2 }, [], gTeams);
   assert.match(grid({ slots: past }), new RegExp(`<p>${noSlotsLeftLine(past, Date.now())}</p>`));
-  assert.match(grid({ slots: past }), /No slots left today — the rest have already passed/);
+  assert.match(grid({ slots: past }), /No slots left — the rest have already passed/);
   assert.match(grid({ slots: past }), /min slots/, "the panel line stays");
   assert.doesNotMatch(grid({ slots: past }), / open</, "no \"0 of 0 open\" when every slot is past");
 });
@@ -392,8 +392,8 @@ test("All teams: each row says its panel or 'No panel', and a status chip or boo
   const by = (n: string) => rows.find((b) => b.attrs.includes(`team ${n},`))!;
   assert.match(by("9882K").text, /Panel 2/);
   assert.match(by("9882K").text, /Requesting a judge/);
-  assert.match(text(by("4410C").text), new RegExp(`Panel 2${formatClock(slotAt(2))}`));
-  assert.match(view({ number: "" }), new RegExp(`dk-sc dk-s-booked dk-tm">${formatClock(slotAt(2))}`));
+  assert.match(text(by("4410C").text), new RegExp(`Panel 2${slotLabel(slotAt(2))}`));
+  assert.match(view({ number: "" }), new RegExp(`dk-sc dk-s-booked dk-tm">${slotLabel(slotAt(2))}`));
   assert.equal(by("8123N").text, "8123NBolt BrigadeNo panel");
   assert.match(view({ number: "" }), /<span class="dk-np">No panel<\/span>/);
   assert.equal(by("7700B").text, "7700BByte MePanel 2", "nothing live, no chip");
@@ -503,4 +503,25 @@ test("only the reschedule view cancels a booking, through the confirm", () => {
   assert.doesNotMatch(view, /action: "cancel"/);
   const page = noComments(read("src/app/queue/page.tsx"));
   assert.equal(page.match(/action: "cancel"/g)!.length, 2, "Undo, and Cancel booking");
+});
+
+test("a two-day panel's grid has a heading per day and one break row, between the 11:00 and 1:00 PM rows", () => {
+  const two: PublicPanel = {
+    ...panel2, slot_minutes: 15, slot_count: 32, slot_start_at: "2026-11-21T10:00:00+07:00",
+    slot_days: [
+      { open_at: "2026-11-21T10:00:00+07:00", end_at: "2026-11-21T16:00:00+07:00", break_from: "2026-11-21T12:00:00+07:00", break_to: "2026-11-21T13:00:00+07:00" },
+      { open_at: "2026-11-22T09:00:00+07:00", end_at: "2026-11-22T12:00:00+07:00", break_from: null, break_to: null },
+    ],
+  };
+  const m = renderToStaticMarkup(
+    <DeskSlots panel={two} slots={buildSlots(two, [], teams)} teamId={null} picked={null} onPick={noop} now={Date.parse("2026-11-21T11:00:00+07:00")} />,
+  );
+  assert.match(text(m), /Day 1 · Sat 21 Nov16 open/);
+  assert.match(text(m), /Day 2 · Sun 22 Nov12 open/);
+  assert.equal(m.match(/dk-brk/g)?.length, 1, "Day 2 has no break");
+  assert.match(text(m), /12:00–13:00 · Break/);
+  // One .dk-hrow per hour row (one line each); the break row is its own full-width block between rows.
+  assert.match(m, /dk-hrow[\s\S]*dk-brk[\s\S]*dk-hrow/);
+  // A one-day panel: no heading, no break.
+  assert.doesNotMatch(grid(), /dk-dh|dk-brk/);
 });

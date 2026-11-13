@@ -413,7 +413,7 @@ test("each status shows its own clock: time on the way, time in the room, the sl
   assert.match(cardOf(markup, "3141P"), /jg-sc jg-s-acknowledged">On the way<\/span><span class="ja-ctm">3 min<\/span>/);
   assert.match(cardOf(markup, "2011A"), /jg-sc jg-s-interviewing">Interviewing<\/span><span class="ja-ctm">7 min<\/span>/);
   const booked = cardOf(markup, "4410C");
-  assert.match(booked, /jg-sc jg-s-scheduled">Booked<\/span><span class="ja-ctm">\d{1,2}:\d{2}/);
+  assert.match(booked, /jg-sc jg-s-scheduled">Booked<\/span><span class="ja-ctm">(?:[A-Z][a-z]{2} )?\d{1,2}:\d{2}/);
   assert.doesNotMatch(booked, /ja-wt|ja-w"/);
   assert.match(cardOf(board({ requests: requests.map((r) => (r.id === "r-9882K" ? { ...r, requested_at: ago(0) } : r)) }), "9882K"), /ja-ctm ja-wt">just now/);
 });

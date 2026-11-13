@@ -6,6 +6,7 @@ import type { Status } from "@/lib/status";
 import { bookingUrgency, type BookingUrgency } from "@/lib/data";
 import { ConsoleLinks } from "./nav";
 import type { Role } from "@/lib/auth";
+import { bangkokDay, bangkokWeekday } from "@/lib/stepTimes";
 
 /** Live "4m ago" text that ticks without a re-render of the whole tree. */
 export function Elapsed({ since, prefix = "" }: { since: string | null; prefix?: string }) {
@@ -41,6 +42,17 @@ export function formatMinutes(mins: number): string {
 export function formatClock(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+/**
+ * A booked slot's time as the desk reads it: the clock alone on the event day
+ * it is today, "Sun 9:15 AM" when it is on another day, so a Day 2 booking
+ * seen on Day 1 is not mistaken for one today.
+ */
+export function slotLabel(iso: string | null, now: number = Date.now()): string {
+  if (!iso) return "—";
+  if (bangkokDay(iso) === bangkokDay(new Date(now).toISOString())) return formatClock(iso);
+  return `${bangkokWeekday(iso)} ${formatClock(iso)}`;
 }
 
 /**
@@ -105,11 +117,11 @@ export function BookingTime({
   return (
     <span
       className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full tabular-nums ${pad} ${tone}`}
-      title={urgency === "later" ? undefined : `Booked for ${formatClock(slotStart)}`}
+      title={urgency === "later" ? undefined : `Booked for ${slotLabel(slotStart)}`}
       suppressHydrationWarning
     >
       {label ? <span className="font-normal opacity-70">{label}</span> : null}
-      {formatClock(slotStart)}
+      {slotLabel(slotStart)}
       {urgency === "due" ? <span className="text-xs">now</span> : null}
       {urgency === "soon" ? (
         <span className="text-xs font-normal">in {minutesUntil(slotStart)} min</span>

@@ -1,4 +1,4 @@
-import { slotKind, slotTime, teamMatches, type SlotKind } from "@/components/desk/deskLogic";
+import { slotGrid, slotKind, slotTime, teamMatches, type GridDay, type SlotKind } from "@/components/desk/deskLogic";
 import { buildSlots, liveRequestFor } from "@/lib/data";
 import { comparePits } from "@/lib/pit";
 import { STATUS_META } from "@/lib/status";
@@ -111,6 +111,9 @@ export type SlotsModel = {
   slots: Slot[];
   /** Today's slots still to come: past ones are left out. */
   lines: SlotLine[];
+  /** The same slots by day, with each day's heading and break row (slotGrid). */
+  days: GridDay[];
+  showDayHeadings: boolean;
   open: number;
   bar: BookBar;
   /** The slot picked, only while it can still be booked. */
@@ -135,6 +138,7 @@ export function slotsModel(input: {
 
   const ctx = { teamId: team?.id ?? null, currentStart: null, now: input.now };
   const lines = slots.map((slot) => ({ slot, kind: slotKind(slot, ctx) })).filter((l) => l.kind !== "past");
+  const grid = panel ? slotGrid(slots, panel, ctx) : null;
   const chosen = lines.find((l) => l.slot.start === input.picked && canBook(bar, l))?.slot ?? null;
-  return { panel, slots, lines, open: lines.filter((l) => l.kind === "open").length, bar, chosen };
+  return { panel, slots, lines, days: grid?.days ?? [], showDayHeadings: grid?.showDayHeadings ?? false, open: lines.filter((l) => l.kind === "open").length, bar, chosen };
 }

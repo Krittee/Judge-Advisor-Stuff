@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { liveRequestFor } from "@/lib/data";
 import { call, useAppState } from "@/components/useAppState";
-import { formatClock } from "@/components/ui";
+import { slotLabel } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { DeskView, type DeskMode } from "@/components/desk/DeskView";
 import { bookLanguageFor, cancelBookingAfterAsking, type BookChoice } from "@/components/desk/deskLogic";
@@ -121,7 +121,7 @@ export default function QueuePage() {
     return submit(
       { teamNumber: number, kind: "queue", language, message: message.trim() || undefined },
       booking
-        ? `Team ${normalizeTeamNumber(number)} queued now; their ${formatClock(booking.slot_start)} slot is free again.`
+        ? `Team ${normalizeTeamNumber(number)} queued now; their ${slotLabel(booking.slot_start)} slot is free again.`
         : `Team ${normalizeTeamNumber(number)} added to the queue.`,
       booking?.id,
     );
@@ -137,7 +137,7 @@ export default function QueuePage() {
         slotEnd: slot.end,
         message: message.trim() || undefined,
       },
-      `Team ${normalizeTeamNumber(number)} booked for ${formatClock(slot.start)}.`,
+      `Team ${normalizeTeamNumber(number)} booked for ${slotLabel(slot.start)}.`,
     );
 
   /**
@@ -174,7 +174,7 @@ export default function QueuePage() {
       setOk(null);
       try {
         await call(`/api/requests/${reschedule.id}`, { method: "PATCH", body: { action: "cancel" } });
-        setOk(`Team ${teamNumber}'s ${formatClock(reschedule.slot_start)} booking cancelled.`);
+        setOk(`Team ${teamNumber}'s ${slotLabel(reschedule.slot_start)} booking cancelled.`);
         setReschedule(null);
         clear();
         await refresh();
@@ -196,7 +196,7 @@ export default function QueuePage() {
         method: "PATCH",
         body: { action: "reschedule", slotStart: slot.start, slotEnd: slot.end },
       });
-      setOk(`Team ${normalizeTeamNumber(number)} moved to ${formatClock(slot.start)}.`);
+      setOk(`Team ${normalizeTeamNumber(number)} moved to ${slotLabel(slot.start)}.`);
       setReschedule(null);
       clear();
       await refresh();

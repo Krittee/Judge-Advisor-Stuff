@@ -1,4 +1,4 @@
-import { formatClock, formatMinutes } from "@/components/ui";
+import { formatClock, formatMinutes, slotLabel } from "@/components/ui";
 import { matchReference } from "@/lib/match";
 import { parseRuleList } from "@/lib/rules";
 import { NEXT_STATUS, type Status } from "@/lib/status";
@@ -92,7 +92,7 @@ export function cancelCopy(
     };
   }
   if (request.status === "scheduled") {
-    const when = request.slot_start ? ` ${formatClock(request.slot_start)}` : "";
+    const when = request.slot_start ? ` ${slotLabel(request.slot_start)}` : "";
     return {
       question: `Cancel ${n}'s${when} booking? The slot opens up.`,
       confirmLabel: "Yes, cancel booking",
