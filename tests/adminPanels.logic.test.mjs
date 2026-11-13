@@ -392,3 +392,11 @@ test("the draft counts slots per day and in all; an unfinished day counts 0", ()
   assert.deepEqual(bad.perDay, [{ count: 0, last: null }, { count: 0, last: null }]);
   assert.equal(bad.total, 0);
 });
+
+test("a slot length the API would refuse counts nothing, without looping", () => {
+  const days = startSlotDraft(two).days;
+  for (const minutes of [0.001, 200, 2, 0, NaN, 15.5]) {
+    assert.deepEqual(draftCount({ minutes, days }), { perDay: [{ count: 0, last: null }, { count: 0, last: null }], total: 0 }, String(minutes));
+  }
+  assert.equal(draftCount({ minutes: 3, days }).total > 0, true);
+});

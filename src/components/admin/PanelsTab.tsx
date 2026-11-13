@@ -1124,7 +1124,7 @@ function SlotsBody({
         </div>
       </div>
       <div className="ja-cf-foot ja-sl-foot">
-        <button type="submit" className="ja-prim" disabled={busy}>
+        <button type="submit" className="ja-prim" disabled={busy || (draft.days.length > 0 && total === 0)}>
           {busy ? "Saving…" : `Save slots · ${total}`}
         </button>
         {slotTimes(panel).length ? (

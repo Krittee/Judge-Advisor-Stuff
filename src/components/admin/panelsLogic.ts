@@ -127,7 +127,10 @@ export function addBreak(day: DayDraft): DayDraft {
 
 /** Each day's slot count and last start ("15:45"), and the total. A day that is unfinished or wrong counts 0. */
 export function draftCount(d: SlotDraft): { perDay: { count: number; last: string | null }[]; total: number } {
+  // The API takes whole minutes from 3 to 120; anything else would also make slotTimes loop for ages.
+  const okMinutes = Number.isInteger(d.minutes) && d.minutes >= 3 && d.minutes <= 120;
   const perDay = d.days.map((day) => {
+    if (!okMinutes) return { count: 0, last: null };
     const one = { slot_days: [dayFromDraft(day)], slot_minutes: d.minutes, slot_start_at: null, slot_count: 0 };
     if ("error" in parseSlotDays(one.slot_days, d.minutes)) return { count: 0, last: null };
     const times = slotTimes(one);
