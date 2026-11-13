@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-11-13 | [Coordinator sign-in: COORDINATOR word clipped](#coordinator-sign-in-coordinator-word-clipped-2026-11-13) | `f4793fb` | Not needed | Local, not pushed |
 | 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Local, not pushed |
 | 2026-10-31 | [Blended division shows as BLN](#blended-division-shows-as-bln-2026-10-31) | `600a5e8` | Not needed | Local, not pushed |
 | 2026-10-31 | [Judging Board: colour key above Unassigned](#judging-board-colour-key-above-unassigned-2026-10-31) | `4a001a8` | Not needed | Local, not pushed |
@@ -13,6 +14,44 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Local, not pushed |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Local, not pushed |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Local, not pushed |
+
+---
+
+## Coordinator sign-in: COORDINATOR word clipped (2026-11-13)
+
+### Problem
+
+On `/coordinator/login` (Version 2.1.1), in the two-column layout (768px and wider), the large spaced-out role word at the bottom of the teal panel ran past the panel's right edge and showed only as "COORDINATO".
+
+### Root cause
+
+From 768px up, the band (`.si-band`) is always 240px wide with 28px padding, leaving 184px. The word (`.si-role`) was a fixed `font-size: 26px` with `letter-spacing: 0.2em`. "COORDINATOR" is one 11-letter word that cannot wrap, and it measured 255px. The other doors fit: their longest single words are 7 letters or fewer (REFEREE 162px, ADVISOR 157px; "Judge Advisor" and "Queue desk" wrap between words). The band never changes width, so the problem was word length, not screen width.
+
+### What changed
+
+- `src/components/SignInForm.tsx` (`Band`): the role word now carries `--si-letters`, the letter count of the label's longest word (Coordinator 11; Referee and Judge Advisor 7; Judge, Queue desk and Staff 5).
+- `src/app/globals.css` (the `min-width: 768px` block only): `.si-band` gets `container-type: inline-size`, and `.si-role` is `font-size: min(26px, 100cqi / var(--si-letters, 7))`, which allows about 1em per letter. Words of 7 letters or fewer still come out at 26px; COORDINATOR is about 16.7px (164px wide). Phone styles are untouched.
+- `tests/doorPage.runtime.test.tsx`: one regression test. It renders the coordinator door and checks `--si-letters:11`, and checks that the 768px block keeps the container and the `min(26px, 100cqi / var(--si-letters` font-size.
+
+### How it was tested
+
+- Browser preview on a scratch data file (not `.data/`). All six doors (`/login`, `/admin/login`, `/judge/login`, `/queue/login`, `/referee/login`, `/coordinator/login`) were measured at 768, 1024, 1280 and 375px. Before: COORDINATOR was 255px in a 184px space, clipped. After: nothing is clipped at any of those widths. The other five doors are still 26px at 768px and up and 13px on phone, unchanged. Screenshots were taken before and after, in light and dark.
+- Phone (375px): the word is the small 13px label in the top row there. It fit before and still fits.
+- `npm test`: 1691 tests, 1690 pass, 0 fail, 1 skipped (the same skip as before).
+- `npx tsc --noEmit`: clean. `npx eslint .`: clean.
+- Real iPhone: not checked. Not needed, since the phone layout did not change. The user has not yet confirmed the fix on the live page.
+
+### Branch / commit
+
+`claude/co-login-word-0bfa4d`, commit `f4793fb`.
+
+### Status
+
+Local only. Not pushed or merged.
+
+### Follow-ups
+
+- If any role label gains a longer single word, it shrinks automatically. No per-role CSS is needed.
 
 ---
 
