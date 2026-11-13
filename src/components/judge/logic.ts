@@ -1,4 +1,5 @@
-import { formatClock, formatMinutes } from "@/components/ui";
+import { formatClock, formatMinutes, slotLabel } from "@/components/ui";
+import { bangkokDay, bangkokDayLabel } from "@/lib/stepTimes";
 import { matchReference } from "@/lib/match";
 import { parseRuleList } from "@/lib/rules";
 import { NEXT_STATUS, type Status } from "@/lib/status";
@@ -92,7 +93,7 @@ export function cancelCopy(
     };
   }
   if (request.status === "scheduled") {
-    const when = request.slot_start ? ` ${formatClock(request.slot_start)}` : "";
+    const when = request.slot_start ? ` ${slotLabel(request.slot_start)}` : "";
     return {
       question: `Cancel ${n}'s${when} booking? The slot opens up.`,
       confirmLabel: "Yes, cancel booking",
@@ -163,25 +164,20 @@ export function nowIndex(slots: Pick<Slot, "start">[], now: number): number {
   return i === -1 ? slots.length : i;
 }
 
-/** "Fri 16 Oct": a date in the device's own wording. */
-export function dayLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
-}
-
 /**
- * The slots on today's calendar date, and when there are none, the date the
- * panel's slots are on. A panel set up for an earlier day would otherwise
- * show that whole day with the "now" rule stranded after it.
- * ponytail: the device clock decides the day, as in parseRefereeSetup
- * (src/lib/flagValidation.ts). Add an event timezone setting if that ever matters.
+ * The slots on today's Bangkok date, and when there are none, the day of the
+ * panel's next slot (else its last): a panel set up for another day would
+ * otherwise show that whole day with the "now" rule stranded after it.
  */
 export function slotsToday(
   slots: Slot[],
   now: number,
 ): { today: Slot[]; otherDay: string | null } {
-  const day = new Date(now).toDateString();
-  const today = slots.filter((s) => new Date(s.start).toDateString() === day);
-  return { today, otherDay: !today.length && slots.length ? dayLabel(slots[0].start) : null };
+  const day = bangkokDay(new Date(now).toISOString());
+  const today = slots.filter((s) => bangkokDay(s.start) === day);
+  if (today.length || !slots.length) return { today, otherDay: null };
+  const next = slots.find((s) => Date.parse(s.start) > now) ?? slots[slots.length - 1];
+  return { today, otherDay: bangkokDayLabel(next.start) };
 }
 
 /**

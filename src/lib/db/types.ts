@@ -231,7 +231,7 @@ export type Store = {
   /** Only ever assigns a team to a panel in the same division. */
   autoAssignTeams(perPanel: number, includeAssigned?: boolean, division?: string): Promise<number>;
 
-  createPanel(input: Omit<Panel, "id" | "created_at">): Promise<Panel>;
+  createPanel(input: Omit<Panel, "id" | "created_at" | "slot_days">): Promise<Panel>;
   /** Create any preset panels that do not exist yet. Returns how many. */
   seedPresetPanels(): Promise<number>;
   updatePanel(id: string, patch: Partial<Panel>): Promise<Panel>;

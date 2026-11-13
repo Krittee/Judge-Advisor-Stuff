@@ -30,7 +30,7 @@ const at = (n: number, minutes = 20) => new Date(BASE + n * minutes * 60_000).to
 
 const panel = (id: string, over: Partial<PublicPanel> = {}): PublicPanel => ({
   id, name: `Panel ${id.slice(1)}`, division: "Middle School", judges: [], languages: ["th"], sort_order: 1,
-  slot_start_at: at(0), slot_minutes: 20, slot_count: 6, ...over,
+  slot_start_at: at(0), slot_minutes: 20, slot_count: 6, slot_days: [], ...over,
 });
 const p2 = panel("p2", { languages: ["en"] });
 const p3 = panel("p3");
@@ -102,7 +102,12 @@ test("a team's pill is its live request, else its booking, else the interview it
 });
 
 test("pill words: a booking carries its time, the rest are the status's short word", () => {
-  assert.equal(pillText({ status: "scheduled", slot_start: at(3) }), `Booked ${slotTime(at(3))}`);
+  assert.equal(pillText({ status: "scheduled", slot_start: at(3) }, BASE), `Booked ${slotTime(at(3))}`);
+  // Another Bangkok day: Saturday's desk sees Sunday's booking with its weekday, still without AM/PM.
+  const sunday = "2026-11-22T09:15:00+07:00";
+  const saturday = Date.parse("2026-11-21T11:00:00+07:00");
+  assert.equal(pillText({ status: "scheduled", slot_start: sunday }, saturday), `Booked Sun ${slotTime(sunday)}`);
+  assert.equal(pillText({ status: "scheduled", slot_start: sunday }, Date.parse("2026-11-22T08:00:00+07:00")), `Booked ${slotTime(sunday)}`);
   assert.equal(pillText({ status: "scheduled", slot_start: null }), "Booked");
   assert.equal(pillText({ status: "acknowledged", slot_start: null }), "On the way");
   assert.equal(pillText({ status: "interviewing", slot_start: null }), "Interviewing");
@@ -218,4 +223,21 @@ test("?tab=slots is Slots; anything else is Teams", () => {
   assert.equal(tabFrom("teams"), "teams");
   assert.equal(tabFrom(null), "teams");
   assert.equal(tabFrom("SLOTS"), "teams");
+});
+
+test("the model carries the same day headings and break as the desk grid", () => {
+  const two = panel("p3", {
+    slot_start_at: "2026-11-21T10:00:00+07:00", slot_minutes: 15, slot_count: 32,
+    slot_days: [
+      { open_at: "2026-11-21T10:00:00+07:00", end_at: "2026-11-21T16:00:00+07:00", break_from: "2026-11-21T12:00:00+07:00", break_to: "2026-11-21T13:00:00+07:00" },
+      { open_at: "2026-11-22T09:00:00+07:00", end_at: "2026-11-22T12:00:00+07:00", break_from: null, break_to: null },
+    ],
+  });
+  const m = model({ panels: [p2, two], now: Date.parse("2026-11-21T11:00:00+07:00") });
+  assert.equal(m.showDayHeadings, true);
+  assert.deepEqual(m.days.map((d) => [d.label, d.open]), [["Day 1 · Sat 21 Nov", 16], ["Day 2 · Sun 22 Nov", 12]]);
+  assert.equal(m.days[0].breakLabel, "12:00–13:00 · Break");
+  assert.equal(m.open, 28);
+  assert.equal(m.lines.length, m.days.flatMap((d) => d.rows.flatMap((r) => r.cells)).length);
+  assert.equal(model().showDayHeadings, false, "a one-day panel has none");
 });

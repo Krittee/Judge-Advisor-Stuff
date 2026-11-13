@@ -17,6 +17,111 @@ launch itself.
 
 ---
 
+## Version 2.1.3: Slot windows (open to end, per day, with a break)
+
+Branch `claude/slot-windows`, cut from the default branch at `aa4a433` (2.1.2).
+Local commits only, not pushed. Spec and chosen mocks: `design/slot-windows/`
+(direction **A · Day cards**, canvas row "v2.2 · Slot windows"). Plan:
+`docs/superpowers/plans/2026-11-13-slot-windows.md`.
+
+### What changed for the user
+
+- **The Judge Advisor sets hours, not a count.** Panels → Booking slots is
+  now one card per day. Each card has a date, open and end times, and an
+  optional break (for lunch). It shows a live count ("20 slots · last
+  15:45") and a total ("Save slots · 32"). There are two days for now, and
+  "Turn booking off" still works.
+- **Slots fill the window.** Slots of the panel's "minutes each" run back to
+  back from the open time. They skip the break and stop at the end time. A
+  slot that would run into the break or past the end is left out, so
+  10:00–12:00 at 15 minutes ends with 11:45.
+- **The booking grids show the days.** The queue desk Book tab, the desk's
+  reschedule view, the JA's interview controls and the Coordinator's Slots
+  tab all show a heading per day ("Day 1 · Sat 14 Nov · 20 open") and a
+  shaded "12:00–13:00 · Break" row. A panel with one day looks as it did
+  before. Rows stay on one line.
+- **Bookings on another day show the weekday.** For example, "Sun 9:15 AM"
+  on the desk lists and toasts, JA Floor and Teams, the Coordinator ("Booked
+  Sun 9:15"), the judge console, the Live board and the team page. Same-day
+  bookings show just the time, as before.
+- **"No slots left today"** now reads "No slots left — the rest have already
+  passed", because more days may follow.
+- **Booking checks are unchanged in how they work.** A time inside the break,
+  after the end, on a day that isn't set up, or off the slot grid is
+  refused. The 20-minute walking gap still applies.
+
+### Data and migration (live data safe)
+
+- **New column.** `panels.slot_days` holds the days as
+  `[{open_at, end_at, break_from, break_to}]`. The Postgres store adds it
+  with its usual self-running migration:
+  `alter table panels add column if not exists slot_days jsonb not null default '[]'::jsonb`.
+  The migration only adds a column; nothing is updated or dropped. The JSON
+  file store fills in `[]` when it loads.
+- **Existing panels need no action.** A panel with no days is read from its
+  old "first slot + minutes + count", exactly as before. When the JA opens
+  and saves it, it becomes a Day 1 window with the same slots.
+- **Old fields stay in sync.** Saving days also writes `slot_start_at` (the
+  first open) and `slot_count` (the total), so "booking off" checks keep
+  working.
+- **API.** `PATCH /api/admin/panels` takes `{ slotMinutes, slotDays }`. A bad
+  day gets a 400 that names it, for example "Day 2: the end time must be
+  after the open time." Changing only the minutes re-checks the stored days.
+
+### Rollback note
+
+If 2.1.2 is ever redeployed over the same database, it ignores `slot_days`.
+It would show a two-day panel as one long run of slots from Day 1's open
+time. After rolling back, the JA should re-save each panel's slots. After
+rolling forward to 2.1.3 again, the saved days take over once more, so
+re-save them there too if the slots were edited during the rollback.
+
+### Checks
+
+- `npm test`: all pass. The new tests cover slot generation, both window
+  edges, both break edges, the second day, the legacy fallback, day
+  validation, the panel API, booking refusals on the file store and through
+  the routes, the dialog draft in Bangkok time under any timezone, the day
+  headings and break row, and the weekday labels. The Postgres side is
+  checked through the SQL tests. The conformance suite against a real
+  Postgres was **not** run, because there is no test database here.
+- `tsc` and `eslint` are clean.
+- **Browser** (a copy of the data, port 3700):
+  - The JA dialog at 1280 matches the wide mock. Add day, add break and save
+    all work.
+  - The desk Book tab at 375 shows the headings, the break row and
+    single-line rows. Booking on Day 2 shows "Sun 9:15 AM" everywhere.
+  - The API refuses a break-time slot, an off-grid Day 2 slot and a Day 3
+    slot, and the gap rule still holds.
+  - The Coordinator Slots tab shows both days and the break.
+- **iPhone 17 simulator:** the desk Book tab and the Coordinator Slots and
+  Teams tabs, with the weekday on the booking chips.
+
+### Known limits
+
+- Two days in the dialog. The server already accepts up to 7, so adding Day
+  3 is a UI change only.
+- One break per day, and one slot length per panel (the same on both days).
+- Re-timing a panel does not move bookings already made, as before.
+- A device set to a timezone other than Bangkok may show a weekday that
+  doesn't match the clock. Event devices are in Bangkok.
+
+### Desk grid: one line per hour for any slot length
+
+Slots shorter than 15 minutes used to wrap an hour's row onto two lines,
+which broke the project's single-line rule. The database default is 12
+minutes, and the new dialog makes short slots easy to choose. Now an hour is
+always one row, with one column per slot position:
+
+- 15- and 20-minute panels look exactly as before.
+- 12-minute slots fit five to a row on a phone.
+- Shorter slots make the whole grid scroll sideways, with the hour label
+  pinned on the left.
+
+Checked in the browser at 375 with a 12-minute and a 5-minute panel.
+
+---
+
 ## Version 2.1.0: Coordinator and team interview language
 
 Branch `claude/v21-coordinator-c9e080` (cut from `version-2.1.0`). Adds a sixth

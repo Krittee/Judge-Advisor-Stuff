@@ -6,17 +6,22 @@ import { CheckIcon, ChevronDown, CloseIcon, PlusIcon, WarnIcon } from "@/compone
 import { call } from "@/components/useAppState";
 import type { AppState, JudgeRow, Panel, PublicPanel } from "@/lib/types";
 import { divisionTag, teamCount } from "./floorLogic";
+import { slotTimes } from "@/lib/data";
 import {
+  addBreak,
+  addDay,
   addJudge,
   changeDivisionAfterAsking,
   conflictsLabel,
   deleteAllPanels,
   deletedAllNotice,
   deletePanelAfterAsking,
+  draftCount,
   judgeConflicts,
   moveJudgeShowing,
   panelJudges,
   panelValue,
+  removeDay,
   removeJudgeAfterAsking,
   rosterGroups,
   slotBody,
@@ -26,6 +31,8 @@ import {
   takeOffCopy,
   takeOffLines,
   teamsByPanel,
+  UI_MAX_DAYS,
+  type DayDraft,
   type PendingMove,
   type SlotDraft,
   type TakeOffInfo,
@@ -318,7 +325,7 @@ export function PanelsTab({
     >
       {dialog}
       <JudgeDialog mode={form} onSubmit={saveJudge} onClose={closeForm} />
-      <SlotsDialog panel={slotsPanel} onSave={(id, draft) => patchPanel(id, slotBody(draft))} onClose={() => setSlotsFor(null)} />
+      <SlotsDialog panel={slotsPanel} onSave={patchPanel} onClose={() => setSlotsFor(null)} />
       <TakeOffDialog info={takeOff} onAnswer={answerTakeOff} />
     </PanelsBoard>
   );
@@ -685,7 +692,7 @@ function PanelCard({
         {!panel.languages.length ? <p className="ja-hint">Not stated — no request will be flagged.</p> : null}
       </div>
 
-      <div className="ja-pn-bsl" data-off={panel.slot_count ? undefined : "true"}>
+      <div className="ja-pn-bsl" data-off={slotTimes(panel).length ? undefined : "true"}>
         <span>{slotsSummary(panel)}</span>
         <button type="button" className="ja-pn-edit" aria-haspopup="dialog" aria-label={`Edit booking slots for ${panel.name}`} onClick={() => onEditSlots(panel)}>
           Edit
@@ -948,7 +955,7 @@ function JudgeFormBody({
   );
 }
 
-/** The slot-grid fields, in a small dialog: first slot, minutes each, how many. */
+/** The booking windows: minutes each, then one card per day (date, open, end, an optional break). */
 export function SlotsDialog({
   panel,
   onSave,
@@ -956,12 +963,13 @@ export function SlotsDialog({
 }: {
   /** The panel being edited; null while the dialog is shut. */
   panel: PublicPanel | null;
-  onSave: (panelId: string, draft: SlotDraft) => Promise<void>;
+  /** Sends the PATCH body for this panel; throws the server's sentence when it refuses. */
+  onSave: (panelId: string, body: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
 }) {
   const titleId = useId();
   return (
-    <Modal open={panel !== null} onClose={onClose} className="ja-pn-dlg" labelledBy={titleId}>
+    <Modal open={panel !== null} onClose={onClose} className="ja-pn-dlg ja-sl-dlg" labelledBy={titleId}>
       {panel ? <SlotsBody key={panel.id} panel={panel} titleId={titleId} onSave={onSave} onClose={onClose} /> : null}
     </Modal>
   );
@@ -975,21 +983,23 @@ function SlotsBody({
 }: {
   panel: PublicPanel;
   titleId: string;
-  onSave: (panelId: string, draft: SlotDraft) => Promise<void>;
+  onSave: (panelId: string, body: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
 }) {
   const uid = useId();
   const [draft, setDraft] = useState<SlotDraft>(() => startSlotDraft(panel));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { perDay, total } = draftCount(draft);
+  const setDay = (i: number, patch: Partial<DayDraft>) =>
+    setDraft({ ...draft, days: draft.days.map((d, j) => (j === i ? { ...d, ...patch } : d)) });
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function send(body: Record<string, unknown>) {
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
-      await onSave(panel.id, draft);
+      await onSave(panel.id, body);
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -999,7 +1009,13 @@ function SlotsBody({
   }
 
   return (
-    <form className="ja-sh-form" onSubmit={submit}>
+    <form
+      className="ja-sh-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void send(slotBody(draft));
+      }}
+    >
       <SheetTop titleId={titleId} title={slotsHeader(panel)} sub={panel.name} onClose={onClose} />
       <div className="ja-cf-scroll">
         {error ? (
@@ -1007,20 +1023,7 @@ function SlotsBody({
             {error}
           </p>
         ) : null}
-        <div className="ja-fl">
-          <label className="ja-lab" htmlFor={`${uid}-start`}>
-            First slot starts
-          </label>
-          <input
-            id={`${uid}-start`}
-            className="ja-in"
-            type="datetime-local"
-            data-autofocus
-            value={draft.start}
-            onChange={(e) => setDraft({ ...draft, start: e.target.value })}
-          />
-        </div>
-        <div className="ja-pn-g2">
+        <div className="ja-sl-mins">
           <div className="ja-fl">
             <label className="ja-lab" htmlFor={`${uid}-min`}>
               Minutes each
@@ -1031,31 +1034,104 @@ function SlotsBody({
               type="number"
               min={3}
               max={120}
+              data-autofocus
               value={draft.minutes}
               onChange={(e) => setDraft({ ...draft, minutes: Number(e.target.value) })}
             />
           </div>
-          <div className="ja-fl">
-            <label className="ja-lab" htmlFor={`${uid}-n`}>
-              How many
-            </label>
-            <input
-              id={`${uid}-n`}
-              className="ja-in"
-              type="number"
-              min={0}
-              max={60}
-              value={draft.count}
-              onChange={(e) => setDraft({ ...draft, count: Number(e.target.value) })}
-            />
-          </div>
+          <p className="ja-sl-tot">
+            <b>{`${total} ${total === 1 ? "slot" : "slots"}`}</b> in all
+          </p>
         </div>
-        <p className="ja-hint">Set &ldquo;how many&rdquo; to 0 for walk-up queue only.</p>
+        <div className="ja-sl-days">
+          {draft.days.map((day, i) => {
+            const id = `${uid}-d${i}`;
+            const n = perDay[i];
+            return (
+              <section key={i} className="ja-sl-day" aria-labelledby={`${id}-h`}>
+                <div className="ja-sl-dh">
+                  <h3 id={`${id}-h`}>{`Day ${i + 1}`}</h3>
+                  <div className="ja-sl-dt">
+                    <label className="sr-only" htmlFor={`${id}-date`}>
+                      Date
+                    </label>
+                    <input id={`${id}-date`} className="ja-in" type="date" value={day.date} onChange={(e) => setDay(i, { date: e.target.value })} />
+                  </div>
+                  {i > 0 ? (
+                    <button type="button" className="ja-sl-rm" aria-label={`Remove Day ${i + 1}`} onClick={() => setDraft(removeDay(draft, i))}>
+                      <CloseIcon />
+                    </button>
+                  ) : null}
+                </div>
+                <div className="ja-sl-g3">
+                  <div className="ja-fl">
+                    <label className="ja-lab ja-sl-mini" htmlFor={`${id}-open`}>
+                      Open
+                    </label>
+                    <input id={`${id}-open`} className="ja-in" type="time" value={day.open} onChange={(e) => setDay(i, { open: e.target.value })} />
+                  </div>
+                  <div className="ja-fl">
+                    <label className="ja-lab ja-sl-mini" htmlFor={`${id}-end`}>
+                      End
+                    </label>
+                    <input id={`${id}-end`} className="ja-in" type="time" value={day.end} onChange={(e) => setDay(i, { end: e.target.value })} />
+                  </div>
+                </div>
+                {day.breakFrom !== null || day.breakTo !== null ? (
+                  <div className="ja-sl-g3">
+                    <div className="ja-fl">
+                      <label className="ja-lab ja-sl-mini" htmlFor={`${id}-bf`}>
+                        Break from
+                      </label>
+                      <input id={`${id}-bf`} className="ja-in" type="time" value={day.breakFrom ?? ""} onChange={(e) => setDay(i, { breakFrom: e.target.value })} />
+                    </div>
+                    <div className="ja-fl">
+                      <label className="ja-lab ja-sl-mini" htmlFor={`${id}-bt`}>
+                        Break to
+                      </label>
+                      <input id={`${id}-bt`} className="ja-in" type="time" value={day.breakTo ?? ""} onChange={(e) => setDay(i, { breakTo: e.target.value })} />
+                    </div>
+                    <button type="button" className="ja-sl-rm" aria-label={`Remove Day ${i + 1} break`} onClick={() => setDay(i, { breakFrom: null, breakTo: null })}>
+                      <CloseIcon />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="ja-sl-nob">
+                    <span>
+                      Break · <b>none</b>
+                    </span>
+                    <button type="button" className="ja-sl-q" onClick={() => setDraft({ ...draft, days: draft.days.map((d, j) => (j === i ? addBreak(d) : d)) })}>
+                      <PlusIcon /> Add break
+                    </button>
+                  </div>
+                )}
+                <p className="ja-sl-cnt">
+                  <b>{`${n.count} ${n.count === 1 ? "slot" : "slots"}`}</b>
+                  {n.last ? ` · last ${n.last}` : ""}
+                </p>
+              </section>
+            );
+          })}
+        </div>
+        <div className="ja-sl-add">
+          {draft.days.length < UI_MAX_DAYS ? (
+            <button type="button" className="ja-sl-q" onClick={() => setDraft(addDay(draft))}>
+              <PlusIcon /> Add day
+            </button>
+          ) : (
+            <span className="ja-hint">{UI_MAX_DAYS} days for now</span>
+          )}
+        </div>
       </div>
-      <div className="ja-cf-foot">
-        <button type="submit" className="ja-prim" disabled={busy}>
-          {busy ? "Saving…" : "Save slot grid"}
+      <div className="ja-cf-foot ja-sl-foot">
+        <button type="submit" className="ja-prim" disabled={busy || (draft.days.length > 0 && total === 0)}>
+          {busy ? "Saving…" : `Save slots · ${total}`}
         </button>
+        {slotTimes(panel).length ? (
+          <button type="button" className="ja-sl-q" disabled={busy} onClick={() => void send({ slotDays: [] })}>
+            Turn booking off
+          </button>
+        ) : null}
       </div>
     </form>
   );

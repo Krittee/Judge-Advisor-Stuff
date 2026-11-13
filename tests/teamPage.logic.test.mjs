@@ -118,6 +118,8 @@ test("times read as a person would: '4 min ago', 'just now', '1h 5m ago'", () =>
   assert.equal(stepTime({ kind: "ago", iso: ago(4) }, NOW), "4 min ago");
   assert.equal(stepTime({ kind: "ago", iso: ago(0) }, NOW), "just now");
   assert.equal(stepTime({ kind: "clock", iso: SLOT }, NOW), formatClock(SLOT));
+  const nextDay = "2026-10-21T02:15:00.000Z"; // 09:15 Wednesday in Bangkok
+  assert.equal(stepTime({ kind: "clock", iso: nextDay }, NOW), `Wed ${formatClock(nextDay)}`, "a booking on another day carries its weekday");
 });
 
 test("an hour or more is 'long', so the big digits are set smaller", () => {

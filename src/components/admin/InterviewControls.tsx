@@ -5,7 +5,7 @@ import { DeskSlots } from "@/components/desk/DeskSlots";
 import { slotKind } from "@/components/desk/deskLogic";
 import { LanguageCover, type Language } from "@/components/Language";
 import { ChevronDown } from "@/components/judge/parts";
-import { formatClock } from "@/components/ui";
+import { slotLabel } from "@/components/ui";
 import { buildSlots } from "@/lib/data";
 import { STATUS_META } from "@/lib/status";
 import { formTimes, readTimes, reachedSteps, startTimes, TIME_STEPS, type TimeField } from "@/lib/stepTimes";
@@ -79,7 +79,7 @@ export function SlotChooser({
           if (chosen && (await onConfirm(chosen, language))) onClose();
         }}
       >
-        {chosen ? `${verb} ${formatClock(chosen.start)}` : `${move ? "Move" : "Book"} · pick a time`}
+        {chosen ? `${verb} ${slotLabel(chosen.start)}` : `${move ? "Move" : "Book"} · pick a time`}
       </button>
       <button type="button" className="ja-tm-od ja-tm-ts" onClick={onClose}>
         Close

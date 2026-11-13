@@ -2464,7 +2464,15 @@ body:has(.desk, .co) > .theme-toggle:hover {
 .dk-tm { min-width: 50px; }
 
 /* Slots: one row per hour, the hour on the left and the slots in fixed columns */
-.dk-slots { display: flex; flex-direction: column; gap: 8px; }
+.dk-slots-in { display: flex; flex-direction: column; gap: 8px; }
+/* More than four columns (slots under 15 min): still one line per hour, the whole grid scrolls sideways. */
+.dk-slots--wide { container-type: inline-size; overflow-x: auto; padding: 3px; margin: -3px; }
+.dk-slots--wide .dk-slots-in { width: max-content; min-width: 100%; }
+.dk-slots--wide .dk-dh, .dk-slots--wide .dk-brk { position: sticky; left: 0; width: 100cqw; }
+.dk-slots--wide .dk-hrow { gap: 6px; }
+.dk-slots--wide .dk-hrow > h3 { grid-column: 1 / -1; width: 56px; align-self: stretch; display: flex; flex-direction: column; justify-content: center; position: sticky; left: -3px; z-index: 1; background: var(--dk-slots-bg, var(--canvas)); box-shadow: -3px 0 0 var(--dk-slots-bg, var(--canvas)), 6px 0 0 var(--dk-slots-bg, var(--canvas)); }
+.dk-slots--wide .dk-slot b { gap: 2px; font-size: 14px; }
+.dk-slots--wide .dk-slot b svg { width: 12px; height: 12px; }
 .dk-hrow { display: grid; align-items: center; gap: 8px; }
 .dk-hrow > h3 { grid-column: 1; grid-row: 1; margin: 0; color: var(--ink-subtle); font-weight: 500; font-size: 12px; letter-spacing: 0.04em; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .dk-hrow > h3 small { display: block; font-size: 11px; letter-spacing: 0; }
@@ -3240,7 +3248,7 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-tm-rq { display: flex; flex-wrap: wrap; gap: 8px; }
 .ja-tm-rq .ja-tm-ghost { flex: 1 1 130px; }
 .ja-tm-bt { flex: none; width: 100%; }
-.ja-tm-slots { --dk-field: var(--jg-field); --dk-field-line: var(--jg-field-line); display: flex; flex-direction: column; gap: 10px; }
+.ja-tm-slots { --dk-field: var(--jg-field); --dk-field-line: var(--jg-field-line); --dk-slots-bg: var(--surface); display: flex; flex-direction: column; gap: 10px; }
 .ja-tm-tt { display: flex; flex-direction: column; gap: 6px; }
 .ja-tm-tr { display: grid; grid-template-columns: minmax(0, 1fr) 132px; align-items: center; gap: 12px; }
 .ja-tm-tr .ja-in { padding: 0 8px; text-align: center; font-variant-numeric: tabular-nums; }
@@ -3441,7 +3449,35 @@ body:has(.admin) > .theme-toggle:hover {
 
 /* The judge, slot and take-off dialogs: a bottom sheet on a phone (the take-off question is a centred card on any screen) */
 .ja-pn-sub { font-family: var(--font-fira), ui-sans-serif, system-ui, sans-serif; font-weight: 400; font-size: 15px; letter-spacing: 0; }
-.ja-pn-g2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+
+/* The slot dialog: minutes each, then a card per day (design/slot-windows/reference-phones and reference-ja-wide). Two cards side by side on wide. */
+.ja-sl-mins { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.ja-sl-mins .ja-fl { width: 150px; }
+.ja-sl-tot { margin: 0; padding-bottom: 12px; color: var(--ink-subtle); font-size: 14px; font-variant-numeric: tabular-nums; }
+.ja-sl-tot b { color: var(--ink); font-weight: 500; }
+.ja-sl-days { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.ja-sl-day { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--canvas); }
+.ja-sl-dh { display: flex; align-items: center; gap: 8px; }
+.ja-sl-dh h3 { flex: 1; font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; font-weight: 700; font-size: 18px; }
+.ja-sl-dt { width: 176px; flex: none; }
+.ja-sl-mins .ja-in, .ja-sl-day .ja-in { height: 44px; padding: 0 8px; border-radius: 12px; font-size: 16px; font-variant-numeric: tabular-nums; }
+.ja-sl-mins .ja-in { text-align: center; }
+.ja-sl-day .ja-in[type="time"] { text-align: center; }
+.ja-sl-g3 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) 44px; gap: 8px; align-items: end; }
+.ja-sl-g3 > .ja-fl { gap: 4px; }
+.ja-sl-mini { color: var(--ink-subtle); font-weight: 400; font-size: 13px; }
+.ja-sl-rm { display: grid; flex: none; width: 44px; height: 44px; place-items: center; border-radius: 10px; background: transparent; color: var(--ink-subtle); }
+.ja-sl-rm:hover { background: var(--surface-2); color: var(--ink); }
+.ja-sl-nob { display: flex; min-height: 44px; align-items: center; justify-content: space-between; color: var(--ink-subtle); font-size: 14px; }
+.ja-sl-nob b { font-weight: 500; }
+.ja-sl-q { display: inline-flex; flex: none; min-height: 44px; align-items: center; gap: 6px; padding: 0 8px; border-radius: 10px; background: transparent; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
+.ja-sl-q:hover:not(:disabled) { color: var(--ink); }
+.ja-sl-q svg { width: 16px; height: 16px; }
+.ja-sl-cnt { display: flex; margin: auto 0 0; align-items: center; gap: 4px; color: var(--ink-subtle); font-size: 13px; font-variant-numeric: tabular-nums; }
+.ja-sl-cnt b { color: var(--ink); font-weight: 500; }
+.ja-sl-add { display: flex; align-items: center; gap: 12px; }
+.ja-sl-foot { display: flex; flex-direction: column; gap: 6px; }
+.ja-sl-foot .ja-sl-q { align-self: center; }
 .ja-sheet.ja-pn-cfm { width: calc(100% - 32px); max-width: 26rem; max-height: calc(100dvh - 32px); margin: auto; border: 1px solid var(--jg-field-line); border-radius: 16px; }
 .ja-pn-cf { display: flex; min-height: 0; flex-direction: column; padding: 20px; overflow-y: auto; }
 .ja-pn-cf h2 { font-weight: 700; font-size: 21px; line-height: 1.2; letter-spacing: -0.005em; }
@@ -3507,6 +3543,10 @@ body:has(.admin) > .theme-toggle:hover {
   /* The sheets are centred dialogs here. */
   .ja-pn-dlg { max-width: 26rem; max-height: min(40rem, calc(100dvh - 4rem)); margin: auto; border: 1px solid var(--jg-field-line); border-radius: 20px; }
   .ja-pn-dlg .jg-grab { display: none; }
+  .ja-pn-dlg.ja-sl-dlg { width: 47.5rem; max-width: calc(100% - 2rem); }
+  .ja-sl-days { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .ja-sl-foot { flex-direction: row-reverse; align-items: center; justify-content: space-between; }
+  .ja-sl-foot .ja-prim { padding: 0 32px; }
 }
 
 /* @ja-block import */
@@ -4148,3 +4188,16 @@ body:has(.admin) > .theme-toggle:hover {
 @media (min-width: 1280px) {
   .ja-ac-ev { grid-template-columns: 20px 48px 224px minmax(0, 1.35fr) minmax(0, 1fr) 84px; }
 }
+
+/* Day headings and the break row in the booking grids (desk, JA, Coordinator).
+   Muted, one line each, no motion. */
+.dk-dh, .co-dh { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 2px 2px 6px; border-bottom: 1px solid var(--line); list-style: none; white-space: nowrap; }
+.dk-dh:not(:first-child), .co-dh:not(:first-child) { margin-top: 8px; }
+.dk-dh h3, .co-dh b { margin: 0; font-weight: 600; font-size: 15px; line-height: 1.2; }
+.dk-dh span, .co-dh span { color: var(--ink-subtle); font-size: 13px; font-variant-numeric: tabular-nums; }
+.dk-brk, .co-brk {
+  display: flex; align-items: center; justify-content: center; gap: 8px; height: 36px; list-style: none; white-space: nowrap;
+  border: 1px dashed var(--line); border-radius: 10px; color: var(--ink-subtle); font-size: 13px; font-variant-numeric: tabular-nums;
+  background: repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px);
+}
+.dk-brk svg, .co-brk svg { flex: none; }

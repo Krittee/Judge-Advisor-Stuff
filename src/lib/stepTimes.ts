@@ -36,6 +36,22 @@ export const bangkokDay = (iso: string): string => dayFormat.format(new Date(iso
 /** The Bangkok clock time of an ISO time as a time input reads it: "10:52". */
 export const bangkokClock = (iso: string): string => clockFormat.format(new Date(iso));
 
+const dayLabelFormat = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Bangkok", weekday: "short", day: "numeric", month: "short" });
+const weekdayFormat = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Bangkok", weekday: "short" });
+
+/** The short Bangkok weekday of an ISO time: "Sun". */
+export const bangkokWeekday = (iso: string): string => weekdayFormat.format(new Date(iso));
+
+/** "Sun " when the time is on a different Bangkok day from `now`, else "": the one place that rule lives. */
+export const dayPrefix = (iso: string, now: number = Date.now()): string =>
+  bangkokDay(iso) === bangkokDay(new Date(now).toISOString()) ? "" : `${bangkokWeekday(iso)} `;
+
+/** The Bangkok weekday, day and month of an ISO time: "Sat 21 Nov". */
+export const bangkokDayLabel = (iso: string): string => {
+  const part = (type: string) => dayLabelFormat.formatToParts(new Date(iso)).find((p) => p.type === type)?.value ?? "";
+  return `${part("weekday")} ${part("day")} ${part("month")}`;
+};
+
 /**
  * The day a request belongs to: when it was asked for. A booking belongs to the
  * day of its slot, not the day it was made.

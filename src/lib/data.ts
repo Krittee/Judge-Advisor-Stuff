@@ -1,5 +1,12 @@
-import type { Panel, PublicPanel, RequestRow, Slot, Team } from "./types";
+import type { Panel, PublicPanel, RequestRow, Slot, SlotDay, Team } from "./types";
 import type { Status } from "./status";
+import { bangkokDay } from "./stepTimes";
+
+/** What the slot helpers read off a panel; slot_days is optional so older callers still compile. */
+export type SlotFields = Pick<PublicPanel, "slot_start_at" | "slot_minutes" | "slot_count"> & { slot_days?: SlotDay[] };
+
+export const MAX_SLOT_DAYS = 7;
+export const MAX_TOTAL_SLOTS = 200;
 
 /**
  * Pure helpers shared by the browser and the server.
@@ -24,7 +31,7 @@ export function stripCode(panel: Panel): PublicPanel {
  * numbers instead of migrating rows.
  */
 export function buildSlots(
-  panel: Pick<PublicPanel, "id" | "slot_start_at" | "slot_minutes" | "slot_count">,
+  panel: Pick<PublicPanel, "id"> & SlotFields,
   requests: RequestRow[],
   teams: Team[],
   /**
@@ -36,7 +43,8 @@ export function buildSlots(
    */
   excludeRequestId?: string,
 ): Slot[] {
-  if (!panel.slot_start_at || panel.slot_count <= 0) return [];
+  const times = slotTimes(panel);
+  if (times.length === 0) return [];
 
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const held = new Map<number, RequestRow>();
@@ -46,7 +54,7 @@ export function buildSlots(
     held.set(new Date(r.slot_start).getTime(), r);
   }
 
-  return slotTimes(panel).map(({ start, end }) => {
+  return times.map(({ start, end }) => {
     const taken = held.get(start.getTime());
     const team = taken ? teamById.get(taken.team_id) : undefined;
 
@@ -139,28 +147,57 @@ export function liveRequestFor(teamId: string, requests: RequestRow[]): RequestR
 }
 
 /**
- * Just the clock times a panel's slots occupy, back to back.
- *
- * Slot i runs from start + i lengths to start + (i+1) lengths, so they
- * tile the session with no gap and no overlap: 1:00-1:20, 1:20-1:40, and
- * so on. Bookings are checked against this list, which is what makes two
- * teams overlapping impossible rather than merely unlikely — every
- * accepted booking sits exactly on the grid, so two bookings either share
- * a start time (refused) or do not intersect at all.
+ * The days a panel takes bookings: its slot_days, earliest first. A panel with
+ * none falls back to its legacy start / length / count as one day, so old
+ * panels keep exactly their old slots with no data migration.
  */
-export function slotTimes(
-  panel: Pick<PublicPanel, "slot_start_at" | "slot_minutes" | "slot_count">,
-): { start: Date; end: Date }[] {
-  if (!panel.slot_start_at || panel.slot_count <= 0 || panel.slot_minutes <= 0) return [];
+export function panelDays(panel: SlotFields): SlotDay[] {
+  if (panel.slot_days?.length) {
+    return [...panel.slot_days].sort((a, b) => new Date(a.open_at).getTime() - new Date(b.open_at).getTime());
+  }
+  const startMs = panel.slot_start_at ? new Date(panel.slot_start_at).getTime() : NaN;
+  if (Number.isNaN(startMs) || panel.slot_count <= 0 || panel.slot_minutes <= 0) return [];
+  return [
+    {
+      open_at: panel.slot_start_at!,
+      end_at: new Date(startMs + panel.slot_count * panel.slot_minutes * 60_000).toISOString(),
+      break_from: null,
+      break_to: null,
+    },
+  ];
+}
 
-  const startMs = new Date(panel.slot_start_at).getTime();
-  if (Number.isNaN(startMs)) return [];
-  const lengthMs = panel.slot_minutes * 60_000;
-
-  return Array.from({ length: panel.slot_count }, (_, i) => ({
-    start: new Date(startMs + i * lengthMs),
-    end: new Date(startMs + (i + 1) * lengthMs),
-  }));
+/**
+ * Just the clock times a panel's slots occupy, back to back within each day.
+ *
+ * A day's slots run from open, one length each, skip the break, and stop at
+ * the end: one ending exactly at the break is kept, one crossing it is dropped
+ * and the next starts at break_to; one crossing the end is dropped. Bookings
+ * are checked against this list, which is what makes two teams overlapping
+ * impossible rather than merely unlikely — every accepted booking sits exactly
+ * on the grid, so two bookings either share a start time (refused) or do not
+ * intersect at all.
+ */
+export function slotTimes(panel: SlotFields): { start: Date; end: Date }[] {
+  if (!(panel.slot_minutes > 0)) return [];
+  const len = panel.slot_minutes * 60_000;
+  const out: { start: Date; end: Date }[] = [];
+  for (const day of panelDays(panel)) {
+    const end = new Date(day.end_at).getTime();
+    const bFrom = day.break_from ? new Date(day.break_from).getTime() : NaN;
+    const bTo = day.break_to ? new Date(day.break_to).getTime() : NaN;
+    let t = new Date(day.open_at).getTime();
+    if (Number.isNaN(t) || Number.isNaN(end)) continue;
+    while (t + len <= end) {
+      if (t < bTo && t + len > bFrom) {
+        t = bTo;
+        continue;
+      }
+      out.push({ start: new Date(t), end: new Date(t + len) });
+      t += len;
+    }
+  }
+  return out;
 }
 
 /**
@@ -173,11 +210,80 @@ export function slotTimes(
  * the one-team-per-start-time rule would not catch.
  */
 export function isRealSlot(
-  panel: Pick<PublicPanel, "slot_start_at" | "slot_minutes" | "slot_count">,
+  panel: SlotFields,
   start: Date,
   end: Date,
 ): boolean {
   return slotTimes(panel).some(
     (s) => s.start.getTime() === start.getTime() && s.end.getTime() === end.getTime(),
   );
+}
+
+/** What a save writes besides slot_days: first open (or null) and the total slot count. */
+export function slotSummaryFields(
+  days: SlotDay[],
+  minutes: number,
+): { slot_start_at: string | null; slot_count: number } {
+  const panel = { slot_days: days, slot_minutes: minutes, slot_start_at: null, slot_count: 0 };
+  return { slot_start_at: panelDays(panel)[0]?.open_at ?? null, slot_count: slotTimes(panel).length };
+}
+
+const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
+const isoOrNull = (v: unknown): string | null => {
+  if (typeof v !== "string" || !ISO.test(v)) return null;
+  const t = new Date(v);
+  return Number.isNaN(t.getTime()) ? null : t.toISOString();
+};
+
+/**
+ * Check a slotDays body and return it normalised (ISO instants, sorted by
+ * open), or one plain sentence naming the day that is wrong. [] is fine: it
+ * turns booking off.
+ */
+export function parseSlotDays(raw: unknown, minutes: number): { days: SlotDay[] } | { error: string } {
+  if (!Array.isArray(raw)) return { error: "Slot days must be a list." };
+  if (raw.length > MAX_SLOT_DAYS) return { error: `A panel can have at most ${MAX_SLOT_DAYS} days.` };
+
+  const rows = raw.map((r) => (r && typeof r === "object" ? (r as Record<string, unknown>) : {}));
+
+  const days: SlotDay[] = [];
+  const dates = new Set<string>();
+  let total = 0;
+  for (const [i, r] of rows.entries()) {
+    const name = `Day ${i + 1}`;
+    const open = isoOrNull(r.open_at);
+    const end = isoOrNull(r.end_at);
+    if (!open || !end) return { error: `${name}: the open and end times must be real times.` };
+    if (new Date(open) >= new Date(end)) return { error: `${name}: the end time must be after the open time.` };
+    if (bangkokDay(open) !== bangkokDay(end)) return { error: `${name}: open and end must be on the same date.` };
+
+    const hasFrom = r.break_from != null && r.break_from !== "";
+    const hasTo = r.break_to != null && r.break_to !== "";
+    let break_from: string | null = null;
+    let break_to: string | null = null;
+    if (hasFrom !== hasTo) return { error: `${name}: set both break times, or neither.` };
+    if (hasFrom) {
+      break_from = isoOrNull(r.break_from);
+      break_to = isoOrNull(r.break_to);
+      if (!break_from || !break_to) return { error: `${name}: the break times must be real times.` };
+      if (new Date(break_from) >= new Date(break_to)) return { error: `${name}: the break must end after it starts.` };
+      if (new Date(break_from) < new Date(open) || new Date(break_to) > new Date(end)) {
+        return { error: `${name}: the break must fall within the open hours.` };
+      }
+    }
+
+    const date = bangkokDay(open);
+    if (dates.has(date)) return { error: `${name}: another day is already on ${date}.` };
+    dates.add(date);
+
+    const day: SlotDay = { open_at: open, end_at: end, break_from, break_to };
+    const count = slotTimes({ slot_days: [day], slot_minutes: minutes, slot_start_at: null, slot_count: 0 }).length;
+    if (count === 0) return { error: `${name}: no slot fits in these hours.` };
+    total += count;
+    days.push(day);
+  }
+  if (total > MAX_TOTAL_SLOTS) return { error: `That makes ${total} slots; the most is ${MAX_TOTAL_SLOTS}.` };
+  // Named in the order entered above; stored earliest first.
+  days.sort((a, b) => new Date(a.open_at).getTime() - new Date(b.open_at).getTime());
+  return { days };
 }

@@ -142,7 +142,7 @@ export function CoordinatorView(p: CoordinatorViewProps) {
 
       <main className="co-body" ref={body}>{p.tab === "teams" ? <TeamsTab {...p} /> : <SlotsTab {...p} model={model} now={now} />}</main>
 
-      {p.tab === "slots" ? <BookingBar model={model} languages={p.languages} busy={p.busy} onBook={p.onBook} /> : null}
+      {p.tab === "slots" ? <BookingBar model={model} languages={p.languages} busy={p.busy} onBook={p.onBook} now={now} /> : null}
 
       <nav className="co-tabs" aria-label="Coordinator sections">
         {TABS.map((t) => (

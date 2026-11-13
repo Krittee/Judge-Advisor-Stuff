@@ -497,6 +497,9 @@ async function migrate(): Promise<void> {
       alter table panels   add column if not exists languages text[] not null default '{}';
       alter table teams    add column if not exists languages text[] not null default '{}';
 
+      -- Each panel's booking days: open, end and an optional break per day.
+      alter table panels   add column if not exists slot_days jsonb not null default '[]'::jsonb;
+
       -- Panels used to carry a room, which turned out not to be wanted.
       alter table panels drop column if exists room;
 
@@ -630,7 +633,7 @@ type Run = <R>(sql: string, params?: unknown[]) => Promise<R[]>;
  * panels.judges column can never be mistaken for the source of truth.
  */
 const PANEL_SELECT = `select p.id, p.name, p.code, p.division, p.languages, p.sort_order,
-  p.slot_start_at, p.slot_minutes, p.slot_count, p.created_at,
+  p.slot_start_at, p.slot_minutes, p.slot_count, p.slot_days, p.created_at,
   array(select j.name from judges j where j.panel_id = p.id order by j.seq) as judges
   from panels p`;
 
@@ -1138,7 +1141,8 @@ export const postgresStore: Store = {
       return (await panelById(id))!;
     }
 
-    const assignments = columns.map((c, i) => `${c} = $${i + 2}`).join(", ");
+    // node-postgres would send a JS array as a Postgres array, so slot_days goes as JSON text.
+    const assignments = columns.map((c, i) => `${c} = $${i + 2}${c === "slot_days" ? "::jsonb" : ""}`).join(", ");
     try {
       await withClient(async (run) => {
         const before = one(await run<{ division: string; code: string }>(
@@ -1164,7 +1168,10 @@ export const postgresStore: Store = {
 
         const updated = one(await run<{ id: string }>(
           `update panels set ${assignments} where id = $1 returning id`,
-          [id, ...columns.map((c) => (fields as Record<string, unknown>)[c])],
+          [id, ...columns.map((c) => {
+            const v = (fields as Record<string, unknown>)[c];
+            return c === "slot_days" ? JSON.stringify(v) : v;
+          })],
         ));
         if (!updated) throw new StoreError("That panel no longer exists.", 404);
         if (release.length) await run("update teams set panel_id = null where id = any($1::uuid[])", [release]);

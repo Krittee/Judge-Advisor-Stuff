@@ -1,16 +1,24 @@
 "use client";
 
-import { useId } from "react";
+import { Fragment, useId } from "react";
 import { noSlotsLeftLine, TOO_CLOSE_TITLE, takenTitle } from "@/components/SlotPicker";
 import { WarnIcon } from "@/components/judge/parts";
 import { clockParts } from "@/components/team/teamLogic";
 import type { PublicPanel, Slot } from "@/lib/types";
-import { slotGrid, slotTime, type SlotKind } from "./deskLogic";
+import { hourRowColumns, isWideGrid, slotGrid, slotTime, type SlotKind } from "./deskLogic";
 
 export function Check() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+export function BreakIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9zM16 10h2a2 2 0 0 1 0 4h-2M8 4v2M12 4v2" />
     </svg>
   );
 }
@@ -85,7 +93,7 @@ export function DeskSlots({
     );
   }
 
-  const grid = slotGrid(slots, panel.slot_minutes, { teamId, currentStart, now });
+  const grid = slotGrid(slots, panel, { teamId, currentStart, now });
 
   return (
     <div>
@@ -104,61 +112,80 @@ export function DeskSlots({
       {grid.open === 0 ? (
         <Caution>{noSlotsLeftLine(slots, now)}</Caution>
       ) : (
-        <div className="dk-slots" role="group" aria-labelledby={labelId}>
-          {grid.rows.map((row) => {
-            const hour = clockParts(row.hourStart);
-            return (
-              <div
-                key={row.hourStart}
-                className="dk-hrow"
-                style={{ gridTemplateColumns: `56px repeat(${grid.columns}, minmax(0, 1fr))` }}
-              >
-                <h3>
-                  {hour.time}
-                  {hour.period ? <small>{hour.period}</small> : null}
-                </h3>
-                {row.cells.map(({ slot, kind, column, row: line }) => {
-                  const at = { gridColumn: column + 2, gridRow: line + 1 };
-                  const time = slotTime(slot.start);
-                  const off = offLine(slot, kind);
-                  if (off) {
-                    return (
-                      <button
-                        key={slot.start}
-                        type="button"
-                        className={`dk-slot dk-slot--${kind}`}
-                        style={at}
-                        disabled
-                        aria-current={kind === "current" ? "true" : undefined}
-                        aria-label={`${time}, ${off.reading}`}
-                        title={off.title}
-                      >
-                        <b>{time}</b>
-                        <small>{off.small}</small>
-                      </button>
-                    );
-                  }
-                  const selected = slot.start === picked;
-                  return (
-                    <button
-                      key={slot.start}
-                      type="button"
-                      className="dk-slot"
-                      style={at}
-                      disabled={disabled}
-                      aria-pressed={selected}
-                      onClick={() => onPick(slot)}
+        <div className={`dk-slots${isWideGrid(grid.columns) ? " dk-slots--wide" : ""}`} role="group" aria-labelledby={labelId}>
+          <div className="dk-slots-in">
+          {grid.days.map((day) => (
+            <Fragment key={day.day}>
+              {grid.showDayHeadings ? (
+                <div className="dk-dh">
+                  <h3>{day.label}</h3>
+                  <span>{day.open} open</span>
+                </div>
+              ) : null}
+              {day.rows.map((row) => {
+                const hour = clockParts(row.hourStart);
+                return (
+                  <Fragment key={row.hourStart}>
+                    <div
+                      className="dk-hrow"
+                      style={{ gridTemplateColumns: hourRowColumns(grid.columns) }}
                     >
-                      <b>
-                        {selected ? <Check /> : null}
-                        {time}
-                      </b>
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })}
+                      <h3>
+                        {hour.time}
+                        {hour.period ? <small>{hour.period}</small> : null}
+                      </h3>
+                      {row.cells.map(({ slot, kind, column, row: line }) => {
+                        const at = { gridColumn: column + 2, gridRow: line + 1 };
+                        const time = slotTime(slot.start);
+                        const off = offLine(slot, kind);
+                        if (off) {
+                          return (
+                            <button
+                              key={slot.start}
+                              type="button"
+                              className={`dk-slot dk-slot--${kind}`}
+                              style={at}
+                              disabled
+                              aria-current={kind === "current" ? "true" : undefined}
+                              aria-label={`${time}, ${off.reading}`}
+                              title={off.title}
+                            >
+                              <b>{time}</b>
+                              <small>{off.small}</small>
+                            </button>
+                          );
+                        }
+                        const selected = slot.start === picked;
+                        return (
+                          <button
+                            key={slot.start}
+                            type="button"
+                            className="dk-slot"
+                            style={at}
+                            disabled={disabled}
+                            aria-pressed={selected}
+                            onClick={() => onPick(slot)}
+                          >
+                            <b>
+                              {selected ? <Check /> : null}
+                              {time}
+                            </b>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {row.hourStart === day.breakAfterHour ? (
+                      <div className="dk-brk" role="note">
+                        <BreakIcon />
+                        <span>{day.breakLabel}</span>
+                      </div>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </Fragment>
+          ))}
+          </div>
         </div>
       )}
     </div>

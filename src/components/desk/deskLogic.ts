@@ -1,9 +1,10 @@
 import type { Ask } from "@/components/judge/logic";
 import type { PanelLoad } from "@/components/SlotPicker";
 import { clockParts } from "@/components/team/teamLogic";
-import { formatClock } from "@/components/ui";
-import { liveRequestFor } from "@/lib/data";
+import { slotLabel } from "@/components/ui";
+import { liveRequestFor, panelDays, type SlotFields } from "@/lib/data";
 import { bookingLanguage } from "@/lib/presets";
+import { bangkokClock, bangkokDay, bangkokDayLabel } from "@/lib/stepTimes";
 import type { Status } from "@/lib/status";
 import { compareTeamNumbers, normalizeTeamNumber } from "@/lib/teamNumber";
 import type { PublicPanel, RequestRow, Slot, Team } from "@/lib/types";
@@ -151,7 +152,26 @@ export type SlotRow = {
   cells: { slot: Slot; kind: SlotKind; column: number; row: number }[];
 };
 
+/** One day of a panel's slots: its heading, its hour rows and where its break row goes. */
+export type GridDay = {
+  /** 1-based, by the panel's day order, so Day 2 stays Day 2 once Day 1 has passed. */
+  day: number;
+  /** "Day 1 · Sat 21 Nov". */
+  label: string;
+  /** Slots on this day that can still be booked. */
+  open: number;
+  rows: SlotRow[];
+  /** The break row sits after the hour row starting here; null when there is no break to show. */
+  breakAfterHour: string | null;
+  /** "12:00–13:00 · Break". */
+  breakLabel: string | null;
+};
+
 export type SlotGrid = {
+  days: GridDay[];
+  /** Two or more days configured: each gets a heading, even when only the last is left. */
+  showDayHeadings: boolean;
+  /** Every day's rows in order, for callers that do not care about days. */
   rows: SlotRow[];
   /** Columns the grid has besides the hour label. */
   columns: number;
@@ -160,46 +180,93 @@ export type SlotGrid = {
   open: number;
 };
 
-const MAX_COLUMNS = 4;
+/** Past this many columns the grid is wider than a phone and scrolls sideways as one block. */
+const WIDE_FROM = 5;
+
+/** The grid-template-columns of an hour row: the hour label, then one column per slot position. */
+export function hourRowColumns(columns: number): string {
+  return `56px repeat(${columns}, minmax(${columns >= WIDE_FROM ? "48px" : "0"}, 1fr))`;
+}
+
+/** True when the grid has more columns than fit a phone without scrolling. */
+export const isWideGrid = (columns: number) => columns >= WIDE_FROM;
 
 /**
- * One row per hour, past slots left out. A slot sits in the column its minute
- * falls in (a 20-minute panel has :00 :20 :40), so the columns line up from
- * hour to hour. Slots shorter than 15 minutes would need more than
- * MAX_COLUMNS, so they just fill the row from the left and wrap.
+ * One row per hour, past slots left out, grouped by the panel's days. A slot
+ * sits in the column its minute falls in (a 20-minute panel has :00 :20 :40),
+ * so the columns line up from hour to hour, and an hour is always one line
+ * however short the slots are (the grid scrolls sideways instead of wrapping).
+ * A day's break row is kept only while slots still show on both sides of it.
  */
-export function slotGrid(slots: Slot[], slotMinutes: number, ctx: SlotContext): SlotGrid {
+export function slotGrid(slots: Slot[], panel: SlotFields, ctx: SlotContext): SlotGrid {
+  const slotMinutes = panel.slot_minutes;
   const perHour = Math.max(1, Math.ceil(60 / Math.max(1, slotMinutes)));
-  const aligned = perHour <= MAX_COLUMNS;
-  const columns = Math.min(perHour, MAX_COLUMNS);
+  const columns = perHour;
 
-  const rows: SlotRow[] = [];
-  const byHour = new Map<number, SlotRow>();
-  let open = 0;
+  const panelDay = panelDays(panel);
+  const days: GridDay[] = panelDay.map((d, i) => ({
+    day: i + 1,
+    label: `Day ${i + 1} · ${bangkokDayLabel(d.open_at)}`,
+    open: 0,
+    rows: [],
+    breakAfterHour: null,
+    breakLabel: null,
+  }));
+  const byHour = panelDay.map(() => new Map<number, SlotRow>());
+  // Per day: the last slot before its break, and the first slot after it.
+  const around = panelDay.map(() => ({ before: null as Slot | null, after: null as Slot | null }));
   let shown = 0;
+  const hourOf = (iso: string) => new Date(iso).setMinutes(0, 0, 0);
 
   for (const slot of slots) {
     const kind = slotKind(slot, ctx);
     if (kind === "past") continue;
+    // A one-day panel owns every slot (a legacy window can cross midnight); else match by Bangkok day.
+    const i = panelDay.length === 1 ? 0 : panelDay.findIndex((d) => bangkokDay(d.open_at) === bangkokDay(slot.start));
+    if (i < 0) continue;
+    const day = days[i];
+    const brk = panelDay[i];
     shown++;
-    if (kind === "open") open++;
+    if (kind === "open") day.open++;
 
     const at = new Date(slot.start);
-    const hour = new Date(at).setMinutes(0, 0, 0);
-    let row = byHour.get(hour);
+    const hour = hourOf(slot.start);
+    let row = byHour[i].get(hour);
     if (!row) {
       row = { hourStart: new Date(hour).toISOString(), cells: [] };
-      byHour.set(hour, row);
-      rows.push(row);
+      byHour[i].set(hour, row);
+      day.rows.push(row);
     }
-    const n = row.cells.length;
-    row.cells.push(
-      aligned
-        ? { slot, kind, column: Math.floor(at.getMinutes() / slotMinutes) % columns, row: 0 }
-        : { slot, kind, column: n % columns, row: Math.floor(n / columns) },
-    );
+    row.cells.push({ slot, kind, column: Math.floor(at.getMinutes() / slotMinutes) % columns, row: 0 });
+
+    if (brk.break_from && brk.break_to) {
+      if (at.getTime() < new Date(brk.break_from).getTime()) around[i].before = slot;
+      else if (at.getTime() >= new Date(brk.break_to).getTime()) around[i].after ??= slot;
+    }
   }
-  return { rows, columns, shown, open };
+
+  const out = days
+    .map((d, i) => {
+      const { before, after } = around[i];
+      if (!before || !after) return d;
+      // Both sides in one hour row (12:15–12:45): the gap in that row says it, a row below would sit under 12:45.
+      if (hourOf(before.start) === hourOf(after.start)) return d;
+      const brk = panelDay[i];
+      return {
+        ...d,
+        breakAfterHour: new Date(hourOf(before.start)).toISOString(),
+        breakLabel: `${bangkokClock(brk.break_from!)}–${bangkokClock(brk.break_to!)} · Break`,
+      };
+    })
+    .filter((d) => d.rows.length);
+  return {
+    days: out,
+    showDayHeadings: panelDay.length >= 2,
+    rows: out.flatMap((d) => d.rows),
+    columns,
+    shown,
+    open: out.reduce((sum, d) => sum + d.open, 0),
+  };
 }
 
 /** "10:40" without the AM/PM, which the hour label carries. */
@@ -245,7 +312,7 @@ export function teamList(teams: Team[], requests: RequestRow[], query: string): 
 /* ---- cancelling a booking --------------------------------------------------------- */
 
 export const cancelBookingPrompt = (teamNumber: string, slotStart: string | null): string =>
-  `Cancel ${teamNumber}'s ${formatClock(slotStart)} booking?`;
+  `Cancel ${teamNumber}'s ${slotLabel(slotStart)} booking?`;
 
 /**
  * Cancel booking, asked first: it is the one thing the desk cannot take back.

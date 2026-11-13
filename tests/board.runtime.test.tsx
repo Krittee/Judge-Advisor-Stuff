@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { formatClock } from "../src/components/ui";
+import { slotLabel } from "../src/components/ui";
+import { bangkokDay } from "../src/lib/stepTimes";
 import { BoardView } from "../src/components/board/BoardView";
 import type { AppState, PublicPanel, RequestRow, Team } from "../src/lib/types";
 
@@ -28,7 +29,7 @@ const team = (number: string, over: Partial<Team> = {}): Team => ({
 
 const panel: PublicPanel = {
   id: "p1", name: "Panel 1", division: "Middle School", judges: ["Dana Ruiz", "Chris Lin"], languages: [],
-  sort_order: 1, slot_start_at: null, slot_minutes: 20, slot_count: 0,
+  sort_order: 1, slot_start_at: null, slot_minutes: 20, slot_count: 0, slot_days: [],
 };
 
 const req = (teamNumber: string, over: Partial<RequestRow>): RequestRow => ({
@@ -201,10 +202,11 @@ test("no motion: no pulse-waiting or animation anywhere, even for a slot that is
 test("a booked tile's reserve for its clock leaves the number its full phone size", () => {
   // Team 1157 booked for 9:20 PM. The reserve is a count of characters of the time's own font size
   // (--bd-tf: 15px on a phone), so it cannot outgrow the tile the way a 1920-wide pixel figure did.
-  const slot = new Date(2099, 0, 1, 21, 20).toISOString();
+  // Today in Bangkok, so the label is the clock alone (another day adds a weekday, which is longer).
+  const slot = new Date(`${bangkokDay(new Date().toISOString())}T21:20:00+07:00`).toISOString();
   const markup = board(appState([team("1157")], [req("1157", { status: "scheduled", kind: "slot", slot_start: slot })]));
   const rc = Number(/--bd-rc:(\d+)/.exec(markup)?.[1]);
-  assert.equal(rc, formatClock(slot).length + 1);
+  assert.equal(rc, slotLabel(slot).length + 1);
   // A phone live tile spans two of four columns of a 343px page: 168px, less 20px padding and 2px border.
   const content = (343 - 3 * 6) / 4 * 2 + 6 - 22;
   const room = (content - rc * 0.55 * 15) / (4 * 0.62);

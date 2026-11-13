@@ -555,6 +555,24 @@ test("migrate() creates the judge roster once, copying the old judge lists with 
   );
 });
 
+test("migrate() adds each panel's slot_days column, additively", () => {
+  assert.ok(migrateBody.includes("alter table panels   add column if not exists slot_days jsonb not null default '[]'::jsonb;"));
+  assert.ok(!/update panels set slot_days|alter table panels[^;]*slot_days[^;]*(drop|set not)/i.test(migrateBody));
+  assert.match(src, /select p\.id, p\.name[^`]*p\.slot_days/);
+});
+
+test("updatePanel sends slot_days as JSON text with a ::jsonb cast, not as a Postgres array", async () => {
+  calls.length = 0;
+  answer = (sql) => (sql.includes("for update") ? [{ division: "Division 1", code: "BRAVO2" }] : sql.startsWith("update panels") ? [{ id: "p2" }] : sql.includes("from panels p") ? [{ id: "p2", judges: [] }] : []);
+  const days = [{ open_at: "2026-11-21T03:00:00.000Z", end_at: "2026-11-21T09:00:00.000Z", break_from: null, break_to: null }];
+  await postgresStore.updatePanel("p2", { slot_days: days, slot_count: 24 });
+  const [update] = sent(/^update panels/);
+  assert.match(update.sql, /slot_days = \$2::jsonb/);
+  assert.doesNotMatch(update.sql, /slot_count = \$3::jsonb/);
+  assert.equal(update.params[1], JSON.stringify(days));
+  assert.equal(update.params[2], 24);
+});
+
 test("migrate() adds the team languages column to old databases, and new ones are created with it", () => {
   assert.ok(migrateBody.includes("alter table teams    add column if not exists languages text[] not null default '{}';"));
   assert.match(migrateBody, /create table if not exists teams \([^;]*languages\s+text\[\] not null default '\{\}'/);

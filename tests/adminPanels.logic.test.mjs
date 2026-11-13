@@ -18,6 +18,11 @@ import {
   removeJudgeAfterAsking,
   removeJudgeQuestion,
   rosterGroups,
+  addBreak,
+  addDay,
+  dayFromDraft,
+  draftCount,
+  removeDay,
   slotBody,
   slotsHeader,
   slotsSummary,
@@ -25,9 +30,8 @@ import {
   takeOffCopy,
   takeOffLines,
   teamsByPanel,
-  toLocalInput,
+  UI_MAX_DAYS,
 } from "../src/components/admin/panelsLogic";
-import { formatClock } from "../src/components/ui";
 import { createConfirmer } from "../src/components/ConfirmDialog";
 
 /* The Panels tab's decisions, run for real against
@@ -325,24 +329,74 @@ test("Delete all is one DELETE ?all=true, and the notice says teams and judges s
 
 /* ---- booking slots ----------------------------------------------------------- */
 
+const two = panel(2, "Middle School", {
+  slot_minutes: 15, slot_count: 32, slot_start_at: "2026-11-21T03:00:00.000Z",
+  slot_days: [
+    { open_at: "2026-11-21T03:00:00.000Z", end_at: "2026-11-21T09:00:00.000Z", break_from: "2026-11-21T05:00:00.000Z", break_to: "2026-11-21T06:00:00.000Z" },
+    { open_at: "2026-11-22T02:00:00.000Z", end_at: "2026-11-22T05:00:00.000Z", break_from: null, break_to: null },
+  ],
+});
+
 test("the slot summary and the dialog's header", () => {
-  const on = panel(1, "High School", { slot_count: 8, slot_minutes: 20, slot_start_at: "2026-10-20T10:00:00.000Z" });
-  assert.equal(slotsSummary(on), `8 slots from ${formatClock(on.slot_start_at)} · 20 min`);
-  assert.equal(slotsSummary({ ...on, slot_count: 1 }), `1 slot from ${formatClock(on.slot_start_at)} · 20 min`);
-  assert.equal(slotsSummary({ ...on, slot_start_at: null }), "8 slots · 20 min", "no start to show");
+  assert.equal(slotsSummary(two), "Day 1 10:00–16:00 · Day 2 09:00–12:00 · 15 min");
+  const legacy = panel(1, "High School", { slot_count: 8, slot_minutes: 20, slot_start_at: "2026-10-20T03:00:00.000Z" });
+  assert.equal(slotsSummary(legacy), "Day 1 10:00–12:40 · 20 min", "a legacy panel is one day");
+  assert.equal(slotsSummary({ ...legacy, slot_days: [{ open_at: "2026-10-20T03:00:00.000Z", end_at: "2026-10-20T08:00:00.000Z", break_from: null, break_to: null }] }), "Day 1 10:00–15:00 · 20 min");
+  assert.equal(slotsSummary({ ...legacy, slot_days: [] }), "Day 1 10:00–12:40 · 20 min");
+  assert.equal(slotsSummary(panel(3, "Middle School", { slot_days: [] })), "Booking slots off");
   assert.equal(slotsSummary(panel(3, "Middle School")), "Booking slots off");
-  assert.equal(slotsHeader(on), "Booking slots (8)");
+  assert.equal(slotsHeader(two), "Booking slots (32)");
   assert.equal(slotsHeader(panel(3, "Middle School")), "Booking slots (off)");
 });
 
-test("the slot fields start from the panel and save as the PATCH the old grid sent", () => {
-  const on = panel(1, "High School", { slot_count: 8, slot_minutes: 20, slot_start_at: "2026-10-20T10:00:00.000Z" });
-  const draft = startSlotDraft(on);
-  assert.deepEqual([draft.minutes, draft.count], [20, 8]);
-  assert.equal(draft.start, toLocalInput(on.slot_start_at));
-  assert.match(draft.start, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, "datetime-local wants wall time, no Z");
-  assert.equal(new Date(draft.start).toISOString(), "2026-10-20T10:00:00.000Z", "and it is the same moment");
-  assert.deepEqual(slotBody(draft), { slotCount: 8, slotMinutes: 20, slotStartAt: "2026-10-20T10:00:00.000Z" });
-  assert.deepEqual(slotBody({ start: "", minutes: 15, count: 0 }), { slotCount: 0, slotMinutes: 15, slotStartAt: null }, "0 for walk-up queue only");
-  assert.equal(toLocalInput(null), "");
+test("a draft round-trips the stored instants, whatever the machine's time zone", () => {
+  const draft = startSlotDraft(two);
+  assert.equal(draft.minutes, 15);
+  assert.deepEqual(draft.days[0], { date: "2026-11-21", open: "10:00", end: "16:00", breakFrom: "12:00", breakTo: "13:00" });
+  assert.deepEqual(draft.days[1], { date: "2026-11-22", open: "09:00", end: "12:00", breakFrom: null, breakTo: null });
+  assert.deepEqual(slotBody(draft), { slotMinutes: 15, slotDays: two.slot_days });
+  assert.equal(new Date(dayFromDraft(draft.days[0]).open_at).getTime(), Date.parse("2026-11-21T03:00:00Z"));
+  assert.deepEqual(slotBody({ minutes: 15, days: [] }), { slotMinutes: 15, slotDays: [] });
+});
+
+test("a legacy panel starts as one day with no break", () => {
+  const draft = startSlotDraft(panel(1, "High School", { slot_count: 8, slot_minutes: 20, slot_start_at: "2026-10-20T03:00:00.000Z" }));
+  assert.deepEqual(draft.days, [{ date: "2026-10-20", open: "10:00", end: "12:40", breakFrom: null, breakTo: null }]);
+  assert.deepEqual(startSlotDraft(p1).days, [], "booking off starts with no day");
+});
+
+test("add day, remove day, and the cap", () => {
+  assert.equal(UI_MAX_DAYS, 2);
+  const one = { minutes: 15, days: [startSlotDraft(two).days[0]] };
+  const added = addDay(one);
+  assert.deepEqual(added.days[1], { date: "2026-11-22", open: "10:00", end: "16:00", breakFrom: "12:00", breakTo: "13:00" });
+  assert.equal(addDay(added), added, "capped at two days: the draft comes back unchanged");
+  assert.deepEqual(removeDay(added, 1), one);
+  assert.equal(addDay({ minutes: 15, days: [] }).days.length, 1, "from nothing, a first day");
+  const month = addDay({ minutes: 15, days: [{ ...one.days[0], date: "2026-11-30" }] });
+  assert.equal(month.days[1].date, "2026-12-01");
+});
+
+test("add break puts 12:00-13:00 inside the window, else the middle hour", () => {
+  const day = { date: "2026-11-21", open: "10:00", end: "16:00", breakFrom: null, breakTo: null };
+  assert.deepEqual([addBreak(day).breakFrom, addBreak(day).breakTo], ["12:00", "13:00"]);
+  const morning = addBreak({ ...day, open: "09:00", end: "12:00" });
+  assert.deepEqual([morning.breakFrom, morning.breakTo], ["10:00", "11:00"]);
+});
+
+test("the draft counts slots per day and in all; an unfinished day counts 0", () => {
+  const c = draftCount(startSlotDraft(two));
+  assert.deepEqual(c.perDay, [{ count: 20, last: "15:45" }, { count: 12, last: "11:45" }]);
+  assert.equal(c.total, 32);
+  const bad = draftCount({ minutes: 15, days: [{ date: "2026-11-21", open: "10:00", end: "", breakFrom: null, breakTo: null }, { date: "", open: "10:00", end: "12:00", breakFrom: "11:00", breakTo: null }] });
+  assert.deepEqual(bad.perDay, [{ count: 0, last: null }, { count: 0, last: null }]);
+  assert.equal(bad.total, 0);
+});
+
+test("a slot length the API would refuse counts nothing, without looping", () => {
+  const days = startSlotDraft(two).days;
+  for (const minutes of [0.001, 200, 2, 0, NaN, 15.5]) {
+    assert.deepEqual(draftCount({ minutes, days }), { perDay: [{ count: 0, last: null }, { count: 0, last: null }], total: 0 }, String(minutes));
+  }
+  assert.equal(draftCount({ minutes: 3, days }).total > 0, true);
 });

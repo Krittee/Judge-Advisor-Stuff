@@ -641,3 +641,96 @@ test("Delete all panels through the route clears the panels and leaves every jud
   assert.deepEqual((await w.db.listConflicts()).map((c) => c.id), [keeps.id]);
   assert.equal((await teamNow(w, w.hawks)).panel_id, null, "teams stay, unassigned");
 });
+
+/* ===== the Panels tab's booking days (slotDays) =========================== */
+
+const DAY_1 = { open_at: "2026-11-21T10:00:00+07:00", end_at: "2026-11-21T16:00:00+07:00", break_from: "2026-11-21T12:00:00+07:00", break_to: "2026-11-21T13:00:00+07:00" };
+const DAY_2 = { open_at: "2026-11-22T09:00:00+07:00", end_at: "2026-11-22T12:00:00+07:00", break_from: null, break_to: null };
+
+test("PATCH slotDays saves the days and syncs slot_count and slot_start_at; a bad day is a 400 that changes nothing", async () => {
+  const w = await world();
+  const save = (body: Record<string, unknown>) => hit(panelsRoute, "PATCH", ADMIN, "/api/admin/panels", { id: w.p1.id, ...body });
+  const now = async () => (await w.db.listPanels()).find((p) => p.id === w.p1.id) as Panel;
+
+  const ok = await save({ slotMinutes: 15, slotDays: [DAY_2, DAY_1] });
+  assert.equal(ok.status, 200, ok.body.error);
+  const saved = await now();
+  assert.equal(saved.slot_minutes, 15);
+  assert.equal(saved.slot_count, 32);
+  assert.equal(saved.slot_start_at, new Date(DAY_1.open_at).toISOString());
+  assert.deepEqual(saved.slot_days.map((d) => d.open_at), [new Date(DAY_1.open_at).toISOString(), new Date(DAY_2.open_at).toISOString()]);
+
+  const bad = await save({ slotMinutes: 15, slotDays: [{ ...DAY_1, end_at: "2026-11-21T09:00:00+07:00" }] });
+  assert.equal(bad.status, 400);
+  assert.match(bad.body.error, /^Day 1: /);
+  assert.deepEqual(await now(), saved, "nothing changed");
+
+  // Only the Judge Advisor writes them.
+  assert.equal((await hit(panelsRoute, "PATCH", QUEUER, "/api/admin/panels", { id: w.p1.id, slotDays: [] })).status, 403);
+});
+
+test("PATCH slotDays [] turns booking off even on a legacy panel, and slotMinutes alone re-derives the count from the days", async () => {
+  const w = await world();
+  const save = (body: Record<string, unknown>) => hit(panelsRoute, "PATCH", ADMIN, "/api/admin/panels", { id: w.p1.id, ...body });
+  const now = async () => (await w.db.listPanels()).find((p) => p.id === w.p1.id) as Panel;
+  const { slotTimes } = await import("../src/lib/data");
+
+  await w.db.updatePanel(w.p1.id, { slot_start_at: "2026-11-21T03:00:00.000Z", slot_minutes: 20, slot_count: 8 });
+  assert.equal(slotTimes(await now()).length, 8);
+  assert.equal((await save({ slotDays: [] })).status, 200);
+  const off = await now();
+  assert.deepEqual([off.slot_days, off.slot_count, off.slot_start_at], [[], 0, null]);
+  assert.deepEqual(slotTimes(off), []);
+
+  await save({ slotMinutes: 15, slotDays: [DAY_1, DAY_2] });
+  assert.equal((await now()).slot_count, 32);
+  assert.equal((await save({ slotMinutes: 20 })).status, 200);
+  const re = await now();
+  assert.equal(re.slot_minutes, 20);
+  assert.equal(re.slot_count, slotTimes(re).length);
+  assert.equal(re.slot_count, 24, "Day 1: 10:00-12:00 is 6, 13:00-16:00 is 9; Day 2: 9; = 6+9+9");
+  assert.equal(re.slot_days.length, 2, "the days stay");
+});
+
+test("an old slotStartAt/slotCount body clears the days so the legacy fields apply; POST takes slotDays too", async () => {
+  const w = await world();
+  const save = (body: Record<string, unknown>) => hit(panelsRoute, "PATCH", ADMIN, "/api/admin/panels", { id: w.p1.id, ...body });
+  const now = async () => (await w.db.listPanels()).find((p) => p.id === w.p1.id) as Panel;
+
+  await save({ slotMinutes: 15, slotDays: [DAY_1, DAY_2] });
+  assert.equal((await now()).slot_days.length, 2);
+  await save({ slotStartAt: "2026-11-23T03:00:00.000Z", slotCount: 4, slotMinutes: 20 });
+  const legacy = await now();
+  assert.deepEqual([legacy.slot_days, legacy.slot_count, legacy.slot_start_at], [[], 4, "2026-11-23T03:00:00.000Z"]);
+
+  const made = await hit(panelsRoute, "POST", ADMIN, "/api/admin/panels", { name: "Panel Z", code: "ZZZ001", slotMinutes: 15, slotDays: [DAY_1, DAY_2] });
+  assert.equal(made.status, 200, made.body.error);
+  assert.deepEqual([made.body.panel.slot_count, made.body.panel.slot_days.length], [32, 2]);
+  const refused = await hit(panelsRoute, "POST", ADMIN, "/api/admin/panels", { name: "Panel Y", code: "YYY001", slotDays: [{ ...DAY_2, end_at: DAY_2.open_at }] });
+  assert.equal(refused.status, 400);
+  assert.ok(!(await w.db.listPanels()).some((p) => p.name === "Panel Y"), "no panel made");
+});
+
+test("slotMinutes alone that would empty a day or pass the cap is a 400 and changes nothing", async () => {
+  const w = await world();
+  const save = (body: Record<string, unknown>) => hit(panelsRoute, "PATCH", ADMIN, "/api/admin/panels", { id: w.p1.id, ...body });
+  const now = async () => (await w.db.listPanels()).find((p) => p.id === w.p1.id) as Panel;
+
+  // Day 2 is one hour: 15-minute slots fit, 120-minute slots leave it with none.
+  const short = { ...DAY_2, end_at: "2026-11-22T10:00:00+07:00" };
+  await save({ slotMinutes: 15, slotDays: [DAY_1, short] });
+  const before = await now();
+  const empty = await save({ slotMinutes: 120 });
+  assert.equal(empty.status, 400);
+  assert.match(empty.body.error, /^Day 2: no slot fits/);
+  assert.deepEqual(await now(), before, "nothing changed");
+
+  // Two 6-hour days at 3 minutes is 240 slots, over the 200 cap.
+  const long = { ...DAY_2, end_at: "2026-11-22T15:00:00+07:00" };
+  await save({ slotMinutes: 15, slotDays: [DAY_1, long] });
+  const wide = await now();
+  const over = await save({ slotMinutes: 3 });
+  assert.equal(over.status, 400);
+  assert.match(over.body.error, /the most is 200/);
+  assert.deepEqual(await now(), wide, "nothing changed");
+});

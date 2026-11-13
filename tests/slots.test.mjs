@@ -123,3 +123,73 @@ test("the booking route checks the slot against the panel", () => {
     "the request route no longer validates bookings against the panel's grid",
   );
 });
+
+/* ---- slot windows: per-day open / end / break --------------------------- */
+
+const bk = (day, hhmm) => `2026-11-${day}T${hhmm}:00+07:00`;
+const clock = (d) => new Date(d.getTime() + 7 * 3_600_000).toISOString().slice(11, 16);
+const day = (d, open, end, from = null, to = null) => ({
+  open_at: bk(d, open),
+  end_at: bk(d, end),
+  break_from: from ? bk(d, from) : null,
+  break_to: to ? bk(d, to) : null,
+});
+const windows = (over = {}) => ({
+  slot_start_at: null,
+  slot_minutes: 15,
+  slot_count: 0,
+  slot_days: [day(21, "10:00", "16:00", "12:00", "13:00"), day(22, "09:00", "12:00")],
+  ...over,
+});
+
+test("two days with a lunch break give 20 + 12 slots", () => {
+  const slots = slotTimes(windows());
+  assert.equal(slots.length, 32);
+  const day1 = slots.slice(0, 20).map((s) => clock(s.start));
+  assert.equal(day1[0], "10:00");
+  assert.equal(day1[7], "11:45");
+  assert.equal(day1[8], "13:00");
+  assert.equal(day1[19], "15:45");
+  const day2 = slots.slice(20).map((s) => clock(s.start));
+  assert.equal(day2[0], "09:00");
+  assert.equal(day2[11], "11:45");
+});
+
+test("a slot ending exactly at the break is kept, one crossing it is dropped, afternoon restarts at break_to", () => {
+  const p = windows({ slot_minutes: 20, slot_days: [day(21, "10:00", "12:00", "11:00", "11:30")] });
+  assert.deepEqual(slotTimes(p).map((s) => clock(s.start)), ["10:00", "10:20", "10:40", "11:30"]);
+  const starts = slotTimes(p).map((s) => clock(s.start));
+  assert.ok(!starts.includes("11:00") && !starts.includes("11:20"));
+  assert.equal(clock(slotTimes(p)[2].end), "11:00");
+});
+
+test("a slot crossing end is dropped; one ending exactly at end is kept", () => {
+  const p = windows({ slot_minutes: 20, slot_days: [day(21, "10:00", "10:50")] });
+  assert.deepEqual(slotTimes(p).map((s) => clock(s.start)), ["10:00", "10:20"]);
+  const exact = windows({ slot_minutes: 20, slot_days: [day(21, "10:00", "10:40")] });
+  assert.deepEqual(slotTimes(exact).map((s) => clock(s.start)), ["10:00", "10:20"]);
+});
+
+test("legacy panel (no slot_days) gives today's slots", () => {
+  const fromLegacy = (p) => slotTimes(p).map((s) => [s.start.toISOString(), s.end.toISOString()]);
+  const today = fromLegacy(panel);
+  assert.equal(today.length, 4);
+  assert.deepEqual(fromLegacy({ ...panel, slot_days: [] }), today);
+  assert.equal(today[0][0], "2026-09-01T13:00:00.000Z");
+  assert.equal(today[3][1], "2026-09-01T14:20:00.000Z");
+});
+
+test("slot_days wins over legacy fields when both are set", () => {
+  const p = { ...panel, slot_days: [day(21, "10:00", "10:30")], slot_minutes: 15 };
+  assert.deepEqual(slotTimes(p).map((s) => clock(s.start)), ["10:00", "10:15"]);
+});
+
+test("isRealSlot refuses a break time, an off-grid time and a third day; accepts a Day 2 slot", () => {
+  const p = windows();
+  const t = (d, hhmm) => new Date(bk(d, hhmm));
+  const plus = (d, m) => new Date(d.getTime() + m * 60_000);
+  assert.equal(isRealSlot(p, t(21, "12:15"), plus(t(21, "12:15"), 15)), false, "inside the break");
+  assert.equal(isRealSlot(p, t(22, "09:07"), plus(t(22, "09:07"), 15)), false, "off the grid");
+  assert.equal(isRealSlot(p, t(23, "10:00"), plus(t(23, "10:00"), 15)), false, "no Day 3");
+  assert.equal(isRealSlot(p, t(22, "09:15"), t(22, "09:30")), true);
+});

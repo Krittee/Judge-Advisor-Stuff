@@ -1,7 +1,8 @@
-import { formatClock } from "@/components/ui";
 import type { Ask } from "@/components/judge/logic";
 import type { call } from "@/components/useAppState";
-import type { ConflictRow, JudgeRow, PublicPanel, Team } from "@/lib/types";
+import { panelDays, parseSlotDays, slotTimes, type SlotFields } from "@/lib/data";
+import { bangkokClock, bangkokDay, isoOnDay } from "@/lib/stepTimes";
+import type { ConflictRow, JudgeRow, PublicPanel, SlotDay, Team } from "@/lib/types";
 import { panelTag } from "./conflictsLogic";
 
 /* The Judge Advisor Panels tab's decisions, kept out of the markup so they run
@@ -49,41 +50,94 @@ export const panelJudges = (panelId: string, judges: Pick<JudgeRow, "name" | "pa
 
 /* ---- booking slots ---------------------------------------------------------- */
 
-type Slots = Pick<PublicPanel, "slot_count" | "slot_minutes" | "slot_start_at">;
+/** The slot dialog offers this many days for now; the store and API allow MAX_SLOT_DAYS. */
+export const UI_MAX_DAYS = 2;
 
-/** The card's one line: "8 slots from 10:00 AM · 20 min", or "Booking slots off". */
-export function slotsSummary(p: Slots): string {
-  if (!p.slot_count) return "Booking slots off";
-  const start = p.slot_start_at ? ` from ${formatClock(p.slot_start_at)}` : "";
-  return `${p.slot_count} ${p.slot_count === 1 ? "slot" : "slots"}${start} · ${p.slot_minutes} min`;
+/** The card's one line: "Day 1 10:00–16:00 · Day 2 09:00–12:00 · 15 min", or "Booking slots off". */
+export function slotsSummary(p: SlotFields): string {
+  const days = panelDays(p);
+  if (!slotTimes(p).length) return "Booking slots off";
+  const spans = days.map((d, i) => `Day ${i + 1} ${bangkokClock(d.open_at)}–${bangkokClock(d.end_at)}`);
+  return `${spans.join(" · ")} · ${p.slot_minutes} min`;
 }
 
 /** The slot dialog's heading, as the old details summary read: "Booking slots (8)" / "(off)". */
-export const slotsHeader = (p: Pick<PublicPanel, "slot_count">): string =>
-  `Booking slots ${p.slot_count ? `(${p.slot_count})` : "(off)"}`;
-
-/** datetime-local wants local wall time, not an ISO string with a Z. */
-export function toLocalInput(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+export function slotsHeader(p: SlotFields): string {
+  const n = slotTimes(p).length;
+  return `Booking slots ${n ? `(${n})` : "(off)"}`;
 }
 
-/** What "Save slot grid" sends. */
-export type SlotDraft = { start: string; minutes: number; count: number };
+/** One day as the dialog edits it: Bangkok wall time, as the date and time inputs read it. */
+export type DayDraft = { date: string; open: string; end: string; breakFrom: string | null; breakTo: string | null };
+/** What "Save slots" sends. */
+export type SlotDraft = { minutes: number; days: DayDraft[] };
 
-export const startSlotDraft = (p: Slots): SlotDraft => ({
-  start: toLocalInput(p.slot_start_at),
+export const startSlotDraft = (p: SlotFields): SlotDraft => ({
   minutes: p.slot_minutes,
-  count: p.slot_count,
+  days: panelDays(p).map((d) => ({
+    date: bangkokDay(d.open_at),
+    open: bangkokClock(d.open_at),
+    end: bangkokClock(d.end_at),
+    breakFrom: d.break_from ? bangkokClock(d.break_from) : null,
+    breakTo: d.break_to ? bangkokClock(d.break_to) : null,
+  })),
 });
 
-export const slotBody = (d: SlotDraft) => ({
-  slotCount: d.count,
-  slotMinutes: d.minutes,
-  slotStartAt: d.start ? new Date(d.start).toISOString() : null,
+// "" for a box that is empty or not a time: the server then says the times must be real.
+const iso = (date: string, clock: string | null): string => {
+  try {
+    return (clock && date && isoOnDay(date, clock)) || "";
+  } catch {
+    return "";
+  }
+};
+
+export const dayFromDraft = (d: DayDraft): SlotDay => ({
+  open_at: iso(d.date, d.open),
+  end_at: iso(d.date, d.end),
+  break_from: d.breakFrom ? iso(d.date, d.breakFrom) : null,
+  break_to: d.breakTo ? iso(d.date, d.breakTo) : null,
 });
+
+export const slotBody = (d: SlotDraft) => ({ slotMinutes: d.minutes, slotDays: d.days.map(dayFromDraft) });
+
+const toMin = (clock: string): number => Number(clock.slice(0, 2)) * 60 + Number(clock.slice(3, 5));
+const toClock = (m: number): string => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+/** The next day, same hours as the last one (10:00–15:00 today when there is none). Unchanged at UI_MAX_DAYS. */
+export function addDay(d: SlotDraft): SlotDraft {
+  if (d.days.length >= UI_MAX_DAYS) return d;
+  const last = d.days[d.days.length - 1];
+  const lastMs = last ? new Date(`${last.date}T00:00:00Z`).getTime() : NaN;
+  const next = Number.isNaN(lastMs) ? bangkokDay(new Date().toISOString()) : new Date(lastMs + 86_400_000).toISOString().slice(0, 10);
+  const day: DayDraft = last ? { ...last, date: next } : { date: next, open: "10:00", end: "15:00", breakFrom: null, breakTo: null };
+  return { ...d, days: [...d.days, day] };
+}
+
+export const removeDay = (d: SlotDraft, i: number): SlotDraft => ({ ...d, days: d.days.filter((_, j) => j !== i) });
+
+/** 12:00–13:00 if that fits inside the day, else the hour in the middle of it. */
+export function addBreak(day: DayDraft): DayDraft {
+  const ok = /^\d\d:\d\d$/.test(day.open) && /^\d\d:\d\d$/.test(day.end);
+  const [o, e] = ok ? [toMin(day.open), toMin(day.end)] : [0, 1440];
+  if (o <= 720 && e >= 780) return { ...day, breakFrom: "12:00", breakTo: "13:00" };
+  const from = Math.max(o, Math.min(Math.round((o + e) / 2 / 5) * 5 - 30, e - 60));
+  return { ...day, breakFrom: toClock(from), breakTo: toClock(Math.min(e, from + 60)) };
+}
+
+/** Each day's slot count and last start ("15:45"), and the total. A day that is unfinished or wrong counts 0. */
+export function draftCount(d: SlotDraft): { perDay: { count: number; last: string | null }[]; total: number } {
+  // The API takes whole minutes from 3 to 120; anything else would also make slotTimes loop for ages.
+  const okMinutes = Number.isInteger(d.minutes) && d.minutes >= 3 && d.minutes <= 120;
+  const perDay = d.days.map((day) => {
+    if (!okMinutes) return { count: 0, last: null };
+    const one = { slot_days: [dayFromDraft(day)], slot_minutes: d.minutes, slot_start_at: null, slot_count: 0 };
+    if ("error" in parseSlotDays(one.slot_days, d.minutes)) return { count: 0, last: null };
+    const times = slotTimes(one);
+    return { count: times.length, last: times.length ? bangkokClock(times[times.length - 1].start.toISOString()) : null };
+  });
+  return { perDay, total: perDay.reduce((n, x) => n + x.count, 0) };
+}
 
 /* ---- moving a judge --------------------------------------------------------- */
 

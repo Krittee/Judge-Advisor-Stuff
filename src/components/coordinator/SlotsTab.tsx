@@ -1,13 +1,15 @@
 "use client";
 
-import { canBook, NO_PANEL_LINE, SET_LANGUAGE_LINE, type SlotsModel } from "./coordinatorLogic";
+import { Fragment } from "react";
+import { canBook, NO_PANEL_LINE, SET_LANGUAGE_LINE, type SlotLine, type SlotsModel } from "./coordinatorLogic";
 import type { CoordinatorViewProps } from "./CoordinatorView";
 import { Info, Pill } from "./TeamsTab";
 import { divisionTag } from "@/components/admin/floorLogic";
-import { Caution, Check } from "@/components/desk/DeskSlots";
+import { BreakIcon, Caution, Check } from "@/components/desk/DeskSlots";
 import { slotTime } from "@/components/desk/deskLogic";
 import { LanguageCover, LanguageTag, type Language } from "@/components/Language";
 import { noSlotsLeftLine, TOO_CLOSE_TITLE, takenTitle } from "@/components/SlotPicker";
+import { dayPrefix } from "@/components/ui";
 import { bookingLanguage } from "@/lib/presets";
 import type { Slot, Team } from "@/lib/types";
 
@@ -23,6 +25,53 @@ export function SlotsTab(p: CoordinatorViewProps & { model: SlotsModel; now: num
   if (!panel) return <p className="dk-empty">No panels yet — the Judge Advisor sets them up.</p>;
 
   const teamById = new Map(p.teams.map((t) => [t.id, t]));
+
+  const renderLine = (line: SlotLine) => {
+    const { slot, kind } = line;
+    const time = slotTime(slot.start);
+
+    if (slot.takenBy) {
+      return (
+        <li key={slot.start} className="co-srow" title={takenTitle(slot.takenBy)}>
+          <span className="co-st">{time}</span>
+          <span className="co-sh">
+            <b>{slot.takenBy.teamNumber}</b>
+            <span>{teamById.get(slot.takenBy.teamId)?.name}</span>
+          </span>
+          <Pill request={{ status: slot.takenBy.status, slot_start: null }} />
+        </li>
+      );
+    }
+
+    const picked = chosen?.start === slot.start;
+    const tooClose = kind === "too-close";
+    return (
+      <li key={slot.start} className="co-srow" data-picked={picked}>
+        <span className="co-st">{time}</span>
+        <span className="co-so" title={tooClose ? TOO_CLOSE_TITLE : undefined}>
+          {tooClose ? "Too close" : "Open"}
+        </span>
+        <button
+          type="button"
+          className="co-bk"
+          aria-pressed={picked}
+          aria-label={tooClose ? `Book ${time}, too close to another booking` : `Book ${time}`}
+          title={tooClose ? TOO_CLOSE_TITLE : undefined}
+          disabled={p.busy || !canBook(bar, line)}
+          onClick={() => p.onPick(picked ? null : slot.start)}
+        >
+          {picked ? (
+            <>
+              <Check />
+              Picked
+            </>
+          ) : (
+            "Book"
+          )}
+        </button>
+      </li>
+    );
+  };
 
   return (
     <>
@@ -61,52 +110,27 @@ export function SlotsTab(p: CoordinatorViewProps & { model: SlotsModel; now: num
 
         {model.lines.length ? (
           <ul className="co-sl" aria-label={`${panel.name} time slots, ${panel.slot_minutes} minutes each`}>
-            {model.lines.map((line) => {
-              const { slot, kind } = line;
-              const time = slotTime(slot.start);
-
-              if (slot.takenBy) {
-                return (
-                  <li key={slot.start} className="co-srow" title={takenTitle(slot.takenBy)}>
-                    <span className="co-st">{time}</span>
-                    <span className="co-sh">
-                      <b>{slot.takenBy.teamNumber}</b>
-                      <span>{teamById.get(slot.takenBy.teamId)?.name}</span>
-                    </span>
-                    <Pill request={{ status: slot.takenBy.status, slot_start: null }} />
+            {model.days.map((day) => (
+              <Fragment key={day.day}>
+                {model.showDayHeadings ? (
+                  <li className="co-dh">
+                    <b>{day.label}</b>
+                    <span>{day.open} open</span>
                   </li>
-                );
-              }
-
-              const picked = chosen?.start === slot.start;
-              const tooClose = kind === "too-close";
-              return (
-                <li key={slot.start} className="co-srow" data-picked={picked}>
-                  <span className="co-st">{time}</span>
-                  <span className="co-so" title={tooClose ? TOO_CLOSE_TITLE : undefined}>
-                    {tooClose ? "Too close" : "Open"}
-                  </span>
-                  <button
-                    type="button"
-                    className="co-bk"
-                    aria-pressed={picked}
-                    aria-label={tooClose ? `Book ${time}, too close to another booking` : `Book ${time}`}
-                    title={tooClose ? TOO_CLOSE_TITLE : undefined}
-                    disabled={p.busy || !canBook(bar, line)}
-                    onClick={() => p.onPick(picked ? null : slot.start)}
-                  >
-                    {picked ? (
-                      <>
-                        <Check />
-                        Picked
-                      </>
-                    ) : (
-                      "Book"
-                    )}
-                  </button>
-                </li>
-              );
-            })}
+                ) : null}
+                {day.rows.map((row) => (
+                  <Fragment key={row.hourStart}>
+                    {row.cells.map(renderLine)}
+                    {row.hourStart === day.breakAfterHour ? (
+                      <li className="co-brk">
+                        <BreakIcon />
+                        <span>{day.breakLabel}</span>
+                      </li>
+                    ) : null}
+                  </Fragment>
+                ))}
+              </Fragment>
+            ))}
           </ul>
         ) : null}
 
@@ -125,16 +149,18 @@ export function BookingBar({
   languages,
   busy,
   onBook,
+  now,
 }: {
   model: SlotsModel;
   languages: Language[];
   busy: boolean;
   onBook: (team: Team, slot: Slot, language: string) => void;
+  now: number;
 }) {
   const { bar, chosen } = model;
   const ready = bar.kind === "ready";
   const language = bar.kind === "ready" ? bookingLanguage(undefined, bar.team, bar.panel) : "";
-  const label = ready ? (chosen ? `Book ${slotTime(chosen.start)}` : "Book · pick a time") : "Book";
+  const label = ready ? (chosen ? `Book ${dayPrefix(chosen.start, now)}${slotTime(chosen.start)}` : "Book · pick a time") : "Book";
 
   return (
     <div className="co-pinb" role="group" aria-label="Booking">

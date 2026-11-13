@@ -42,7 +42,7 @@ const teams = [gremlins, breakers, rangers, titans, byte, sparky, bolt, high];
 
 const panel = (n: number, over: Partial<PublicPanel> = {}): PublicPanel => ({
   id: `p${n}`, name: `Panel ${n}`, division: "Middle School", judges: [], languages: ["th"], sort_order: n,
-  slot_start_at: slotAt(0), slot_minutes: 20, slot_count: 8, ...over,
+  slot_start_at: slotAt(0), slot_minutes: 20, slot_count: 8, slot_days: [], ...over,
 });
 const panels = [panel(1, { languages: ["en"] }), panel(2, { languages: ["en", "th"] }), panel(3), panel(4, { slot_start_at: null, slot_count: 0 })];
 
@@ -287,6 +287,19 @@ test("the pinned bar: who, their language and the panel line; Book waits for a t
   assert.deepEqual(buttons(barOf(slots())).map((b) => b.disabled), [true]);
 });
 
+test("the pinned bar names the weekday for a pick on another day, and not for one today", () => {
+  const barOf = (m: string) => m.match(/<div class="co-pinb"[\s\S]*?<\/button><\/div>/)![0];
+  const label = (now: number) => {
+    const two = { ...panel(3), slot_start_at: "2026-11-21T10:00:00+07:00", slot_minutes: 15, slot_count: 32, slot_days: [
+      { open_at: "2026-11-21T10:00:00+07:00", end_at: "2026-11-21T12:00:00+07:00", break_from: null, break_to: null },
+      { open_at: "2026-11-22T09:00:00+07:00", end_at: "2026-11-22T12:00:00+07:00", break_from: null, break_to: null },
+    ] };
+    return buttons(barOf(slots({ chosenId: byte.id, picked: new Date("2026-11-22T09:15:00+07:00").toISOString(), now, panels: panels.map((x) => (x.id === "p3" ? two : x)) }))).map((b) => b.text);
+  };
+  assert.deepEqual(label(Date.parse("2026-11-21T11:00:00+07:00")), [`Book Sun ${slotTime("2026-11-22T09:15:00+07:00")}`]);
+  assert.deepEqual(label(Date.parse("2026-11-22T08:00:00+07:00")), [`Book ${slotTime("2026-11-22T09:15:00+07:00")}`]);
+});
+
 test("the pinned bar for a team that cannot be booked says why", () => {
   assert.match(text(slots({ chosenId: sparky.id })), /Booking for5150ZSet the language first/);
   assert.match(text(slots({ chosenId: high.id })), /Booking for5555HAlready booked — the queue desk can change it\./);
@@ -304,7 +317,7 @@ test("a panel with no times, or none left, says so instead of an empty list", ()
   assert.match(text(none), /Panel 4 has no bookable times set up yet\./);
   assert.equal(slotRows(none).length, 0);
   const over = slots({ now: BASE + 99 * 20 * 60_000 });
-  assert.match(text(over), /No slots left today — the rest have already passed/);
+  assert.match(text(over), /No slots left — the rest have already passed/);
   assert.equal(slotRows(over).length, 0);
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Elapsed, formatClock } from "@/components/ui";
+import { Elapsed, slotLabel } from "@/components/ui";
 import type { TileData } from "./boardLogic";
 
 /**
@@ -20,7 +20,7 @@ export function TileTime({
   if (tile.slotStart) {
     return (
       <span className={className} suppressHydrationWarning>
-        {formatClock(tile.slotStart)}
+        {slotLabel(tile.slotStart)}
       </span>
     );
   }

@@ -9,8 +9,8 @@ import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
 import type { RequestRow } from "@/lib/types";
 
 /** The status pill: the same fill and ink pairs the board and the desk use. */
-export function Pill({ request }: { request: Pick<RequestRow, "status" | "slot_start"> }) {
-  return <span className={`dk-sc dk-s-${TONE[request.status]}`}>{pillText(request)}</span>;
+export function Pill({ request, now }: { request: Pick<RequestRow, "status" | "slot_start">; now?: number }) {
+  return <span className={`dk-sc dk-s-${TONE[request.status]}`}>{pillText(request, now)}</span>;
 }
 
 export function Info() {
@@ -114,7 +114,7 @@ export function TeamsTab(p: CoordinatorViewProps) {
                         {divisionTag(team.division)}
                         {team.pit ? ` · Pit ${team.pit}` : ""}
                       </span>
-                      {request ? <Pill request={request} /> : null}
+                      {request ? <Pill request={request} now={p.now} /> : null}
                     </span>
                   </span>
                   <span className="co-ask">{none ? "Ask" : ""}</span>
@@ -140,7 +140,7 @@ export function TeamsTab(p: CoordinatorViewProps) {
                 <div className="co-xp" id={`co-x-${team.id}`} role="group" aria-label={`Actions for ${team.number}`}>
                   {state.kind === "held" ? (
                     <p className="co-held">
-                      <Pill request={state.request} />
+                      <Pill request={state.request} now={p.now} />
                       <span>{ASK_DESK_LINE}</span>
                     </p>
                   ) : (
