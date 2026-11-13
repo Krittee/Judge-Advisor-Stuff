@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `COMMIT` | Not yet | Local, not pushed |
 | 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Local, not pushed |
 | 2026-10-31 | [Blended division shows as BLN](#blended-division-shows-as-bln-2026-10-31) | `600a5e8` | Not needed | Local, not pushed |
 | 2026-10-31 | [Judging Board: colour key above Unassigned](#judging-board-colour-key-above-unassigned-2026-10-31) | `4a001a8` | Not needed | Local, not pushed |
@@ -13,6 +14,47 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Local, not pushed |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Local, not pushed |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Local, not pushed |
+
+---
+
+## Coordinator page scrolls past its tab bar (2026-11-13)
+
+### Problem / request
+
+Reported on the live Coordinator console (`/coordinator`, Version 2.1.1), in a desktop browser about 1000 px wide. Scrolling down the Teams tab made the whole page "go over". The Teams / Slots tab bar ended up partway up the screen with a large empty grey area below it, the team cards were cut off at the tab bar, and the browser's scrollbar showed the page as taller than the screen. Expected: the tab bar stays pinned to the bottom and only the team list scrolls.
+
+### Root cause
+
+The console is an app shell (`.co`: `height: 100dvh; overflow: hidden`) with the list scrolling inside `.co-body`. Each EN/TH language chip has a hidden screen-reader label (`<span class="sr-only">`, which Tailwind makes `position: absolute`). Nothing between those labels and `<body>` was positioned, so their containing block was `<body>`, and `.co-body`'s overflow did not clip them. They sat where the cards are laid out, up to about 2,000 px down, and made the document that tall (measured: document 2,025 px on a 552 px window, while `.co` and `<body>` were both 552 px). A wheel or trackpad scroll over the header, the tab bar or the page scrollbar then scrolled the document and slid the whole shell up.
+
+It was not the iOS 100vh issue: the shell already uses `100dvh`. Only the Coordinator leaked. Judge, Referee and the Judge Advisor console measured exactly one screen tall, and the Slots tab was fine. The queue desk scrolls the whole page by design and is unchanged.
+
+### What changed
+
+- `src/app/globals.css`: `.co-body` gets `position: relative`, with a short comment. The scroller is now the containing block for absolutely positioned descendants, so the labels scroll and clip with the list.
+- `tests/coordinatorShell.css.test.mjs` (new): asserts the `.co-body` rule has `position: relative` and `overflow-y: auto`. It fails on the old CSS and passes on the new.
+
+### How it was tested
+
+- Browser preview on a scratch data file (demo roster, never `.data/`), signed in as a coordinator.
+- Before: reproduced at 1000×552 light and 375×700 dark. Wheeling over the tab bar scrolled the document up to 1,473 px, and the shell slid off the screen.
+- After, at 1000×552 light and 375×700 dark, on both tabs: the document height equals the window (552 / 700). Wheeling over the list, the tab bar and the header, and even a forced `window.scrollTo(0, 350)`, leave the page at 0. The list still scrolls to its last card with the tab bar at the bottom of the window.
+- Other consoles re-measured after the change, with the same results as before: Judge, Referee and Judge Advisor at 552 / 552; the queue desk is still its normal document scroll.
+- `npm test`: 1691 tests, 1690 pass, 0 fail, 1 skipped (the same skip as before). `npx tsc --noEmit`: clean. `npm run lint` (`eslint .`): clean.
+- Not checked on a real iPhone, and the user has not confirmed it yet.
+
+### Commit and branch
+
+- Change: `COMMIT` on `claude/co-scroll-fix-59d632`.
+
+### Status
+
+Committed locally on the fix branch. NOT merged, pushed or deployed.
+
+### Follow-ups
+
+- Check on a real iPhone and on the live site once it is merged and deployed (needs approval).
+- The Judge, Referee and Judge Advisor shells have the same unpositioned-scroller pattern but don't leak today, because their hidden labels sit inside positioned elements. If a bare `sr-only` is ever added to one of their lists, the same bug would come back there.
 
 ---
 
