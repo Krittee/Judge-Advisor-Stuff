@@ -710,3 +710,27 @@ test("an old slotStartAt/slotCount body clears the days so the legacy fields app
   assert.equal(refused.status, 400);
   assert.ok(!(await w.db.listPanels()).some((p) => p.name === "Panel Y"), "no panel made");
 });
+
+test("slotMinutes alone that would empty a day or pass the cap is a 400 and changes nothing", async () => {
+  const w = await world();
+  const save = (body: Record<string, unknown>) => hit(panelsRoute, "PATCH", ADMIN, "/api/admin/panels", { id: w.p1.id, ...body });
+  const now = async () => (await w.db.listPanels()).find((p) => p.id === w.p1.id) as Panel;
+
+  // Day 2 is one hour: 15-minute slots fit, 120-minute slots leave it with none.
+  const short = { ...DAY_2, end_at: "2026-11-22T10:00:00+07:00" };
+  await save({ slotMinutes: 15, slotDays: [DAY_1, short] });
+  const before = await now();
+  const empty = await save({ slotMinutes: 120 });
+  assert.equal(empty.status, 400);
+  assert.match(empty.body.error, /^Day 2: no slot fits/);
+  assert.deepEqual(await now(), before, "nothing changed");
+
+  // Two 6-hour days at 3 minutes is 240 slots, over the 200 cap.
+  const long = { ...DAY_2, end_at: "2026-11-22T15:00:00+07:00" };
+  await save({ slotMinutes: 15, slotDays: [DAY_1, long] });
+  const wide = await now();
+  const over = await save({ slotMinutes: 3 });
+  assert.equal(over.status, 400);
+  assert.match(over.body.error, /the most is 200/);
+  assert.deepEqual(await now(), wide, "nothing changed");
+});

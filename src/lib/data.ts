@@ -43,7 +43,8 @@ export function buildSlots(
    */
   excludeRequestId?: string,
 ): Slot[] {
-  if (slotTimes(panel).length === 0) return [];
+  const times = slotTimes(panel);
+  if (times.length === 0) return [];
 
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const held = new Map<number, RequestRow>();
@@ -53,7 +54,7 @@ export function buildSlots(
     held.set(new Date(r.slot_start).getTime(), r);
   }
 
-  return slotTimes(panel).map(({ start, end }) => {
+  return times.map(({ start, end }) => {
     const taken = held.get(start.getTime());
     const team = taken ? teamById.get(taken.team_id) : undefined;
 
@@ -223,11 +224,8 @@ export function slotSummaryFields(
   days: SlotDay[],
   minutes: number,
 ): { slot_start_at: string | null; slot_count: number } {
-  const first = [...days].sort((a, b) => a.open_at.localeCompare(b.open_at))[0];
-  return {
-    slot_start_at: first ? first.open_at : null,
-    slot_count: slotTimes({ slot_days: days, slot_minutes: minutes, slot_start_at: null, slot_count: 0 }).length,
-  };
+  const panel = { slot_days: days, slot_minutes: minutes, slot_start_at: null, slot_count: 0 };
+  return { slot_start_at: panelDays(panel)[0]?.open_at ?? null, slot_count: slotTimes(panel).length };
 }
 
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
@@ -247,7 +245,6 @@ export function parseSlotDays(raw: unknown, minutes: number): { days: SlotDay[] 
   if (raw.length > MAX_SLOT_DAYS) return { error: `A panel can have at most ${MAX_SLOT_DAYS} days.` };
 
   const rows = raw.map((r) => (r && typeof r === "object" ? (r as Record<string, unknown>) : {}));
-  rows.sort((a, b) => (new Date(String(a.open_at)).getTime() || Infinity) - (new Date(String(b.open_at)).getTime() || Infinity));
 
   const days: SlotDay[] = [];
   const dates = new Set<string>();
@@ -286,5 +283,7 @@ export function parseSlotDays(raw: unknown, minutes: number): { days: SlotDay[] 
     days.push(day);
   }
   if (total > MAX_TOTAL_SLOTS) return { error: `That makes ${total} slots; the most is ${MAX_TOTAL_SLOTS}.` };
+  // Named in the order entered above; stored earliest first.
+  days.sort((a, b) => new Date(a.open_at).getTime() - new Date(b.open_at).getTime());
   return { days };
 }

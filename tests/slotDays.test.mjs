@@ -72,3 +72,17 @@ test("slotSummaryFields gives the first open and the total count", () => {
   assert.deepEqual(slotSummaryFields(ok.days, 15), { slot_start_at: "2026-11-21T03:00:00.000Z", slot_count: 32 });
   assert.deepEqual(slotSummaryFields([], 15), { slot_start_at: null, slot_count: 0 });
 });
+
+test("errors name the day by the position the user entered, not the sorted one", () => {
+  // Given reversed: the first-entered day (Day 2 chronologically) has the bad end.
+  refuses([{ ...day2, end_at: day2.open_at }, day1], 15, /^Day 1: .*end time must be after the open time/);
+  refuses([day1, { ...day2, open_at: "soon" }], 15, /^Day 2: .*real times/);
+  refuses([{ ...day1, open_at: "soon" }, day2], 15, /^Day 1: .*real times/);
+});
+
+test("slotSummaryFields picks the first day by instant, not by string", () => {
+  // 10:00+07:00 is 03:00Z, earlier than 04:00Z, though it sorts later as text.
+  const other = { open_at: "2026-11-21T04:00:00.000Z", end_at: "2026-11-21T06:00:00.000Z", break_from: null, break_to: null };
+  const first = { open_at: "2026-11-21T10:00:00+07:00", end_at: "2026-11-21T12:00:00+07:00", break_from: null, break_to: null };
+  assert.equal(slotSummaryFields([other, first], 15).slot_start_at, first.open_at);
+});

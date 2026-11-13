@@ -103,7 +103,9 @@ export async function PATCH(request: Request) {
     } else if ("slotStartAt" in body || "slotCount" in body) {
       patch.slot_days = [];
     } else if (patch.slot_minutes !== undefined && was?.slot_days?.length) {
-      Object.assign(patch, slotSummaryFields(was.slot_days, patch.slot_minutes));
+      const parsed = parseSlotDays(was.slot_days, patch.slot_minutes);
+      if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+      Object.assign(patch, slotSummaryFields(parsed.days, patch.slot_minutes));
     }
 
     /* The judges field is the roster's now: each name is found or added and
