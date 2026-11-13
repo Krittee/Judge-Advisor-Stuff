@@ -3442,6 +3442,35 @@ body:has(.admin) > .theme-toggle:hover {
 /* The judge, slot and take-off dialogs: a bottom sheet on a phone (the take-off question is a centred card on any screen) */
 .ja-pn-sub { font-family: var(--font-fira), ui-sans-serif, system-ui, sans-serif; font-weight: 400; font-size: 15px; letter-spacing: 0; }
 .ja-pn-g2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+
+/* The slot dialog: minutes each, then a card per day (design/slot-windows/reference-phones and reference-ja-wide). Two cards side by side on wide. */
+.ja-sl-mins { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.ja-sl-mins .ja-fl { width: 150px; }
+.ja-sl-tot { margin: 0; padding-bottom: 12px; color: var(--ink-subtle); font-size: 14px; font-variant-numeric: tabular-nums; }
+.ja-sl-tot b { color: var(--ink); font-weight: 500; }
+.ja-sl-days { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.ja-sl-day { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--canvas); }
+.ja-sl-dh { display: flex; align-items: center; gap: 8px; }
+.ja-sl-dh h3 { flex: 1; font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; font-weight: 700; font-size: 18px; }
+.ja-sl-dt { width: 176px; flex: none; }
+.ja-sl-mins .ja-in, .ja-sl-day .ja-in { height: 44px; padding: 0 8px; border-radius: 12px; font-size: 16px; font-variant-numeric: tabular-nums; }
+.ja-sl-mins .ja-in { text-align: center; }
+.ja-sl-day .ja-in[type="time"] { text-align: center; }
+.ja-sl-g3 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) 44px; gap: 8px; align-items: end; }
+.ja-sl-g3 > .ja-fl { gap: 4px; }
+.ja-sl-mini { color: var(--ink-subtle); font-weight: 400; font-size: 13px; }
+.ja-sl-rm { display: grid; flex: none; width: 44px; height: 44px; place-items: center; border-radius: 10px; background: transparent; color: var(--ink-subtle); }
+.ja-sl-rm:hover { background: var(--surface-2); color: var(--ink); }
+.ja-sl-nob { display: flex; min-height: 44px; align-items: center; justify-content: space-between; color: var(--ink-subtle); font-size: 14px; }
+.ja-sl-nob b { font-weight: 500; }
+.ja-sl-q { display: inline-flex; flex: none; min-height: 44px; align-items: center; gap: 6px; padding: 0 8px; border-radius: 10px; background: transparent; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
+.ja-sl-q:hover:not(:disabled) { color: var(--ink); }
+.ja-sl-q svg { width: 16px; height: 16px; }
+.ja-sl-cnt { display: flex; margin: auto 0 0; align-items: center; gap: 4px; color: var(--ink-subtle); font-size: 13px; font-variant-numeric: tabular-nums; }
+.ja-sl-cnt b { color: var(--ink); font-weight: 500; }
+.ja-sl-add { display: flex; align-items: center; gap: 12px; }
+.ja-sl-foot { display: flex; flex-direction: column; gap: 6px; }
+.ja-sl-foot .ja-sl-q { align-self: center; }
 .ja-sheet.ja-pn-cfm { width: calc(100% - 32px); max-width: 26rem; max-height: calc(100dvh - 32px); margin: auto; border: 1px solid var(--jg-field-line); border-radius: 16px; }
 .ja-pn-cf { display: flex; min-height: 0; flex-direction: column; padding: 20px; overflow-y: auto; }
 .ja-pn-cf h2 { font-weight: 700; font-size: 21px; line-height: 1.2; letter-spacing: -0.005em; }
@@ -3507,6 +3536,10 @@ body:has(.admin) > .theme-toggle:hover {
   /* The sheets are centred dialogs here. */
   .ja-pn-dlg { max-width: 26rem; max-height: min(40rem, calc(100dvh - 4rem)); margin: auto; border: 1px solid var(--jg-field-line); border-radius: 20px; }
   .ja-pn-dlg .jg-grab { display: none; }
+  .ja-pn-dlg.ja-sl-dlg { width: 47.5rem; max-width: calc(100% - 2rem); }
+  .ja-sl-days { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .ja-sl-foot { flex-direction: row-reverse; align-items: center; justify-content: space-between; }
+  .ja-sl-foot .ja-prim { padding: 0 32px; }
 }
 
 /* @ja-block import */

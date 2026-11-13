@@ -202,11 +202,21 @@ test("the language toggles are pressed buttons; with none on it says Not stated"
   assert.match(none, /<p class="ja-hint">Not stated — no request will be flagged\.<\/p>/);
 });
 
+const twoDays = panel(2, "Middle School", {
+  slot_minutes: 15, slot_count: 32, slot_start_at: "2026-11-21T03:00:00.000Z",
+  slot_days: [
+    { open_at: "2026-11-21T03:00:00.000Z", end_at: "2026-11-21T09:00:00.000Z", break_from: "2026-11-21T05:00:00.000Z", break_to: "2026-11-21T06:00:00.000Z" },
+    { open_at: "2026-11-22T02:00:00.000Z", end_at: "2026-11-22T05:00:00.000Z", break_from: null, break_to: null },
+  ],
+});
+
 test("the slots line summarises the grid and Edit opens the fields; off says so", () => {
   const m = board();
   assert.match(cardOf(m, "Panel 1"), new RegExp(`<div class="ja-pn-bsl"><span>${slotsSummary(panels[0]).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</span><button type="button" class="ja-pn-edit" aria-haspopup="dialog" aria-label="Edit booking slots for Panel 1">Edit</button></div>`));
-  assert.match(text(cardOf(m, "Panel 1")), /8 slots from .+ · 20 min/);
-  assert.match(text(cardOf(m, "Panel 4")), /10 slots from .+ · 15 min/);
+  assert.match(text(cardOf(m, "Panel 1")), /Day 1 17:00–19:40 · 20 min/, "a legacy panel reads as one day, in Bangkok time");
+  assert.match(text(cardOf(m, "Panel 4")), /Day 1 17:20–19:50 · 15 min/);
+  const two = board({ state: { panels: [twoDays] } });
+  assert.match(text(cardOf(two, "Panel 2")), /Day 1 10:00–16:00 · Day 2 09:00–12:00 · 15 min/);
   assert.match(cardOf(m, "Panel 3"), /<div class="ja-pn-bsl" data-off="true"><span>Booking slots off<\/span>/);
 });
 
@@ -343,15 +353,39 @@ test("Rename starts on the judge's name and has no note", () => {
   assert.doesNotMatch(renderToStaticMarkup(<JudgeDialog mode={null} onSubmit={async () => {}} onClose={noop} />), /<form/);
 });
 
-test("the slot dialog keeps the grid fields, the Booking slots (N) header and the walk-up caption", () => {
-  const d = renderToStaticMarkup(<SlotsDialog panel={panels[0]} onSave={async () => {}} onClose={noop} />);
-  assert.match(text(d), /Booking slots \(8\) · Panel 1/);
-  assert.match(d, /<label class="ja-lab" for="[^"]+-start">First slot starts<\/label><input[^>]*type="datetime-local"/);
-  assert.match(d, /Minutes each<\/label><input[^>]*type="number" min="3" max="120" value="20"/);
-  assert.match(d, /How many<\/label><input[^>]*type="number" min="0" max="60" value="8"/);
-  assert.match(d, /<p class="ja-hint">Set “how many” to 0 for walk-up queue only\.<\/p>/);
-  assert.match(d, />Save slot grid<\/button>/);
-  assert.match(text(renderToStaticMarkup(<SlotsDialog panel={panels[2]} onSave={async () => {}} onClose={noop} />)), /Booking slots \(off\) · Panel 3/);
+test("the slot dialog shows a card per day, the counts and the save button", () => {
+  const d = renderToStaticMarkup(<SlotsDialog panel={twoDays} onSave={async () => {}} onClose={noop} />);
+  assert.match(text(d), /Booking slots \(32\) · Panel 2/);
+  assert.match(d, /<h3[^>]*>Day 1<\/h3>/);
+  assert.match(d, /<h3[^>]*>Day 2<\/h3>/);
+  for (const [label, type, value] of [["Date", "date", "2026-11-21"], ["Open", "time", "10:00"], ["End", "time", "16:00"], ["Break from", "time", "12:00"], ["Break to", "time", "13:00"], ["Date", "date", "2026-11-22"], ["Open", "time", "09:00"], ["End", "time", "12:00"]]) {
+    assert.match(d, new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${label}</label><input[^>]*id="\\1"[^>]*type="${type}"[^>]*value="${value}"`), `${label} ${value}`);
+  }
+  assert.match(d, /Minutes each<\/label><input[^>]*type="number" min="3" max="120"[^>]*value="15"/);
+  assert.match(text(d), /20 slots · last 15:45/);
+  assert.match(text(d), /12 slots · last 11:45/);
+  assert.match(text(d), /32 slots in all/);
+  assert.match(text(d), /Save slots · 32/);
+  assert.match(d, /aria-label="Remove Day 2"/);
+  assert.doesNotMatch(d, /aria-label="Remove Day 1"/, "Day 1 stays");
+  assert.match(d, /aria-label="Remove Day 1 break"/);
+  assert.match(text(d), /Break · none/);
+  assert.match(text(d), /Add break/);
+  assert.match(text(d), /2 days for now/, "at the cap there is no Add day");
+  assert.doesNotMatch(text(d), /Add day/);
+  assert.match(text(d), /Turn booking off/);
+});
+
+test("one day offers Add day; a panel that is off offers a first day and no Turn booking off", () => {
+  const one = renderToStaticMarkup(<SlotsDialog panel={{ ...twoDays, slot_days: twoDays.slot_days.slice(0, 1) }} onSave={async () => {}} onClose={noop} />);
+  assert.match(text(one), /Add day/);
+  assert.doesNotMatch(text(one), /2 days for now/);
+  assert.doesNotMatch(one, /aria-label="Remove Day \d"/);
+  const off = text(renderToStaticMarkup(<SlotsDialog panel={panels[2]} onSave={async () => {}} onClose={noop} />));
+  assert.match(off, /Booking slots \(off\) · Panel 3/);
+  assert.match(off, /Add day/);
+  assert.doesNotMatch(off, /Turn booking off/);
+  assert.match(off, /Save slots · 0/);
 });
 
 /* ---- the wiring, read from source -------------------------------------------- */
@@ -413,6 +447,16 @@ test("the take-off dialog answers No for Escape, the backdrop and Cancel, and Ye
   assert.ok(tab.includes("el.showModal();") && tab.includes('querySelector<HTMLElement>("[data-autofocus]")?.focus()'));
   // Answering clears the question and settles the promise the move is waiting on.
   assert.match(tab, /function answerTakeOff\(ok: boolean\) \{\s*takeOff\?\.answer\(ok\);\s*setTakeOff\(null\);/);
+});
+
+test("the slot dialog saves { slotMinutes, slotDays }, Turn booking off sends slotDays: [], and the server's sentence lands in the alert", () => {
+  const dlg = tab.slice(tab.indexOf("function SlotsBody"));
+  assert.ok(dlg.includes("void send(slotBody(draft))") && dlg.includes("await onSave(panel.id, body)"));
+  assert.ok(dlg.includes("void send({ slotDays: [] })"));
+  assert.match(dlg, /catch \(err\) \{\s*setError\(\(err as Error\)\.message\);/);
+  assert.match(dlg, /<p className="ja-err" role="alert">/);
+  assert.ok(tab.includes("<SlotsDialog panel={slotsPanel} onSave={patchPanel} onClose={() => setSlotsFor(null)} />"));
+  assert.ok(!/useConfirm|ask\(/.test(dlg), "no confirm: it is not a destructive loss of data");
 });
 
 test("no keydown handler on this tab opens a question: the one there closes the menu and nothing else", () => {
