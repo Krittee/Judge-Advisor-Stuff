@@ -173,11 +173,11 @@ test("short slots stay on one line per hour: 12-minute gives five columns, 5-min
   assert.deepEqual([twenty.columns, twenty.rows[0].cells.map((c) => c.column)], [3, [0, 1, 2]]);
 });
 
-test("the hour row template is unchanged up to four columns and gets a 52px minimum past that", () => {
+test("the hour row template is unchanged up to four columns and gets a 48px minimum past that", () => {
   assert.equal(hourRowColumns(3), "56px repeat(3, minmax(0, 1fr))");
   assert.equal(hourRowColumns(4), "56px repeat(4, minmax(0, 1fr))");
-  assert.equal(hourRowColumns(5), "56px repeat(5, minmax(52px, 1fr))");
-  assert.equal(hourRowColumns(12), "56px repeat(12, minmax(52px, 1fr))");
+  assert.equal(hourRowColumns(5), "56px repeat(5, minmax(48px, 1fr))");
+  assert.equal(hourRowColumns(12), "56px repeat(12, minmax(48px, 1fr))");
   assert.deepEqual([4, 5].map(isWideGrid), [false, true]);
 });
 

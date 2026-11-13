@@ -185,7 +185,7 @@ const WIDE_FROM = 5;
 
 /** The grid-template-columns of an hour row: the hour label, then one column per slot position. */
 export function hourRowColumns(columns: number): string {
-  return `56px repeat(${columns}, minmax(${columns >= WIDE_FROM ? "52px" : "0"}, 1fr))`;
+  return `56px repeat(${columns}, minmax(${columns >= WIDE_FROM ? "48px" : "0"}, 1fr))`;
 }
 
 /** True when the grid has more columns than fit a phone without scrolling. */

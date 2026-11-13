@@ -105,9 +105,20 @@ re-save them there too if the slots were edited during the rollback.
 - Re-timing a panel does not move bookings already made, as before.
 - A device set to a timezone other than Bangkok may show a weekday that
   doesn't match the clock. Event devices are in Bangkok.
-- Slots shorter than 15 minutes still wrap their hour row onto two lines on
-  the desk grid. This is older behaviour, not from this change, and it is a
-  follow-up.
+
+### Desk grid: one line per hour for any slot length
+
+Slots shorter than 15 minutes used to wrap an hour's row onto two lines,
+which broke the project's single-line rule. The database default is 12
+minutes, and the new dialog makes short slots easy to choose. Now an hour is
+always one row, with one column per slot position:
+
+- 15- and 20-minute panels look exactly as before.
+- 12-minute slots fit five to a row on a phone.
+- Shorter slots make the whole grid scroll sideways, with the hour label
+  pinned on the left.
+
+Checked in the browser at 375 with a 12-minute and a 5-minute panel.
 
 ---
 

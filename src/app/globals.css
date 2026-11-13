@@ -2469,7 +2469,8 @@ body:has(.desk, .co) > .theme-toggle:hover {
 .dk-slots--wide { container-type: inline-size; overflow-x: auto; padding: 3px; margin: -3px; }
 .dk-slots--wide .dk-slots-in { width: max-content; min-width: 100%; }
 .dk-slots--wide .dk-dh, .dk-slots--wide .dk-brk { position: sticky; left: 0; width: 100cqw; }
-.dk-slots--wide .dk-hrow > h3 { grid-column: 1 / -1; width: 56px; position: sticky; left: 0; z-index: 1; background: var(--surface); }
+.dk-slots--wide .dk-hrow { gap: 6px; }
+.dk-slots--wide .dk-hrow > h3 { grid-column: 1 / -1; width: 56px; align-self: stretch; display: flex; flex-direction: column; justify-content: center; position: sticky; left: -3px; z-index: 1; background: var(--dk-slots-bg, var(--canvas)); box-shadow: -3px 0 0 var(--dk-slots-bg, var(--canvas)), 6px 0 0 var(--dk-slots-bg, var(--canvas)); }
 .dk-slots--wide .dk-slot b { gap: 2px; font-size: 14px; }
 .dk-slots--wide .dk-slot b svg { width: 12px; height: 12px; }
 .dk-hrow { display: grid; align-items: center; gap: 8px; }
@@ -3247,7 +3248,7 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-tm-rq { display: flex; flex-wrap: wrap; gap: 8px; }
 .ja-tm-rq .ja-tm-ghost { flex: 1 1 130px; }
 .ja-tm-bt { flex: none; width: 100%; }
-.ja-tm-slots { --dk-field: var(--jg-field); --dk-field-line: var(--jg-field-line); display: flex; flex-direction: column; gap: 10px; }
+.ja-tm-slots { --dk-field: var(--jg-field); --dk-field-line: var(--jg-field-line); --dk-slots-bg: var(--surface); display: flex; flex-direction: column; gap: 10px; }
 .ja-tm-tt { display: flex; flex-direction: column; gap: 6px; }
 .ja-tm-tr { display: grid; grid-template-columns: minmax(0, 1fr) 132px; align-items: center; gap: 12px; }
 .ja-tm-tr .ja-in { padding: 0 8px; text-align: center; font-variant-numeric: tabular-nums; }
