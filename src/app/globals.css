@@ -2163,7 +2163,11 @@ body:has(.judge) > .theme-toggle:hover {
 
 .co-msgs { display: flex; flex: none; flex-direction: column; gap: 8px; padding: 10px var(--co-gutter) 0; }
 
+/* position: relative makes the scroller the containing block for absolute descendants (the chips'
+   sr-only labels), so they scroll and clip with the list instead of stretching the document past
+   the 100dvh shell and letting the whole page scroll. */
 .co-body {
+  position: relative;
   display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 10px;
   padding: 12px var(--co-gutter) 14px; overflow-y: auto; overscroll-behavior: contain;
 }
