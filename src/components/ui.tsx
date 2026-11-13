@@ -6,7 +6,9 @@ import type { Status } from "@/lib/status";
 import { bookingUrgency, type BookingUrgency } from "@/lib/data";
 import { ConsoleLinks } from "./nav";
 import type { Role } from "@/lib/auth";
-import { bangkokDay, bangkokWeekday } from "@/lib/stepTimes";
+import { dayPrefix } from "@/lib/stepTimes";
+
+export { dayPrefix };
 
 /** Live "4m ago" text that ticks without a re-render of the whole tree. */
 export function Elapsed({ since, prefix = "" }: { since: string | null; prefix?: string }) {
@@ -51,11 +53,6 @@ export function formatClock(iso: string | null): string {
  */
 export function slotLabel(iso: string | null, now: number = Date.now()): string {
   return iso ? `${dayPrefix(iso, now)}${formatClock(iso)}` : "—";
-}
-
-/** "Sun " when the time is on a different Bangkok day from `now`, else "": the one place that rule lives. */
-export function dayPrefix(iso: string, now: number = Date.now()): string {
-  return bangkokDay(iso) === bangkokDay(new Date(now).toISOString()) ? "" : `${bangkokWeekday(iso)} `;
 }
 
 /**

@@ -1417,7 +1417,8 @@ function demoData(): Data {
     sort_order: i + 1,
     // Every demo panel runs slots, so "Book a time" has something to show
     // straight away. Panel C keeps a shorter grid to look less uniform.
-    slot_start_at: iso(20),
+    // Whole minute, so the slot dialog can re-save it without shifting the grid.
+    slot_start_at: new Date(Math.ceil((now + 20 * 60_000) / 60_000) * 60_000).toISOString(),
     slot_minutes: bookingDefaults().slotMinutes,
     slot_count: i === 2 ? 5 : 8,
     slot_days: [],

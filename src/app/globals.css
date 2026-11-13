@@ -3441,7 +3441,6 @@ body:has(.admin) > .theme-toggle:hover {
 
 /* The judge, slot and take-off dialogs: a bottom sheet on a phone (the take-off question is a centred card on any screen) */
 .ja-pn-sub { font-family: var(--font-fira), ui-sans-serif, system-ui, sans-serif; font-weight: 400; font-size: 15px; letter-spacing: 0; }
-.ja-pn-g2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 
 /* The slot dialog: minutes each, then a card per day (design/slot-windows/reference-phones and reference-ja-wide). Two cards side by side on wide. */
 .ja-sl-mins { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }

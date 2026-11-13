@@ -42,6 +42,10 @@ const weekdayFormat = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Bangkok
 /** The short Bangkok weekday of an ISO time: "Sun". */
 export const bangkokWeekday = (iso: string): string => weekdayFormat.format(new Date(iso));
 
+/** "Sun " when the time is on a different Bangkok day from `now`, else "": the one place that rule lives. */
+export const dayPrefix = (iso: string, now: number = Date.now()): string =>
+  bangkokDay(iso) === bangkokDay(new Date(now).toISOString()) ? "" : `${bangkokWeekday(iso)} `;
+
 /** The Bangkok weekday, day and month of an ISO time: "Sat 21 Nov". */
 export const bangkokDayLabel = (iso: string): string => {
   const part = (type: string) => dayLabelFormat.formatToParts(new Date(iso)).find((p) => p.type === type)?.value ?? "";

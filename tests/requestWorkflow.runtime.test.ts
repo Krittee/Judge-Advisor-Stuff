@@ -599,7 +599,8 @@ test("rescheduling logs the new time on the Bangkok clock, wherever the server r
   }
 
   const line = (await w.db.listActivity()).find((a) => a.request_id === held.id);
-  assert.equal(line?.action, "rescheduled to 10:20");
+  // 2099-01-01 is a Thursday in Bangkok, another day from now, so the weekday leads the clock.
+  assert.equal(line?.action, "rescheduled to Thu 10:20");
 });
 
 /* ===== the screens: what they send (source-checked, like the other pages) = */

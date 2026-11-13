@@ -353,6 +353,17 @@ test("no break row once the morning has passed: nothing remains before it", () =
   assert.equal(g.days[0].open, 12);
 });
 
+test("a break inside one hour row (12:15–12:45) gets no row; 12:00–13:00 still does", () => {
+  const same = { ...TWO_DAYS, slot_days: [{ ...TWO_DAYS.slot_days[0], break_from: "2026-11-21T12:15:00+07:00", break_to: "2026-11-21T12:45:00+07:00" }] };
+  const slots = buildSlots(same, [], []);
+  const g = slotGrid(slots, same, { teamId: null, currentStart: null, now: Date.parse("2026-11-21T09:00:00+07:00") });
+  assert.equal(g.days[0].breakLabel, null);
+  assert.equal(g.days[0].breakAfterHour, null);
+  const normal = gridAt("2026-11-21T09:00:00+07:00");
+  assert.equal(normal.days[0].breakLabel, "12:00–13:00 · Break");
+  assert.equal(bangkokClock(normal.days[0].breakAfterHour!), "11:00");
+});
+
 test("a one-day legacy panel has no headings and the rows it always had", () => {
   const legacy = { id: "p-old", slot_start_at: "2026-11-21T10:00:00+07:00", slot_minutes: 20, slot_count: 6, slot_days: [] };
   const slots = buildSlots(legacy, [], []);

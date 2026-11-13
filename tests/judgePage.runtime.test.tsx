@@ -9,7 +9,8 @@ import { QueueTab, type QueueActions } from "../src/components/judge/QueueTab";
 import { ScoresTab } from "../src/components/judge/ScoresTab";
 import { RubricSegment, TeamSheet } from "../src/components/judge/TeamSheet";
 import { TodayTab } from "../src/components/judge/TodayTab";
-import { cancelAfterAsking, dayLabel } from "../src/components/judge/logic";
+import { cancelAfterAsking } from "../src/components/judge/logic";
+import { bangkokDayLabel } from "../src/lib/stepTimes";
 import { createConfirmer, type Pending } from "../src/components/ConfirmDialog";
 import { rankTeams } from "../src/lib/ranking";
 import { rubricById, rubrics } from "../src/lib/rubrics";
@@ -519,7 +520,7 @@ test("with no slots today, Today names the date the panel's slots are on", () =>
   const markup = renderToStaticMarkup(
     <TodayTab panel={{ name: "Panel A", slot_minutes: 20 }} slots={slots} teams={[]} panelTeams={[]} requests={[]} categories={categories} now={NOW} onOpen={noop} />,
   );
-  assert.ok(markup.includes(`No slots today. Panel A&#x27;s slots are on ${dayLabel(start)}.`), markup);
+  assert.ok(markup.includes(`No slots today. Panel A&#x27;s slots are on ${bangkokDayLabel(start)}.`), markup);
   assert.doesNotMatch(markup, /jg-now|jg-sl|booked/, "no timeline for another day");
 });
 

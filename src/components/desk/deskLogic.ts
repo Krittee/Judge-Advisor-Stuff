@@ -205,9 +205,10 @@ export function slotGrid(slots: Slot[], panel: SlotFields, ctx: SlotContext): Sl
     breakLabel: null,
   }));
   const byHour = panelDay.map(() => new Map<number, SlotRow>());
-  // Per day: the last slot before its break, and whether any slot follows it.
-  const around = panelDay.map(() => ({ before: null as Slot | null, after: false }));
+  // Per day: the last slot before its break, and the first slot after it.
+  const around = panelDay.map(() => ({ before: null as Slot | null, after: null as Slot | null }));
   let shown = 0;
+  const hourOf = (iso: string) => new Date(iso).setMinutes(0, 0, 0);
 
   for (const slot of slots) {
     const kind = slotKind(slot, ctx);
@@ -221,7 +222,7 @@ export function slotGrid(slots: Slot[], panel: SlotFields, ctx: SlotContext): Sl
     if (kind === "open") day.open++;
 
     const at = new Date(slot.start);
-    const hour = new Date(at).setMinutes(0, 0, 0);
+    const hour = hourOf(slot.start);
     let row = byHour[i].get(hour);
     if (!row) {
       row = { hourStart: new Date(hour).toISOString(), cells: [] };
@@ -237,7 +238,7 @@ export function slotGrid(slots: Slot[], panel: SlotFields, ctx: SlotContext): Sl
 
     if (brk.break_from && brk.break_to) {
       if (at.getTime() < new Date(brk.break_from).getTime()) around[i].before = slot;
-      else if (at.getTime() >= new Date(brk.break_to).getTime()) around[i].after = true;
+      else if (at.getTime() >= new Date(brk.break_to).getTime()) around[i].after ??= slot;
     }
   }
 
@@ -245,10 +246,12 @@ export function slotGrid(slots: Slot[], panel: SlotFields, ctx: SlotContext): Sl
     .map((d, i) => {
       const { before, after } = around[i];
       if (!before || !after) return d;
+      // Both sides in one hour row (12:15–12:45): the gap in that row says it, a row below would sit under 12:45.
+      if (hourOf(before.start) === hourOf(after.start)) return d;
       const brk = panelDay[i];
       return {
         ...d,
-        breakAfterHour: new Date(new Date(before.start).setMinutes(0, 0, 0)).toISOString(),
+        breakAfterHour: new Date(hourOf(before.start)).toISOString(),
         breakLabel: `${bangkokClock(brk.break_from!)}–${bangkokClock(brk.break_to!)} · Break`,
       };
     })

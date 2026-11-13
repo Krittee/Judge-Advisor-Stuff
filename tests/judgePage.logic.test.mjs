@@ -6,7 +6,6 @@ import {
   clearScoresQuestion,
   clockParts,
   completedBeforeSlots,
-  dayLabel,
   dueText,
   flagDetail,
   interviewTimer,
@@ -106,19 +105,27 @@ test("the time column splits the period off so the column stays narrow", () => {
   assert.ok(period === "" || /^[AP]M$/i.test(period), `a 12-hour locale gives AM/PM, a 24-hour one nothing (got "${period}")`);
 });
 
-test("Today keeps the slots on today's date, and names the other date when none are", () => {
-  const slot = (d, h, m = 0) => ({ start: new Date(2026, 9, d, h, m).toISOString() });
-  // Slots either side of midnight: the 16th is another day, however close.
-  const mixed = [slot(16, 23, 40), slot(17, 0, 0), slot(17, 23, 40), slot(18, 0, 0)];
-  const { today, otherDay } = slotsToday(mixed, NOW);
+test("Today keeps the slots on today's Bangkok date, and names the next slot's day when none are", () => {
+  const bkk = (iso) => ({ start: iso });
+  const now = (iso) => Date.parse(iso);
+  // Slots either side of Bangkok midnight: the 16th is another day, however close.
+  const mixed = [bkk("2026-10-16T23:40:00+07:00"), bkk("2026-10-17T00:00:00+07:00"), bkk("2026-10-17T23:40:00+07:00"), bkk("2026-10-18T00:00:00+07:00")];
+  const { today, otherDay } = slotsToday(mixed, now("2026-10-17T12:36:00+07:00"));
   assert.deepEqual(today, [mixed[1], mixed[2]]);
   assert.equal(otherDay, null);
 
-  const earlier = [slot(16, 9), slot(16, 9, 20)];
-  const none = slotsToday(earlier, NOW);
-  assert.deepEqual(none.today, []);
-  assert.equal(none.otherDay, dayLabel(earlier[0].start), "named by the first slot's date");
-  assert.match(none.otherDay, /16/);
+  // Two days with a gap between: 21 Nov (Sat) and 23 Nov (Mon); today is the 22nd.
+  const two = [bkk("2026-11-21T10:00:00+07:00"), bkk("2026-11-21T10:15:00+07:00"), bkk("2026-11-23T09:00:00+07:00"), bkk("2026-11-23T09:15:00+07:00")];
+  const between = slotsToday(two, now("2026-11-22T08:00:00+07:00"));
+  assert.deepEqual(between.today, []);
+  assert.equal(between.otherDay, "Mon 23 Nov", "names the next slot's day, not the first slot's");
+  // Day 1 evening: today is still Day 1, so its (passed) slots stay; Day 2 morning: Day 2's.
+  assert.equal(slotsToday(two, now("2026-11-21T20:00:00+07:00")).today.length, 2);
+  const morning = slotsToday(two, now("2026-11-23T08:00:00+07:00"));
+  assert.deepEqual(morning.today, [two[2], two[3]]);
+  assert.equal(morning.otherDay, null);
+  assert.equal(slotsToday(two, now("2026-11-20T08:00:00+07:00")).otherDay, "Sat 21 Nov", "before the event: the first day");
+  assert.equal(slotsToday(two, now("2026-11-24T08:00:00+07:00")).otherDay, "Mon 23 Nov", "after the event: the last day");
 
   assert.deepEqual(slotsToday([], NOW), { today: [], otherDay: null }, "no slots at all is not another day");
 });
