@@ -5,7 +5,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { DoorPage } from "../src/components/door/DoorPage";
-import { Welcome } from "../src/components/SignInForm";
+import { SignInForm, Welcome } from "../src/components/SignInForm";
 import { TICKET_ERROR, TeamTicket, ticketTarget } from "../src/components/door/TeamTicket";
 import { TeamNotFound } from "../src/components/team/TeamView";
 import { filterTeamNumberInput } from "../src/lib/teamNumber";
@@ -160,4 +160,17 @@ test("the coordinator is on the crew pass with its own picture", () => {
 
 test("the top bar brand stays the front door", () => {
   assert.match(read("src/components/ui.tsx"), /href="\/"/);
+});
+
+test("the coordinator's sign-in band sizes its word by the longest word, so COORDINATOR fits", () => {
+  const router = {} as React.ContextType<typeof AppRouterContext>;
+  const markup = renderToStaticMarkup(
+    <AppRouterContext.Provider value={router}>
+      <SignInForm title="Coordinator" intro="" door="coordinator" />
+    </AppRouterContext.Provider>,
+  );
+  assert.match(markup, /<div class="si-role" style="--si-letters:11">Coordinator<\/div>/);
+  const wide = read("src/app/globals.css").match(/@media \(min-width: 768px\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(wide, /\.si-band \{ container-type: inline-size;/);
+  assert.match(wide, /\.si-role \{[^}]*font-size: min\(26px, 100cqi \/ var\(--si-letters/);
 });

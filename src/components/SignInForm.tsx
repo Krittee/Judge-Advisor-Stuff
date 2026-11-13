@@ -216,6 +216,9 @@ export function SignInForm({
 /** The top of the pass: who it is for, and the crew it covers. */
 function Band({ door, checking }: { door?: Role; checking: boolean }) {
   const look = !door ? "" : door === "referee" ? " si-band--ref" : ` si-band--solo ${ROLES[door].tone}`;
+  const label = door ? ROLES[door].label : "Staff";
+  // The word must fit the band, so CSS sizes it by its longest word.
+  const longest = Math.max(...label.split(" ").map((w) => w.length));
   return (
     <div className={`si-band${look}${checking ? " is-checking" : ""}`}>
       <span className="si-slot" aria-hidden="true" />
@@ -231,7 +234,7 @@ function Band({ door, checking }: { door?: Role; checking: boolean }) {
           </span>
           <span>Judge Queue</span>
         </div>
-        <div className="si-role">{door ? ROLES[door].label : "Staff"}</div>
+        <div className="si-role" style={{ "--si-letters": longest } as React.CSSProperties}>{label}</div>
       </div>
 
       {door ? (

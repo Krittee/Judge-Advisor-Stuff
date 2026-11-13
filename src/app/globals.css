@@ -1024,9 +1024,10 @@ body:has(.landing) > .theme-toggle:hover {
   .si-stage { flex-direction: row; align-items: center; justify-content: center; padding: 0 32px 56px; }
   .si-pwrap { flex: none; width: 100%; max-width: 780px; min-height: 572px; margin: 0; }
   .si-pass { flex-direction: row; }
-  .si-band { width: 240px; min-height: 0; justify-content: space-between; gap: 0; padding: 36px 28px 28px; }
+  .si-band { container-type: inline-size; width: 240px; min-height: 0; justify-content: space-between; gap: 0; padding: 36px 28px 28px; }
   .si-band-top { display: contents; }
-  .si-role { order: 2; text-align: left; font-size: 26px; letter-spacing: 0.2em; }
+  /* The band is a fixed width, so the word shrinks only when its longest word would not fit, at about 1em per letter. */
+  .si-role { order: 2; text-align: left; font-size: min(26px, 100cqi / var(--si-letters, 7)); letter-spacing: 0.2em; }
   .si-crew { flex-direction: column; gap: 12px; }
   .si-mate { flex: none; flex-direction: row; justify-content: flex-start; gap: 14px; }
   .si-solo { align-items: flex-start; gap: 10px; }
@@ -2163,7 +2164,11 @@ body:has(.judge) > .theme-toggle:hover {
 
 .co-msgs { display: flex; flex: none; flex-direction: column; gap: 8px; padding: 10px var(--co-gutter) 0; }
 
+/* position: relative makes the scroller the containing block for absolute descendants (the chips'
+   sr-only labels), so they scroll and clip with the list instead of stretching the document past
+   the 100dvh shell and letting the whole page scroll. */
 .co-body {
+  position: relative;
   display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 10px;
   padding: 12px var(--co-gutter) 14px; overflow-y: auto; overscroll-behavior: contain;
 }
