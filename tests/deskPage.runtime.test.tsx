@@ -46,7 +46,7 @@ const teams = [byte, robo, titans, bolt, high];
 
 const panel2: PublicPanel = {
   id: "p2", name: "Panel 2", division: "Middle School", judges: [], languages: ["en", "th"], sort_order: 2,
-  slot_start_at: slotAt(0), slot_minutes: 20, slot_count: 7,
+  slot_start_at: slotAt(0), slot_minutes: 20, slot_count: 7, slot_days: [],
 };
 
 const req = (over: Partial<RequestRow>): RequestRow => ({

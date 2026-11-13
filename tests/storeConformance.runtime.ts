@@ -1494,4 +1494,39 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
       "two panels sharing a code would sign judges into the wrong one",
     );
   });
+
+  /* ---- slot windows: per-day booking days ----------------------------- */
+
+  const DAY_1 = { open_at: "2026-11-21T10:00:00+07:00", end_at: "2026-11-21T16:00:00+07:00", break_from: "2026-11-21T12:00:00+07:00", break_to: "2026-11-21T13:00:00+07:00" };
+  const DAY_2 = { open_at: "2026-11-22T09:00:00+07:00", end_at: "2026-11-22T12:00:00+07:00", break_from: null, break_to: null };
+
+  it("a new panel has no slot days; they round-trip through updatePanel", async (store) => {
+    const panel = await store.createPanel(panelInput());
+    assert.deepEqual(panel.slot_days, []);
+
+    const saved = await store.updatePanel(panel.id, { slot_days: [DAY_1, DAY_2], slot_minutes: 15, slot_count: 32, slot_start_at: DAY_1.open_at });
+    assert.deepEqual(saved.slot_days, [DAY_1, DAY_2]);
+    assert.deepEqual((await store.listPanels())[0].slot_days, [DAY_1, DAY_2]);
+
+    const off = await store.updatePanel(panel.id, { slot_days: [] });
+    assert.deepEqual(off.slot_days, []);
+  });
+
+  it("a Day 2 slot can be booked, and the walking gap holds across the panel's days", async (store) => {
+    const panel = await store.createPanel(panelInput({ slot_minutes: 20 }));
+    await store.updatePanel(panel.id, { slot_days: [DAY_1, DAY_2], slot_count: 32, slot_start_at: DAY_1.open_at });
+    await store.upsertTeams([teamInput("1001"), teamInput("1002")]);
+    const a = await store.findTeamByNumber("1001");
+    const b = await store.findTeamByNumber("1002");
+    assert.ok(a && b);
+
+    const day2 = (hhmm: string, to: string) => ({ kind: "slot", slotStart: `2026-11-22T${hhmm}:00+07:00`, slotEnd: `2026-11-22T${to}:00+07:00` });
+    await store.createRequest(requestInput(a.id, panel.id, day2("09:00", "09:15")));
+    await assert.rejects(
+      () => store.createRequest(requestInput(b.id, panel.id, day2("09:15", "09:30"))),
+      (e: unknown) => e instanceof StoreError,
+      "a slot within 20 minutes of a booking on the same panel is refused",
+    );
+    await store.createRequest(requestInput(b.id, panel.id, day2("09:30", "09:45")));
+  });
 }

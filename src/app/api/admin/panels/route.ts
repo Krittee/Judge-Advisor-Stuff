@@ -5,6 +5,7 @@ import { store, StoreError } from "@/lib/db";
 import { takeOffPanel, teamsToTakeOff } from "@/lib/conflicts";
 import { judgeKey } from "@/lib/roster";
 import type { Panel } from "@/lib/types";
+import { parseSlotDays, slotSummaryFields } from "@/lib/data";
 import { parseLanguageList, presetDivisions } from "@/lib/presets";
 import { normalizePanelCode } from "@/lib/panelCode";
 
@@ -30,18 +31,27 @@ export async function POST(request: Request) {
   const name = String(body.name ?? "").trim().slice(0, 80);
   if (!name) return NextResponse.json({ error: "Give the panel a name." }, { status: 400 });
 
+  const slotMinutes = clamp(body.slotMinutes, 3, 120, 12);
+  const days = "slotDays" in body ? parseSlotDays(body.slotDays, slotMinutes) : null;
+  if (days && "error" in days) return NextResponse.json({ error: days.error }, { status: 400 });
+
   try {
-    const panel = await store().createPanel({
+    let panel = await store().createPanel({
       name,
       code: normalizePanelCode(body.code) || (await store().generatePanelCode()),
       division: resolveDivision(body.division),
       judges: parseJudges(body.judges),
       languages: parseLanguageList(body.languages),
       sort_order: Number(body.sortOrder) || 0,
-      slot_minutes: clamp(body.slotMinutes, 3, 120, 12),
-      slot_count: clamp(body.slotCount, 0, 60, 0),
-      slot_start_at: body.slotStartAt ? new Date(String(body.slotStartAt)).toISOString() : null,
+      slot_minutes: slotMinutes,
+      ...(days
+        ? slotSummaryFields(days.days, slotMinutes)
+        : {
+            slot_count: clamp(body.slotCount, 0, 60, 0),
+            slot_start_at: body.slotStartAt ? new Date(String(body.slotStartAt)).toISOString() : null,
+          }),
     });
+    if (days?.days.length) panel = await store().updatePanel(panel.id, { slot_days: days.days });
     await logSetup(session, "added a panel", `${panel.name} · ${panel.division}`);
     return NextResponse.json({ panel });
   } catch (e) {
@@ -81,6 +91,21 @@ export async function PATCH(request: Request) {
     const db = store();
     const was = (await db.listPanels()).find((p) => p.id === id);
 
+    /* Booking windows. slotDays (with the minutes each) is the new way and wins; an old
+       slotStartAt / slotCount body clears the days so the legacy fields apply; minutes
+       alone on a panel with days re-derives the count from the stored days. */
+    if ("slotDays" in body) {
+      if (!was) return NextResponse.json({ error: "That panel no longer exists." }, { status: 404 });
+      const minutes = patch.slot_minutes ?? was.slot_minutes;
+      const parsed = parseSlotDays(body.slotDays, minutes);
+      if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+      Object.assign(patch, { slot_days: parsed.days, slot_minutes: minutes }, slotSummaryFields(parsed.days, minutes));
+    } else if ("slotStartAt" in body || "slotCount" in body) {
+      patch.slot_days = [];
+    } else if (patch.slot_minutes !== undefined && was?.slot_days?.length) {
+      Object.assign(patch, slotSummaryFields(was.slot_days, patch.slot_minutes));
+    }
+
     /* The judges field is the roster's now: each name is found or added and
        put on this panel, and anyone else on it is taken off. A judge with a
        conflict who joins a panel that holds the team takes it off, so that
@@ -118,7 +143,7 @@ export async function PATCH(request: Request) {
     }
     // The judges field is the roster's and logged above; this is the panel's own settings.
     const changed = (Object.keys(patch) as (keyof Panel)[]).filter(
-      (k) => k !== "judges" && String(was?.[k]) !== String(panel[k]),
+      (k) => k !== "judges" && JSON.stringify(was?.[k]) !== JSON.stringify(panel[k]),
     );
     if (changed.length) {
       await logSetup(session, "edited a panel", `${panel.name} · ${changed.map((k) => k.replace(/_/g, " ")).join(", ")}`);

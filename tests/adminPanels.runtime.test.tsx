@@ -24,7 +24,7 @@ const languages = [
   { id: "th", label: "ไทย", short: "TH" },
 ];
 const panel = (n: number, division: string, over: Partial<PublicPanel> = {}): PublicPanel => ({
-  id: `p${n}`, name: `Panel ${n}`, division, judges: [], languages: ["en"], sort_order: n, slot_start_at: null, slot_minutes: 20, slot_count: 0, ...over,
+  id: `p${n}`, name: `Panel ${n}`, division, judges: [], languages: ["en"], sort_order: n, slot_start_at: null, slot_minutes: 20, slot_count: 0, slot_days: [], ...over,
 });
 // The Panels mock, as data: Panel 3 has booking slots off, Panel 4 is in Elementary School.
 const panels = [

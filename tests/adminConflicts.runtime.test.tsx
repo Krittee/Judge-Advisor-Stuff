@@ -12,7 +12,7 @@ import type { AppState, ConflictRow, JudgeRow, PublicPanel, Team } from "../src/
    adminConflicts.logic.test.mjs and the wiring is read from source at the foot. */
 
 const panel = (n: number, division: string): PublicPanel => ({
-  id: `p${n}`, name: `Panel ${n}`, division, judges: [], languages: ["en"], sort_order: n, slot_start_at: null, slot_minutes: 20, slot_count: 0,
+  id: `p${n}`, name: `Panel ${n}`, division, judges: [], languages: ["en"], sort_order: n, slot_start_at: null, slot_minutes: 20, slot_count: 0, slot_days: [],
 });
 const panels = [panel(1, "High School"), panel(2, "Middle School"), panel(3, "Middle School"), panel(4, "Elementary School")];
 

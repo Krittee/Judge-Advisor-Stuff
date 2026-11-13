@@ -1,6 +1,16 @@
 import type { Status } from "./status";
 import type { MatchType } from "./rules";
 
+/** One day of a panel's booking window. Both breaks are set or both null. */
+export type SlotDay = {
+  /** ISO instant the first slot starts. */
+  open_at: string;
+  /** ISO instant the last slot must end by; same Bangkok day as open_at. */
+  end_at: string;
+  break_from: string | null;
+  break_to: string | null;
+};
+
 export type Panel = {
   id: string;
   name: string;
@@ -14,6 +24,8 @@ export type Panel = {
   slot_start_at: string | null;
   slot_minutes: number;
   slot_count: number;
+  /** The panel's booking days. [] = not set: the legacy slot_* fields apply. */
+  slot_days: SlotDay[];
   created_at: string;
 };
 

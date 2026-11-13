@@ -21,7 +21,7 @@ const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.ur
 const text = (markup: string) => markup.replace(/<[^>]+>/g, "");
 
 const panel = (n: number, division: string): PublicPanel => ({
-  id: `p${n}`, name: `Panel ${n}`, division, judges: [], languages: ["en"], sort_order: n, slot_start_at: null, slot_minutes: 20, slot_count: 0,
+  id: `p${n}`, name: `Panel ${n}`, division, judges: [], languages: ["en"], sort_order: n, slot_start_at: null, slot_minutes: 20, slot_count: 0, slot_days: [],
 });
 const panels = [panel(1, "High School"), panel(2, "Middle School"), panel(3, "Middle School"), panel(4, "Elementary School")];
 const judge = (id: string, panel_id: string | null): JudgeRow => ({ id, name: id, note: null, panel_id, created_at: "2026-10-20T08:00:00Z" });

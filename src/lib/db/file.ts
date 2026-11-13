@@ -311,7 +311,10 @@ function migrate(data: Data): Data {
 
   // Languages and panel language cover arrived after the first rosters.
   for (const r of data.requests) r.language ??= defaultLanguage();
-  for (const p of data.panels) p.languages ??= [];
+  for (const p of data.panels) {
+    p.languages ??= [];
+    p.slot_days ??= [];
+  }
   for (const t of data.teams) t.languages ??= [];
   const fallback = data.panels[0]?.division ?? DEFAULT_DIVISION;
 
@@ -801,12 +804,12 @@ function autoAssignTeams(perPanel: number, includeAssigned = false, division?: s
  * Panels
  * ------------------------------------------------------------------ */
 
-function createPanel(input: Omit<Panel, "id" | "created_at">): Panel {
+function createPanel(input: Omit<Panel, "id" | "created_at" | "slot_days">): Panel {
   if (state().panels.some((p) => p.code.toUpperCase() === normalizePanelCode(input.code))) {
     throw new StoreError("That panel code is already in use.", 409);
   }
   const { judges, ...rest } = input;
-  const panel: StoredPanel = { ...rest, id: randomUUID(), created_at: new Date().toISOString() };
+  const panel: StoredPanel = { ...rest, slot_days: [], id: randomUUID(), created_at: new Date().toISOString() };
   state().panels.push(panel);
   syncPanelJudges(panel.id, judges);
   save();
@@ -917,6 +920,7 @@ function seedPresetPanels(): number {
       slot_start_at: preset.slotStartAt,
       slot_minutes: preset.slotMinutes,
       slot_count: preset.slotCount,
+      slot_days: [],
       created_at: new Date().toISOString(),
     });
     syncPanelJudges(id, preset.judges);
@@ -1416,6 +1420,7 @@ function demoData(): Data {
     slot_start_at: iso(20),
     slot_minutes: bookingDefaults().slotMinutes,
     slot_count: i === 2 ? 5 : 8,
+    slot_days: [],
     created_at: iso(0),
   }));
 

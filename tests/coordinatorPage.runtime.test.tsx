@@ -42,7 +42,7 @@ const teams = [gremlins, breakers, rangers, titans, byte, sparky, bolt, high];
 
 const panel = (n: number, over: Partial<PublicPanel> = {}): PublicPanel => ({
   id: `p${n}`, name: `Panel ${n}`, division: "Middle School", judges: [], languages: ["th"], sort_order: n,
-  slot_start_at: slotAt(0), slot_minutes: 20, slot_count: 8, ...over,
+  slot_start_at: slotAt(0), slot_minutes: 20, slot_count: 8, slot_days: [], ...over,
 });
 const panels = [panel(1, { languages: ["en"] }), panel(2, { languages: ["en", "th"] }), panel(3), panel(4, { slot_start_at: null, slot_count: 0 })];
 

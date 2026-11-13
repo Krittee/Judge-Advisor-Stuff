@@ -39,7 +39,7 @@ const panel = (n: number, division: string, langs: string[], judges: string[]): 
   languages: langs,
   sort_order: n,
   slot_start_at: null,
-  slot_minutes: 20,
+  slot_minutes: 20, slot_days: [],
   slot_count: 0,
 });
 const panels = [

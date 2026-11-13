@@ -28,7 +28,7 @@ const team = (number: string, over: Partial<Team> = {}): Team => ({
 
 const panel: PublicPanel = {
   id: "p1", name: "Panel 1", division: "Middle School", judges: ["Dana Ruiz", "Chris Lin"], languages: [],
-  sort_order: 1, slot_start_at: null, slot_minutes: 20, slot_count: 0,
+  sort_order: 1, slot_start_at: null, slot_minutes: 20, slot_count: 0, slot_days: [],
 };
 
 const req = (teamNumber: string, over: Partial<RequestRow>): RequestRow => ({

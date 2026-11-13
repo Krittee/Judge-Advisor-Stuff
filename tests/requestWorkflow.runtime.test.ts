@@ -527,6 +527,30 @@ test("booking a slot that has already ended is a 409; a slot still to come is ac
   assert.equal(future.status, 200, future.body.error);
 });
 
+test("with booking days: a Day 2 slot is accepted, a break time and an old-grid slot are refused", async () => {
+  const w = await world();
+  // Days a day or two ahead in Bangkok, so nothing has passed yet.
+  const bkk = (plusDays: number) =>
+    new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + plusDays * 86_400_000));
+  const [d1, d2] = [bkk(1), bkk(2)];
+  const at = (d: string, hhmm: string) => `${d}T${hhmm}:00+07:00`;
+  const legacy = slotOf(w.panelA, 12); // on the old grid, still to come
+  await w.db.updatePanel(w.panelA.id, {
+    slot_minutes: 15,
+    slot_days: [
+      { open_at: at(d1, "10:00"), end_at: at(d1, "16:00"), break_from: at(d1, "12:00"), break_to: at(d1, "13:00") },
+      { open_at: at(d2, "09:00"), end_at: at(d2, "12:00"), break_from: null, break_to: null },
+    ],
+  });
+
+  const book = (d: string, from: string, to: string) => post(QUEUER, { teamNumber: "1001", kind: "slot", slotStart: at(d, from), slotEnd: at(d, to) });
+  assert.equal((await book(d1, "12:15", "12:30")).status, 409, "inside the break");
+  assert.equal((await post(QUEUER, { teamNumber: "1001", kind: "slot", ...legacy })).status, 409, "the old grid is gone");
+  assert.equal((await w.db.listRequests()).length, 0);
+  const ok = await book(d2, "09:15", "09:30");
+  assert.equal(ok.status, 200, ok.body.error);
+});
+
 test("rescheduling onto a slot that has already ended is a 409 and leaves the booking where it was", async () => {
   const w = await world();
   const held = await booking(w, 12);

@@ -38,7 +38,7 @@ const other = (n: number): Team => ({ ...titans, id: `t-other${n}`, number: `10$
 
 const panel2: PublicPanel = {
   id: "p2", name: "Panel 2", division: "Middle School", judges: ["Priya Nair", "Alex Chen"], languages: ["en", "es"],
-  sort_order: 2, slot_start_at: slotAt(0), slot_minutes: 20, slot_count: 7,
+  sort_order: 2, slot_start_at: slotAt(0), slot_minutes: 20, slot_count: 7, slot_days: [],
 };
 
 const req = (over: Partial<RequestRow>): RequestRow => ({

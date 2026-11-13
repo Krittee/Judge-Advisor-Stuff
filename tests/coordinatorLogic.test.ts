@@ -30,7 +30,7 @@ const at = (n: number, minutes = 20) => new Date(BASE + n * minutes * 60_000).to
 
 const panel = (id: string, over: Partial<PublicPanel> = {}): PublicPanel => ({
   id, name: `Panel ${id.slice(1)}`, division: "Middle School", judges: [], languages: ["th"], sort_order: 1,
-  slot_start_at: at(0), slot_minutes: 20, slot_count: 6, ...over,
+  slot_start_at: at(0), slot_minutes: 20, slot_count: 6, slot_days: [], ...over,
 });
 const p2 = panel("p2", { languages: ["en"] });
 const p3 = panel("p3");
