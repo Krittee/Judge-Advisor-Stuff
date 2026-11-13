@@ -17,7 +17,7 @@ launch itself.
 
 ---
 
-## Version 2.2.0: Slot windows (open to end, per day, with a break)
+## Version 2.1.3: Slot windows (open to end, per day, with a break)
 
 Branch `claude/slot-windows`, cut from the default branch at `aa4a433` (2.1.2).
 Local commits only, not pushed. Spec and chosen mocks: `design/slot-windows/`
@@ -73,7 +73,7 @@ Local commits only, not pushed. Spec and chosen mocks: `design/slot-windows/`
 If 2.1.2 is ever redeployed over the same database, it ignores `slot_days`.
 It would show a two-day panel as one long run of slots from Day 1's open
 time. After rolling back, the JA should re-save each panel's slots. After
-rolling forward to 2.2.0 again, the saved days take over once more, so
+rolling forward to 2.1.3 again, the saved days take over once more, so
 re-save them there too if the slots were edited during the rollback.
 
 ### Checks

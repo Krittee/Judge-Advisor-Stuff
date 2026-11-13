@@ -174,4 +174,4 @@ export function slotGrid(slots: Slot[], panel: SlotFields, ctx: SlotContext): Sl
 
 ### After Task 3 (Opus)
 
-Review each task's diff against the spec. Then browser-check on a copy of `.data` (JA dialog at 1280 and 375, desk Book, Coordinator Slots), and check on the iPhone 17 simulator (desk + Coordinator). Add a "Version 2.2.0: slot windows" section to `RELEASE-NOTES-2.0-2.2.md` (including the rollback note), bump `package.json` to 2.2.0, and commit locally.
+Review each task's diff against the spec. Then browser-check on a copy of `.data` (JA dialog at 1280 and 375, desk Book, Coordinator Slots), and check on the iPhone 17 simulator (desk + Coordinator). Add a "Version 2.1.3: slot windows" section to `RELEASE-NOTES-2.0-2.2.md` (including the rollback note), bump `package.json` to 2.1.3, and commit locally.

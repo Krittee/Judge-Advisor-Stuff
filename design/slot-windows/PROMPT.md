@@ -1,4 +1,4 @@
-# Slot windows: open–end per day, a break, two days (v2.2.0)
+# Slot windows: open–end per day, a break, two days (v2.1.3)
 
 Chosen direction: **A · Day cards** (canvas row "v2.2 · Slot windows").
 Reference boards in this folder: `reference-phones.dc.html` (JA sheet + desk
