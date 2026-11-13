@@ -9,6 +9,7 @@ import { BreakIcon, Caution, Check } from "@/components/desk/DeskSlots";
 import { slotTime } from "@/components/desk/deskLogic";
 import { LanguageCover, LanguageTag, type Language } from "@/components/Language";
 import { noSlotsLeftLine, TOO_CLOSE_TITLE, takenTitle } from "@/components/SlotPicker";
+import { dayPrefix } from "@/components/ui";
 import { bookingLanguage } from "@/lib/presets";
 import type { Slot, Team } from "@/lib/types";
 
@@ -148,16 +149,18 @@ export function BookingBar({
   languages,
   busy,
   onBook,
+  now,
 }: {
   model: SlotsModel;
   languages: Language[];
   busy: boolean;
   onBook: (team: Team, slot: Slot, language: string) => void;
+  now: number;
 }) {
   const { bar, chosen } = model;
   const ready = bar.kind === "ready";
   const language = bar.kind === "ready" ? bookingLanguage(undefined, bar.team, bar.panel) : "";
-  const label = ready ? (chosen ? `Book ${slotTime(chosen.start)}` : "Book · pick a time") : "Book";
+  const label = ready ? (chosen ? `Book ${dayPrefix(chosen.start, now)}${slotTime(chosen.start)}` : "Book · pick a time") : "Book";
 
   return (
     <div className="co-pinb" role="group" aria-label="Booking">

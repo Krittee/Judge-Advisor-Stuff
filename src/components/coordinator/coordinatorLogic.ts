@@ -1,4 +1,5 @@
 import { slotGrid, slotKind, slotTime, teamMatches, type GridDay, type SlotKind } from "@/components/desk/deskLogic";
+import { dayPrefix } from "@/components/ui";
 import { buildSlots, liveRequestFor } from "@/lib/data";
 import { comparePits } from "@/lib/pit";
 import { STATUS_META } from "@/lib/status";
@@ -46,10 +47,10 @@ export function requestOf(teamId: string, requests: RequestRow[]): RequestRow | 
   return done[0] ?? null;
 }
 
-/** "Booked 10:40" for a booking, else the status's short word. */
-export function pillText(request: Pick<RequestRow, "status" | "slot_start">): string {
+/** "Booked 10:40" ("Booked Sun 9:15" on another day) for a booking, else the status's short word. */
+export function pillText(request: Pick<RequestRow, "status" | "slot_start">, now: number = Date.now()): string {
   const word = STATUS_META[request.status].short;
-  return request.status === "scheduled" && request.slot_start ? `${word} ${slotTime(request.slot_start)}` : word;
+  return request.status === "scheduled" && request.slot_start ? `${word} ${dayPrefix(request.slot_start, now)}${slotTime(request.slot_start)}` : word;
 }
 
 export type TeamFilter = { query: string; division: string; notAskedOnly: boolean };

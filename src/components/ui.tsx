@@ -50,9 +50,12 @@ export function formatClock(iso: string | null): string {
  * seen on Day 1 is not mistaken for one today.
  */
 export function slotLabel(iso: string | null, now: number = Date.now()): string {
-  if (!iso) return "—";
-  if (bangkokDay(iso) === bangkokDay(new Date(now).toISOString())) return formatClock(iso);
-  return `${bangkokWeekday(iso)} ${formatClock(iso)}`;
+  return iso ? `${dayPrefix(iso, now)}${formatClock(iso)}` : "—";
+}
+
+/** "Sun " when the time is on a different Bangkok day from `now`, else "": the one place that rule lives. */
+export function dayPrefix(iso: string, now: number = Date.now()): string {
+  return bangkokDay(iso) === bangkokDay(new Date(now).toISOString()) ? "" : `${bangkokWeekday(iso)} `;
 }
 
 /**

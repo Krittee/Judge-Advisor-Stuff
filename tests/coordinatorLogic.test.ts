@@ -102,7 +102,12 @@ test("a team's pill is its live request, else its booking, else the interview it
 });
 
 test("pill words: a booking carries its time, the rest are the status's short word", () => {
-  assert.equal(pillText({ status: "scheduled", slot_start: at(3) }), `Booked ${slotTime(at(3))}`);
+  assert.equal(pillText({ status: "scheduled", slot_start: at(3) }, BASE), `Booked ${slotTime(at(3))}`);
+  // Another Bangkok day: Saturday's desk sees Sunday's booking with its weekday, still without AM/PM.
+  const sunday = "2026-11-22T09:15:00+07:00";
+  const saturday = Date.parse("2026-11-21T11:00:00+07:00");
+  assert.equal(pillText({ status: "scheduled", slot_start: sunday }, saturday), `Booked Sun ${slotTime(sunday)}`);
+  assert.equal(pillText({ status: "scheduled", slot_start: sunday }, Date.parse("2026-11-22T08:00:00+07:00")), `Booked ${slotTime(sunday)}`);
   assert.equal(pillText({ status: "scheduled", slot_start: null }), "Booked");
   assert.equal(pillText({ status: "acknowledged", slot_start: null }), "On the way");
   assert.equal(pillText({ status: "interviewing", slot_start: null }), "Interviewing");
