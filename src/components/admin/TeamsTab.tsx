@@ -705,7 +705,7 @@ function TeamTable({ shown, panels, requests, flags, flagKinds, stranded, langua
                   <PanelMisfit team={team} panels={panels} languages={languages} />
                 </td>
                 <td className="ja-tm-lo">
-                  <span className={bookedAt ? "ja-tm-bk" : "ja-tm-bk ja-tm-none"}>{formatClock(bookedAt)}</span>
+                  <span className={bookedAt ? "ja-tm-bk" : "ja-tm-bk ja-tm-none"}>{slotLabel(bookedAt)}</span>
                 </td>
                 <td>{request ? <StatusPill status={request.status} short /> : <span className="ja-tm-bk ja-tm-none">—</span>}</td>
                 <td>
@@ -1041,7 +1041,7 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, bu
         </div>
         <div className="ja-fl">
           <span className="ja-lab">{time.label}</span>
-          <span className={time.at ? "ja-tm-bk" : "ja-tm-bk ja-tm-none"}>{formatClock(time.at)}</span>
+          <span className={time.at ? "ja-tm-bk" : "ja-tm-bk ja-tm-none"}>{time.label === "Booked" ? slotLabel(time.at) : formatClock(time.at)}</span>
           {booking && bookingPanel ? (
             <button type="button" className="ja-tm-od ja-tm-ts" aria-expanded={changing} disabled={busy} onClick={() => setChanging(!changing)}>
               Change time

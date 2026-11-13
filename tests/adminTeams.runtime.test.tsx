@@ -1,3 +1,4 @@
+import { slotLabel } from "../src/components/ui";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
@@ -159,7 +160,7 @@ test("a row carries pit, notebook, division, panel, booked time, status pill and
   assert.ok(row.includes(`class="ja-sp ${pillClass("amber")}"`));
   assert.ok(rowOf(m, "3141P").includes(`class="ja-sp ${pillClass("black")}" title="Disqualified">DQ ×1</span>`));
   // A booked slot shows its time and the Booked pill; a team with nothing shows dashes.
-  assert.match(rowOf(m, "4410C"), /ja-tm-bk">\d{1,2}:\d{2}[^<]*<\/span>[\s\S]*jg-s-scheduled">Booked/);
+  assert.match(rowOf(m, "4410C"), /ja-tm-bk">(?:[A-Z][a-z]{2} )?\d{1,2}:\d{2}[^<]*<\/span>[\s\S]*jg-s-scheduled">Booked/);
   assert.match(text(rowOf(m, "5150Z")), /5150ZSparkyC7Fully DevelopedMSNot asked/);
   assert.doesNotMatch(rowOf(m, "5150Z"), /jg-sc|ja-sp/);
 });
@@ -247,7 +248,7 @@ test("the drawer edits number, pit, name, division, notebook and panel, and show
   const dv = selectOf(d, "division");
   assert.deepEqual(optionsOf(dv).map((o) => o[1]), ["High School", "Middle School", "Elementary School"]);
   assert.match(dv, /<option value="Middle School" selected="">Middle School<\/option>/);
-  assert.match(d, /<span class="ja-lab">Booked<\/span><span class="ja-tm-bk">\d{1,2}:\d{2}/);
+  assert.match(d, /<span class="ja-lab">Booked<\/span><span class="ja-tm-bk">(?:[A-Z][a-z]{2} )?\d{1,2}:\d{2}/);
   const nb = selectOf(d, "category");
   assert.deepEqual(optionsOf(nb).map((o) => o[1]), ["Developing", "Fully Developed", "Ungraded"]);
   assert.match(nb, /<option value="ungraded" selected="">Ungraded<\/option>/);
@@ -670,7 +671,7 @@ test("with no panel, or a panel change not yet saved, both are off and the drawe
 
 test("a booking: its time with Change time under it, Cancel booking (asks first) in the Interview row, and no Request or Book", () => {
   const d = drawer(board({ picked: rangers }));
-  assert.match(d, /<span class="ja-lab">Booked<\/span><span class="ja-tm-bk">\d{1,2}:\d{2}[^<]*<\/span><button type="button" class="ja-tm-od ja-tm-ts" aria-expanded="false">Change time<\/button>/);
+  assert.match(d, /<span class="ja-lab">Booked<\/span><span class="ja-tm-bk">(?:[A-Z][a-z]{2} )?\d{1,2}:\d{2}[^<]*<\/span><button type="button" class="ja-tm-od ja-tm-ts" aria-expanded="false">Change time<\/button>/);
   assert.match(d, /<button type="button" class="ja-tm-rmb">Cancel booking<\/button><p class="ja-hint">Asks first\. Frees the (?:[A-Z][a-z]{2} )?\d{1,2}:\d{2}[^<]*slot\.<\/p>/);
   assert.match(d, /jg-s-scheduled">Booked/);
   assert.match(d, /Reset to…/, "the override stays as it was");
@@ -772,4 +773,13 @@ test("the Interview controls' styles live in the Teams block, use tokens, and gi
   assert.doesNotMatch(teams, /oklch\(|#[0-9a-f]{3,6}\b|\brgb\(|transition|animation/i);
   // The desk's tile classes are defined once, bare, for both screens.
   assert.match(css, /\.dk-slot \{[^}]*height: 48px/);
+});
+
+test("a booking on another day reads with its weekday in the table and the drawer, not as a bare clock", () => {
+  const slot = "2026-10-20T11:00:00.000Z"; // a Tuesday in Bangkok, never today
+  const label = slotLabel(slot, Date.parse("2026-10-19T03:00:00.000Z"));
+  assert.match(label, /^Tue /);
+  assert.ok(rowOf(board(), "4410C").includes(`ja-tm-bk">${slotLabel(slot)}</span>`));
+  assert.ok(drawer(board({ picked: rangers })).includes(`<span class="ja-lab">Booked</span><span class="ja-tm-bk">${slotLabel(slot)}</span>`));
+  assert.match(slotLabel(slot), /^[A-Z][a-z]{2} /);
 });

@@ -1,4 +1,4 @@
-import { formatClock, formatMinutes } from "@/components/ui";
+import { formatMinutes, slotLabel } from "@/components/ui";
 import { STATUS_META, type Status } from "@/lib/status";
 import { bangkokDay } from "@/lib/stepTimes";
 import type { RequestRow } from "@/lib/types";
@@ -144,7 +144,7 @@ export function statusCaps(s: Status): string {
 
 /** A step's time as one line: "10:40 AM", "4 min ago", "just now". */
 export function stepTime(at: StepAt, now: number): string {
-  if (at.kind === "clock") return formatClock(at.iso);
+  if (at.kind === "clock") return slotLabel(at.iso, now);
   const { text, suffix } = agoParts(at.iso, now);
   return suffix ? `${text} ${suffix}` : text;
 }
