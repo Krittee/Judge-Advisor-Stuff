@@ -21,6 +21,7 @@ import type {
   ScoreRow,
   Team,
   WinnerRow,
+  NoWinnerRow,
 } from "../types";
 import type { Status } from "../status";
 import { readActivity, type StoredActivity } from "../activity";
@@ -51,6 +52,7 @@ import {
   type NewAdminNomination,
   type NewNomination,
   type NewWinner,
+  type NewNoWinner,
   type NominationKey,
   type FlagEdit,
   type NewRefereeSetup,
@@ -91,6 +93,8 @@ type Data = {
   nominations: NominationRow[];
   /** The Judge Advisor's pick per (award, division). */
   winners: WinnerRow[];
+  /** Awards the Judge Advisor marked "No winner", per division. */
+  noWinners: NoWinnerRow[];
   conflicts: ConflictRow[];
   /** The judge roster, in the order judges were added. */
   judges: JudgeRow[];
@@ -169,6 +173,7 @@ function empty(): Data {
     scores: [],
     nominations: [],
     winners: [],
+    noWinners: [],
     conflicts: [],
     judges: [],
     flags: [],
@@ -255,6 +260,7 @@ function migrate(data: Data): Data {
   // Nominations gained a role when the Judge Advisor could nominate; an older one is a judge's.
   for (const n of data.nominations) n.role ??= "judge";
   data.winners ??= [];
+  data.noWinners ??= [];
   data.conflicts ??= [];
   data.judges ??= [];
   data.flags ??= [];
@@ -506,7 +512,7 @@ function listRequests(): RequestRow[] {
 
 function listNotes(teamId?: string): Note[] {
   return state().notes
-    .filter((n) => !teamId || n.team_id === teamId)
+    .filter((n) => !n.deleted_at && (!teamId || n.team_id === teamId))
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, 400);
 }
@@ -979,6 +985,36 @@ function createNote(input: NewNote): Note {
   return note;
 }
 
+function getNote(id: string): Note | null {
+  return state().notes.find((n) => n.id === id) ?? null;
+}
+
+function updateNote(id: string, body: string, editedBy: string): Note | null {
+  const note = getNote(id);
+  if (!note || note.deleted_at) return null;
+  note.body = body;
+  note.edited_at = new Date().toISOString();
+  note.edited_by = editedBy;
+  save();
+  return note;
+}
+
+function deleteNote(id: string): Note | null {
+  const note = getNote(id);
+  if (!note || note.deleted_at) return null;
+  note.deleted_at = new Date().toISOString();
+  save();
+  return note;
+}
+
+function restoreNote(id: string): Note | null {
+  const note = getNote(id);
+  if (!note?.deleted_at) return null;
+  note.deleted_at = null;
+  save();
+  return note;
+}
+
 function listConflicts(): ConflictRow[] {
   return [...state().conflicts];
 }
@@ -1317,7 +1353,7 @@ function listWinners(): WinnerRow[] {
   return state().winners.map((w) => ({ ...w }));
 }
 
-/** Awards are decided per division, so (award, division) holds one team and a second replaces it. */
+/** Awards are decided per division. With `places` 1, (award, division) holds one team and a second replaces it; with more, teams are added beside each other. */
 function setWinner(input: NewWinner): WinnerRow {
   if (!state().teams.some((t) => t.id === input.teamId)) throw new StoreError("That team no longer exists.", 404);
 
@@ -1328,7 +1364,14 @@ function setWinner(input: NewWinner): WinnerRow {
     decided_by: input.decidedBy,
     decided_at: new Date().toISOString(),
   };
-  const at = state().winners.findIndex((w) => w.award_id === row.award_id && w.division === row.division);
+  if (input.places <= 1) {
+    state().winners = state().winners.filter(
+      (w) => !(w.award_id === row.award_id && w.division === row.division && w.team_id !== row.team_id),
+    );
+  }
+  const at = state().winners.findIndex(
+    (w) => w.award_id === row.award_id && w.division === row.division && w.team_id === row.team_id,
+  );
   if (at >= 0) state().winners[at] = row;
   else state().winners.push(row);
 
@@ -1336,10 +1379,40 @@ function setWinner(input: NewWinner): WinnerRow {
   return { ...row };
 }
 
-function clearWinner(awardId: string, division: string): boolean {
+function clearWinner(awardId: string, division: string, teamId?: string): boolean {
   const before = state().winners.length;
-  state().winners = state().winners.filter((w) => !(w.award_id === awardId && w.division === division));
+  state().winners = state().winners.filter(
+    (w) => !(w.award_id === awardId && w.division === division && (!teamId || w.team_id === teamId)),
+  );
   const removed = state().winners.length < before;
+  if (removed) save();
+  return removed;
+}
+
+function listNoWinners(): NoWinnerRow[] {
+  return state().noWinners.map((n) => ({ ...n }));
+}
+
+/** Like a winner, one mark per (award, division); marking again refreshes who and when. */
+function setNoWinner(input: NewNoWinner): NoWinnerRow {
+  const row: NoWinnerRow = {
+    award_id: input.awardId,
+    division: input.division,
+    decided_by: input.decidedBy,
+    decided_at: new Date().toISOString(),
+  };
+  const at = state().noWinners.findIndex((n) => n.award_id === row.award_id && n.division === row.division);
+  if (at >= 0) state().noWinners[at] = row;
+  else state().noWinners.push(row);
+
+  save();
+  return { ...row };
+}
+
+function clearNoWinner(awardId: string, division: string): boolean {
+  const before = state().noWinners.length;
+  state().noWinners = state().noWinners.filter((n) => !(n.award_id === awardId && n.division === division));
+  const removed = state().noWinners.length < before;
   if (removed) save();
   return removed;
 }
@@ -1374,6 +1447,7 @@ function resetDay(): void {
   state().scores = [];
   state().nominations = [];
   state().winners = [];
+  state().noWinners = [];
   state().activity = [];
   save();
 }
@@ -1547,6 +1621,7 @@ function demoData(): Data {
     scores: [],
     nominations: [],
     winners: [],
+    noWinners: [],
     conflicts: [],
     judges,
     flags: [],
@@ -1598,6 +1673,10 @@ export const fileStore: Store = {
   generatePanelCode: async () => generatePanelCode(),
 
   createNote: async (input) => createNote(input),
+  getNote: async (id) => getNote(id),
+  updateNote: async (id, body, editedBy) => updateNote(id, body, editedBy),
+  deleteNote: async (id) => deleteNote(id),
+  restoreNote: async (id) => restoreNote(id),
 
   listFlags: async (teamId) => listFlags(teamId),
   createFlag: async (input) => createFlag(input),
@@ -1628,7 +1707,10 @@ export const fileStore: Store = {
   removeNomination: async (id) => removeNomination(id),
   listWinners: async () => listWinners(),
   setWinner: async (input) => setWinner(input),
-  clearWinner: async (awardId, division) => clearWinner(awardId, division),
+  clearWinner: async (awardId, division, teamId) => clearWinner(awardId, division, teamId),
+  listNoWinners: async () => listNoWinners(),
+  setNoWinner: async (input) => setNoWinner(input),
+  clearNoWinner: async (awardId, division) => clearNoWinner(awardId, division),
 
   resetDay: async () => resetDay(),
   resetAll: async () => resetAll(),

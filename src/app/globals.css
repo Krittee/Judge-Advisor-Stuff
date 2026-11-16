@@ -2047,12 +2047,21 @@ body:has(.judge) > .theme-toggle:hover {
 .jg-caution svg { flex: none; margin-top: 2px; }
 .jg-caution b { color: var(--caution); font-weight: 500; }
 :root[data-theme="light"] .jg-caution b { color: inherit; font-weight: 600; }
+.jg-flag { display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4; }
+.jg-flag svg { flex: none; margin-top: 2px; }
+.jg-flag b { color: inherit; font-weight: 600; }
 .jg-fb { margin-top: 2px; }
 .jg-nl { display: flex; flex-direction: column; gap: 8px; }
 .jg-nn { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--jg-field); }
 .jg-nh { display: flex; align-items: center; gap: 6px; color: var(--ink-subtle); font-size: 12.5px; }
 .jg-nh b { color: var(--ink); font-weight: 500; }
 .jg-nb { margin-top: 3px; font-size: 15px; line-height: 1.4; white-space: pre-wrap; }
+.jg-nacts { display: flex; gap: 12px; margin-left: auto; }
+.jg-nn > .jg-nacts { margin-top: 6px; }
+.jg-nact { padding: 4px 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; }
+.jg-nact:disabled { color: var(--ink-faint); cursor: default; }
+.jg-ne { margin-top: 4px; color: var(--ink-subtle); font-size: 12px; }
+.jg-nx { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border: 1px dashed var(--line); border-radius: 12px; color: var(--ink-subtle); font-size: 13.5px; }
 .jg-none { color: var(--ink-faint); font-size: 14px; }
 .jg-sh-foot {
   display: flex; flex: none; flex-direction: column; gap: 8px; padding: 10px 16px max(18px, env(safe-area-inset-bottom));
@@ -3960,6 +3969,8 @@ body:has(.admin) > .theme-toggle:hover {
 /* Add team: the Judge Advisor's picker at the foot of an award's list, the console's own select */
 .ja-aw-add { padding: 8px 12px 12px; border-top: 1px solid var(--line); }
 .ja-aw-add .ja-in, .ja-aw-dr .ja-selw .ja-in { height: 44px; }
+.ja-aw-nw { display: flex; justify-content: flex-end; padding: 0 4px; border-top: 1px solid var(--line); }
+.ja-aw-nw .ja-aw-lnk { white-space: nowrap; }
 
 /* The side panel: the same in both views */
 .ja-aw-dr { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }

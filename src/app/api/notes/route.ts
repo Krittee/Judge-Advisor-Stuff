@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { canReadNotes, getSession, mayActOnPanel, type Session } from "@/lib/auth";
+import { actorParts } from "@/lib/activity";
+import { canAdminister, canReadNotes, getSession, mayActOnPanel, type Session } from "@/lib/auth";
 import { store } from "@/lib/db";
 import { blockedTeams, CONFLICT_MESSAGE, isConflicted, loadBlocks } from "@/lib/conflicts";
-import type { Team } from "@/lib/types";
+import type { Note, Team } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,71 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ note });
+}
+
+/**
+ * Correct or restore a note: `{ id, body }` or `{ id, restore: true }`.
+ *
+ * Judges write notes but cannot rewrite them afterwards, so only the Judge
+ * Advisor gets this; the Activity log keeps what was there before.
+ */
+export async function PATCH(request: Request) {
+  const session = await getSession();
+  if (!canAdminister(session)) return refuseToChange();
+
+  const body = await request.json().catch(() => ({}));
+  const found = await findNote(String(body.id ?? ""));
+  if (!found) return noSuchNote();
+
+  if (body.restore === true) {
+    const note = await store().restoreNote(found.id);
+    if (!note) return noSuchNote();
+    await logChange(session, note, "restored", note.body);
+    return NextResponse.json({ note });
+  }
+
+  const text = String(body.body ?? "").trim().slice(0, 4000);
+  if (!text) return NextResponse.json({ error: "A note cannot be empty." }, { status: 400 });
+
+  const was = found.body; // read now: the file store edits the stored row in place
+  const note = await store().updateNote(found.id, text, session!.name);
+  if (!note) return noSuchNote();
+  await logChange(session, note, "edited", `Was: ${was}`);
+  return NextResponse.json({ note });
+}
+
+/** Delete a note: `?id=`. It is only hidden, so PATCH with `restore` brings it back. */
+export async function DELETE(request: Request) {
+  const session = await getSession();
+  if (!canAdminister(session)) return refuseToChange();
+
+  const found = await findNote(new URL(request.url).searchParams.get("id") ?? "");
+  if (!found) return noSuchNote();
+  const note = await store().deleteNote(found.id);
+  if (!note) return noSuchNote();
+  await logChange(session, note, "deleted", note.body);
+  return NextResponse.json({ note });
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The note with this id, deleted or not; anything that is not an id is simply not found. */
+async function findNote(id: string): Promise<Note | null> {
+  return UUID.test(id) ? store().getNote(id) : null;
+}
+
+const refuseToChange = () =>
+  NextResponse.json({ error: "Only the Judge Advisor can change or delete a note." }, { status: 403 });
+const noSuchNote = () => NextResponse.json({ error: "That note no longer exists." }, { status: 404 });
+
+function logChange(session: Session | null, note: Note, verb: string, detail: string) {
+  return store().logActivity({
+    teamId: note.team_id,
+    kind: "setup",
+    ...actorParts(session),
+    action: `${verb} a note by ${note.author}`,
+    detail,
+  });
 }
 
 async function findTeam(teamId: string): Promise<Team | null> {

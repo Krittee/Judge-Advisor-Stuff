@@ -9,6 +9,8 @@ import {
   buildAwardPanels,
   buildMatrix,
   clearAfterAsking,
+  clearNoWinnerAfterAsking,
+  clearNoWinnerQuestion,
   clearQuestion,
   conductIn,
   conductKeyText,
@@ -18,8 +20,10 @@ import {
   decidedText,
   defaultDivision,
   detailFor,
+  fullText,
   distinctTeams,
   giveAfterAsking,
+  giveOverNoWinnerQuestion,
   giveQuestion,
   hasText,
   hiddenNote,
@@ -27,6 +31,8 @@ import {
   JA_KEY,
   judgesText,
   loadView,
+  markNoWinnerAfterAsking,
+  markNoWinnerQuestion,
   nominateAsAdmin,
   nominationsIn,
   nominationsText,
@@ -47,7 +53,7 @@ import { withRanks } from "../src/components/admin/scoresLogic";
 import { rankTeams } from "../src/lib/ranking";
 import { rubrics } from "../src/lib/rubrics";
 import {
-  adminNom, awards, byteMe, divisions, gearGrinders, HS, labRats, MS, momentum, monitors, nom, nominations, panels, quiet, roboraptors, teams, torque, win, winners,
+  adminNom, awards, byteMe, divisions, gearGrinders, hexAppeal, HS, labRats, MS, momentum, monitors, nom, nominations, panels, quiet, roboraptors, teams, torque, win, winners,
 } from "./adminAwards.fixtures";
 
 /* The Judge Advisor Awards board's decisions, run for real against
@@ -216,6 +222,80 @@ test("the decided counts are per division, over the awards the config lists", ()
   // An award the config no longer lists has no row on the board to be decided in.
   assert.equal(decidedCount([...winners, { ...win("retired", gearGrinders), award_id: "retired" }], awards, MS), 3);
   assert.equal(decidedText(winners, [], MS), "0/0");
+});
+
+/* ---- an award with two winners (the Judges Award) ------------------------------------------------------- */
+
+const one = [...winners, win("judges", hexAppeal)];
+const both = [...one, win("judges", byteMe)];
+const judgesNoms = [...msNoms, adminNom(byteMe, "judges"), adminNom(quiet, "judges")];
+
+test("an award with two winners is decided only once both are picked", () => {
+  assert.equal(winnersOf(both, MS).get("judges").length, 2);
+  assert.equal(decidedCount(one, awards, MS), 3, "1 of 2 is not decided");
+  assert.equal(decidedText(one, awards, MS), "3/11");
+  assert.equal(decidedCount(both, awards, MS), 4, "2 of 2 is");
+  assert.equal(decidedText(both, awards, MS), "4/11");
+});
+
+test("By award says how many of the two winners are picked, lists both first, and flags both", () => {
+  const panel = (w) => buildAwardPanels(awards, judgesNoms, winnersOf(w, MS), msTeams, panels).find((l) => l.award.id === "judges");
+  assert.deepEqual([panel(one).status, panel(one).decided], ["1 of 2 winners", false]);
+  assert.deepEqual([panel(both).status, panel(both).decided], ["Decided", true]);
+  assert.deepEqual(panel(both).nominees.map((n) => [n.team.number, n.winner]), [["3311X", true], ["7700B", true], ["1111Q", false]], "both winners lead the list");
+});
+
+test("the matrix marks both winners' cells and ticks the column only when full", () => {
+  const m = (w) => buildMatrix(awards, judgesNoms, winnersOf(w, MS), msTeams, panels);
+  const col = (mm) => mm.columns.findIndex((c) => c.award.id === "judges");
+  assert.equal(m(one).columns[col(m(one))].decided, false);
+  assert.equal(m(both).columns[col(m(both))].decided, true);
+  const cell = (mm, n) => mm.rows.find((r) => r.team.number === n).cells[col(mm)];
+  assert.deepEqual([cell(m(both), "7700B"), cell(m(both), "3311X"), cell(m(both), "1111Q")], ["winner", "winner", "nominated"]);
+});
+
+test("the side panel of a full award offers no Give to a third team; a half-full one just adds, and a single-winner one still replaces", () => {
+  const detail = (w, awardId, t) => detailFor({ awardId, teamId: t.id }, { awards, nominations: judgesNoms, winners: w, teams, panels });
+  assert.equal(detail(both, "judges", quiet).full, true);
+  assert.equal(fullText(awards.find((a) => a.id === "judges"), quiet), "Judges has 2 winners. Clear one to give it to 1111Q.");
+  assert.equal(detail(both, "judges", byteMe).full, false, "a winner is not told the award is full");
+  assert.equal(detail(both, "judges", byteMe).isWinner, true);
+  assert.deepEqual(detail(both, "judges", quiet).others.filter((o) => o.winner).map((o) => o.team.number).sort(), ["3311X", "7700B"]);
+
+  const half = detail(one, "judges", quiet);
+  assert.deepEqual([half.full, half.current], [false, null], "room for another: Give adds, it replaces nobody");
+  const design = detail(winners, "design", byteMe);
+  assert.deepEqual([design.full, design.current?.number], [false, "2088C"], "Design has one place: Give still asks to replace");
+});
+
+test("an award marked No winner counts as decided, in its own division only", () => {
+  const marks = [{ award_id: "energy", division: MS }];
+  assert.equal(decidedCount(winners, awards, MS, marks), 4);
+  assert.equal(decidedText(winners, awards, MS, marks), "4/11");
+  assert.equal(decidedText(winners, awards, HS, marks), "0/11", "a mark is per division");
+  // A mark on an award that also has a winner counts once; one the config dropped does not count.
+  assert.equal(decidedText(winners, awards, MS, [{ award_id: "design", division: MS }, { award_id: "retired", division: MS }]), "3/11");
+  assert.equal(decidedText(winners, awards, MS), "3/11", "the marks are optional");
+});
+
+test("an award marked No winner reads 'No winner' and decided, nominees still listed; the matrix flags its column", () => {
+  const lists = buildAwardPanels(awards, msNoms, decided, msTeams, panels, ALL_PANELS, new Map(), new Set(["excellence", "energy"]));
+  const excellence = lists.find((l) => l.award.id === "excellence");
+  assert.deepEqual([excellence.decided, excellence.status, excellence.noWinner], [true, "No winner", true]);
+  assert.ok(excellence.nominees.length > 0, "the nominees are still there");
+  const energy = lists.find((l) => l.award.id === "energy");
+  assert.deepEqual([energy.decided, energy.status, energy.noWinner], [true, "No winner", true], "even with no nominees");
+  const design = lists.find((l) => l.award.id === "design");
+  assert.deepEqual([design.decided, design.status, design.noWinner], [true, "Decided", false]);
+  assert.equal(lists.find((l) => l.award.id === "create").noWinner, false);
+
+  const m = buildMatrix(awards, msNoms, decided, msTeams, panels, ALL_PANELS, new Map(), new Set(["excellence", "energy"]));
+  const col = (id) => m.columns.find((c) => c.award.id === id);
+  assert.deepEqual([col("excellence").decided, col("excellence").noWinner], [true, true]);
+  assert.equal(col("energy"), undefined, "no nominations, so no column");
+  assert.ok(m.hidden.some((a) => a.id === "energy"));
+  assert.equal(col("design").noWinner, false);
+  assert.equal(matrix.columns.find((c) => c.award.id === "excellence").noWinner, false);
 });
 
 test("the board opens on the first division with a nomination, and keeps the one chosen while it exists", () => {
@@ -420,6 +500,8 @@ test("a team that already has another award is not refused: the caution is the s
 
 test("clearing a winner asks first and sends nothing on a no", async () => {
   assert.equal(clearQuestion(design, labRats), "Clear Design? 2088C will no longer be the winner.");
+  const judges = awards.find((a) => a.id === "judges");
+  assert.equal(clearQuestion(judges, labRats), "Clear Judges? 2088C will no longer be a winner.", "an award with two winners clears one of them");
   const no = asker(false);
   const declined = caller();
   assert.equal(await clearAfterAsking(no.ask, declined.call, { award: design, team: labRats }), false);
@@ -428,7 +510,62 @@ test("clearing a winner asks first and sends nothing on a no", async () => {
 
   const sent = caller();
   assert.equal(await clearAfterAsking(asker(true).ask, sent.call, { award: design, team: labRats }), true);
-  assert.deepEqual(sent.calls, [{ url: "/api/awards/winners", method: "DELETE", body: { awardId: "design", division: MS } }]);
+  assert.deepEqual(sent.calls, [{ url: "/api/awards/winners", method: "DELETE", body: { awardId: "design", division: MS, teamId: labRats.id } }]);
+});
+
+test("marking No winner asks first, naming the holder when there is one, and sends nothing on a no", async () => {
+  assert.equal(markNoWinnerQuestion(design, []), "Mark Design as no winner?");
+  assert.equal(markNoWinnerQuestion(design, [labRats]), "Mark Design as no winner? 2088C will no longer be the winner.");
+  assert.equal(markNoWinnerQuestion(awards.find((a) => a.id === "judges"), [hexAppeal, byteMe]), `Mark Judges as no winner? ${hexAppeal.number} and ${byteMe.number} will no longer be winners.`);
+  const no = asker(false);
+  const declined = caller();
+  assert.equal(await markNoWinnerAfterAsking(no.ask, declined.call, { award: design, division: MS, holders: [labRats] }), false);
+  assert.deepEqual(no.asked, [{ question: "Mark Design as no winner? 2088C will no longer be the winner.", options: { confirmLabel: "Mark no winner" } }]);
+  assert.deepEqual(declined.calls, []);
+
+  const yes = asker(true);
+  const sent = caller();
+  assert.equal(await markNoWinnerAfterAsking(yes.ask, sent.call, { award: design, division: MS, holders: [] }), true);
+  assert.deepEqual(yes.asked.map((a) => a.question), ["Mark Design as no winner?"]);
+  assert.deepEqual(sent.calls, [{ url: "/api/awards/no-winner", method: "PUT", body: { awardId: "design", division: MS } }]);
+});
+
+test("clearing No winner asks first and sends nothing on a no", async () => {
+  assert.equal(clearNoWinnerQuestion(design), "Clear No winner on Design?");
+  const no = asker(false);
+  const declined = caller();
+  assert.equal(await clearNoWinnerAfterAsking(no.ask, declined.call, { award: design, division: MS }), false);
+  assert.deepEqual(no.asked, [{ question: "Clear No winner on Design?", options: { confirmLabel: "Clear" } }]);
+  assert.deepEqual(declined.calls, []);
+
+  const sent = caller();
+  assert.equal(await clearNoWinnerAfterAsking(asker(true).ask, sent.call, { award: design, division: MS }), true);
+  assert.deepEqual(sent.calls, [{ url: "/api/awards/no-winner", method: "DELETE", body: { awardId: "design", division: MS } }]);
+});
+
+test("giving an award that is marked No winner asks first, then gives it", async () => {
+  assert.equal(giveOverNoWinnerQuestion(design, byteMe), "Give Design to 7700B instead of No winner?");
+  const no = asker(false);
+  const declined = caller();
+  assert.equal(await giveAfterAsking(no.ask, declined.call, { award: design, team: byteMe, current: null, noWinner: true }), false);
+  assert.deepEqual(no.asked, [{ question: "Give Design to 7700B instead of No winner?", options: { confirmLabel: "Replace No winner" } }]);
+  assert.deepEqual(declined.calls, []);
+
+  const yes = asker(true);
+  const sent = caller();
+  assert.equal(await giveAfterAsking(yes.ask, sent.call, { award: design, team: byteMe, current: null, noWinner: true }), true);
+  assert.deepEqual(sent.calls, [{ url: "/api/awards/winners", method: "PUT", body: { awardId: "design", division: MS, teamId: byteMe.id } }]);
+
+  const plain = asker(true);
+  await giveAfterAsking(plain.ask, caller().call, { award: design, team: byteMe, current: null, noWinner: false });
+  assert.deepEqual(plain.asked, [], "no mark, no question");
+});
+
+test("detailFor says whether the award is marked No winner in the team's division", () => {
+  const sel = { awardId: "excellence", teamId: byteMe.id };
+  assert.equal(detailFor(sel, everything).noWinner, false);
+  assert.equal(detailFor(sel, { ...everything, noWinners: [{ award_id: "excellence", division: MS }] }).noWinner, true);
+  assert.equal(detailFor(sel, { ...everything, noWinners: [{ award_id: "excellence", division: HS }] }).noWinner, false, "another division's mark");
 });
 
 /* ---- the Judge Advisor's own nominations ------------------------------------------------------------------------------ */

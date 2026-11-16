@@ -7,7 +7,7 @@ Judge Advisor runs it all and decides the awards; a colour-coded board shows the
 whole floor at a glance.
 
 **Version 2.0** (released 2026-10-26) redesigned every page and added awards.
-What changed and how it works: [RELEASE-NOTES-2.0-2.2.md](RELEASE-NOTES-2.0-2.2.md).
+What changed and how it works: [RELEASE-NOTES-2.x.md](RELEASE-NOTES-2.x.md).
 Version 1 is tag `v1.0.0`.
 
 ## Two ways to run it
@@ -924,7 +924,7 @@ What happened to each audit finding, and what is still open, is in the status ta
 - **Database traffic grows with open screens**, not with teams: plan the
   database tier for the event (DEPLOY.md).
 - Open items after the 2.0 release are listed in §7 of the
-  [release notes](RELEASE-NOTES-2.0-2.2.md).
+  [release notes](RELEASE-NOTES-2.x.md).
 
 ---
 

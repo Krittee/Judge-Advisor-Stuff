@@ -83,7 +83,7 @@ export default function AdminPage() {
   const division = pickDivision(awardDivision, state.divisions, awards.data?.nominations ?? [], state.teams);
   const counts = {
     ...railCounts(state),
-    ...(awards.data?.awards.length ? { awards: decidedText(awards.data.winners, awards.data.awards, division) } : {}),
+    ...(awards.data?.awards.length ? { awards: decidedText(awards.data.winners, awards.data.awards, division, awards.data.noWinners) } : {}),
   };
   const sheetTeam = state.teams.find((t) => t.id === sheetId) ?? null;
 
@@ -191,6 +191,7 @@ export default function AdminPage() {
           flags={state.flags}
           flagKinds={state.flagKinds}
           ask={ask}
+          canFixNotes
           onClose={() => {
             setSheetId(null);
             // Scores shows the totals the sheet just wrote; its own poll is up to 15 s away.

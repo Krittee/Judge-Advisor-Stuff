@@ -9,7 +9,7 @@ import { ScoreRowItem, ScoresBoard, ScoresTab } from "../src/components/admin/Sc
 import { NO_SCORE_FILTERS, withRanks, worstConduct, type ScoreFilters } from "../src/components/admin/scoresLogic";
 import { TeamsBoard } from "../src/components/admin/TeamsTab";
 import { startDraft } from "../src/components/admin/teamsLogic";
-import { TeamSheet } from "../src/components/judge/TeamSheet";
+import { NoteItem, TeamSheet } from "../src/components/judge/TeamSheet";
 import { rankTeams } from "../src/lib/ranking";
 import { rubrics } from "../src/lib/rubrics";
 import type { AppState, FlagRow, ScoreRow, Team, TeamCategoryView } from "../src/lib/types";
@@ -574,7 +574,7 @@ test("the team sheet for a judge renders exactly as it did before it was shared"
   // Captured from the sheet as it stood before the Judge Advisor console began to use it; TeamSheet.tsx changed in comments only.
   assert.equal(
     markup,
-    `<dialog class="jg-sheet" aria-modal="true" aria-labelledby="ID"><div class="jg-grab" aria-hidden="true"></div><div class="jg-sh-top"><div class="jg-sh-h"><div class="jg-sh-id"><h2 id="ID">9882K</h2><p class="jg-nm">Torque Titans</p><p class="jg-sub">Developing · EN · Pit B4</p></div><button type="button" class="jg-x" aria-label="Close"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div><p class="jg-priv">Private to judges and the Judge Advisor.</p><div class="jg-seg" role="group" aria-label="Team sheet sections"><button type="button" aria-pressed="true"><span>Notes</span><small>no notes</small></button></div></div><div class="jg-sh-scroll"><div class="jg-caution" role="note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01"></path></svg><div><p><b>Warning</b> · GG17 · Q19 — reported by Jordan Lee</p><p class="jg-fb">Reset another team&#x27;s field.</p></div></div><p class="jg-none">No notes yet.</p></div><div class="jg-sh-foot"><label class="sr-only" for="jg-note">Add a note</label><textarea id="jg-note" class="jg-ta" rows="3" placeholder="Add a note for the panel…"></textarea><button type="button" class="jg-prim" disabled="">Save note</button></div></dialog>`,
+    `<dialog class="jg-sheet" aria-modal="true" aria-labelledby="ID"><div class="jg-grab" aria-hidden="true"></div><div class="jg-sh-top"><div class="jg-sh-h"><div class="jg-sh-id"><h2 id="ID">9882K</h2><p class="jg-nm">Torque Titans</p><p class="jg-sub">Developing · EN · Pit B4</p></div><button type="button" class="jg-x" aria-label="Close"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div><p class="jg-priv">Private to judges and the Judge Advisor.</p><div class="jg-seg" role="group" aria-label="Team sheet sections"><button type="button" aria-pressed="true"><span>Notes</span><small>no notes</small></button></div></div><div class="jg-sh-scroll"><div class="jg-flag ring-1 ring-inset bg-caution/18 text-caution-quiet ring-caution/40" role="note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01"></path></svg><div><p><b>Warning</b> · GG17 · Q19 — reported by Jordan Lee</p><p class="jg-fb">Reset another team&#x27;s field.</p></div></div><p class="jg-none">No notes yet.</p></div><div class="jg-sh-foot"><label class="sr-only" for="jg-note">Add a note</label><textarea id="jg-note" class="jg-ta" rows="3" placeholder="Add a note for the panel…"></textarea><button type="button" class="jg-prim" disabled="">Save note</button></div></dialog>`,
   );
 });
 
@@ -582,6 +582,9 @@ test("the judge console still mounts the same TeamSheet, and the Judge Advisor's
   const judgePage = read("src/app/judge/page.tsx");
   const sheetProps = (src: string) => [...(src.match(/<TeamSheet\s[\s\S]*?\/>/)?.[0] ?? "").matchAll(/^\s+(\w+)=/gm)].map((m) => m[1]).sort();
   assert.deepEqual(sheetProps(page), sheetProps(judgePage), "no admin-only prop, no judge-only chrome");
+  // The one difference is a bare boolean, which the prop scan above cannot see.
+  assert.match(page.match(/<TeamSheet\s[\s\S]*?\/>/)![0], /^\s+canFixNotes$/m, "the Judge Advisor can fix notes");
+  assert.doesNotMatch(judgePage, /canFixNotes/, "a judge never gets Edit and Delete");
   assert.ok(judgePage.includes('import { TeamSheet } from "@/components/judge/TeamSheet"'));
   // The sheet's own file is not forked: it still comes from one place and has no admin branch.
   const sheet = read("src/components/judge/TeamSheet.tsx");
@@ -675,4 +678,22 @@ test("the Scores block: its own prefix, after the import block, tokens only, no 
   assert.match(block, /\.ja-sc-cin:focus-visible \+ \.ja-sc-box \{ outline: 2px solid var\(--accent\)/, "the checkbox shows its focus on the visible box");
   // Chips use the accent for the selected one, as the Teams and Referee chips do.
   assert.match(block, /\.ja-sc-chip\[aria-pressed="true"\] \{[^}]*background: var\(--accent\)/);
+});
+
+/* ---- the Judge Advisor can fix a note; a judge cannot ---- */
+
+test("a note shows Edit and Delete only with canFix, and says when it was edited", () => {
+  const note = { id: "n1", team_id: "t1", request_id: null, panel_id: null, author: "Pim", body: "Great pitch", created_at: "2026-10-20T09:00:00Z" };
+  const item = (n: typeof note & { edited_at?: string; edited_by?: string }, canFix?: boolean) =>
+    renderToStaticMarkup(<ul><NoteItem note={n} canFix={canFix} onEdit={async () => true} onDelete={noop} /></ul>);
+
+  const judge = item(note);
+  assert.doesNotMatch(judge, /Edit|Delete|edited by/);
+  const advisor = item(note, true);
+  assert.match(advisor, /aria-label="Edit note by Pim"/);
+  assert.match(advisor, /aria-label="Delete note by Pim"/);
+
+  const edited = item({ ...note, edited_at: "2026-10-20T09:30:00Z", edited_by: "Judge Advisor" });
+  assert.match(text(edited), /edited by Judge Advisor · /, "a judge sees that it was edited");
+  assert.doesNotMatch(edited, /aria-label="Delete note/);
 });

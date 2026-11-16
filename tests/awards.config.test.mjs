@@ -47,7 +47,25 @@ test("a malformed entry is dropped rather than thrown, and a missing label or sh
   assert.deepEqual(parseAwards("design"), []);
   assert.deepEqual(parseAwards([null, 7, {}, { id: "  " }, { label: "No id" }]), []);
   assert.deepEqual(parseAwards([{ id: "grit" }, { id: "spark", label: "Spark" }]), [
-    { id: "grit", label: "grit", short: "grit", blurb: "" },
-    { id: "spark", label: "Spark", short: "Spark", blurb: "" },
+    { id: "grit", label: "grit", short: "grit", blurb: "", places: 1 },
+    { id: "spark", label: "Spark", short: "Spark", blurb: "", places: 1 },
   ]);
+});
+
+test("the Judges Award has two winners per division; every other award has one", () => {
+  assert.deepEqual(
+    awards().filter((a) => a.places !== 1).map((a) => [a.id, a.places]),
+    [["judges", 2]],
+  );
+});
+
+test("winners is a whole number from 1 to 10, and 1 when it is missing or not a number", () => {
+  const winnersOf = (winners) => parseAwards([{ id: "x", winners }])[0].places;
+  assert.equal(winnersOf(undefined), 1);
+  assert.equal(winnersOf("lots"), 1);
+  assert.equal(winnersOf(2), 2);
+  assert.equal(winnersOf(2.6), 3);
+  assert.equal(winnersOf(0), 1);
+  assert.equal(winnersOf(-4), 1);
+  assert.equal(winnersOf(99), 10);
 });

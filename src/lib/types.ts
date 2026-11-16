@@ -79,6 +79,11 @@ export type Note = {
   author: string;
   body: string;
   created_at: string;
+  /** Set when the Judge Advisor corrected the text. Notes from before this existed have none. */
+  edited_at?: string | null;
+  edited_by?: string | null;
+  /** Set when the Judge Advisor deleted it. The row stays so the deletion can be undone. */
+  deleted_at?: string | null;
 };
 
 /**
@@ -200,6 +205,8 @@ export type AwardView = {
   label: string;
   short: string;
   blurb: string;
+  /** How many teams can win it per division: 1 unless config/event.json says more (the Judges Award has 2). */
+  places: number;
 };
 
 /** Whose nomination a row is: a judge's, or the Judge Advisor's own. */
@@ -236,12 +243,20 @@ export type WinnerRow = {
   decided_at: string;
 };
 
+/** The Judge Advisor's decision that one award in one division goes to no team. Secret until the ceremony, like a winner. */
+export type NoWinnerRow = {
+  award_id: string;
+  division: string;
+  decided_by: string;
+  decided_at: string;
+};
+
 /**
  * GET /api/awards for the Judge Advisor: every nomination and every winner.
  * A judge's reply is `AwardsJudgeView` and has no `winners` key at all, so
  * `"winners" in reply` tells the two apart.
  */
-export type AwardsAdminView = { awards: AwardView[]; nominations: NominationRow[]; winners: WinnerRow[] };
+export type AwardsAdminView = { awards: AwardView[]; nominations: NominationRow[]; winners: WinnerRow[]; noWinners: NoWinnerRow[] };
 /** GET /api/awards for a judge: their own panel's nominations only, and never a winner. */
 export type AwardsJudgeView = { awards: AwardView[]; nominations: NominationRow[] };
 
@@ -251,6 +266,8 @@ export type NominateReply = { nomination: NominationRow };
 export type RemoveReply = { ok: true; removed: boolean };
 /** PUT /api/awards/winners. */
 export type WinnerReply = { winner: WinnerRow };
+/** PUT /api/awards/no-winner. Its DELETE replies with `RemoveReply`. */
+export type NoWinnerReply = { noWinner: NoWinnerRow };
 
 export type ActivityKind = "request" | "referee" | "conflict" | "setup" | "award";
 

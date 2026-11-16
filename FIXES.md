@@ -4,17 +4,209 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `259cabb` | Simulator only | Merged locally, not pushed |
-| 2026-11-13 | [Coordinator sign-in: COORDINATOR word clipped](#coordinator-sign-in-coordinator-word-clipped-2026-11-13) | `f4793fb` | Not needed | Merged locally, not pushed |
-| 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Local, not pushed |
-| 2026-10-31 | [Blended division shows as BLN](#blended-division-shows-as-bln-2026-10-31) | `600a5e8` | Not needed | Local, not pushed |
-| 2026-10-31 | [Judging Board: colour key above Unassigned](#judging-board-colour-key-above-unassigned-2026-10-31) | `4a001a8` | Not needed | Local, not pushed |
-| 2026-10-31 | [Team page: a way back, and no details strip](#team-page-a-way-back-and-no-details-strip-2026-10-31) | `be78288` | Not yet | Local, not pushed |
-| 2026-10-31 | [Head referee can remove a flag](#head-referee-can-remove-a-flag-2026-10-31) | `ebbd0ab` | Not yet | Local, not pushed |
-| 2026-10-31 | [Referee: keyboard hides the team being typed](#referee-keyboard-hides-the-team-being-typed-2026-10-31) | `cf7d3a5` | Skipped | Local, not pushed |
-| 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Local, not pushed |
-| 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Local, not pushed |
-| 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Local, not pushed |
+| 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Local only |
+| 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ef84422` | Not yet | Local only |
+| 2026-11-16 | [Judges Award can have two winners](#judges-award-can-have-two-winners-2026-11-16) | `c04c9b3` | Not needed | Local only |
+| 2026-11-16 | [Awards: mark an award "No winner"](#awards-mark-an-award-no-winner-2026-11-16) | `1d9aa15`..`c68fecd` | Not yet (phone-width preview only) | Local only |
+| 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `259cabb` | Simulator only | Live in 2.1.2 |
+| 2026-11-13 | [Coordinator sign-in: COORDINATOR word clipped](#coordinator-sign-in-coordinator-word-clipped-2026-11-13) | `f4793fb` | Not needed | Live in 2.1.2 |
+| 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Live in 2.1.1 |
+| 2026-10-31 | [Blended division shows as BLN](#blended-division-shows-as-bln-2026-10-31) | `600a5e8` | Not needed | Live in 2.0.1 |
+| 2026-10-31 | [Judging Board: colour key above Unassigned](#judging-board-colour-key-above-unassigned-2026-10-31) | `4a001a8` | Not needed | Live in 2.0.1 |
+| 2026-10-31 | [Team page: a way back, and no details strip](#team-page-a-way-back-and-no-details-strip-2026-10-31) | `be78288` | Not yet | Live in 2.0.1 |
+| 2026-10-31 | [Head referee can remove a flag](#head-referee-can-remove-a-flag-2026-10-31) | `ebbd0ab` | Not yet | Live in 2.0.1 |
+| 2026-10-31 | [Referee: keyboard hides the team being typed](#referee-keyboard-hides-the-team-being-typed-2026-10-31) | `cf7d3a5` | Skipped | Live in 2.0.1 |
+| 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
+| 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
+| 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Team sheet: Good conduct shows as a warning (2026-11-16)
+
+### Problem / request
+
+Reported on Version 2.1.3. A referee filed a Good conduct flag on 1852A. The Judge Advisor's Teams list showed it as a green "Good ×1" chip, which is right. But the team sheet (the panel with Notes · Notebook · Interview, "Private to judges and the Judge Advisor.") showed the same flag in an amber warning box with a ⚠ icon: "Good conduct · P5 — reported by Pim". Judges and the JA could read a compliment as a problem.
+
+### Root cause
+
+`TeamSheet.tsx` drew every flag as `<div class="jg-caution">` with `WarnIcon`, whatever its kind. The chip elsewhere takes its colour from the flag kind's `color` in `config/event.json` (`refereeFlags`) through `tone()` in `src/lib/tone.ts`, so the two disagreed. The team sheet is the only place that draws the flag detail box. Judges and the JA (Scores, Floor notes, Teams drawer, Activity) all open the same `TeamSheet`, so one fix covers all of them.
+
+### Decision
+
+The user chose "each its own colour". Every flag box wears its kind's colour, from the same `tone(kind.color)` the chip uses: Good is green with a ✓, Warning amber, Minor orange, Major red, DQ ink, and those four keep the ⚠. A team with several flags shows one box per flag, worst first (highest severity, then newest), so a mixed team shows its violations above its Good conduct.
+
+### What changed
+
+- `src/components/judge/TeamSheet.tsx`: each flag box is `jg-flag ring-1 ring-inset` plus `tone(kind?.color)`. The icon is `CheckIcon` for `GOOD_CONDUCT` (from `src/lib/awards.ts`) and `WarnIcon` otherwise. Boxes are listed with `flagsWorstFirst`.
+- `src/components/judge/logic.ts`: new `flagsWorstFirst(flags, kinds)` holds the sort that was inside `leadFlag`. `leadFlag` now returns its first item, so the rule exists once.
+- `src/app/globals.css`: new `.jg-flag` (the `.jg-caution` layout without its own colours; the tone classes supply fill, ink and ring). `.jg-caution` is unchanged for its other uses.
+- `tests/judgePage.logic.test.mjs`: new test for `flagsWorstFirst`: mixed order, unknown kind last, input not mutated, `leadFlag` agrees, empty list.
+- `tests/adminScores.runtime.test.tsx`: the team sheet snapshot now expects the new box class for its Warning flag. The icon and everything else are unchanged.
+
+### How it was tested
+
+- `npm test`: 1741 tests, 1740 pass, 0 fail, 1 skipped (the same skip as before). `npx tsc --noEmit`: clean. `npx eslint . --ignore-pattern '.claude/**'`: clean.
+- Browser preview on a copy of `.data/state.json` in the session scratchpad (never `.data/`), signed in as the Judge Advisor, opening team sheets from the Teams drawer. A Good conduct flag was added to 1115 on the copy so one team had only Good conduct.
+  - Before: 1115 showed the amber ⚠ box (dark desktop and light phone).
+  - After: 1115 (Good only) is green with ✓ at light phone width. 1108 (Warning ×2 and Good) shows two amber Warnings, then a green Good, in light desktop and dark phone. 1101 (DQ, Minor, Warning) shows DQ in ink, Minor orange and Warning amber, in that order, in dark desktop. No console errors.
+- Not checked on a real iPhone or the simulator. Not yet confirmed by the user.
+
+### Commit and branch
+
+- Change: `claude/conduct-green-695821`, commit `fa039dd` (this entry is in the same commit).
+
+### Status
+
+Local only. Not merged, pushed or deployed.
+
+### Follow-ups
+
+- Check on a real iPhone once merged and deployed (needs approval).
+- The snapshot test's comment still says "TeamSheet.tsx changed in comments only", which was already stale. Worth a one-line tidy next time that test is touched.
+## Judge Advisor can fix or delete a judge's note (2026-11-16)
+
+### Problem / request
+
+Reported on Version 2.1.3. Judges cannot delete or change a note once it is saved, which is intended, but sometimes a note is added by mistake (wrong team, wrong text) and nobody could fix it. Request: keep judges unable to change notes, and let the Judge Advisor correct or delete any judge's note.
+
+Decisions made with the user before building:
+- An edited note keeps its author and time, and shows "edited by <JA> · <time>" to everyone, judges included.
+- The old text is kept in the Activity log, which only the Judge Advisor can read.
+- Delete asks first, and can be undone.
+
+### Root cause
+
+Not a bug: notes were append-only by design. `/api/notes` had only GET and POST, and neither store had a way to update or remove a note.
+
+### What changed
+
+- `src/app/api/notes/route.ts`:
+  - New `PATCH` (`{ id, body }` edits, `{ id, restore: true }` undoes a delete) and `DELETE ?id=` (soft delete).
+  - Only the Judge Advisor role passes (`canAdminister`). Judges and signed-out callers get 403 "Only the Judge Advisor can change or delete a note." An unknown note gets 404, and empty text gets 400.
+  - Each change writes an Activity line naming the JA and the note's author: "edited a note by X" (detail "Was: <old text>"), "deleted a note by X" and "restored a note by X" (detail: the text). GET and POST are unchanged.
+- `src/lib/types.ts`: `Note` gets optional `edited_at`, `edited_by`, `deleted_at`.
+- `src/lib/db/types.ts`, `src/lib/db/file.ts` and `src/lib/db/postgres.ts`:
+  - New `getNote`, `updateNote`, `deleteNote` and `restoreNote`.
+  - `listNotes` skips deleted notes, so judges, the Scores note counts and everything else stop seeing a note once it is deleted.
+  - Postgres gets three `alter table notes add column if not exists` lines (nullable, no default) in the store's own migration, so it is additive and existing notes are untouched. Old file-store rows work without the new fields.
+- `src/components/useTeamRecord.ts`: `editNote`, `deleteNote` and `restoreNote`, plus the list of notes deleted while the sheet is open.
+- `src/components/judge/TeamSheet.tsx`:
+  - New `canFixNotes` prop (set only by `src/app/admin/page.tsx`). Each note gets Edit and Delete.
+  - Edit swaps in a focused text box with Save and Cancel.
+  - Delete asks "Delete this note by X?" through the existing confirm dialog, then shows "Note by X deleted · Undo" in its place until the sheet closes.
+  - The note row is now `NoteItem`.
+- `src/app/globals.css`: small `.jg-nacts`, `.jg-nact`, `.jg-ne` and `.jg-nx` rules using existing tokens only, so they work in light and dark.
+
+### How it was tested
+
+- New `tests/notesFix.runtime.test.ts`: judge PATCH and DELETE get 403, signed-out gets 403, JA edit records the old text in the Activity log, 400 for empty text, 404 for an unknown note, and delete then restore as seen by the JA and a judge.
+- `tests/storeConformance.runtime.ts`: update, delete, restore, and list skipping deleted notes, for both stores.
+- `tests/adminScores.runtime.test.tsx`: Edit and Delete render only with `canFix`; the "edited by" line shows for judges; the judge page never passes `canFixNotes`. `tests/coordinator.runtime.test.ts` now also covers the new PATCH and DELETE handlers.
+- `npm test`: 1745 pass, 0 fail, 1 skipped. The skipped one is the real-Postgres suite: **not run**, because `TEST_DATABASE_URL` was not set. `tsc` and `eslint` are clean.
+- Browser preview on a scratch copy of the data (never `.data/`), signed in as the JA, on desktop width in dark mode and phone width in light mode:
+  - Edit, then Save: the text changed and showed "edited by".
+  - Delete asked first, then showed the Undo line, and the tab count changed to "no notes".
+  - Undo brought the note back.
+  - All three changes appeared in the Activity log with the old text.
+- Against the same server, signed in with a real judge code: PATCH and DELETE gave 403, a signed-out call gave 403, and the judge still read the note with its "edited by" marker.
+- Not checked on a real iPhone, and not yet confirmed by the user.
+
+### Branch / commit
+
+`claude/ja-edit-notes-a9614a`, commit `ef84422` (local only).
+
+### Status
+
+Local only: not pushed, not merged, not deployed. The Postgres columns are added on the first start against a database (additive).
+
+### Follow-ups
+
+- There is no screen listing notes deleted in earlier sessions. Undo lasts only while the sheet stays open, after which the text survives in the Activity log and the database row.
+- Run the real-Postgres conformance suite (`TEST_DATABASE_URL`) before release.
+## Judges Award can have two winners (2026-11-16)
+
+### Problem / request
+
+Reported on Version 2.1.3: some events give two Judges Awards, but the Awards board let the Judge Advisor pick only one winner per award per division. Picking a second team replaced the first.
+
+### Root cause
+
+One winner per (award, division) was built in at every level: the Postgres `award_winners` primary key was `(award_id, division)`, both stores' `setWinner` replaced the holder, and the board logic (`winnersOf`) held one row per award.
+
+### What changed
+
+Decisions agreed with the user: the count is fixed in config, it applies per division (both winners may come from the same division), a third pick is refused with "clear one first", and the award shows "1 of 2 winners" until both are picked.
+
+- `config/event.json`: the `judges` award gets `"winners": 2`. Any award without it has one winner.
+- `src/lib/types.ts`, `src/lib/presets.ts`: `AwardView.places` (1 to 10, default 1), read from the config's `winners`. It is named `places` so a judge's `/api/awards` reply still never contains the word "winner".
+- `src/lib/db/postgres.ts`: the `award_winners` key is now `(award_id, division, team_id)`. A guarded step in `migrate()` swaps the key only while the old two-column key exists, so it is safe to re-run. Existing rows are unique on the old key, so nothing is lost. `setWinner` takes `places`: with 1 it still replaces the holder (in one transaction), with more it adds the team beside the others. `clearWinner` takes an optional `teamId`.
+- `src/lib/db/file.ts`, `src/lib/db/types.ts`: the same store semantics. The JSON file needs no migration.
+- `src/app/api/awards/winners/route.ts`: PUT refuses a winner beyond the award's places with 409 ("Judges already has its 2 winners in <division>. Clear one first."). DELETE takes an optional `teamId`, so clearing one Judges winner keeps the other.
+- `src/components/admin/awardsLogic.ts`: `winnersOf` returns a list per award. An award counts as decided (status, the "x/11" count) only when all its places are filled, and shows "1 of 2 winners" in between. `Detail.full` and `fullText` are new, and Clear sends the team.
+- `src/components/admin/AwardsTab.tsx`: when the award is full, the side panel shows "Judges has 2 winners. Clear one to give it to 1115." in place of the Give button.
+- Tests: `awards.config`, `adminAwards.logic`, `awardsRoute.runtime` (the second winner is accepted, a third gets 409, Design still replaces, a clear by team keeps the other, and the judge-secrecy check is unchanged in strength), `storeConformance.runtime`, `postgres-sql`, and `judgeNominate.runtime` fixtures.
+
+### How it was tested
+
+- `npm test`: 1749 tests, 1748 pass, 0 fail, 1 skipped. The skip is the real-Postgres conformance suite, which was **not run** because `TEST_DATABASE_URL` was not set. The key migration and the transaction are covered only by the SQL-text tests and the file store.
+- `tsc --noEmit` and `eslint . --ignore-pattern '.claude/**'` are clean.
+- Browser preview on a copy of `.data/state.json` (scratchpad `DATA_FILE`, never `.data/`), signed in as the Judge Advisor:
+  - Two Judges winners were given and a third was refused (409).
+  - The board showed both winners, "Decided", and 1/11 in the rail, and the third nominee's panel showed the "clear one" note.
+  - Clearing one winner changed the status to "1 of 2 winners" and the rail to 0/11, kept the other winner, and brought Give back.
+- No iPhone check: the layout is unchanged apart from one line of text. The user has not confirmed it yet.
+
+### Branch / commit
+
+`claude/judges-award-two-b405c9`, one local commit. Not pushed.
+
+### Status
+
+Local only. It merges with the "No winner" change (`no-winner-award`), which touches the same files. Before deploying, run the conformance suite against the Neon test database, since the live Supabase migration changes the primary key.
+
+### Follow-ups
+
+- Run the real-Postgres conformance suite (`TEST_DATABASE_URL`) before release.
+- Two simultaneous PUTs could both take the last place: the cap is checked in the route, not by a lock. There is a single Judge Advisor, so this is accepted for now.
+## Awards: mark an award "No winner" (2026-11-16)
+
+### Problem / request
+
+Reported on 2.1.3: "In the awards, sometimes no team is nominated for an award. Can you have something like 'No Team' or something that shows this award has no winner?" On the JA's Awards board an award nobody won just sat at "Open" or "N nominees", so the JA couldn't tell "not decided yet" from "deliberately not given", and the "N of 11 decided" count could never reach 11.
+
+### Root cause
+
+A winner record had to name a real team (`award_winners.team_id` is required and is linked to the teams table), so there was no way to record "no team".
+
+### What changed
+
+The user chose: any award can be marked (even one with nominees), the wording is "No winner", and it's saved in its own new table. Design and plan: `docs/superpowers/specs/2026-11-16-no-winner-award-design.md`, `docs/superpowers/plans/2026-11-16-no-winner-award.md`.
+
+- Storage (both stores): `listNoWinners` / `setNoWinner` / `clearNoWinner`, one mark per award per division. Postgres adds `award_no_winner` with `create table if not exists` and RLS on. The migration only adds, so live Supabase data is untouched, and `award_winners` is unchanged. The file store defaults `noWinners` to `[]` for old state files. Day reset and full reset clear the marks.
+- API: new `src/app/api/awards/no-winner/route.ts` (PUT marks, DELETE clears, JA only, logged in Activity). Marking an award a team holds takes it off that team. `PUT /api/awards/winners` now also clears a mark when a team is given that award ("instead of No winner" in Activity). The JA's `GET /api/awards` adds `noWinners`; a judge's reply is unchanged and never sees it.
+- Board: each award in "By award" has a **Mark no winner** button at the foot of its card. A marked award shows a green "No winner" chip in the decided style and a **Clear** button. Every action asks first. The Matrix header shows a dash instead of the decided tick. "N of 11 decided", the division chips and the side-menu count all include marks.
+- Files: `src/lib/types.ts`, `src/lib/db/types.ts`, `src/lib/db/file.ts`, `src/lib/db/postgres.ts`, `src/app/api/awards/no-winner/route.ts` (new), `src/app/api/awards/route.ts`, `src/app/api/awards/winners/route.ts` (PUT only), `src/components/admin/awardsLogic.ts`, `src/components/admin/AwardsTab.tsx`, `src/app/admin/page.tsx`, `src/app/globals.css`. Tests: `tests/storeConformance.runtime.ts`, `tests/postgres-sql.test.mjs`, `tests/awardsRoute.runtime.test.ts`, `tests/adminAwards.logic.test.mjs`, `tests/adminAwards.runtime.test.tsx`, `tests/refereeRuleFeature.test.mjs` (one regex: `resetAll` now names `award_no_winner`).
+
+### How it was tested
+
+- `npm test`: 1755 tests, 1754 pass, 1 skipped. The skip is the real-Postgres conformance suite, which was **not run** (no `TEST_DATABASE_URL`); the Postgres SQL is covered by the mocked tests only. `tsc` and eslint (`--ignore-pattern '.claude/**'`) are clean.
+- Browser preview on a copy of `.data/state.json` in the scratchpad (never `.data/`), signed in as the JA, at desktop width and at 375 px phone width. Checked: marking Design moved the counts to 1/11 and showed the chip and Clear; giving a nominee the award removed the mark, and marking again took it off the team; the Matrix dash; Clear brought it back to "1 nominee" and 0/11; Activity read "marked Design no winner", "gave Design to 1101 · instead of No winner", "marked Design no winner · instead of 1101"; `/api/state` carries no marks. The first build crowded the card header at 1024 px (title over the chip). Moving the button to its own row at the foot of the card fixed it.
+- Not checked on a real iPhone. The user has not confirmed it yet.
+
+### Branch / commits
+
+`claude/no-winner-award-7e1ad9`: `1d9aa15` (store), `5322810` (API), `006acc2` (board), `c68fecd` (button row), plus this entry.
+
+### Status
+
+Local only. Not pushed, merged or deployed.
+
+### Follow-ups
+
+- Merge with the parallel "two Judges Award winners" change (`judges-award-two`): both touch `src/app/api/awards/winners/route.ts` (here, the PUT only), `src/lib/types.ts`, `awardsLogic.ts` and `AwardsTab.tsx`. Once Judges Award can have two winners, decide whether marking it "No winner" should clear both (the no-winner route clears via `clearWinner(award, division)`).
+- Run the real-Postgres conformance suite against the throwaway Neon project before release.
+- The Matrix legend has no entry for the dash. It could gain one if the dash isn't clear enough on its own.
 
 ---
 
@@ -50,7 +242,7 @@ It was not the iOS 100vh issue: the shell already uses `100dvh`. Only the Coordi
 
 ### Status
 
-Merged locally into `claude/event-judge-booking-app-kcprxn` on 2026-11-13. NOT pushed or deployed.
+Live in 2.1.2 (PR #16, 2026-11-13).
 
 ### Follow-ups
 
@@ -87,7 +279,7 @@ From 768px up, the band (`.si-band`) is always 240px wide with 28px padding, lea
 
 ### Status
 
-Merged locally into `claude/event-judge-booking-app-kcprxn` on 2026-11-13. Not pushed or deployed.
+Live in 2.1.2 (PR #16, 2026-11-13).
 
 ### Follow-ups
 
@@ -123,7 +315,7 @@ No app code changed. A re-import with a blank notebook cell still keeps the team
 
 ### Status
 
-Committed locally. NOT pushed or deployed. The 32 teams already on the live site keep their stored type.
+Live in 2.1.1 (PR #15, 2026-11-08). The 32 teams already on the live site keep their stored type.
 
 ---
 
@@ -152,7 +344,7 @@ Every short division label already goes through `divisionTag`, so there was no h
 
 ### Status
 
-Committed locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -189,7 +381,7 @@ The Pit floor view and the `.bd-pkey` status line are unchanged.
 
 ### Status
 
-Committed locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -232,7 +424,7 @@ The user chose to drop pit, division and notebook category: they now show nowher
 
 ### Status
 
-Committed locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -253,7 +445,7 @@ The user: "add head ref - remove flag - authorization". Only the Judge Advisor c
 - `src/app/api/flags/route.ts`: DELETE uses `canRemoveFlag`; the 403 now reads "Only the head referee or the Judge Advisor can remove a flag."; doc comments updated. The Activity log entry is unchanged and names whoever removed it.
 - `src/components/Flags.tsx`: `FlagList` takes an optional `onRemove` and shows a red **Remove** next to **Edit**; the two wrap together at the right on a phone.
 - `src/app/referee/page.tsx`: the head referee gets Remove on every flag (Today tab and "Already on <team>"), behind the same confirm the JA gets.
-- `README.md`, `RELEASE-NOTES-2.0-2.2.md`: the permission text and API table now say head referee or JA removes.
+- `README.md`, `RELEASE-NOTES-2.x.md`: the permission text and API table now say head referee or JA removes.
 - `tests/flagsRoute.runtime.test.ts`, `tests/flags.test.mjs`, `tests/flagsRendering.runtime.test.tsx`, `tests/refereePage.source.test.mjs`: new and updated tests.
 
 ### Who can do what now
@@ -286,7 +478,7 @@ The confirm reads "Remove this flag? The judges will stop seeing it." with **Can
 
 ### Status
 
-Committed locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -332,7 +524,7 @@ It works with the earlier `min-h-dvh` body fix (`4415991`): the page still can't
 
 ### Status
 
-Committed locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -381,7 +573,7 @@ This is the root layout, so it covers every page. The judge console and the Judg
 
 ### Status
 
-Committed locally and merged into the main branch locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -448,8 +640,7 @@ to Today and back. Report and All teams are unchanged. No CSS changes.
 
 ### Status
 
-Committed locally and merged into the main branch
-(`claude/event-judge-booking-app-kcprxn`) locally. **Not pushed or deployed.**
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -501,7 +692,7 @@ The bug itself could not be reproduced on this Mac: Chromium and this Mac's newe
 
 ### Status
 
-Committed locally, and merged into the main branch locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 

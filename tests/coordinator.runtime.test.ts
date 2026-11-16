@@ -337,7 +337,7 @@ const REFUSED: { route: string; method: string; body?: unknown; query?: string }
   { route: "admin/teams", method: "PATCH", body: { action: "resetDay" } },
   { route: "admin/teams", method: "PATCH", body: { teamId: "x", languages: ["th"] } },
   { route: "admin/activity", method: "GET" },
-  ...["GET", "POST"].map((method) => ({ route: "notes", method })),
+  ...["GET", "POST", "PATCH", "DELETE"].map((method) => ({ route: "notes", method })),
   ...["GET", "POST", "DELETE"].map((method) => ({ route: "scores", method })),
   ...["GET", "POST", "DELETE"].map((method) => ({ route: "conflicts", method })),
   ...["GET", "POST", "PATCH", "DELETE"].map((method) => ({ route: "flags", method })),

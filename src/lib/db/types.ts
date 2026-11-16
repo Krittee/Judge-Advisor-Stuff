@@ -12,6 +12,7 @@ import type {
   ScoreRow,
   Team,
   WinnerRow,
+  NoWinnerRow,
 } from "../types";
 
 /** Thrown for rule violations we want to show the user verbatim. */
@@ -155,6 +156,14 @@ export type NewWinner = {
   division: string;
   teamId: string;
   decidedBy: string;
+  /** How many teams can hold this award in a division (config `winners`): 1 replaces whoever held it, more just adds a holder. */
+  places: number;
+};
+
+export type NewNoWinner = {
+  awardId: string;
+  division: string;
+  decidedBy: string;
 };
 
 export type NewActivity = {
@@ -241,6 +250,14 @@ export type Store = {
   generatePanelCode(): Promise<string>;
 
   createNote(input: NewNote): Promise<Note>;
+  /** One note by id, deleted or not: the route needs the old text for the log. */
+  getNote(id: string): Promise<Note | null>;
+  /** Correct a note's text. null if there is no such note, or it is deleted. */
+  updateNote(id: string, body: string, editedBy: string): Promise<Note | null>;
+  /** Soft delete: the note leaves listNotes but can be restored. null if missing or already deleted. */
+  deleteNote(id: string): Promise<Note | null>;
+  /** Undo deleteNote. null if missing or not deleted. */
+  restoreNote(id: string): Promise<Note | null>;
 
   /** Referee observations. Optionally narrowed to one team. */
   listFlags(teamId?: string): Promise<FlagRow[]>;
@@ -299,10 +316,20 @@ export type Store = {
   removeNomination(id: string): Promise<boolean>;
   /** Who won what, per division. Secret until the ceremony: never part of the shared state. */
   listWinners(): Promise<WinnerRow[]>;
-  /** One winner per (awardId, division): setting another replaces it. 404 if the team is gone. */
+  /**
+   * With `places` 1 there is one winner per (awardId, division) and setting another replaces it; with more,
+   * the team is added beside the others (the caller enforces the cap). Setting the same team again just
+   * refreshes it. 404 if the team is gone.
+   */
   setWinner(input: NewWinner): Promise<WinnerRow>;
+  /** Clear one team's win, or every winner of that award in that division when `teamId` is left out. Returns whether there was one. */
+  clearWinner(awardId: string, division: string, teamId?: string): Promise<boolean>;
+  /** Awards the Judge Advisor decided go to no team, per division. Secret until the ceremony. */
+  listNoWinners(): Promise<NoWinnerRow[]>;
+  /** One mark per (awardId, division): marking again refreshes who and when. */
+  setNoWinner(input: NewNoWinner): Promise<NoWinnerRow>;
   /** Returns whether there was one. */
-  clearWinner(awardId: string, division: string): Promise<boolean>;
+  clearNoWinner(awardId: string, division: string): Promise<boolean>;
 
   resetDay(): Promise<void>;
   resetAll(): Promise<void>;

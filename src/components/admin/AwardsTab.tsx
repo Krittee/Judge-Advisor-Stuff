@@ -15,6 +15,7 @@ import {
   buildAwardPanels,
   buildMatrix,
   clearAfterAsking,
+  clearNoWinnerAfterAsking,
   conductIn,
   conductKeyText,
   conductLine,
@@ -23,13 +24,16 @@ import {
   decidedText,
   detailFor,
   distinctTeams,
+  fullText,
   giveAfterAsking,
   hasText,
   hiddenNote,
   holdsText,
   JA_KEY,
   loadView,
+  markNoWinnerAfterAsking,
   nominateAsAdmin,
+  noWinnersOf,
   nominationsIn,
   nominationsText,
   panelChips,
@@ -179,8 +183,17 @@ export function AwardsTab({
         onSelect={setSel}
         wide={wide}
         busy={busy}
-        onGive={(d) => write(() => giveAfterAsking(ask, call, { award: d.award, team: d.team, current: d.current }))}
+        onGive={(d) => write(() => giveAfterAsking(ask, call, { award: d.award, team: d.team, current: d.current, noWinner: d.noWinner }))}
         onClear={(d) => write(() => clearAfterAsking(ask, call, { award: d.award, team: d.team }))}
+        onMarkNoWinner={(awardId) => {
+          const award = data.awards.find((a) => a.id === awardId);
+          const held = new Set(data.winners.filter((w) => w.award_id === awardId && w.division === division).map((w) => w.team_id));
+          if (award) void write(() => markNoWinnerAfterAsking(ask, call, { award, division, holders: state.teams.filter((t) => held.has(t.id)) }));
+        }}
+        onClearNoWinner={(awardId) => {
+          const award = data.awards.find((a) => a.id === awardId);
+          if (award) void write(() => clearNoWinnerAfterAsking(ask, call, { award, division }));
+        }}
         onNominate={(awardId, teamId) => write(() => nominateAsAdmin(call, { awardId, teamId }))}
         onRemove={(d, line) => write(() => removeAfterAsking(ask, call, { ...line, award: d.award, team: d.team }))}
       />
@@ -214,6 +227,8 @@ export function AwardsBoard({
   busy = false,
   onGive,
   onClear,
+  onMarkNoWinner,
+  onClearNoWinner,
   onNominate,
   onRemove,
 }: {
@@ -236,13 +251,16 @@ export function AwardsBoard({
   busy?: boolean;
   onGive: (detail: Detail) => void;
   onClear: (detail: Detail) => void;
+  /** The Judge Advisor marks an award "No winner" in this division, or takes the mark off: the award's id. */
+  onMarkNoWinner: (awardId: string) => void;
+  onClearNoWinner: (awardId: string) => void;
   /** The Judge Advisor nominates a team for an award. */
   onNominate: (awardId: string, teamId: string) => void;
   /** The Judge Advisor removes one nomination, a judge's or their own: its id, and whose it is for the question. */
   onRemove: (detail: Detail, line: { id: string; by: string }) => void;
 }) {
   const uid = useId();
-  const { awards, nominations, winners } = data;
+  const { awards, nominations, winners, noWinners } = data;
   const { teams, panels, divisions, flags, flagKinds } = state;
 
   if (!awards.length) return <p className="ja-empty">No awards are set up. They are listed in config/event.json.</p>;
@@ -254,10 +272,11 @@ export function AwardsBoard({
   const scoped = nominationsIn(nominations, teams, division, panel?.id);
   const conduct = conductIn(flags, teams, division, panel?.id);
   const decided = winnersOf(winners, division);
-  const detail = sel ? detailFor(sel, { awards, nominations, winners, teams, panels, flags }) : null;
+  const none = noWinnersOf(noWinners, division);
+  const detail = sel ? detailFor(sel, { awards, nominations, winners, noWinners, teams, panels, flags }) : null;
   const teamsHere = teams.filter((t) => t.division === division);
   const titleId = `${uid}-t`;
-  const matrix = buildMatrix(awards, scoped, decided, teamsHere, panels, panel?.id, conduct);
+  const matrix = buildMatrix(awards, scoped, decided, teamsHere, panels, panel?.id, conduct, none);
 
   const nominee = detail ? (
     <NomineePanel
@@ -280,7 +299,7 @@ export function AwardsBoard({
       <div className="ja-aw-top">
         <h2 className="ja-aw-h">Awards</h2>
         <p className="ja-aw-meta">
-          {division} · {panel ? panel.name : "all panels"} · <b>{decidedCount(winners, awards, division)} of {awards.length}</b> decided · {nominationsText(scoped.length + conduct.size, distinctTeams(scoped, conduct.keys()))}
+          {division} · {panel ? panel.name : "all panels"} · <b>{decidedCount(winners, awards, division, noWinners)} of {awards.length}</b> decided · {nominationsText(scoped.length + conduct.size, distinctTeams(scoped, conduct.keys()))}
         </p>
         <p className="ja-aw-priv">
           <LockIcon />
@@ -299,7 +318,7 @@ export function AwardsBoard({
                 <span aria-hidden="true">{divisionTag(d)}</span>
                 <span className="sr-only">{d}</span>
                 <span className="ja-aw-fn">
-                  {decidedText(winners, awards, d)}
+                  {decidedText(winners, awards, d, noWinners)}
                   <span className="sr-only"> decided</span>
                 </span>
               </button>
@@ -339,9 +358,10 @@ export function AwardsBoard({
             />
           ) : (
             <AwardLists
-              lists={buildAwardPanels(awards, scoped, decided, teamsHere, panels, panel?.id, conduct)}
+              lists={buildAwardPanels(awards, scoped, decided, teamsHere, panels, panel?.id, conduct, none)}
               sel={sel}
               onSelect={onSelect}
+              noWinner={{ busy, onMark: onMarkNoWinner, onClear: onClearNoWinner }}
               // The Judge Advisor's nominations belong to no panel, so one added under a panel's filter would not show: Add team is for All panels.
               add={panel ? undefined : { teams: teamsByNumber(teamsHere), busy, onAdd: onNominate }}
             />
@@ -418,13 +438,17 @@ export function MatrixView({
               <th scope="col" className="ja-aw-pn">
                 Panel
               </th>
-              {matrix.columns.map(({ award, decided }) => (
+              {matrix.columns.map(({ award, decided, noWinner }) => (
                 <th key={award.id} scope="col" className={sel?.awardId === award.id ? "ja-aw-on" : undefined}>
                   <abbr className="ja-aw-hl" title={award.label}>
                     {award.short}
                   </abbr>
                   <span className="ja-aw-hk">
-                    {decided ? (
+                    {noWinner ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="no winner">
+                        <path d="M6 12h12" />
+                      </svg>
+                    ) : decided ? (
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="decided">
                         <path d="M5 12.5l4.5 4.5L19 7.5" />
                       </svg>
@@ -510,21 +534,24 @@ function Backing({ judges, ja = 0, conduct }: { judges: number; ja?: number; con
  * Every award in the config's order, nominated or not, each with its nominees as rows
  * and, when `add` is given, an Add team picker under them: the Judge Advisor's way
  * to put any team of the division up for the award. A team already added is listed but off.
+ * When `noWinner` is given, each award's header has Mark no winner (or, once marked, Clear).
  */
 export function AwardLists({
   lists,
   sel,
   onSelect,
   add,
+  noWinner,
 }: {
   lists: AwardPanel[];
   sel: Sel | null;
   onSelect: (sel: Sel | null) => void;
   add?: { teams: Team[]; busy: boolean; onAdd: (awardId: string, teamId: string) => void };
+  noWinner?: { busy: boolean; onMark: (awardId: string) => void; onClear: (awardId: string) => void };
 }) {
   return (
     <div className="ja-aw-aps">
-      {lists.map(({ award, decided, status, nominees, ja }) => (
+      {lists.map(({ award, decided, status, nominees, ja, noWinner: marked }) => (
         <section key={award.id} className={decided ? "ja-aw-ap ja-aw-dec" : "ja-aw-ap"} aria-label={`${award.label} Award`}>
           <header className="ja-aw-aph">
             <h2 title={award.blurb}>{award.label}</h2>
@@ -587,6 +614,19 @@ export function AwardLists({
                 </select>
                 <ChevronDown />
               </div>
+            </div>
+          ) : null}
+          {noWinner ? (
+            <div className="ja-aw-nw">
+              {marked ? (
+                <button type="button" className="ja-aw-lnk" disabled={noWinner.busy} aria-label={`Clear No winner on ${award.label}`} onClick={() => noWinner.onClear(award.id)}>
+                  Clear
+                </button>
+              ) : (
+                <button type="button" className="ja-aw-lnk" disabled={noWinner.busy} aria-label={`Mark no winner for ${award.label}`} onClick={() => noWinner.onMark(award.id)}>
+                  Mark no winner
+                </button>
+              )}
             </div>
           ) : null}
         </section>
@@ -772,6 +812,8 @@ export function NomineePanel({
             Clear winner
           </button>
         </div>
+      ) : detail.full ? (
+        <p className="ja-aw-note">{fullText(award, team)}</p>
       ) : detail.nominated ? (
         <>
           <button type="button" className="ja-aw-prim" disabled={busy} onClick={() => onGive(detail)}>

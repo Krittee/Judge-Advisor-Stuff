@@ -11,6 +11,7 @@ import type {
   ScoreRow,
   Team,
   WinnerRow,
+  NoWinnerRow,
 } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { randomPanelCode } from "../panelCode";
@@ -33,6 +34,7 @@ import {
   type NewRefereeSetup,
   type NewRequest,
   type NewWinner,
+  type NewNoWinner,
   type NominationKey,
   type SaveScore,
   type Store,
@@ -376,11 +378,22 @@ async function migrate(): Promise<void> {
       on nominations (award_id, team_id, panel_id, lower(btrim(judge)));
 
     -- The Judge Advisor's pick: one winner per award per division, so setting
-    -- another replaces it. Never part of the shared state.
+    -- another replaces it, or as many as the award's "winners" in config (the
+    -- Judges Award has two). Never part of the shared state.
     create table if not exists award_winners (
       award_id   text not null,
       division   text not null,
       team_id    uuid not null references teams(id) on delete cascade,
+      decided_by text not null,
+      decided_at timestamptz not null default now(),
+      primary key (award_id, division, team_id)
+    );
+
+    -- The Judge Advisor's decision that an award goes to no team: one mark per
+    -- award per division. No team, so nothing to cascade from.
+    create table if not exists award_no_winner (
+      award_id   text not null,
+      division   text not null,
       decided_by text not null,
       decided_at timestamptz not null default now(),
       primary key (award_id, division)
@@ -469,6 +482,7 @@ async function migrate(): Promise<void> {
     alter table scores    enable row level security;
     alter table nominations enable row level security;
     alter table award_winners enable row level security;
+    alter table award_no_winner enable row level security;
     alter table activity  enable row level security;
     alter table referee_setup enable row level security;
   `);
@@ -508,6 +522,12 @@ async function migrate(): Promise<void> {
       alter table flags add column if not exists match_number text;
       alter table flags add column if not exists field text;
 
+      -- The Judge Advisor can correct or delete a note. A delete only sets
+      -- deleted_at, so it can be undone.
+      alter table notes add column if not exists edited_at timestamptz;
+      alter table notes add column if not exists edited_by text;
+      alter table notes add column if not exists deleted_at timestamptz;
+
       -- Which Quick Reference rule(s) a violation flag was against (comma-joined).
       alter table flags add column if not exists rule text;
 
@@ -542,6 +562,14 @@ async function migrate(): Promise<void> {
       alter table nominations add column if not exists role text not null default 'judge' check (role in ('judge', 'admin'));
       create unique index if not exists nominations_one_per_admin
         on nominations (award_id, team_id, lower(btrim(judge))) where role = 'admin';
+
+      -- An award can have more than one winner (the Judges Award has two), so the key gains the team.
+      -- Every existing row is unique on (award_id, division), so it is unique on the wider key too: nothing is lost.
+      -- Only fires while the old two-column key exists, so it is safe to run on every start.
+      if exists (select 1 from pg_constraint where conrelid = 'award_winners'::regclass and contype = 'p' and array_length(conkey, 1) = 2) then
+        alter table award_winners drop constraint award_winners_pkey;
+        alter table award_winners add primary key (award_id, division, team_id);
+      end if;
     end $$;
   `);
     await client.query("commit");
@@ -755,10 +783,10 @@ export const postgresStore: Store = {
     return rows(
       teamId
         ? await query<Note>(
-            "select * from notes where team_id = $1 order by created_at desc limit 400",
+            "select * from notes where team_id = $1 and deleted_at is null order by created_at desc limit 400",
             [teamId],
           )
-        : await query<Note>("select * from notes order by created_at desc limit 400"),
+        : await query<Note>("select * from notes where deleted_at is null order by created_at desc limit 400"),
     );
   },
 
@@ -1219,6 +1247,38 @@ export const postgresStore: Store = {
     )!;
   },
 
+  async getNote(id) {
+    return one(await query<Note>("select * from notes where id = $1", [id]));
+  },
+
+  async updateNote(id, body, editedBy) {
+    return one(
+      await query<Note>(
+        `update notes set body = $2, edited_at = now(), edited_by = $3
+         where id = $1 and deleted_at is null returning *`,
+        [id, body, editedBy],
+      ),
+    );
+  },
+
+  async deleteNote(id) {
+    return one(
+      await query<Note>(
+        "update notes set deleted_at = now() where id = $1 and deleted_at is null returning *",
+        [id],
+      ),
+    );
+  },
+
+  async restoreNote(id) {
+    return one(
+      await query<Note>(
+        "update notes set deleted_at = null where id = $1 and deleted_at is not null returning *",
+        [id],
+      ),
+    );
+  },
+
   async listConflicts() {
     return rows(await query<ConflictRow>("select * from conflicts"));
   },
@@ -1593,27 +1653,66 @@ export const postgresStore: Store = {
 
   async setWinner(input: NewWinner) {
     try {
-      return one(
-        await query<WinnerRow>(
-          `insert into award_winners (award_id, division, team_id, decided_by)
-           values ($1, $2, $3, $4)
-           on conflict (award_id, division) do update set
-             team_id = excluded.team_id,
-             decided_by = excluded.decided_by,
-             decided_at = now()
-           returning *`,
-          [input.awardId, input.division, input.teamId, input.decidedBy],
-        ),
-      )!;
+      return await withClient(async (run) => {
+        // A single-winner award replaces whoever held it; one with more places just adds a holder.
+        if (input.places <= 1) {
+          await run(
+            "delete from award_winners where award_id = $1 and division = $2 and team_id <> $3",
+            [input.awardId, input.division, input.teamId],
+          );
+        }
+        return one(
+          await run<WinnerRow>(
+            `insert into award_winners (award_id, division, team_id, decided_by)
+             values ($1, $2, $3, $4)
+             on conflict (award_id, division, team_id) do update set
+               decided_by = excluded.decided_by,
+               decided_at = now()
+             returning *`,
+            [input.awardId, input.division, input.teamId, input.decidedBy],
+          ),
+        )!;
+      });
     } catch (e) {
       if ((e as { code?: string })?.code === "23503") throw new StoreError("That team no longer exists.", 404);
       throw e;
     }
   },
 
-  async clearWinner(awardId, division) {
+  async clearWinner(awardId, division, teamId) {
+    const gone = teamId
+      ? await query<{ award_id: string }>(
+          "delete from award_winners where award_id = $1 and division = $2 and team_id = $3 returning award_id",
+          [awardId, division, teamId],
+        )
+      : await query<{ award_id: string }>(
+          "delete from award_winners where award_id = $1 and division = $2 returning award_id",
+          [awardId, division],
+        );
+    return gone.length > 0;
+  },
+
+  async listNoWinners() {
+    return rows(await query<NoWinnerRow>("select * from award_no_winner order by decided_at, award_id, division"));
+  },
+
+  async setNoWinner(input: NewNoWinner) {
+    return one(
+      await query<NoWinnerRow>(
+        `insert into award_no_winner (award_id, division, decided_by)
+         values ($1, $2, $3)
+         on conflict (award_id, division) do update set
+           decided_by = excluded.decided_by,
+           decided_at = now()
+         returning *`,
+        [input.awardId, input.division, input.decidedBy],
+      ),
+    )!;
+  },
+
+  async clearNoWinner(awardId, division) {
     const gone = await query<{ award_id: string }>(
-      "delete from award_winners where award_id = $1 and division = $2 returning award_id",
+      "delete from award_no_winner where award_id = $1 and division = $2 returning award_id",
       [awardId, division],
     );
     return gone.length > 0;
@@ -1644,7 +1743,7 @@ export const postgresStore: Store = {
   async resetDay() {
     // Referee flags intentionally survive a day reset: repeat history is
     // event-wide, including at multi-day events. So does the referee setup.
-    await query("truncate activity, notes, scores, nominations, award_winners, requests");
+    await query("truncate activity, notes, scores, nominations, award_winners, award_no_winner, requests");
   },
 
   async resetAll() {
@@ -1652,8 +1751,9 @@ export const postgresStore: Store = {
     // boundary and must be used before importing the next event's roster.
     // The referee setup is the event's too, so it goes with them.
     // cascade also takes nominations and award_winners: both reference teams.
+    // award_no_winner has no team, so it is named.
     await query(
-      "truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup cascade",
+      "truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup, award_no_winner cascade",
     );
   },
 };

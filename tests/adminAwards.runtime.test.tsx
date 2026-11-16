@@ -5,7 +5,7 @@ import type { ReactElement, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { AwardLists, AwardsBoard, MatrixView, NomineePanel, ViewToggle } from "../src/components/admin/AwardsTab";
-import { buildAwardPanels, buildMatrix, detailFor, hiddenNote, nominationsIn, winnersOf, type Detail, type Sel, type View } from "../src/components/admin/awardsLogic";
+import { ALL_PANELS, buildAwardPanels, buildMatrix, detailFor, hiddenNote, nominationsIn, winnersOf, type Detail, type Sel, type View } from "../src/components/admin/awardsLogic";
 import { withRanks } from "../src/components/admin/scoresLogic";
 import { rankTeams } from "../src/lib/ranking";
 import { rubrics } from "../src/lib/rubrics";
@@ -50,7 +50,7 @@ const marked = (rubric: typeof notebook, mark: number) => {
 const categories = [{ id: "developing", label: "Developing", color: "amber", excludesRubrics: [] }];
 const rows = withRanks(rankTeams(teams, [marked(notebook, 2), marked(interview, 1)], rubricList, categories));
 
-const data: AwardsAdminView = { awards, nominations, winners };
+const data: AwardsAdminView = { awards, nominations, winners, noWinners: [] };
 // One Good conduct flag is below the two that count as a Sportsmanship nomination, so these flags change nothing on the board.
 const state = { teams, panels, divisions, flags: [flag(byteMe, "good")], flagKinds };
 /** Quiet Ones: three Good conduct flags and no judge. Torque Titans: two, beside a judge's Sportsmanship nomination. Byte Me: one. */
@@ -83,6 +83,8 @@ function board(over: { data?: AwardsAdminView; division?: string; panelId?: stri
       busy={over.busy}
       onGive={noop}
       onClear={noop}
+      onMarkNoWinner={noop}
+      onClearNoWinner={noop}
       onNominate={noop}
       onRemove={noop}
     />,
@@ -193,11 +195,11 @@ test("the selected cell is pressed and its award's column header is marked; noth
 });
 
 test("with nobody nominated the matrix says so instead of drawing an empty table", () => {
-  const m = board({ data: { awards, nominations: [], winners: [] } });
+  const m = board({ data: { awards, nominations: [], winners: [], noWinners: [] } });
   assert.doesNotMatch(m, /<table/);
   assert.match(m, /No nominations in Middle School yet\. Judges nominate the teams they have interviewed\./);
   assert.match(board({ division: "Blended" }), /No nominations in Blended yet/);
-  assert.match(board({ panelId: "p3", data: { awards, nominations: nominations.filter((n) => n.panel_id !== "p3"), winners: [] } }), /No nominations in Middle School from Panel 3 yet/);
+  assert.match(board({ panelId: "p3", data: { awards, nominations: nominations.filter((n) => n.panel_id !== "p3"), winners: [], noWinners: [] } }), /No nominations in Middle School from Panel 3 yet/);
 });
 
 /* ---- by award ----------------------------------------------------------------------------------- */
@@ -284,6 +286,36 @@ test("both views open the same side panel on the same nominee", () => {
   assert.deepEqual(again, [null, null]);
 });
 
+test("No winner: the chip, Clear on a marked award, Mark no winner on the rest, counted in the header; the matrix header carries a sign", () => {
+  const marked: AwardsAdminView = { ...data, noWinners: [{ award_id: "energy", division: MS, decided_by: "Alex Morgan", decided_at: "2026-10-20T15:00:00Z" }] };
+  assert.match(board({ data: marked }), /<b>4 of 11<\/b> decided/);
+
+  const lists = buildAwardPanels(awards, nominationsIn(nominations, teams, MS), winnersOf(winners, MS), teams.filter((t) => t.division === MS), panels, ALL_PANELS, new Map(), new Set(["energy"]));
+  const marks: string[] = [];
+  const noWinner = { busy: false, onMark: (id: string) => marks.push(`mark ${id}`), onClear: (id: string) => marks.push(`clear ${id}`) };
+  const els = walk(AwardLists({ lists, sel: null, onSelect: noop, noWinner }));
+  const energy = sections(board({ view: "award", data: marked })).find((s) => s.name === "Energy Award")!.body;
+  assert.match(energy, /<span class="ja-aw-cst ja-aw-ok">No winner<\/span>/);
+  assert.match(energy, />Clear<\/button>/);
+  assert.doesNotMatch(energy, /Mark no winner/);
+  const create = sections(board({ view: "award", data: marked })).find((s) => s.name === "Create Award")!.body;
+  assert.match(create, />Mark no winner<\/button>/);
+
+  click(els.find((e) => e.props["aria-label"] === "Mark no winner for Create")!);
+  click(els.find((e) => e.props["aria-label"] === "Clear No winner on Energy")!);
+  assert.deepEqual(marks, ["mark create", "clear energy"]);
+  // Busy turns both off, like every other write.
+  assert.ok(walk(AwardLists({ lists, sel: null, onSelect: noop, noWinner: { ...noWinner, busy: true } })).filter((e) => String(e.props["aria-label"] ?? "").match(/Mark no winner for|Clear No winner/)).every((e) => e.props.disabled === true));
+  // Without the actions (no write access) there are no buttons.
+  assert.doesNotMatch(renderToStaticMarkup(AwardLists({ lists, sel: null, onSelect: noop })), /Mark no winner|>Clear</);
+
+  // A marked award with nominees shows its column with the sign, not the tick.
+  const m = buildMatrix(awards, nominationsIn(nominations, teams, MS), winnersOf(winners, MS), teams.filter((t) => t.division === MS), panels, ALL_PANELS, new Map(), new Set(["excellence"]));
+  const head = renderToStaticMarkup(MatrixView({ matrix: m, sel: null, note: "", none: "", onSelect: noop }));
+  assert.match(head, /aria-label="no winner"/);
+  assert.equal((head.match(/aria-label="no winner"/g) ?? []).length, 1);
+});
+
 /* ---- the side panel ------------------------------------------------------------------------------------- */
 
 test("the side panel: the award and division, the team, its scores and band, and why the panel nominated it", () => {
@@ -366,7 +398,7 @@ test("before anything is picked the column holds a hint, not a panel", () => {
 /* ---- a winner nobody nominates any more ------------------------------------------------------------------ */
 
 test("a judge can withdraw after a winner is set: the winner keeps its row, its tick and its panel, and nothing breaks", () => {
-  const left = { awards, nominations: nominations.filter((n) => n.team_id !== labRats.id), winners };
+  const left = { awards, nominations: nominations.filter((n) => n.team_id !== labRats.id), winners, noWinners: [] };
   const matrix = board({ data: left });
   assert.ok(bodyRows(matrix).includes("2088C"), "the row is still there");
   assert.match(matrix, /aria-label="2088C, Design: winner"/);
@@ -384,7 +416,7 @@ test("a judge can withdraw after a winner is set: the winner keeps its row, its 
 
 test("a nominee nobody nominates any more (the last nomination removed, or withdrawn elsewhere) offers no Give, only a way back; the winner keeps its Clear", () => {
   // 7700B's Design nomination was Sam's alone; once it is gone the panel is still open on it.
-  const gone = { awards, nominations: nominations.filter((n) => !(n.team_id === byteMe.id && n.award_id === "design")), winners: winners.filter((w) => w.award_id !== "design") };
+  const gone = { awards, nominations: nominations.filter((n) => !(n.team_id === byteMe.id && n.award_id === "design")), winners: winners.filter((w) => w.award_id !== "design"), noWinners: [] };
   const sel = { awardId: "design", teamId: byteMe.id };
   const p = aside(board({ data: gone, sel }));
   assert.match(p, /No judge is nominating 7700B for Design any more\./);
@@ -405,7 +437,7 @@ test("a nominee nobody nominates any more (the last nomination removed, or withd
   assert.match(aside(board({ data: jaOnly, sel })), /Give Design to 7700B/);
   assert.match(aside(board({ sel: { awardId: "sportsmanship", teamId: quiet.id }, flags: conductFlags })), /Give Sportsmanship to 1111Q/);
   // The winner nobody nominates is unchanged: the chip and Clear winner, and no way back to offer.
-  const held = aside(board({ data: { awards, nominations: nominations.filter((n) => n.team_id !== labRats.id), winners }, sel: { awardId: "design", teamId: labRats.id } }));
+  const held = aside(board({ data: { awards, nominations: nominations.filter((n) => n.team_id !== labRats.id), winners, noWinners: [] }, sel: { awardId: "design", teamId: labRats.id } }));
   assert.match(held, /Clear winner/);
   assert.doesNotMatch(held, /Nominate for|ja-aw-prim/);
 });
@@ -416,9 +448,9 @@ test("a selection whose team or nomination has gone shows no panel and does not 
 });
 
 test("no awards in the config, or no divisions, is said plainly", () => {
-  assert.match(board({ data: { awards: [], nominations: [], winners: [] } }), /No awards are set up/);
+  assert.match(board({ data: { awards: [], nominations: [], winners: [], noWinners: [] } }), /No awards are set up/);
   const none = renderToStaticMarkup(
-    <AwardsBoard data={data} state={{ ...state, divisions: [] }} rows={[]} rubricList={rubricList} division="" onDivision={noop} onPanel={noop} view="matrix" onView={noop} sel={null} onSelect={noop} onGive={noop} onClear={noop} onNominate={noop} onRemove={noop} />,
+    <AwardsBoard data={data} state={{ ...state, divisions: [] }} rows={[]} rubricList={rubricList} division="" onDivision={noop} onPanel={noop} view="matrix" onView={noop} sel={null} onSelect={noop} onGive={noop} onClear={noop} onMarkNoWinner={noop} onClearNoWinner={noop} onNominate={noop} onRemove={noop} />,
   );
   assert.match(none, /No divisions yet/);
 });
@@ -448,14 +480,14 @@ test("the matrix: a team referees flagged for Good conduct twice has a row and a
 
 test("the Sportsmanship column appears when only referees put someone up, and the winner of it is a tick", () => {
   const judged = nominations.filter((n) => n.award_id !== "sportsmanship");
-  const flagged = board({ data: { awards, nominations: judged, winners }, flags: conductFlags });
+  const flagged = board({ data: { awards, nominations: judged, winners, noWinners: [] }, flags: conductFlags });
   assert.match(flagged, /<abbr class="ja-aw-hl" title="Sportsmanship">Spt<\/abbr>/);
   assert.match(text(flagged.match(/<p class="ja-aw-key">[\s\S]*?<\/p>/)![0]), /Only nominated teams are listed\. Energy has no nominations yet, so its column is hidden\.$/, "Sportsmanship's column is not among the hidden");
-  const bare = board({ data: { awards, nominations: judged, winners }, flags: [] });
+  const bare = board({ data: { awards, nominations: judged, winners, noWinners: [] }, flags: [] });
   assert.doesNotMatch(bare, /<abbr class="ja-aw-hl" title="Sportsmanship">/);
   assert.match(text(bare.match(/<p class="ja-aw-key">[\s\S]*?<\/p>/)![0]), /Sportsmanship and Energy have no nominations yet, so their columns are hidden\.$/);
 
-  const won = board({ data: { awards, nominations, winners: [...winners, { award_id: "sportsmanship", division: MS, team_id: quiet.id, decided_by: "Alex Morgan", decided_at: "2026-10-20T15:00:00Z" }] }, flags: conductFlags });
+  const won = board({ data: { awards, nominations, winners: [...winners, { award_id: "sportsmanship", division: MS, team_id: quiet.id, decided_by: "Alex Morgan", decided_at: "2026-10-20T15:00:00Z" }], noWinners: [] }, flags: conductFlags });
   assert.match(won, /<button type="button" class="ja-aw-cell ja-aw-won" aria-pressed="false" aria-label="1111Q, Sportsmanship: winner"><svg/);
   assert.match(won, /<span class="ja-aw-sub ja-aw-has">Has Sportsmanship<\/span>/);
 });
@@ -469,7 +501,7 @@ test("the header and the All panels chip count each Good conduct team once; a pa
   assert.match(p2, /Middle School · Panel 2 · <b>3 of 11<\/b> decided · 10 nominations for 5 teams/);
   assert.ok(!bodyRows(p2).includes("1111Q"));
   assert.match(board({ flags: [flag(byteMe, "good")] }), /18 nominations for 9 teams/, "one flag changes nothing");
-  assert.match(board({ flags: conductFlags, data: { awards, nominations, winners: [] } }), /<b>0 of 11<\/b> decided/, "the decided counts are the winners', not the flags'");
+  assert.match(board({ flags: conductFlags, data: { awards, nominations, winners: [], noWinners: [] } }), /<b>0 of 11<\/b> decided/, "the decided counts are the winners', not the flags'");
 });
 
 test("the matrix sorts a Good conduct team as one nomination", () => {
@@ -544,7 +576,7 @@ test("the Give button hands a Good conduct nominee to the board like any other",
 // Quiet Ones: no judge nominated them, the Judge Advisor does. Byte Me: two judges and the Judge Advisor, all for Excellence.
 const jaQuiet = adminNom(quiet, "excellence", "Deserves a look.");
 const jaByte = adminNom(byteMe, "excellence");
-const withJa: AwardsAdminView = { awards, nominations: [...nominations, jaQuiet, jaByte], winners };
+const withJa: AwardsAdminView = { awards, nominations: [...nominations, jaQuiet, jaByte], winners, noWinners: [] };
 const select = (markup: string, label: string) => markup.match(new RegExp(`<select class="ja-in ja-sel" aria-label="${label}"[^>]*>([\\s\\S]*?)</select>`));
 const options = (selectMarkup: string) => [...selectMarkup.matchAll(/<option value="([^"]*)"( disabled="")?[^>]*>(.*?)<\/option>/g)].map((o) => `${o[1]}|${o[2] ? "off|" : ""}${o[3]}`);
 
@@ -671,7 +703,7 @@ test("on a phone the panel is a bottom sheet over the board, not a column: a nat
 
 test("replacing or clearing a winner asks through useConfirm; there is no window.confirm", () => {
   assert.ok(tab.includes("const { ask, dialog } = useConfirm();") && tab.includes("{dialog}"));
-  assert.ok(tab.includes("giveAfterAsking(ask, call, { award: d.award, team: d.team, current: d.current })"));
+  assert.ok(tab.includes("giveAfterAsking(ask, call, { award: d.award, team: d.team, current: d.current, noWinner: d.noWinner })"));
   assert.ok(tab.includes("clearAfterAsking(ask, call, { award: d.award, team: d.team })"));
   assert.ok(!tab.includes("window.confirm") && !/(^|[^\w.])confirm\(/m.test(tab.replace(/\/\*[\s\S]*?\*\//g, "")));
   // The writes are the two routes the API already has, and only through the logic.
@@ -721,7 +753,7 @@ test("the sheet follows the Sections sheet: showModal when a nominee is open, Es
 
 test("the page fetches the awards for every section once signed in, gives the rail its count, and mounts the tab", () => {
   assert.ok(page.includes("useAwards({ enabled: Boolean(session) })"));
-  assert.match(page, /\.\.\.\(awards\.data\?\.awards\.length \? \{ awards: decidedText\(awards\.data\.winners, awards\.data\.awards, division\) \} : \{\}\)/);
+  assert.match(page, /\.\.\.\(awards\.data\?\.awards\.length \? \{ awards: decidedText\(awards\.data\.winners, awards\.data\.awards, division, awards\.data\.noWinners\) \} : \{\}\)/);
   assert.ok(page.includes("pickDivision(awardDivision, state.divisions, awards.data?.nominations ?? [], state.teams)"));
   assert.match(page, /tab === "awards" \? \(\s*<AwardsTab\s+state=\{state\}\s+data=\{awards\.data\}\s+error=\{awards\.error\}\s+reload=\{awards\.reload\}\s+division=\{division\}\s+onDivision=\{setAwardDivision\}\s+onError=\{setError\}/);
   assert.match(page, /tab === "awards" \|\| tab === "scores"/, "Awards fills the width the rail leaves");

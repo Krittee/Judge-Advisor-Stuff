@@ -4,10 +4,12 @@ import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { Banner, formatClock } from "@/components/ui";
 import { useRubricScoring } from "@/components/useRubricScoring";
 import { useTeamRecord } from "@/components/useTeamRecord";
+import { GOOD_CONDUCT } from "@/lib/awards";
 import type { Rubric } from "@/lib/rubrics";
-import type { AppState, FlagRow, RequestRow, ScoreRow, Team } from "@/lib/types";
+import { tone } from "@/lib/tone";
+import type { AppState, FlagRow, Note, RequestRow, ScoreRow, Team } from "@/lib/types";
 import { BandPill, CheckIcon, CloseIcon, WarnIcon } from "./parts";
-import { clearScoresQuestion, flagDetail, rubricShort, sectionMax, type Ask } from "./logic";
+import { clearScoresQuestion, flagDetail, flagsWorstFirst, rubricShort, sectionMax, type Ask } from "./logic";
 
 /**
  * The team sheet: everything a judge records about one team, in a bottom
@@ -62,6 +64,77 @@ export function TeamSheet({
   );
 }
 
+/** One note; with `canFix`, Edit and Delete too. An edited note says so for everyone. */
+export function NoteItem({
+  note: n,
+  canFix,
+  onEdit,
+  onDelete,
+}: {
+  note: Note;
+  canFix?: boolean;
+  /** Resolves true once the new text is saved. */
+  onEdit: (text: string) => Promise<boolean>;
+  onDelete: () => void;
+}) {
+  const [text, setText] = useState<string | null>(null); // null: not editing
+
+  return (
+    <li className="jg-nn">
+      <p className="jg-nh">
+        <b>{n.author}</b>
+        <span aria-hidden="true">·</span>
+        <span>{formatClock(n.created_at)}</span>
+        {canFix && text === null ? (
+          <span className="jg-nacts">
+            <button type="button" className="jg-nact" aria-label={`Edit note by ${n.author}`} onClick={() => setText(n.body)}>
+              Edit
+            </button>
+            <button type="button" className="jg-nact" aria-label={`Delete note by ${n.author}`} onClick={onDelete}>
+              Delete
+            </button>
+          </span>
+        ) : null}
+      </p>
+      {text === null ? (
+        <p className="jg-nb">{n.body}</p>
+      ) : (
+        <>
+          <textarea
+            className="jg-ta"
+            rows={3}
+            aria-label={`Edit note by ${n.author}`}
+            value={text}
+            autoFocus
+            onFocus={(e) => e.currentTarget.setSelectionRange(e.currentTarget.value.length, e.currentTarget.value.length)}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <div className="jg-nacts">
+            <button
+              type="button"
+              className="jg-nact"
+              disabled={!text.trim()}
+              onClick={async () => {
+                if (await onEdit(text)) setText(null);
+              }}
+            >
+              Save
+            </button>
+            <button type="button" className="jg-nact" onClick={() => setText(null)}>
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+      {n.edited_at ? (
+        <p className="jg-ne">
+          edited by {n.edited_by} · {formatClock(n.edited_at)}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
 type BodyProps = {
   team: Team;
   /** The team's live request: notes are filed against it. */
@@ -71,6 +144,8 @@ type BodyProps = {
   flags: FlagRow[];
   flagKinds: AppState["flagKinds"];
   ask: Ask;
+  /** Show Edit and Delete on each note: the Judge Advisor's console only. */
+  canFixNotes?: boolean;
 };
 
 function Body({
@@ -81,6 +156,7 @@ function Body({
   flags,
   flagKinds,
   ask,
+  canFixNotes,
   titleId,
   onClose,
 }: BodyProps & { titleId: string; onClose: () => void }) {
@@ -99,6 +175,10 @@ function Body({
     scores,
     setScores,
     saveNote,
+    editNote,
+    deleteNote,
+    restoreNote,
+    removed,
     total,
     max,
     scored,
@@ -120,7 +200,8 @@ function Body({
   const mine = flags
     .filter((f) => f.team_id === team.id)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const newestFirst = [...notes].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  // A deleted note stays in the list as an Undo line until the sheet closes.
+  const newestFirst = [...notes.filter((n) => !removed.some((r) => r.id === n.id)), ...removed].sort((a, b) => b.created_at.localeCompare(a.created_at));
   const language = languages.find((l) => l.id === request?.language)?.short;
   const sub = [categoryLabel, language, team.pit ? `Pit ${team.pit}` : null].filter(Boolean).join(" · ");
 
@@ -188,12 +269,12 @@ function Body({
         <>
           <div className="jg-sh-scroll" ref={scroller}>
             {error ? <Banner kind="error">{error}</Banner> : null}
-            {mine.map((f) => {
+            {flagsWorstFirst(mine, flagKinds).map((f) => {
               const kind = flagKinds.find((k) => k.id === f.kind);
               const detail = flagDetail(f);
               return (
-                <div key={f.id} className="jg-caution" role="note">
-                  <WarnIcon />
+                <div key={f.id} className={`jg-flag ring-1 ring-inset ${tone(kind?.color)}`} role="note">
+                  {kind?.id === GOOD_CONDUCT ? <CheckIcon /> : <WarnIcon />}
                   <div>
                     <p>
                       <b>{kind?.label ?? f.kind}</b>
@@ -206,16 +287,28 @@ function Body({
             })}
             {newestFirst.length ? (
               <ul className="jg-nl" aria-label="Notes">
-                {newestFirst.map((n) => (
-                  <li key={n.id} className="jg-nn">
-                    <p className="jg-nh">
-                      <b>{n.author}</b>
-                      <span aria-hidden="true">·</span>
-                      <span>{formatClock(n.created_at)}</span>
-                    </p>
-                    <p className="jg-nb">{n.body}</p>
-                  </li>
-                ))}
+                {newestFirst.map((n) =>
+                  removed.some((r) => r.id === n.id) ? (
+                    <li key={n.id} className="jg-nx">
+                      <span>Note by {n.author} deleted</span>
+                      <button type="button" className="jg-nact" onClick={() => restoreNote(n.id)}>
+                        Undo
+                      </button>
+                    </li>
+                  ) : (
+                    <NoteItem
+                      key={n.id}
+                      note={n}
+                      canFix={canFixNotes}
+                      onEdit={(text) => editNote(n.id, text)}
+                      onDelete={async () => {
+                        if (await ask(`Delete this note by ${n.author}?`, { confirmLabel: "Delete", danger: true })) {
+                          await deleteNote(n);
+                        }
+                      }}
+                    />
+                  ),
+                )}
               </ul>
             ) : (
               <p className="jg-none">No notes yet.</p>

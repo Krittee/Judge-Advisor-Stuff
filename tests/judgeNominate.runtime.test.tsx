@@ -22,10 +22,10 @@ const noop = () => {};
 
 // The labels come from config/event.json through GET /api/awards: these are not the real ones on purpose.
 const awards: AwardView[] = [
-  { id: "excellence", label: "Top Prize", short: "Top", blurb: "Overall excellence." },
-  { id: "design", label: "Design", short: "Des", blurb: "An organised design process." },
-  { id: "think", label: "Think", short: "Thk", blurb: "Coding and software." },
-  { id: "inspire", label: "Inspire", short: "Ins", blurb: "Passion and spirit." },
+  { id: "excellence", label: "Top Prize", short: "Top", blurb: "Overall excellence.", places: 1 },
+  { id: "design", label: "Design", short: "Des", blurb: "An organised design process.", places: 1 },
+  { id: "think", label: "Think", short: "Thk", blurb: "Coding and software.", places: 1 },
+  { id: "inspire", label: "Inspire", short: "Ins", blurb: "Passion and spirit.", places: 1 },
 ];
 const me = { judge: "Sam Rivera", panelId: "p2" };
 

@@ -1038,18 +1038,70 @@ test("migrate() gives nominations a role and the Judge Advisor's rows an index o
   assert.ok(!/nominations_one_per_admin[^;]*panel_id/.test(migrateBody), "the Judge Advisor's key has no panel in it");
 });
 
-test("migrate() creates award_winners with one row per (award, division), cascading with the team", () => {
+test("migrate() creates award_winners keyed on (award, division, team), cascading with the team", () => {
   assert.match(
     migrateBody,
-    /create table if not exists award_winners \(\s*award_id\s+text not null,\s*division\s+text not null,\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*decided_by text not null,\s*decided_at timestamptz not null default now\(\),\s*primary key \(award_id, division\)\s*\);/,
+    /create table if not exists award_winners \(\s*award_id\s+text not null,\s*division\s+text not null,\s*team_id\s+uuid not null references teams\(id\) on delete cascade,\s*decided_by text not null,\s*decided_at timestamptz not null default now\(\),\s*primary key \(award_id, division, team_id\)\s*\);/,
   );
   assert.ok(migrateBody.includes("create index if not exists award_winners_team_idx on award_winners (team_id);"));
+});
+
+test("migrate() widens an old (award, division) winners key to include the team, only while the old key exists, after the table is created", () => {
+  const create = migrateBody.search(/create table if not exists award_winners/);
+  const widen = after(migrateBody, "conrelid = 'award_winners'::regclass and contype = 'p' and array_length(conkey, 1) = 2");
+  assert.ok(create >= 0 && widen > create, "the guarded step runs after the table exists");
+  const step = migrateBody.slice(widen, widen + 400);
+  assert.match(step, /alter table award_winners drop constraint award_winners_pkey;\s*alter table award_winners add primary key \(award_id, division, team_id\);/);
 });
 
 test("both award tables are locked down like every other", () => {
   for (const table of ["nominations", "award_winners"]) {
     assert.ok(migrateBody.includes(`alter table ${table} enable row level security;`), `${table}: RLS in migrate()`);
   }
+});
+
+test("migrate() creates award_no_winner, one row per (award, division), additive and locked down", () => {
+  assert.match(
+    migrateBody,
+    /create table if not exists award_no_winner \(\s*award_id\s+text not null,\s*division\s+text not null,\s*decided_by text not null,\s*decided_at timestamptz not null default now\(\),\s*primary key \(award_id, division\)\s*\);/,
+  );
+  assert.ok(migrateBody.includes("alter table award_no_winner enable row level security;"));
+});
+
+test("setNoWinner upserts on (award, division); clearNoWinner deletes by the same key; the list is oldest first", async () => {
+  calls.length = 0;
+  answer = () => [{ award_id: "design", division: "Middle School", decided_by: "Alex", decided_at: new Date("2026-10-24T09:00:00.000Z") }];
+  const made = await postgresStore.setNoWinner({ awardId: "design", division: "Middle School", decidedBy: "Alex" });
+  const [upsert] = sent(/^insert into award_no_winner/);
+  assert.match(
+    upsert.sql,
+    /^insert into award_no_winner \(award_id, division, decided_by\) values \(\$1, \$2, \$3\) on conflict \(award_id, division\) do update set decided_by = excluded\.decided_by, decided_at = now\(\) returning \*$/,
+  );
+  assert.deepEqual(upsert.params, ["design", "Middle School", "Alex"]);
+  assert.equal(made.decided_at, "2026-10-24T09:00:00.000Z");
+
+  calls.length = 0;
+  await postgresStore.listNoWinners();
+  assert.equal(sent(/from award_no_winner/)[0].sql, "select * from award_no_winner order by decided_at, award_id, division");
+
+  calls.length = 0;
+  answer = () => [{ award_id: "design" }];
+  assert.equal(await postgresStore.clearNoWinner("design", "Middle School"), true);
+  const [del] = sent(/^delete from award_no_winner/);
+  assert.equal(del.sql, "delete from award_no_winner where award_id = $1 and division = $2 returning award_id");
+  assert.deepEqual(del.params, ["design", "Middle School"]);
+  answer = () => [];
+  assert.equal(await postgresStore.clearNoWinner("design", "Middle School"), false);
+});
+
+test("a day reset and a full wipe both name award_no_winner (it has no team to cascade from)", async () => {
+  answer = () => [];
+  calls.length = 0;
+  await postgresStore.resetDay();
+  assert.match(sent(/^truncate/)[0].sql, /\baward_no_winner\b/);
+  calls.length = 0;
+  await postgresStore.resetAll();
+  assert.match(sent(/^truncate/)[0].sql, /\baward_no_winner\b/);
 });
 
 const NOMINATION = { id: "n1", award_id: "excellence", team_id: "t1", panel_id: "p1", judge: "Amy", reason: null, created_at: new Date("2026-10-24T08:00:00.000Z"), updated_at: new Date("2026-10-24T08:00:00.000Z") };
@@ -1171,21 +1223,29 @@ test("nominations and winners are read whole, oldest first", async () => {
   assert.equal(winners[0].decided_at, "2026-10-24T09:00:00.000Z");
 });
 
-test("setWinner upserts on (award, division) so a replacement takes the place; clearWinner deletes by the same key", async () => {
+test("setWinner upserts on (award, division, team) and, with one place, first drops the other holders; clearWinner deletes by award and division, or by team too", async () => {
   calls.length = 0;
   answer = () => [{ award_id: "design", division: "Middle School", team_id: "t2", decided_by: "Alex", decided_at: new Date("2026-10-24T09:00:00.000Z") }];
-  await postgresStore.setWinner({ awardId: "design", division: "Middle School", teamId: "t2", decidedBy: "Alex" });
+  await postgresStore.setWinner({ awardId: "design", division: "Middle School", teamId: "t2", decidedBy: "Alex", places: 1 });
   const [upsert] = sent(/^insert into award_winners/);
   assert.match(
     upsert.sql,
-    /^insert into award_winners \(award_id, division, team_id, decided_by\) values \(\$1, \$2, \$3, \$4\) on conflict \(award_id, division\) do update set team_id = excluded\.team_id, decided_by = excluded\.decided_by, decided_at = now\(\) returning \*$/,
+    /^insert into award_winners \(award_id, division, team_id, decided_by\) values \(\$1, \$2, \$3, \$4\) on conflict \(award_id, division, team_id\) do update set decided_by = excluded\.decided_by, decided_at = now\(\) returning \*$/,
   );
   assert.deepEqual(upsert.params, ["design", "Middle School", "t2", "Alex"]);
+  const [replace] = sent(/^delete from award_winners/);
+  assert.equal(replace.sql, "delete from award_winners where award_id = $1 and division = $2 and team_id <> $3");
+  assert.deepEqual(replace.params, ["design", "Middle School", "t2"]);
+
+  calls.length = 0;
+  await postgresStore.setWinner({ awardId: "judges", division: "Middle School", teamId: "t2", decidedBy: "Alex", places: 2 });
+  assert.equal(sent(/^delete from award_winners/).length, 0, "with more places nobody is replaced");
+  assert.equal(sent(/^insert into award_winners/).length, 1);
 
   answer = () => {
     throw pgError("23503", "award_winners_team_id_fkey");
   };
-  await assert.rejects(() => postgresStore.setWinner({ awardId: "design", division: "Middle School", teamId: "t2", decidedBy: "Alex" }), (e) => e.status === 404);
+  await assert.rejects(() => postgresStore.setWinner({ awardId: "design", division: "Middle School", teamId: "t2", decidedBy: "Alex", places: 1 }), (e) => e.status === 404);
 
   calls.length = 0;
   answer = () => [{ award_id: "design" }];
@@ -1195,6 +1255,13 @@ test("setWinner upserts on (award, division) so a replacement takes the place; c
   assert.deepEqual(del.params, ["design", "Middle School"]);
   answer = () => [];
   assert.equal(await postgresStore.clearWinner("design", "Middle School"), false);
+
+  calls.length = 0;
+  answer = () => [{ award_id: "judges" }];
+  assert.equal(await postgresStore.clearWinner("judges", "Middle School", "t2"), true);
+  const [one] = sent(/^delete from award_winners/);
+  assert.equal(one.sql, "delete from award_winners where award_id = $1 and division = $2 and team_id = $3 returning award_id");
+  assert.deepEqual(one.params, ["judges", "Middle School", "t2"]);
 });
 
 test("a day reset names the nominations and winners (and still spares flags and the setup); a full wipe reaches them through teams", async () => {

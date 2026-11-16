@@ -1,4 +1,4 @@
-# Judge Queue 2.0 → 2.2: what changed, and how it works
+# Judge Queue Version 2: what changed, and how it works
 
 Written 2026-10-25. Covers everything built after Version 1 (the default
 branch, `claude/event-judge-booking-app-kcprxn`, at `61cf67a`):
@@ -15,12 +15,69 @@ Vercel deployed it to judge-advisor-stuff.vercel.app. Version 1 is kept as tag
 `v1.0.0` and the GitHub release "Version 1.0 (old version)". See §8 for the
 launch itself.
 
+## Releases
+
+Newest first. Each version links to its section below.
+
+| Version | Live on | PR | Merge commit | What |
+|---|---|---|---|---|
+| [2.1.4](#version-214-four-fixes-from-16-november) | (pending) | (pending) | (pending) | Good conduct green; JA fixes notes; Judges Award two winners; No winner |
+| [2.1.3](#version-213-slot-windows-open-to-end-per-day-with-a-break) | 2026-11-14 | [#17](https://github.com/Krittee/Judge-Advisor-Stuff/pull/17) | `a4ee1b4` | Slot windows: per-panel days with open, end and an optional break |
+| [2.1.2](#version-212-two-coordinator-fixes) | 2026-11-13 | [#16](https://github.com/Krittee/Judge-Advisor-Stuff/pull/16) | `aa4a433` | Two Coordinator fixes |
+| [2.1.1](#version-211-onboarding-guides-and-new-teams-start-ungraded) | 2026-11-08 | [#15](https://github.com/Krittee/Judge-Advisor-Stuff/pull/15) | `97ef20a` | Onboarding guides; new teams start Ungraded |
+| [2.1.0](#version-210-coordinator-and-team-interview-language) | 2026-11-07 | [#14](https://github.com/Krittee/Judge-Advisor-Stuff/pull/14) | `bae537b` | Coordinator role and team interview language |
+| 2.0.1 | 2026-10-31 | [#10](https://github.com/Krittee/Judge-Advisor-Stuff/pull/10)–[#13](https://github.com/Krittee/Judge-Advisor-Stuff/pull/13) | `e550f77` (last of the four) | Bug fixes from 31 October; see [FIXES.md](FIXES.md) |
+| [2.0](#1-version-20-the-redesign) | 2026-10-26 | [#9](https://github.com/Krittee/Judge-Advisor-Stuff/pull/9) | (see section 8, The launch) | The redesign |
+
+"2.2" in this file's old name was never a released version: slot windows was
+first numbered 2.2.0 and shipped as 2.1.3. Individual bug fixes are logged in
+`FIXES.md`.
+
+---
+
+## Version 2.1.4: four fixes from 16 November
+
+Not yet live: branch `version-2.1.4`. Four fixes the user reported on 2026-11-16,
+each built in its own session and merged locally on the default branch:
+
+- **Good conduct is green in the team sheet.** Each referee flag now wears its
+  own colour from `config/event.json` (Good conduct emerald with a tick; warnings
+  stay amber), and the sheet lists the most serious flag first. Commit `fa039dd`.
+- **The Judge Advisor can fix or delete a judge's note.** Edit and Delete on each
+  note in the JA's team sheet (`PATCH` / `DELETE /api/notes`, JA only; judges are
+  refused). A delete is soft (`deleted_at`) and can be undone from the sheet; an
+  edited note says who edited it and when; the Activity log keeps the old text.
+  Commit `ef84422`.
+- **The Judges Award can have two winners per division.** `"winners": 2` on the
+  award in `config/event.json` (`places` on `AwardView`). Giving a third team is
+  refused until one is cleared; Clear takes off one team. Single-place awards
+  still replace. Commit `c04c9b3`.
+- **An award can be marked "No winner".** Mark no winner / Clear at the foot of
+  each award in By award; it counts as decided and shows a dash in the matrix.
+  Marking clears every holder (both Judges winners, named in the question);
+  giving a team a marked award clears the mark. Commits `1d9aa15`..`c68fecd`,
+  combined with the two-winner change in merge `130a8d3`.
+
+**Database (runs by itself on the first request after deploy, additive):**
+`notes` gains `edited_at`, `edited_by`, `deleted_at`; `award_winners`' primary
+key widens from (award, division) to (award, division, team) inside a `do`
+block that only fires while the old key exists; new table `award_no_winner`
+(row level security on, like the others). Existing winners are kept.
+
+Checked: 1770 tests pass (1 skipped) locally; **real Postgres on Neon at
+`130a8d3`: 1835/1835, 0 skipped**; tsc, eslint and `npm run build` clean; all
+four checked in the browser on a copy of the data as the JA, and the judge
+refusals checked by API. Not checked on an iPhone. Details in
+[FIXES.md](FIXES.md#team-sheet-good-conduct-shows-as-a-warning-2026-11-16).
+
 ---
 
 ## Version 2.1.3: Slot windows (open to end, per day, with a break)
 
 Branch `claude/slot-windows`, cut from the default branch at `aa4a433` (2.1.2).
-Local commits only, not pushed. Spec and chosen mocks: `design/slot-windows/`
+Live 2026-11-14 via PR #17 (merge `a4ee1b4`). The Supabase migration ran (all live
+panels got `slot_days: []`). The real-Postgres conformance test was NOT run before
+merging (the user chose to merge without it). Spec and chosen mocks: `design/slot-windows/`
 (direction **A · Day cards**, canvas row "v2.2 · Slot windows"). Plan:
 `docs/superpowers/plans/2026-11-13-slot-windows.md`.
 
@@ -122,31 +179,68 @@ Checked in the browser at 375 with a 12-minute and a 5-minute panel.
 
 ---
 
+## Version 2.1.2: two Coordinator fixes
+
+Live 2026-11-13 via PR #16, merged as `aa4a433`; version bump `9f701d8`. Two fixes:
+
+- The Coordinator page no longer scrolls past its tab bar. The hidden
+  screen-reader labels on the EN/TH chips were positioned against the page and
+  stretched it; `.co-body` got `position: relative` in `src/app/globals.css`.
+  Commit `259cabb`; test `tests/coordinatorShell.css.test.mjs`.
+- "COORDINATOR" is no longer cut off on the sign-in page at tablet and desktop
+  widths. The role word shrinks only when its longest word wouldn't fit the 240px
+  band (`--si-letters` in `src/components/SignInForm.tsx`,
+  `min(26px, 100cqi / var(--si-letters, 7))` in `globals.css`). Commit `f4793fb`.
+
+Checked: 1691 tests pass (1 skipped), tsc and eslint clean; iPhone 17 simulator
+(iOS 27.2); live CSS confirmed after deploy. Not checked on a real iPhone.
+Details in
+[FIXES.md](FIXES.md#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) and
+[FIXES.md](FIXES.md#coordinator-sign-in-coordinator-word-clipped-2026-11-13).
+
+---
+
+## Version 2.1.1: onboarding guides, and new teams start Ungraded
+
+Live 2026-11-08 via PR #15, merged as `97ef20a`; version bump `b1a6112`.
+
+- Onboarding guides for every role in `docs/onboarding/` (start at
+  `docs/onboarding/README.md`): roles and doors, chain of command, which door to
+  use, a team's interview journey, a who-can-do-what table, and sign-in. Commit
+  `edc94b1`. They print no access codes.
+- New teams start Ungraded. `config/event.json` `teamCategories` now lists
+  Ungraded first, and the first entry is the default for new teams and for import
+  rows with a blank notebook cell. Teams already in the event keep their type.
+  Commit `3b9d670`; details in
+  [FIXES.md](FIXES.md#new-teams-start-ungraded-2026-11-08).
+
+---
+
 ## Version 2.1.0: Coordinator and team interview language
 
 Branch `claude/v21-coordinator-c9e080` (cut from `version-2.1.0`). Adds a sixth
 role, the **Coordinator**, who walks the pits, and an **interview language** on
 every team (EN, TH or both) that the Judge Advisor, the queue desk and the
-auto-assigner all use. Every change below is local and not pushed.
+auto-assigner all use. Live 2026-11-07 via PR #14 (merge `bae537b`).
 
 | Change | Commit | iPhone checked | Status |
 |---|---|---|---|
-| [Coordinator role: code, sign-in door, permissions](#coordinator-role) | `7886537` | Not yet (browser phone size only) | Local, not pushed |
-| [Teams carry an interview language (and an import column)](#team-language) | `a1c1299` | Not needed | Local, not pushed |
-| [Docs: the coordinator code, door and team language](#docs-first-pass) | `3420adb` | Not needed | Local, not pushed |
-| [Coordinator API: set team language, request and book](#coordinator-api) | `d566deb` | Not needed | Local, not pushed |
-| [Auto-assign prefers a panel that speaks the team's language](#language-auto-assign) | `cadd447` | Not needed | Local, not pushed |
-| [Spec: the redesign brief and mocks](#spec) | `cf4a575`, merged as `73e498b` | Not needed | Local, not pushed |
-| [Team language for the Judge Advisor](#language-ja) | `d498aed` | Not yet (browser phone size only) | Local, not pushed |
-| [Team language on the queue desk and the team page](#language-desk-team) | `31c873c` | Not yet (browser phone size only) | Local, not pushed |
-| [Coordinator: no team messages, "Already booked", placeholder avatar](#coordinator-deltas) | `d5aa4c0` | Not yet (browser phone size only) | Local, not pushed |
-| [Coordinator console `/coordinator`: Teams + Slots](#coordinator-console) | `2fe4d72` | Not yet (browser phone size only) | Local, not pushed |
-| [The sixth door, the last docs and these notes](#door-and-docs) | `2ae05d9` | Not yet (browser phone size only) | Local, not pushed |
-| [Review fixes: booked time no longer wraps; coordinator tabs open at the top](#review-fixes) | `ac9a4bf` | Not yet (browser phone size only) | Local, not pushed |
-| [The Coordinator door moves after Queue desk](#door-order) | `aecd28c` | Not yet (browser phone size only) | Local, not pushed |
-| [Coordinator avatar](#coordinator-avatar) | `7612f0b` | Not yet (browser phone size only) | Local, not pushed |
-| [Over-engineering audit fixes (all 15)](#audit-fixes) | `df61a87`..`f1b04e4` | Not yet (browser phone size only) | Local, not pushed |
-| [Team door picture](#team-door-picture) | `599d84c` | Not yet (browser phone size only) | Local, not pushed |
+| [Coordinator role: code, sign-in door, permissions](#coordinator-role) | `7886537` | Not yet (browser phone size only) | Live in 2.1.0 |
+| [Teams carry an interview language (and an import column)](#team-language) | `a1c1299` | Not needed | Live in 2.1.0 |
+| [Docs: the coordinator code, door and team language](#docs-first-pass) | `3420adb` | Not needed | Live in 2.1.0 |
+| [Coordinator API: set team language, request and book](#coordinator-api) | `d566deb` | Not needed | Live in 2.1.0 |
+| [Auto-assign prefers a panel that speaks the team's language](#language-auto-assign) | `cadd447` | Not needed | Live in 2.1.0 |
+| [Spec: the redesign brief and mocks](#spec) | `cf4a575`, merged as `73e498b` | Not needed | Live in 2.1.0 |
+| [Team language for the Judge Advisor](#language-ja) | `d498aed` | Not yet (browser phone size only) | Live in 2.1.0 |
+| [Team language on the queue desk and the team page](#language-desk-team) | `31c873c` | Not yet (browser phone size only) | Live in 2.1.0 |
+| [Coordinator: no team messages, "Already booked", placeholder avatar](#coordinator-deltas) | `d5aa4c0` | Not yet (browser phone size only) | Live in 2.1.0 |
+| [Coordinator console `/coordinator`: Teams + Slots](#coordinator-console) | `2fe4d72` | Not yet (browser phone size only) | Live in 2.1.0 |
+| [The sixth door, the last docs and these notes](#door-and-docs) | `2ae05d9` | Not yet (browser phone size only) | Live in 2.1.0 |
+| [Review fixes: booked time no longer wraps; coordinator tabs open at the top](#review-fixes) | `ac9a4bf` | Not yet (browser phone size only) | Live in 2.1.0 |
+| [The Coordinator door moves after Queue desk](#door-order) | `aecd28c` | Not yet (browser phone size only) | Live in 2.1.0 |
+| [Coordinator avatar](#coordinator-avatar) | `7612f0b` | Not yet (browser phone size only) | Live in 2.1.0 |
+| [Over-engineering audit fixes (all 15)](#audit-fixes) | `df61a87`..`f1b04e4` | iPhone simulator only (not a real iPhone) | Live in 2.1.0 |
+| [Team door picture](#team-door-picture) | `599d84c` | Not yet (browser phone size only) | Live in 2.1.0 |
 
 ### Your decisions for 2.1.0
 
@@ -334,7 +428,7 @@ and sixth (language) columns. Files: `src/components/door/DoorPage.tsx`,
 
 **Problem / request.** The user decided the Coordinator door goes after Queue desk, not last, as `design/coordinator-redesign/PROMPT.md` says. Wide layout is now Team, Judge, Referee / Queue desk, Coordinator, Judge Advisor.
 
-**What changed.** `DOORS` in `src/components/door/DoorPage.tsx` lists the Coordinator fifth. Files: `src/components/door/DoorPage.tsx`, `tests/doorPage.runtime.test.tsx`, `RELEASE-NOTES-2.0-2.2.md`.
+**What changed.** `DOORS` in `src/components/door/DoorPage.tsx` lists the Coordinator fifth. Files: `src/components/door/DoorPage.tsx`, `tests/doorPage.runtime.test.tsx`, `RELEASE-NOTES-2.x.md`.
 
 **How it was tested.** `tests/doorPage.runtime.test.tsx` checks the new hrefs, names, lines and card positions. Browser check at `aecd28c` (demo-data copy): at 1280 dark the doors read Team, Judge, Referee / Queue desk, Coordinator, Judge Advisor; on the phone (375, light) the Coordinator's dashed door sits between Queue desk and Judge Advisor.
 
@@ -349,7 +443,7 @@ and sixth (language) columns. Files: `src/components/door/DoorPage.tsx`,
 
 **How it was tested.** `tests/doorPage.runtime.test.tsx`, `doorPage.css.test.mjs`, `coordinatorPage.runtime.test.tsx`. Browser check at `7612f0b` (demo-data copy, 375 dark): the picture shows with no frame on the door (teal ring), the sign-in pass and the console top bar.
 
-**Commit and branch.** `7612f0b` on `claude/v21-coordinator-c9e080`. Local, not pushed.
+**Commit and branch.** `7612f0b` on `claude/v21-coordinator-c9e080`. Live in 2.1.0.
 
 <a id="audit-fixes"></a>
 ### Over-engineering audit fixes (all 15)
@@ -373,7 +467,9 @@ Net: about −220 src/CSS lines and −157 test lines.
 
 **How it was tested.** `npm test` 1689 pass, 1 skip, 0 fail (down from 1704 because duplicated tests were removed). `tsc --noEmit`, `eslint src tests` and `next build` are clean. Browser check on a fresh demo-data copy, at 375 and 1280, light and dark: `/coordinator` (a chip saves; on the Slots tab an EN+TH team on the EN-only Panel A shows EN), the queue desk (tags only), `/team/1129`, the JA Teams tab and drawer ("Doesn't cover Thai. You can keep it."), and the Floor. The check found the clipped TH tag, which `76252b5` fixes.
 
-**Commit and branch.** `df61a87`..`76252b5`, then `f1b04e4`, on `claude/v21-audit-fixes-4ac63c` (cut from `claude/v21-coordinator-c9e080` at `4e59854`). Local, not pushed.
+**iPhone simulator check.** Safari on the iPhone 18 Pro Max simulator (iOS 27.2), light and dark, on a scratch demo-data copy. `/coordinator`: a chip fades while it saves and then lights; the dashed "Ask" chips; "Request · English" / "Request · Thai"; the "ask the queue desk" note; a full booking (Book a time → pick 12:18 → Booked, saved as English). `/team/1157` shows the slot, "English" and "Interview in EN". JA Floor, Teams tab and drawer ("Doesn't cover Thai. You can keep it."). Nothing broken. Not checked on the phone: the queue desk, and a real iPhone.
+
+**Commit and branch.** `df61a87`..`76252b5`, then `f1b04e4`, on `claude/v21-audit-fixes-4ac63c` (cut from `claude/v21-coordinator-c9e080` at `4e59854`). Live in 2.1.0.
 
 <a id="team-door-picture"></a>
 ### Team door picture
@@ -384,7 +480,7 @@ Net: about −220 src/CSS lines and −157 test lines.
 
 **How it was tested.** `tests/doorPage.runtime.test.tsx` checks the Team card has the picture, no ring, and its caption. Browser check at `599d84c` (demo-data copy): on the phone (375, light) and at 1280 dark the Team door shows the picture with no ring and no frame, with "Opens the team ticket" under it.
 
-**Commit and branch.** `599d84c` on `claude/v21-coordinator-c9e080`. Local, not pushed.
+**Commit and branch.** `599d84c` on `claude/v21-coordinator-c9e080`. Live in 2.1.0.
 
 ---
 

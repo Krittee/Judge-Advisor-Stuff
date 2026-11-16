@@ -26,6 +26,8 @@ export function useTeamRecord(
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /* Notes deleted from this sheet, kept so each can show an Undo. */
+  const [removed, setRemoved] = useState<Note[]>([]);
 
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [scores, setScores] = useState<ScoreRow[]>([]);
@@ -68,6 +70,34 @@ export function useTeamRecord(
     }
   }
 
+  /** Run a Judge Advisor change to a note, then reload. True once it went through. */
+  async function change(run: () => Promise<unknown>): Promise<boolean> {
+    setError(null);
+    try {
+      await run();
+      await loadNotes();
+      return true;
+    } catch (e) {
+      setError((e as Error).message);
+      return false;
+    }
+  }
+
+  const editNote = (id: string, body: string) =>
+    change(() => call("/api/notes", { method: "PATCH", body: { id, body } }));
+
+  const deleteNote = (note: Note) =>
+    change(async () => {
+      await call(`/api/notes?id=${note.id}`, { method: "DELETE" });
+      setRemoved((r) => [...r, note]);
+    });
+
+  const restoreNote = (id: string) =>
+    change(async () => {
+      await call("/api/notes", { method: "PATCH", body: { id, restore: true } });
+      setRemoved((r) => r.filter((n) => n.id !== id));
+    });
+
   /* Total across the rubrics this team is judged on, which is what the
      colour band reads. A category can put one out of scope: an Ungraded
      notebook is unmarked, not zero, so it counts in neither the total nor
@@ -87,6 +117,12 @@ export function useTeamRecord(
     /** For RubricSegment: `onSaved` and `onCleared` update these. */
     setScores,
     saveNote,
+    /** Judge Advisor only (the endpoint refuses a judge): each resolves true once it went through. */
+    editNote,
+    deleteNote,
+    restoreNote,
+    /** Notes deleted from this sheet, which restoreNote can bring back. */
+    removed,
     /** The rubrics that count for this team. */
     applicable,
     total,
