@@ -3969,6 +3969,8 @@ body:has(.admin) > .theme-toggle:hover {
 /* Add team: the Judge Advisor's picker at the foot of an award's list, the console's own select */
 .ja-aw-add { padding: 8px 12px 12px; border-top: 1px solid var(--line); }
 .ja-aw-add .ja-in, .ja-aw-dr .ja-selw .ja-in { height: 44px; }
+.ja-aw-nw { display: flex; justify-content: flex-end; padding: 0 4px; border-top: 1px solid var(--line); }
+.ja-aw-nw .ja-aw-lnk { white-space: nowrap; }
 
 /* The side panel: the same in both views */
 .ja-aw-dr { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }

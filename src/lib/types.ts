@@ -243,12 +243,20 @@ export type WinnerRow = {
   decided_at: string;
 };
 
+/** The Judge Advisor's decision that one award in one division goes to no team. Secret until the ceremony, like a winner. */
+export type NoWinnerRow = {
+  award_id: string;
+  division: string;
+  decided_by: string;
+  decided_at: string;
+};
+
 /**
  * GET /api/awards for the Judge Advisor: every nomination and every winner.
  * A judge's reply is `AwardsJudgeView` and has no `winners` key at all, so
  * `"winners" in reply` tells the two apart.
  */
-export type AwardsAdminView = { awards: AwardView[]; nominations: NominationRow[]; winners: WinnerRow[] };
+export type AwardsAdminView = { awards: AwardView[]; nominations: NominationRow[]; winners: WinnerRow[]; noWinners: NoWinnerRow[] };
 /** GET /api/awards for a judge: their own panel's nominations only, and never a winner. */
 export type AwardsJudgeView = { awards: AwardView[]; nominations: NominationRow[] };
 
@@ -258,6 +266,8 @@ export type NominateReply = { nomination: NominationRow };
 export type RemoveReply = { ok: true; removed: boolean };
 /** PUT /api/awards/winners. */
 export type WinnerReply = { winner: WinnerRow };
+/** PUT /api/awards/no-winner. Its DELETE replies with `RemoveReply`. */
+export type NoWinnerReply = { noWinner: NoWinnerRow };
 
 export type ActivityKind = "request" | "referee" | "conflict" | "setup" | "award";
 

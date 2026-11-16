@@ -4,7 +4,7 @@ import { goodConductTeams, GOOD_CONDUCT, GOOD_CONDUCT_MIN, SPORTSMANSHIP } from 
 import { matchReference } from "@/lib/match";
 import { judgeKey } from "@/lib/roster";
 import type { Rubric } from "@/lib/rubrics";
-import type { AwardView, FlagRow, NominationRow, PublicPanel, Team, WinnerRow } from "@/lib/types";
+import type { AwardView, FlagRow, NominationRow, NoWinnerRow, PublicPanel, Team, WinnerRow } from "@/lib/types";
 import { teamCount } from "./floorLogic";
 import { compareLines, type RankedRow } from "./scoresLogic";
 import type { Call } from "./teamsLogic";
@@ -79,14 +79,22 @@ export function winnersOf(winners: WinnerRow[], division: string): Map<string, W
 /** Whether an award has all the winners it can have: one, or the config's `winners` for the Judges Award. */
 const isFull = (award: Pick<AwardView, "places">, holders: WinnerRow[] | undefined): boolean => (holders?.length ?? 0) >= award.places;
 
-/** How many of the config's awards a division has decided (all of an award's winners picked). A winner for an award the config has dropped has no row to show, so it is not counted. */
-export function decidedCount(winners: WinnerRow[], awards: Pick<AwardView, "id" | "places">[], division: string): number {
+/** The awards one division has marked "No winner", by award id. */
+export function noWinnersOf(noWinners: Pick<NoWinnerRow, "award_id" | "division">[], division: string): Set<string> {
+  return new Set(noWinners.filter((n) => n.division === division).map((n) => n.award_id));
+}
+
+type Marks = Pick<NoWinnerRow, "award_id" | "division">[];
+
+/** How many of the config's awards a division has decided: all of an award's winners picked, or "No winner". One the config has dropped has no row to show, so it is not counted. */
+export function decidedCount(winners: WinnerRow[], awards: Pick<AwardView, "id" | "places">[], division: string, noWinners: Marks = []): number {
   const decided = winnersOf(winners, division);
-  return awards.filter((a) => isFull(a, decided.get(a.id))).length;
+  const none = noWinnersOf(noWinners, division);
+  return awards.filter((a) => isFull(a, decided.get(a.id)) || none.has(a.id)).length;
 }
 
 /** "3/11": the rail's count and a division chip's. */
-export const decidedText = (winners: WinnerRow[], awards: Pick<AwardView, "id" | "places">[], division: string): string => `${decidedCount(winners, awards, division)}/${awards.length}`;
+export const decidedText = (winners: WinnerRow[], awards: Pick<AwardView, "id" | "places">[], division: string, noWinners: Marks = []): string => `${decidedCount(winners, awards, division, noWinners)}/${awards.length}`;
 
 /** The awards a team holds in its division, in the config's order, other than `except`. */
 export function alreadyHas(awards: AwardView[], decided: Map<string, WinnerRow[]>, teamId: string, except = ""): AwardView[] {
@@ -241,7 +249,8 @@ export type MatrixRow = {
   cells: CellState[];
 };
 
-export type Matrix = { columns: { award: AwardView; decided: boolean }[]; rows: MatrixRow[]; hidden: AwardView[] };
+/** `noWinner`: the award is marked "No winner" (and has no winner), so its header wears a sign instead of the tick. */
+export type Matrix = { columns: { award: AwardView; decided: boolean; noWinner: boolean }[]; rows: MatrixRow[]; hidden: AwardView[] };
 
 /**
  * Only teams with a nomination are rows (most nominations first, then team
@@ -258,11 +267,14 @@ export function buildMatrix(
   panels: Pick<PublicPanel, "id" | "name">[],
   panelId = ALL_PANELS,
   conduct: Map<string, number> = new Map(),
+  noWinner: Set<string> = new Set(),
 ): Matrix {
   const keep = panelId ? [] : awards.filter((a) => decided.has(a.id));
   const nominated = new Set(nominations.map((n) => n.award_id));
   if (conduct.size) nominated.add(SPORTSMANSHIP);
-  const columns = awards.filter((a) => nominated.has(a.id) || keep.includes(a)).map((award) => ({ award, decided: isFull(award, decided.get(award.id)) }));
+  const columns = awards
+    .filter((a) => nominated.has(a.id) || keep.includes(a))
+    .map((award) => ({ award, decided: isFull(award, decided.get(award.id)) || noWinner.has(award.id), noWinner: noWinner.has(award.id) && !decided.has(award.id) }));
 
   const mine = byTeam(nominations);
   const winnerIds = new Set(keep.flatMap((a) => decided.get(a.id)!.map((w) => w.team_id)));
@@ -293,7 +305,7 @@ export function buildMatrix(
 
 export type Nominee = { team: Team; judges: number; /** The Judge Advisor's nominations of it: 0 or 1. */ ja: number; /** Good conduct flags, on Sportsmanship only. */ conduct: number; tag: string; winner: boolean; has: AwardView[] };
 /** `ja` is the teams (by id) the Judge Advisor has put up for this award, which the Add team picker marks as added. */
-export type AwardPanel = { award: AwardView; decided: boolean; status: string; nominees: Nominee[]; ja: Set<string> };
+export type AwardPanel = { award: AwardView; decided: boolean; status: string; nominees: Nominee[]; ja: Set<string>; /** Marked "No winner" (and no team holds it). */ noWinner: boolean };
 
 /** Every award, in the config's order, with its nominees: the winner(s) first, then the most nominations (judges and the Judge Advisor), then team number. */
 export function buildAwardPanels(
@@ -304,6 +316,7 @@ export function buildAwardPanels(
   panels: Pick<PublicPanel, "id" | "name">[],
   panelId = ALL_PANELS,
   conduct: Map<string, number> = new Map(),
+  noWinner: Set<string> = new Set(),
 ): AwardPanel[] {
   return awards.map((award) => {
     const holders = decided.get(award.id) ?? [];
@@ -332,8 +345,9 @@ export function buildAwardPanels(
     const k = nominees.length;
     const ja = new Set(nominations.filter((n) => n.award_id === award.id && n.role === "admin").map((n) => n.team_id));
     const full = isFull(award, holders);
-    const status = full ? "Decided" : holders.length ? `${holders.length} of ${award.places} winners` : k ? `${k} ${k === 1 ? "nominee" : "nominees"}` : "Open";
-    return { award, decided: full, status, nominees, ja };
+    const none = !holders.length && noWinner.has(award.id);
+    const status = full ? "Decided" : none ? "No winner" : holders.length ? `${holders.length} of ${award.places} winners` : k ? `${k} ${k === 1 ? "nominee" : "nominees"}` : "Open";
+    return { award, decided: full || none, status, nominees, ja, noWinner: none };
   });
 }
 
@@ -357,6 +371,8 @@ export type Detail = {
   /** The other teams in the running for this award in this division, and who holds it. */
   others: { team: Team; judges: number; ja: number; conduct: number; winner: boolean; has: AwardView[] }[];
   isWinner: boolean;
+  /** Whether the award is marked "No winner" in the team's division: giving it to this team asks first. */
+  noWinner: boolean;
   /** Who holds the award now, when it is not this team and the award has one place: the team a Give would replace. Null for an award with several winners, which adds rather than replaces. */
   current: Team | null;
   /** The award has several winners, all picked, and this team is not one of them: Give is replaced by "clear one first". */
@@ -367,6 +383,7 @@ type Everything = {
   awards: AwardView[];
   nominations: NominationRow[];
   winners: WinnerRow[];
+  noWinners?: Marks;
   teams: Team[];
   panels: Pick<PublicPanel, "id" | "name">[];
   /** Every team's referee flags. */
@@ -427,6 +444,7 @@ export function detailFor(sel: Sel, all: Everything): Detail | null {
     has: alreadyHas(all.awards, decided, team.id, award.id),
     others,
     isWinner,
+    noWinner: !holders.length && noWinnersOf(all.noWinners ?? [], team.division).has(award.id),
     current: !isWinner && award.places <= 1 && holders[0] ? (all.teams.find((t) => t.id === holders[0].team_id) ?? null) : null,
     full: !isWinner && award.places > 1 && isFull(award, holders),
   };
@@ -469,10 +487,22 @@ export const clearQuestion = (award: Pick<AwardView, "label" | "places">, team: 
 export const fullText = (award: Pick<AwardView, "label" | "places">, team: Pick<Team, "number">): string =>
   `${award.label} has ${award.places} winners. Clear one to give it to ${team.number}.`;
 
-/** Give the award, asking first only when it takes it from another team. Nothing is sent on a no. Returns whether it sent. */
-export async function giveAfterAsking(ask: Ask, call: Call, pick: { award: AwardView; team: Team; current: Team | null }): Promise<boolean> {
+/** "Give Design to 7700B instead of No winner?" */
+export const giveOverNoWinnerQuestion = (award: Pick<AwardView, "label">, team: Pick<Team, "number">): string => `Give ${award.label} to ${team.number} instead of No winner?`;
+
+/** "Mark Design as no winner?", and who loses it when a team holds it. */
+export const markNoWinnerQuestion = (award: Pick<AwardView, "label">, holders: Pick<Team, "number">[]): string =>
+  `Mark ${award.label} as no winner?${
+    holders.length > 1 ? ` ${holders.map((h) => h.number).join(" and ")} will no longer be winners.` : holders.length ? ` ${holders[0].number} will no longer be the winner.` : ""
+  }`;
+
+export const clearNoWinnerQuestion = (award: Pick<AwardView, "label">): string => `Clear No winner on ${award.label}?`;
+
+/** Give the award, asking first when it takes it from another team or from "No winner". Nothing is sent on a no. Returns whether it sent. */
+export async function giveAfterAsking(ask: Ask, call: Call, pick: { award: AwardView; team: Team; current: Team | null; noWinner?: boolean }): Promise<boolean> {
   const { award, team, current } = pick;
   if (current && !(await ask(giveQuestion(award, team, current), { confirmLabel: "Replace winner" }))) return false;
+  if (!current && pick.noWinner && !(await ask(giveOverNoWinnerQuestion(award, team), { confirmLabel: "Replace No winner" }))) return false;
   await call("/api/awards/winners", { method: "PUT", body: { awardId: award.id, division: team.division, teamId: team.id } });
   return true;
 }
@@ -498,5 +528,21 @@ export async function clearAfterAsking(ask: Ask, call: Call, pick: { award: Awar
   const { award, team } = pick;
   if (!(await ask(clearQuestion(award, team), { confirmLabel: "Clear winner" }))) return false;
   await call("/api/awards/winners", { method: "DELETE", body: { awardId: award.id, division: team.division, teamId: team.id } });
+  return true;
+}
+
+/** Mark the award "No winner" in a division, asked first (it also takes the award off a team that holds it). Returns whether it sent. */
+export async function markNoWinnerAfterAsking(ask: Ask, call: Call, pick: { award: AwardView; division: string; holders: Team[] }): Promise<boolean> {
+  const { award, division, holders } = pick;
+  if (!(await ask(markNoWinnerQuestion(award, holders), { confirmLabel: "Mark no winner" }))) return false;
+  await call("/api/awards/no-winner", { method: "PUT", body: { awardId: award.id, division } });
+  return true;
+}
+
+/** Take the "No winner" mark back off, asked first. Returns whether it sent. */
+export async function clearNoWinnerAfterAsking(ask: Ask, call: Call, pick: { award: AwardView; division: string }): Promise<boolean> {
+  const { award, division } = pick;
+  if (!(await ask(clearNoWinnerQuestion(award), { confirmLabel: "Clear" }))) return false;
+  await call("/api/awards/no-winner", { method: "DELETE", body: { awardId: award.id, division } });
   return true;
 }

@@ -41,7 +41,8 @@ export async function GET() {
 
   if (session?.role === "admin") {
     const winners = await db.listWinners();
-    return NextResponse.json({ awards: awards(), nominations, winners }, noStore);
+    const noWinners = await db.listNoWinners();
+    return NextResponse.json({ awards: awards(), nominations, winners, noWinners }, noStore);
   }
 
   // A judge gets their own panel's nominations, minus any team the panel has

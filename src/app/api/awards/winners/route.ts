@@ -73,7 +73,11 @@ export async function PUT(request: Request) {
     );
   }
 
+  // A team given an award marked "No winner" takes the mark off it.
+  const marked = (await db.listNoWinners()).some((n) => n.award_id === awardId && n.division === division);
+
   try {
+    if (marked) await db.clearNoWinner(awardId, division);
     const winner = await db.setWinner({ awardId, division, teamId, decidedBy: session!.name, places: award.places });
     const before = award.places <= 1 ? holders[0] : undefined;
     const previous = before && teams.find((t) => t.id === before.team_id)?.number;
@@ -82,7 +86,7 @@ export async function PUT(request: Request) {
       kind: "award",
       ...actorParts(session),
       action: `gave ${award.label} to ${team.number}`,
-      detail: previous ? `${division} · instead of ${previous}` : division,
+      detail: previous ? `${division} · instead of ${previous}` : marked ? `${division} · instead of No winner` : division,
     });
     return NextResponse.json({ winner });
   } catch (e) {

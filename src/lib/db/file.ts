@@ -21,6 +21,7 @@ import type {
   ScoreRow,
   Team,
   WinnerRow,
+  NoWinnerRow,
 } from "../types";
 import type { Status } from "../status";
 import { readActivity, type StoredActivity } from "../activity";
@@ -51,6 +52,7 @@ import {
   type NewAdminNomination,
   type NewNomination,
   type NewWinner,
+  type NewNoWinner,
   type NominationKey,
   type FlagEdit,
   type NewRefereeSetup,
@@ -91,6 +93,8 @@ type Data = {
   nominations: NominationRow[];
   /** The Judge Advisor's pick per (award, division). */
   winners: WinnerRow[];
+  /** Awards the Judge Advisor marked "No winner", per division. */
+  noWinners: NoWinnerRow[];
   conflicts: ConflictRow[];
   /** The judge roster, in the order judges were added. */
   judges: JudgeRow[];
@@ -169,6 +173,7 @@ function empty(): Data {
     scores: [],
     nominations: [],
     winners: [],
+    noWinners: [],
     conflicts: [],
     judges: [],
     flags: [],
@@ -255,6 +260,7 @@ function migrate(data: Data): Data {
   // Nominations gained a role when the Judge Advisor could nominate; an older one is a judge's.
   for (const n of data.nominations) n.role ??= "judge";
   data.winners ??= [];
+  data.noWinners ??= [];
   data.conflicts ??= [];
   data.judges ??= [];
   data.flags ??= [];
@@ -1383,6 +1389,34 @@ function clearWinner(awardId: string, division: string, teamId?: string): boolea
   return removed;
 }
 
+function listNoWinners(): NoWinnerRow[] {
+  return state().noWinners.map((n) => ({ ...n }));
+}
+
+/** Like a winner, one mark per (award, division); marking again refreshes who and when. */
+function setNoWinner(input: NewNoWinner): NoWinnerRow {
+  const row: NoWinnerRow = {
+    award_id: input.awardId,
+    division: input.division,
+    decided_by: input.decidedBy,
+    decided_at: new Date().toISOString(),
+  };
+  const at = state().noWinners.findIndex((n) => n.award_id === row.award_id && n.division === row.division);
+  if (at >= 0) state().noWinners[at] = row;
+  else state().noWinners.push(row);
+
+  save();
+  return { ...row };
+}
+
+function clearNoWinner(awardId: string, division: string): boolean {
+  const before = state().noWinners.length;
+  state().noWinners = state().noWinners.filter((n) => !(n.award_id === awardId && n.division === division));
+  const removed = state().noWinners.length < before;
+  if (removed) save();
+  return removed;
+}
+
 function logActivity(entry: NewActivity): void {
   state().activity.push({
     id: randomUUID(),
@@ -1413,6 +1447,7 @@ function resetDay(): void {
   state().scores = [];
   state().nominations = [];
   state().winners = [];
+  state().noWinners = [];
   state().activity = [];
   save();
 }
@@ -1586,6 +1621,7 @@ function demoData(): Data {
     scores: [],
     nominations: [],
     winners: [],
+    noWinners: [],
     conflicts: [],
     judges,
     flags: [],
@@ -1672,6 +1708,9 @@ export const fileStore: Store = {
   listWinners: async () => listWinners(),
   setWinner: async (input) => setWinner(input),
   clearWinner: async (awardId, division, teamId) => clearWinner(awardId, division, teamId),
+  listNoWinners: async () => listNoWinners(),
+  setNoWinner: async (input) => setNoWinner(input),
+  clearNoWinner: async (awardId, division) => clearNoWinner(awardId, division),
 
   resetDay: async () => resetDay(),
   resetAll: async () => resetAll(),

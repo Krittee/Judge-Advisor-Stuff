@@ -91,12 +91,15 @@ async function hit(
 
 const awardsRoute = () => import("../src/app/api/awards/route");
 const winnersRoute = () => import("../src/app/api/awards/winners/route");
+const noWinnerRoute = () => import("../src/app/api/awards/no-winner/route");
 const stateRoute = () => import("../src/app/api/state/route");
 
 const awardsApi = (session: Session | null, method: "GET" | "POST" | "DELETE", body?: unknown, query = "") =>
   hit(awardsRoute, method, session, `/api/awards${query}`, body);
 const winnersApi = (session: Session | null, method: "PUT" | "DELETE", body?: unknown) =>
   hit(winnersRoute, method, session, "/api/awards/winners", body);
+const noWinnerApi = (session: Session | null, method: "PUT" | "DELETE", body?: unknown) =>
+  hit(noWinnerRoute, method, session, "/api/awards/no-winner", body);
 
 /* ---- the fixture ------------------------------------------------------- */
 
@@ -546,7 +549,7 @@ test("the Judge Advisor reads every nomination from every panel, and the winners
 
   const reply = await awardsApi(ADMIN, "GET");
   assert.equal(reply.status, 200);
-  assert.deepEqual(Object.keys(reply.body).sort(), ["awards", "nominations", "winners"]);
+  assert.deepEqual(Object.keys(reply.body).sort(), ["awards", "noWinners", "nominations", "winners"]);
   assert.deepEqual(reply.body.awards.map((a: { id: string }) => a.id).slice(0, 3), ["excellence", "design", "innovate"]);
   assert.deepEqual(reply.body.nominations.map((n: { judge: string }) => n.judge).sort(), ["Amy", "Cleo", "Dev"]);
   assert.deepEqual(
@@ -743,6 +746,89 @@ test("a judge withdrawing a nomination does not undo a winner, and is told nothi
   const reply = await awardsApi(amy(w), "DELETE", { awardId: "excellence", teamId: w.hawks.id });
   assert.deepEqual(reply.body, { ok: true, removed: true }, "the same answer as with no winner");
   assert.equal((await w.db.listWinners()).length, 1, "the Judge Advisor's decision stands");
+});
+
+/* ===== no winner ========================================================= */
+
+test("only the Judge Advisor marks or clears No winner; a bad request is a 400", async () => {
+  const w = await world();
+  const body = { awardId: "design", division: ES };
+  for (const session of [amy(w), QUEUER, REFEREE, null]) {
+    const who = session?.role ?? "nobody";
+    assert.equal((await noWinnerApi(session, "PUT", body)).status, 403, `${who} must not mark`);
+    assert.equal((await noWinnerApi(session, "DELETE", body)).status, 403, `${who} must not clear`);
+  }
+  assert.deepEqual(await w.db.listNoWinners(), []);
+
+  assert.equal((await noWinnerApi(ADMIN, "PUT", { awardId: "design" })).status, 400, "no division");
+  assert.equal((await noWinnerApi(ADMIN, "PUT", { division: ES })).status, 400, "no award");
+  assert.equal((await noWinnerApi(ADMIN, "PUT", { awardId: "pizza", division: ES })).status, 400, "unknown award");
+  assert.equal((await noWinnerApi(ADMIN, "DELETE", { awardId: "design" })).status, 400);
+  assert.deepEqual(await w.db.listNoWinners(), []);
+});
+
+test("the Judge Advisor marks No winner (taking the award off a holder) and clears it, each logged", async () => {
+  const w = await world();
+  await nominate(amy(w), "design", w.hawks);
+  await winnersApi(ADMIN, "PUT", { awardId: "design", division: ES, teamId: w.hawks.id });
+
+  const marked = await noWinnerApi(ADMIN, "PUT", { awardId: "design", division: ES });
+  assert.equal(marked.status, 200);
+  assert.deepEqual(
+    [marked.body.noWinner.award_id, marked.body.noWinner.division, marked.body.noWinner.decided_by],
+    ["design", ES, "Alex"],
+  );
+  assert.deepEqual((await w.db.listNoWinners()).map((n) => [n.award_id, n.division]), [["design", ES]]);
+  assert.deepEqual(await w.db.listWinners(), [], "the held winner is gone");
+
+  assert.equal((await noWinnerApi(ADMIN, "PUT", { awardId: "design", division: ES })).status, 200, "marking again");
+  const cleared = await noWinnerApi(ADMIN, "DELETE", { awardId: "design", division: ES });
+  assert.deepEqual([cleared.status, cleared.body], [200, { ok: true, removed: true }]);
+  assert.deepEqual((await noWinnerApi(ADMIN, "DELETE", { awardId: "design", division: ES })).body, { ok: true, removed: false });
+  assert.deepEqual(await w.db.listNoWinners(), []);
+
+  assert.deepEqual(
+    sameLines((await w.db.listActivity()).filter((a) => a.kind === "award" && a.actor_role === "Judge Advisor").map((a) => [a.action, a.detail ?? "", a.team_number ?? ""])),
+    sameLines([
+      ["gave Design to 9882K", ES, "9882K"],
+      ["marked Design no winner", `${ES} · instead of 9882K`, "9882K"],
+      ["cleared No winner on Design", ES, ""],
+    ]),
+    "marking again and clearing nothing log nothing",
+  );
+});
+
+test("giving a team an award marked No winner removes the mark", async () => {
+  const w = await world();
+  await nominate(amy(w), "design", w.hawks);
+  await noWinnerApi(ADMIN, "PUT", { awardId: "design", division: ES });
+  await noWinnerApi(ADMIN, "PUT", { awardId: "design", division: MS });
+
+  const given = await winnersApi(ADMIN, "PUT", { awardId: "design", division: ES, teamId: w.hawks.id });
+  assert.equal(given.status, 200);
+  assert.deepEqual((await w.db.listNoWinners()).map((n) => n.division), [MS], "only that division's mark went");
+  assert.equal((await w.db.listWinners()).length, 1);
+  assert.ok((await logged(w)).includes("gave Design to 9882K"));
+  assert.ok(
+    (await w.db.listActivity()).some((a) => a.action === "gave Design to 9882K" && a.detail === `${ES} · instead of No winner`),
+  );
+
+  // A refused give (not a nominee) leaves a mark alone.
+  await noWinnerApi(ADMIN, "PUT", { awardId: "excellence", division: ES });
+  assert.equal((await winnersApi(ADMIN, "PUT", { awardId: "excellence", division: ES, teamId: w.bolts.id })).status, 409);
+  assert.equal((await w.db.listNoWinners()).filter((n) => n.award_id === "excellence").length, 1);
+});
+
+test("a judge never sees a No winner mark; the Judge Advisor does", async () => {
+  const w = await world();
+  await nominate(amy(w), "design", w.hawks);
+  await noWinnerApi(ADMIN, "PUT", { awardId: "excellence", division: ES });
+
+  const judge = await awardsApi(amy(w), "GET");
+  assert.deepEqual(Object.keys(judge.body).sort(), ["awards", "nominations"]);
+  assert.doesNotMatch(JSON.stringify(judge.body), /no.?winner/i);
+  const admin = await awardsApi(ADMIN, "GET");
+  assert.deepEqual(admin.body.noWinners.map((n: { award_id: string }) => n.award_id), ["excellence"]);
 });
 
 /* ===== /api/state ======================================================== */

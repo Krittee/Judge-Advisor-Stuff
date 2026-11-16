@@ -7,6 +7,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Local only |
 | 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ef84422` | Not yet | Local only |
 | 2026-11-16 | [Judges Award can have two winners](#judges-award-can-have-two-winners-2026-11-16) | `c04c9b3` | Not needed | Local only |
+| 2026-11-16 | [Awards: mark an award "No winner"](#awards-mark-an-award-no-winner-2026-11-16) | `1d9aa15`..`c68fecd` | Not yet (phone-width preview only) | Local only |
 | 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `259cabb` | Simulator only | Live in 2.1.2 |
 | 2026-11-13 | [Coordinator sign-in: COORDINATOR word clipped](#coordinator-sign-in-coordinator-word-clipped-2026-11-13) | `f4793fb` | Not needed | Live in 2.1.2 |
 | 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Live in 2.1.1 |
@@ -168,6 +169,44 @@ Local only. It merges with the "No winner" change (`no-winner-award`), which tou
 
 - Run the real-Postgres conformance suite (`TEST_DATABASE_URL`) before release.
 - Two simultaneous PUTs could both take the last place: the cap is checked in the route, not by a lock. There is a single Judge Advisor, so this is accepted for now.
+## Awards: mark an award "No winner" (2026-11-16)
+
+### Problem / request
+
+Reported on 2.1.3: "In the awards, sometimes no team is nominated for an award. Can you have something like 'No Team' or something that shows this award has no winner?" On the JA's Awards board an award nobody won just sat at "Open" or "N nominees", so the JA couldn't tell "not decided yet" from "deliberately not given", and the "N of 11 decided" count could never reach 11.
+
+### Root cause
+
+A winner record had to name a real team (`award_winners.team_id` is required and is linked to the teams table), so there was no way to record "no team".
+
+### What changed
+
+The user chose: any award can be marked (even one with nominees), the wording is "No winner", and it's saved in its own new table. Design and plan: `docs/superpowers/specs/2026-11-16-no-winner-award-design.md`, `docs/superpowers/plans/2026-11-16-no-winner-award.md`.
+
+- Storage (both stores): `listNoWinners` / `setNoWinner` / `clearNoWinner`, one mark per award per division. Postgres adds `award_no_winner` with `create table if not exists` and RLS on. The migration only adds, so live Supabase data is untouched, and `award_winners` is unchanged. The file store defaults `noWinners` to `[]` for old state files. Day reset and full reset clear the marks.
+- API: new `src/app/api/awards/no-winner/route.ts` (PUT marks, DELETE clears, JA only, logged in Activity). Marking an award a team holds takes it off that team. `PUT /api/awards/winners` now also clears a mark when a team is given that award ("instead of No winner" in Activity). The JA's `GET /api/awards` adds `noWinners`; a judge's reply is unchanged and never sees it.
+- Board: each award in "By award" has a **Mark no winner** button at the foot of its card. A marked award shows a green "No winner" chip in the decided style and a **Clear** button. Every action asks first. The Matrix header shows a dash instead of the decided tick. "N of 11 decided", the division chips and the side-menu count all include marks.
+- Files: `src/lib/types.ts`, `src/lib/db/types.ts`, `src/lib/db/file.ts`, `src/lib/db/postgres.ts`, `src/app/api/awards/no-winner/route.ts` (new), `src/app/api/awards/route.ts`, `src/app/api/awards/winners/route.ts` (PUT only), `src/components/admin/awardsLogic.ts`, `src/components/admin/AwardsTab.tsx`, `src/app/admin/page.tsx`, `src/app/globals.css`. Tests: `tests/storeConformance.runtime.ts`, `tests/postgres-sql.test.mjs`, `tests/awardsRoute.runtime.test.ts`, `tests/adminAwards.logic.test.mjs`, `tests/adminAwards.runtime.test.tsx`, `tests/refereeRuleFeature.test.mjs` (one regex: `resetAll` now names `award_no_winner`).
+
+### How it was tested
+
+- `npm test`: 1755 tests, 1754 pass, 1 skipped. The skip is the real-Postgres conformance suite, which was **not run** (no `TEST_DATABASE_URL`); the Postgres SQL is covered by the mocked tests only. `tsc` and eslint (`--ignore-pattern '.claude/**'`) are clean.
+- Browser preview on a copy of `.data/state.json` in the scratchpad (never `.data/`), signed in as the JA, at desktop width and at 375 px phone width. Checked: marking Design moved the counts to 1/11 and showed the chip and Clear; giving a nominee the award removed the mark, and marking again took it off the team; the Matrix dash; Clear brought it back to "1 nominee" and 0/11; Activity read "marked Design no winner", "gave Design to 1101 · instead of No winner", "marked Design no winner · instead of 1101"; `/api/state` carries no marks. The first build crowded the card header at 1024 px (title over the chip). Moving the button to its own row at the foot of the card fixed it.
+- Not checked on a real iPhone. The user has not confirmed it yet.
+
+### Branch / commits
+
+`claude/no-winner-award-7e1ad9`: `1d9aa15` (store), `5322810` (API), `006acc2` (board), `c68fecd` (button row), plus this entry.
+
+### Status
+
+Local only. Not pushed, merged or deployed.
+
+### Follow-ups
+
+- Merge with the parallel "two Judges Award winners" change (`judges-award-two`): both touch `src/app/api/awards/winners/route.ts` (here, the PUT only), `src/lib/types.ts`, `awardsLogic.ts` and `AwardsTab.tsx`. Once Judges Award can have two winners, decide whether marking it "No winner" should clear both (the no-winner route clears via `clearWinner(award, division)`).
+- Run the real-Postgres conformance suite against the throwaway Neon project before release.
+- The Matrix legend has no entry for the dash. It could gain one if the dash isn't clear enough on its own.
 
 ---
 

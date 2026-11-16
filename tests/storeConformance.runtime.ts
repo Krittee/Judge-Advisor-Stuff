@@ -1479,6 +1479,34 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     assert.deepEqual(await holders("design"), [b.id]);
   });
 
+  it("an award can be marked no winner per division: marking again replaces it, clear removes it, resets clear it", async (store) => {
+    const first = await store.setNoWinner({ awardId: "design", division: ES, decidedBy: "Alex" });
+    assert.deepEqual([first.award_id, first.division, first.decided_by], ["design", ES, "Alex"]);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const again = await store.setNoWinner({ awardId: "design", division: ES, decidedBy: "Sam" });
+    assert.equal(again.decided_by, "Sam");
+    assert.ok(again.decided_at > first.decided_at, "marking again is a fresh decision");
+    assert.equal((await store.listNoWinners()).length, 1, "marking again replaces it, it does not add one");
+
+    await store.setNoWinner({ awardId: "design", division: MS, decidedBy: "Alex" });
+    assert.equal((await store.listNoWinners()).length, 2, "each division keeps its own");
+    assert.deepEqual(await store.listWinners(), [], "a mark is not a winner");
+
+    assert.equal(await store.clearNoWinner("design", ES), true);
+    assert.equal(await store.clearNoWinner("design", ES), false, "nothing left to clear");
+    assert.deepEqual(
+      (await store.listNoWinners()).map((n) => `${n.award_id}/${n.division}`),
+      [`design/${MS}`],
+      "clearing one leaves the other division",
+    );
+
+    await store.resetDay();
+    assert.deepEqual(await store.listNoWinners(), []);
+    await store.setNoWinner({ awardId: "design", division: ES, decidedBy: "Alex" });
+    await store.resetAll();
+    assert.deepEqual(await store.listNoWinners(), []);
+  });
+
   it("deleting a team takes its nominations and wins with it, and no other team's", async (store) => {
     const panel = await store.createPanel(panelInput());
     await store.upsertTeams([teamInput("1001"), teamInput("1002")]);
