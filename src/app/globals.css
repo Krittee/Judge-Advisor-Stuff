@@ -2047,6 +2047,9 @@ body:has(.judge) > .theme-toggle:hover {
 .jg-caution svg { flex: none; margin-top: 2px; }
 .jg-caution b { color: var(--caution); font-weight: 500; }
 :root[data-theme="light"] .jg-caution b { color: inherit; font-weight: 600; }
+.jg-flag { display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4; }
+.jg-flag svg { flex: none; margin-top: 2px; }
+.jg-flag b { color: inherit; font-weight: 600; }
 .jg-fb { margin-top: 2px; }
 .jg-nl { display: flex; flex-direction: column; gap: 8px; }
 .jg-nn { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--jg-field); }

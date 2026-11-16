@@ -4,10 +4,12 @@ import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { Banner, formatClock } from "@/components/ui";
 import { useRubricScoring } from "@/components/useRubricScoring";
 import { useTeamRecord } from "@/components/useTeamRecord";
+import { GOOD_CONDUCT } from "@/lib/awards";
 import type { Rubric } from "@/lib/rubrics";
+import { tone } from "@/lib/tone";
 import type { AppState, FlagRow, RequestRow, ScoreRow, Team } from "@/lib/types";
 import { BandPill, CheckIcon, CloseIcon, WarnIcon } from "./parts";
-import { clearScoresQuestion, flagDetail, rubricShort, sectionMax, type Ask } from "./logic";
+import { clearScoresQuestion, flagDetail, flagsWorstFirst, rubricShort, sectionMax, type Ask } from "./logic";
 
 /**
  * The team sheet: everything a judge records about one team, in a bottom
@@ -188,12 +190,12 @@ function Body({
         <>
           <div className="jg-sh-scroll" ref={scroller}>
             {error ? <Banner kind="error">{error}</Banner> : null}
-            {mine.map((f) => {
+            {flagsWorstFirst(mine, flagKinds).map((f) => {
               const kind = flagKinds.find((k) => k.id === f.kind);
               const detail = flagDetail(f);
               return (
-                <div key={f.id} className="jg-caution" role="note">
-                  <WarnIcon />
+                <div key={f.id} className={`jg-flag ring-1 ring-inset ${tone(kind?.color)}`} role="note">
+                  {kind?.id === GOOD_CONDUCT ? <CheckIcon /> : <WarnIcon />}
                   <div>
                     <p>
                       <b>{kind?.label ?? f.kind}</b>

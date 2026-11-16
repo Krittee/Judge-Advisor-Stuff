@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | this branch | Not yet | Local only |
 | 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `259cabb` | Simulator only | Live in 2.1.2 |
 | 2026-11-13 | [Coordinator sign-in: COORDINATOR word clipped](#coordinator-sign-in-coordinator-word-clipped-2026-11-13) | `f4793fb` | Not needed | Live in 2.1.2 |
 | 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Live in 2.1.1 |
@@ -15,6 +16,51 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Team sheet: Good conduct shows as a warning (2026-11-16)
+
+### Problem / request
+
+Reported on Version 2.1.3. A referee filed a Good conduct flag on 1852A. The Judge Advisor's Teams list showed it as a green "Good ×1" chip, which is right. But the team sheet (the panel with Notes · Notebook · Interview, "Private to judges and the Judge Advisor.") showed the same flag in an amber warning box with a ⚠ icon: "Good conduct · P5 — reported by Pim". Judges and the JA could read a compliment as a problem.
+
+### Root cause
+
+`TeamSheet.tsx` drew every flag as `<div class="jg-caution">` with `WarnIcon`, whatever its kind. The chip elsewhere takes its colour from the flag kind's `color` in `config/event.json` (`refereeFlags`) through `tone()` in `src/lib/tone.ts`, so the two disagreed. The team sheet is the only place that draws the flag detail box. Judges and the JA (Scores, Floor notes, Teams drawer, Activity) all open the same `TeamSheet`, so one fix covers all of them.
+
+### Decision
+
+The user chose "each its own colour". Every flag box wears its kind's colour, from the same `tone(kind.color)` the chip uses: Good is green with a ✓, Warning amber, Minor orange, Major red, DQ ink, and those four keep the ⚠. A team with several flags shows one box per flag, worst first (highest severity, then newest), so a mixed team shows its violations above its Good conduct.
+
+### What changed
+
+- `src/components/judge/TeamSheet.tsx`: each flag box is `jg-flag ring-1 ring-inset` plus `tone(kind?.color)`. The icon is `CheckIcon` for `GOOD_CONDUCT` (from `src/lib/awards.ts`) and `WarnIcon` otherwise. Boxes are listed with `flagsWorstFirst`.
+- `src/components/judge/logic.ts`: new `flagsWorstFirst(flags, kinds)` holds the sort that was inside `leadFlag`. `leadFlag` now returns its first item, so the rule exists once.
+- `src/app/globals.css`: new `.jg-flag` (the `.jg-caution` layout without its own colours; the tone classes supply fill, ink and ring). `.jg-caution` is unchanged for its other uses.
+- `tests/judgePage.logic.test.mjs`: new test for `flagsWorstFirst`: mixed order, unknown kind last, input not mutated, `leadFlag` agrees, empty list.
+- `tests/adminScores.runtime.test.tsx`: the team sheet snapshot now expects the new box class for its Warning flag. The icon and everything else are unchanged.
+
+### How it was tested
+
+- `npm test`: 1741 tests, 1740 pass, 0 fail, 1 skipped (the same skip as before). `npx tsc --noEmit`: clean. `npx eslint . --ignore-pattern '.claude/**'`: clean.
+- Browser preview on a copy of `.data/state.json` in the session scratchpad (never `.data/`), signed in as the Judge Advisor, opening team sheets from the Teams drawer. A Good conduct flag was added to 1115 on the copy so one team had only Good conduct.
+  - Before: 1115 showed the amber ⚠ box (dark desktop and light phone).
+  - After: 1115 (Good only) is green with ✓ at light phone width. 1108 (Warning ×2 and Good) shows two amber Warnings, then a green Good, in light desktop and dark phone. 1101 (DQ, Minor, Warning) shows DQ in ink, Minor orange and Warning amber, in that order, in dark desktop. No console errors.
+- Not checked on a real iPhone or the simulator. Not yet confirmed by the user.
+
+### Commit and branch
+
+- Change: on `claude/conduct-green-695821` (this entry is in the same commit).
+
+### Status
+
+Local only. Not merged, pushed or deployed.
+
+### Follow-ups
+
+- Check on a real iPhone once merged and deployed (needs approval).
+- The snapshot test's comment still says "TeamSheet.tsx changed in comments only", which was already stale. Worth a one-line tidy next time that test is touched.
 
 ---
 

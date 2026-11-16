@@ -64,17 +64,23 @@ export function flagDetail(f: FlagRow): string {
     .join(" · ");
 }
 
+/** Flags worst first: the most serious, then the newest. A sorted copy. */
+export function flagsWorstFirst(
+  flags: FlagRow[],
+  kinds: { id: string; severity: number }[],
+): FlagRow[] {
+  const severity = (f: FlagRow) => kinds.find((k) => k.id === f.kind)?.severity ?? -1;
+  return [...flags].sort(
+    (a, b) => severity(b) - severity(a) || b.created_at.localeCompare(a.created_at),
+  );
+}
+
 /** The flag worth one line on a card: the most serious, then the newest. */
 export function leadFlag(
   flags: FlagRow[],
   kinds: { id: string; severity: number }[],
 ): FlagRow | null {
-  const severity = (f: FlagRow) => kinds.find((k) => k.id === f.kind)?.severity ?? -1;
-  return (
-    [...flags].sort(
-      (a, b) => severity(b) - severity(a) || b.created_at.localeCompare(a.created_at),
-    )[0] ?? null
-  );
+  return flagsWorstFirst(flags, kinds)[0] ?? null;
 }
 
 /**
