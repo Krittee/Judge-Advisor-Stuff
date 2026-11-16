@@ -21,6 +21,7 @@ Newest first. Each version links to its section below.
 
 | Version | Live on | PR | Merge commit | What |
 |---|---|---|---|---|
+| [2.1.4](#version-214-four-fixes-from-16-november) | (pending) | (pending) | (pending) | Good conduct green; JA fixes notes; Judges Award two winners; No winner |
 | [2.1.3](#version-213-slot-windows-open-to-end-per-day-with-a-break) | 2026-11-14 | [#17](https://github.com/Krittee/Judge-Advisor-Stuff/pull/17) | `a4ee1b4` | Slot windows: per-panel days with open, end and an optional break |
 | [2.1.2](#version-212-two-coordinator-fixes) | 2026-11-13 | [#16](https://github.com/Krittee/Judge-Advisor-Stuff/pull/16) | `aa4a433` | Two Coordinator fixes |
 | [2.1.1](#version-211-onboarding-guides-and-new-teams-start-ungraded) | 2026-11-08 | [#15](https://github.com/Krittee/Judge-Advisor-Stuff/pull/15) | `97ef20a` | Onboarding guides; new teams start Ungraded |
@@ -31,6 +32,43 @@ Newest first. Each version links to its section below.
 "2.2" in this file's old name was never a released version: slot windows was
 first numbered 2.2.0 and shipped as 2.1.3. Individual bug fixes are logged in
 `FIXES.md`.
+
+---
+
+## Version 2.1.4: four fixes from 16 November
+
+Not yet live: branch `version-2.1.4`. Four fixes the user reported on 2026-11-16,
+each built in its own session and merged locally on the default branch:
+
+- **Good conduct is green in the team sheet.** Each referee flag now wears its
+  own colour from `config/event.json` (Good conduct emerald with a tick; warnings
+  stay amber), and the sheet lists the most serious flag first. Commit `fa039dd`.
+- **The Judge Advisor can fix or delete a judge's note.** Edit and Delete on each
+  note in the JA's team sheet (`PATCH` / `DELETE /api/notes`, JA only; judges are
+  refused). A delete is soft (`deleted_at`) and can be undone from the sheet; an
+  edited note says who edited it and when; the Activity log keeps the old text.
+  Commit `ef84422`.
+- **The Judges Award can have two winners per division.** `"winners": 2` on the
+  award in `config/event.json` (`places` on `AwardView`). Giving a third team is
+  refused until one is cleared; Clear takes off one team. Single-place awards
+  still replace. Commit `c04c9b3`.
+- **An award can be marked "No winner".** Mark no winner / Clear at the foot of
+  each award in By award; it counts as decided and shows a dash in the matrix.
+  Marking clears every holder (both Judges winners, named in the question);
+  giving a team a marked award clears the mark. Commits `1d9aa15`..`c68fecd`,
+  combined with the two-winner change in merge `130a8d3`.
+
+**Database (runs by itself on the first request after deploy, additive):**
+`notes` gains `edited_at`, `edited_by`, `deleted_at`; `award_winners`' primary
+key widens from (award, division) to (award, division, team) inside a `do`
+block that only fires while the old key exists; new table `award_no_winner`
+(row level security on, like the others). Existing winners are kept.
+
+Checked: 1770 tests pass (1 skipped) locally; **real Postgres on Neon at
+`130a8d3`: 1835/1835, 0 skipped**; tsc, eslint and `npm run build` clean; all
+four checked in the browser on a copy of the data as the JA, and the judge
+refusals checked by API. Not checked on an iPhone. Details in
+[FIXES.md](FIXES.md#team-sheet-good-conduct-shows-as-a-warning-2026-11-16).
 
 ---
 
