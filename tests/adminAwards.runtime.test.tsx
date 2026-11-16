@@ -5,7 +5,7 @@ import type { ReactElement, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { AwardLists, AwardsBoard, MatrixView, NomineePanel, ViewToggle } from "../src/components/admin/AwardsTab";
-import { buildAwardPanels, buildMatrix, detailFor, hiddenNote, nominationsIn, winnersOf, type Detail, type Sel, type View } from "../src/components/admin/awardsLogic";
+import { ALL_PANELS, buildAwardPanels, buildMatrix, detailFor, hiddenNote, nominationsIn, winnersOf, type Detail, type Sel, type View } from "../src/components/admin/awardsLogic";
 import { withRanks } from "../src/components/admin/scoresLogic";
 import { rankTeams } from "../src/lib/ranking";
 import { rubrics } from "../src/lib/rubrics";
@@ -83,6 +83,8 @@ function board(over: { data?: AwardsAdminView; division?: string; panelId?: stri
       busy={over.busy}
       onGive={noop}
       onClear={noop}
+      onMarkNoWinner={noop}
+      onClearNoWinner={noop}
       onNominate={noop}
       onRemove={noop}
     />,
@@ -284,6 +286,36 @@ test("both views open the same side panel on the same nominee", () => {
   assert.deepEqual(again, [null, null]);
 });
 
+test("No winner: the chip, Clear on a marked award, Mark no winner on the rest, counted in the header; the matrix header carries a sign", () => {
+  const marked: AwardsAdminView = { ...data, noWinners: [{ award_id: "energy", division: MS, decided_by: "Alex Morgan", decided_at: "2026-10-20T15:00:00Z" }] };
+  assert.match(board({ data: marked }), /<b>4 of 11<\/b> decided/);
+
+  const lists = buildAwardPanels(awards, nominationsIn(nominations, teams, MS), winnersOf(winners, MS), teams.filter((t) => t.division === MS), panels, ALL_PANELS, new Map(), new Set(["energy"]));
+  const marks: string[] = [];
+  const noWinner = { busy: false, onMark: (id: string) => marks.push(`mark ${id}`), onClear: (id: string) => marks.push(`clear ${id}`) };
+  const els = walk(AwardLists({ lists, sel: null, onSelect: noop, noWinner }));
+  const energy = sections(board({ view: "award", data: marked })).find((s) => s.name === "Energy Award")!.body;
+  assert.match(energy, /<span class="ja-aw-cst ja-aw-ok">No winner<\/span>/);
+  assert.match(energy, />Clear<\/button>/);
+  assert.doesNotMatch(energy, /Mark no winner/);
+  const create = sections(board({ view: "award", data: marked })).find((s) => s.name === "Create Award")!.body;
+  assert.match(create, />Mark no winner<\/button>/);
+
+  click(els.find((e) => e.props["aria-label"] === "Mark no winner for Create")!);
+  click(els.find((e) => e.props["aria-label"] === "Clear No winner on Energy")!);
+  assert.deepEqual(marks, ["mark create", "clear energy"]);
+  // Busy turns both off, like every other write.
+  assert.ok(walk(AwardLists({ lists, sel: null, onSelect: noop, noWinner: { ...noWinner, busy: true } })).filter((e) => String(e.props["aria-label"] ?? "").match(/Mark no winner for|Clear No winner/)).every((e) => e.props.disabled === true));
+  // Without the actions (no write access) there are no buttons.
+  assert.doesNotMatch(renderToStaticMarkup(AwardLists({ lists, sel: null, onSelect: noop })), /Mark no winner|>Clear</);
+
+  // A marked award with nominees shows its column with the sign, not the tick.
+  const m = buildMatrix(awards, nominationsIn(nominations, teams, MS), winnersOf(winners, MS), teams.filter((t) => t.division === MS), panels, ALL_PANELS, new Map(), new Set(["excellence"]));
+  const head = renderToStaticMarkup(MatrixView({ matrix: m, sel: null, note: "", none: "", onSelect: noop }));
+  assert.match(head, /aria-label="no winner"/);
+  assert.equal((head.match(/aria-label="no winner"/g) ?? []).length, 1);
+});
+
 /* ---- the side panel ------------------------------------------------------------------------------------- */
 
 test("the side panel: the award and division, the team, its scores and band, and why the panel nominated it", () => {
@@ -418,7 +450,7 @@ test("a selection whose team or nomination has gone shows no panel and does not 
 test("no awards in the config, or no divisions, is said plainly", () => {
   assert.match(board({ data: { awards: [], nominations: [], winners: [], noWinners: [] } }), /No awards are set up/);
   const none = renderToStaticMarkup(
-    <AwardsBoard data={data} state={{ ...state, divisions: [] }} rows={[]} rubricList={rubricList} division="" onDivision={noop} onPanel={noop} view="matrix" onView={noop} sel={null} onSelect={noop} onGive={noop} onClear={noop} onNominate={noop} onRemove={noop} />,
+    <AwardsBoard data={data} state={{ ...state, divisions: [] }} rows={[]} rubricList={rubricList} division="" onDivision={noop} onPanel={noop} view="matrix" onView={noop} sel={null} onSelect={noop} onGive={noop} onClear={noop} onMarkNoWinner={noop} onClearNoWinner={noop} onNominate={noop} onRemove={noop} />,
   );
   assert.match(none, /No divisions yet/);
 });
@@ -671,7 +703,7 @@ test("on a phone the panel is a bottom sheet over the board, not a column: a nat
 
 test("replacing or clearing a winner asks through useConfirm; there is no window.confirm", () => {
   assert.ok(tab.includes("const { ask, dialog } = useConfirm();") && tab.includes("{dialog}"));
-  assert.ok(tab.includes("giveAfterAsking(ask, call, { award: d.award, team: d.team, current: d.current })"));
+  assert.ok(tab.includes("giveAfterAsking(ask, call, { award: d.award, team: d.team, current: d.current, noWinner: d.noWinner })"));
   assert.ok(tab.includes("clearAfterAsking(ask, call, { award: d.award, team: d.team })"));
   assert.ok(!tab.includes("window.confirm") && !/(^|[^\w.])confirm\(/m.test(tab.replace(/\/\*[\s\S]*?\*\//g, "")));
   // The writes are the two routes the API already has, and only through the logic.
@@ -721,7 +753,7 @@ test("the sheet follows the Sections sheet: showModal when a nominee is open, Es
 
 test("the page fetches the awards for every section once signed in, gives the rail its count, and mounts the tab", () => {
   assert.ok(page.includes("useAwards({ enabled: Boolean(session) })"));
-  assert.match(page, /\.\.\.\(awards\.data\?\.awards\.length \? \{ awards: decidedText\(awards\.data\.winners, awards\.data\.awards, division\) \} : \{\}\)/);
+  assert.match(page, /\.\.\.\(awards\.data\?\.awards\.length \? \{ awards: decidedText\(awards\.data\.winners, awards\.data\.awards, division, awards\.data\.noWinners\) \} : \{\}\)/);
   assert.ok(page.includes("pickDivision(awardDivision, state.divisions, awards.data?.nominations ?? [], state.teams)"));
   assert.match(page, /tab === "awards" \? \(\s*<AwardsTab\s+state=\{state\}\s+data=\{awards\.data\}\s+error=\{awards\.error\}\s+reload=\{awards\.reload\}\s+division=\{division\}\s+onDivision=\{setAwardDivision\}\s+onError=\{setError\}/);
   assert.match(page, /tab === "awards" \|\| tab === "scores"/, "Awards fills the width the rail leaves");
