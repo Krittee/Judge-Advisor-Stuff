@@ -376,14 +376,15 @@ async function migrate(): Promise<void> {
       on nominations (award_id, team_id, panel_id, lower(btrim(judge)));
 
     -- The Judge Advisor's pick: one winner per award per division, so setting
-    -- another replaces it. Never part of the shared state.
+    -- another replaces it, or as many as the award's "winners" in config (the
+    -- Judges Award has two). Never part of the shared state.
     create table if not exists award_winners (
       award_id   text not null,
       division   text not null,
       team_id    uuid not null references teams(id) on delete cascade,
       decided_by text not null,
       decided_at timestamptz not null default now(),
-      primary key (award_id, division)
+      primary key (award_id, division, team_id)
     );
 
     create table if not exists activity (
@@ -548,6 +549,14 @@ async function migrate(): Promise<void> {
       alter table nominations add column if not exists role text not null default 'judge' check (role in ('judge', 'admin'));
       create unique index if not exists nominations_one_per_admin
         on nominations (award_id, team_id, lower(btrim(judge))) where role = 'admin';
+
+      -- An award can have more than one winner (the Judges Award has two), so the key gains the team.
+      -- Every existing row is unique on (award_id, division), so it is unique on the wider key too: nothing is lost.
+      -- Only fires while the old two-column key exists, so it is safe to run on every start.
+      if exists (select 1 from pg_constraint where conrelid = 'award_winners'::regclass and contype = 'p' and array_length(conkey, 1) = 2) then
+        alter table award_winners drop constraint award_winners_pkey;
+        alter table award_winners add primary key (award_id, division, team_id);
+      end if;
     end $$;
   `);
     await client.query("commit");
@@ -1631,29 +1640,42 @@ export const postgresStore: Store = {
 
   async setWinner(input: NewWinner) {
     try {
-      return one(
-        await query<WinnerRow>(
-          `insert into award_winners (award_id, division, team_id, decided_by)
-           values ($1, $2, $3, $4)
-           on conflict (award_id, division) do update set
-             team_id = excluded.team_id,
-             decided_by = excluded.decided_by,
-             decided_at = now()
-           returning *`,
-          [input.awardId, input.division, input.teamId, input.decidedBy],
-        ),
-      )!;
+      return await withClient(async (run) => {
+        // A single-winner award replaces whoever held it; one with more places just adds a holder.
+        if (input.places <= 1) {
+          await run(
+            "delete from award_winners where award_id = $1 and division = $2 and team_id <> $3",
+            [input.awardId, input.division, input.teamId],
+          );
+        }
+        return one(
+          await run<WinnerRow>(
+            `insert into award_winners (award_id, division, team_id, decided_by)
+             values ($1, $2, $3, $4)
+             on conflict (award_id, division, team_id) do update set
+               decided_by = excluded.decided_by,
+               decided_at = now()
+             returning *`,
+            [input.awardId, input.division, input.teamId, input.decidedBy],
+          ),
+        )!;
+      });
     } catch (e) {
       if ((e as { code?: string })?.code === "23503") throw new StoreError("That team no longer exists.", 404);
       throw e;
     }
   },
 
-  async clearWinner(awardId, division) {
-    const gone = await query<{ award_id: string }>(
-      "delete from award_winners where award_id = $1 and division = $2 returning award_id",
-      [awardId, division],
-    );
+  async clearWinner(awardId, division, teamId) {
+    const gone = teamId
+      ? await query<{ award_id: string }>(
+          "delete from award_winners where award_id = $1 and division = $2 and team_id = $3 returning award_id",
+          [awardId, division, teamId],
+        )
+      : await query<{ award_id: string }>(
+          "delete from award_winners where award_id = $1 and division = $2 returning award_id",
+          [awardId, division],
+        );
     return gone.length > 0;
   },
 

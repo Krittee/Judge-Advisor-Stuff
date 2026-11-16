@@ -432,6 +432,7 @@ export function parseAwards(list: unknown): AwardView[] {
       label,
       short: String(o.short ?? "").trim() || label,
       blurb: String(o.blurb ?? "").trim(),
+      places: clamp(o.winners, 1, 10, 1),
     });
   }
 

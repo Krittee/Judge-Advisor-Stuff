@@ -6,6 +6,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 |---|---|---|---|---|
 | 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Local only |
 | 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ef84422` | Not yet | Local only |
+| 2026-11-16 | [Judges Award can have two winners](#judges-award-can-have-two-winners-2026-11-16) | branch `claude/judges-award-two-b405c9` | Not needed | Local only |
 | 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `259cabb` | Simulator only | Live in 2.1.2 |
 | 2026-11-13 | [Coordinator sign-in: COORDINATOR word clipped](#coordinator-sign-in-coordinator-word-clipped-2026-11-13) | `f4793fb` | Not needed | Live in 2.1.2 |
 | 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Live in 2.1.1 |
@@ -122,6 +123,51 @@ Local only: not pushed, not merged, not deployed. The Postgres columns are added
 
 - There is no screen listing notes deleted in earlier sessions. Undo lasts only while the sheet stays open, after which the text survives in the Activity log and the database row.
 - Run the real-Postgres conformance suite (`TEST_DATABASE_URL`) before release.
+## Judges Award can have two winners (2026-11-16)
+
+### Problem / request
+
+Reported on Version 2.1.3: some events give two Judges Awards, but the Awards board let the Judge Advisor pick only one winner per award per division. Picking a second team replaced the first.
+
+### Root cause
+
+One winner per (award, division) was built in at every level: the Postgres `award_winners` primary key was `(award_id, division)`, both stores' `setWinner` replaced the holder, and the board logic (`winnersOf`) held one row per award.
+
+### What changed
+
+Decisions agreed with the user: the count is fixed in config, it applies per division (both winners may come from the same division), a third pick is refused with "clear one first", and the award shows "1 of 2 winners" until both are picked.
+
+- `config/event.json`: the `judges` award gets `"winners": 2`. Any award without it has one winner.
+- `src/lib/types.ts`, `src/lib/presets.ts`: `AwardView.places` (1 to 10, default 1), read from the config's `winners`. It is named `places` so a judge's `/api/awards` reply still never contains the word "winner".
+- `src/lib/db/postgres.ts`: the `award_winners` key is now `(award_id, division, team_id)`. A guarded step in `migrate()` swaps the key only while the old two-column key exists, so it is safe to re-run. Existing rows are unique on the old key, so nothing is lost. `setWinner` takes `places`: with 1 it still replaces the holder (in one transaction), with more it adds the team beside the others. `clearWinner` takes an optional `teamId`.
+- `src/lib/db/file.ts`, `src/lib/db/types.ts`: the same store semantics. The JSON file needs no migration.
+- `src/app/api/awards/winners/route.ts`: PUT refuses a winner beyond the award's places with 409 ("Judges already has its 2 winners in <division>. Clear one first."). DELETE takes an optional `teamId`, so clearing one Judges winner keeps the other.
+- `src/components/admin/awardsLogic.ts`: `winnersOf` returns a list per award. An award counts as decided (status, the "x/11" count) only when all its places are filled, and shows "1 of 2 winners" in between. `Detail.full` and `fullText` are new, and Clear sends the team.
+- `src/components/admin/AwardsTab.tsx`: when the award is full, the side panel shows "Judges has 2 winners. Clear one to give it to 1115." in place of the Give button.
+- Tests: `awards.config`, `adminAwards.logic`, `awardsRoute.runtime` (the second winner is accepted, a third gets 409, Design still replaces, a clear by team keeps the other, and the judge-secrecy check is unchanged in strength), `storeConformance.runtime`, `postgres-sql`, and `judgeNominate.runtime` fixtures.
+
+### How it was tested
+
+- `npm test`: 1749 tests, 1748 pass, 0 fail, 1 skipped. The skip is the real-Postgres conformance suite, which was **not run** because `TEST_DATABASE_URL` was not set. The key migration and the transaction are covered only by the SQL-text tests and the file store.
+- `tsc --noEmit` and `eslint . --ignore-pattern '.claude/**'` are clean.
+- Browser preview on a copy of `.data/state.json` (scratchpad `DATA_FILE`, never `.data/`), signed in as the Judge Advisor:
+  - Two Judges winners were given and a third was refused (409).
+  - The board showed both winners, "Decided", and 1/11 in the rail, and the third nominee's panel showed the "clear one" note.
+  - Clearing one winner changed the status to "1 of 2 winners" and the rail to 0/11, kept the other winner, and brought Give back.
+- No iPhone check: the layout is unchanged apart from one line of text. The user has not confirmed it yet.
+
+### Branch / commit
+
+`claude/judges-award-two-b405c9`, one local commit. Not pushed.
+
+### Status
+
+Local only. It merges with the "No winner" change (`no-winner-award`), which touches the same files. Before deploying, run the conformance suite against the Neon test database, since the live Supabase migration changes the primary key.
+
+### Follow-ups
+
+- Run the real-Postgres conformance suite (`TEST_DATABASE_URL`) before release.
+- Two simultaneous PUTs could both take the last place: the cap is checked in the route, not by a lock. There is a single Judge Advisor, so this is accepted for now.
 
 ---
 

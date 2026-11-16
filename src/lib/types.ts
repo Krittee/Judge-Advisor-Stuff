@@ -205,6 +205,8 @@ export type AwardView = {
   label: string;
   short: string;
   blurb: string;
+  /** How many teams can win it per division: 1 unless config/event.json says more (the Judges Award has 2). */
+  places: number;
 };
 
 /** Whose nomination a row is: a judge's, or the Judge Advisor's own. */

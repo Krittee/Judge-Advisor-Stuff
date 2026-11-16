@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * The winners: the Judge Advisor's call alone, one team per award per
- * division. Reading them is GET /api/awards, which only the Judge Advisor
+ * division (the Judges Award has two: `winners` in config/event.json). Reading them is GET /api/awards, which only the Judge Advisor
  * gets them from.
  *
  * A winner is a nominee: a judge nominated the team, or, for Sportsmanship
@@ -61,11 +61,21 @@ export async function PUT(request: Request) {
   }
 
   // Picking the team that already has it changes nothing, so it writes and logs nothing.
-  const before = (await db.listWinners()).find((w) => w.award_id === awardId && w.division === division);
-  if (before?.team_id === teamId) return NextResponse.json({ winner: before });
+  const holders = (await db.listWinners()).filter((w) => w.award_id === awardId && w.division === division);
+  const already = holders.find((w) => w.team_id === teamId);
+  if (already) return NextResponse.json({ winner: already });
+
+  // An award with several places fills up; a single-place award replaces its holder instead.
+  if (award.places > 1 && holders.length >= award.places) {
+    return NextResponse.json(
+      { error: `${award.label} already has its ${award.places} winners in ${division}. Clear one first.` },
+      { status: 409 },
+    );
+  }
 
   try {
-    const winner = await db.setWinner({ awardId, division, teamId, decidedBy: session!.name });
+    const winner = await db.setWinner({ awardId, division, teamId, decidedBy: session!.name, places: award.places });
+    const before = award.places <= 1 ? holders[0] : undefined;
     const previous = before && teams.find((t) => t.id === before.team_id)?.number;
     await db.logActivity({
       teamId,
@@ -81,7 +91,7 @@ export async function PUT(request: Request) {
   }
 }
 
-/** Take the winner back off an award in one division. */
+/** Take the winner back off an award in one division; `teamId` clears just that team (the Judges Award has two), none clears them all. */
 export async function DELETE(request: Request) {
   const session = await getSession();
   if (!canAdminister(session)) {
@@ -96,8 +106,11 @@ export async function DELETE(request: Request) {
   }
 
   const db = store();
-  const before = (await db.listWinners()).find((w) => w.award_id === awardId && w.division === division);
-  const removed = await db.clearWinner(awardId, division);
+  const teamId = String(body.teamId ?? "");
+  const before = (await db.listWinners()).find(
+    (w) => w.award_id === awardId && w.division === division && (!teamId || w.team_id === teamId),
+  );
+  const removed = await db.clearWinner(awardId, division, teamId || undefined);
   if (removed && before) {
     const team = (await db.listTeams()).find((t) => t.id === before.team_id);
     await db.logActivity({

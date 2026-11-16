@@ -508,7 +508,7 @@ test("a judge reads their own panel's nominations: no winners field at all, and 
   await nominate(ben(w), "design", w.bolts);
   await nominate(cleo(w), "excellence", w.comets, "Cleo's secret");
   await nominate(judgeOf(w.p3, "Dev"), "excellence", w.storm);
-  await w.db.setWinner({ awardId: "excellence", division: ES, teamId: w.hawks.id, decidedBy: "Alex" });
+  await w.db.setWinner({ awardId: "excellence", division: ES, teamId: w.hawks.id, decidedBy: "Alex", places: 1 });
 
   const reply = await awardsApi(amy(w), "GET");
   assert.equal(reply.status, 200);
@@ -519,7 +519,7 @@ test("a judge reads their own panel's nominations: no winners field at all, and 
     "her panel's, her colleague's included",
   );
   assert.equal(reply.body.awards.length, 11);
-  assert.deepEqual(Object.keys(reply.body.awards[0]).sort(), ["blurb", "id", "label", "short"]);
+  assert.deepEqual(Object.keys(reply.body.awards[0]).sort(), ["blurb", "id", "label", "places", "short"]);
   const text = JSON.stringify(reply.body);
   assert.doesNotMatch(text, /winner|decided_by|\bCleo\b|\bDev\b|2088C/i);
   assert.ok(!text.includes(w.comets.id) && !text.includes(w.storm.id), "no other panel's team shows up");
@@ -652,6 +652,37 @@ test("the Judge Advisor decides, replaces and clears a winner, and each is logge
     ]),
     "the same pick twice and clearing nothing log nothing",
   );
+});
+
+test("the Judges Award takes two winners per division: a third is refused, a single-winner award still replaces, and a clear can name one team", async () => {
+  const w = await world();
+  for (const t of [w.hawks, w.bolts, w.rookie]) await nominate(ADMIN, "judges", t);
+  for (const t of [w.hawks, w.bolts]) await nominate(ADMIN, "design", t);
+  const put = (award: string, t: Team) => winnersApi(ADMIN, "PUT", { awardId: award, division: ES, teamId: t.id });
+  const holders = async (award: string) => (await w.db.listWinners()).filter((x) => x.award_id === award).map((x) => x.team_id).sort();
+
+  assert.equal((await put("judges", w.hawks)).status, 200);
+  assert.equal((await put("judges", w.bolts)).status, 200, "the second Judges winner is added beside the first");
+  assert.deepEqual(await holders("judges"), [w.hawks.id, w.bolts.id].sort());
+  assert.equal((await put("judges", w.bolts)).status, 200, "picking a holder again is harmless");
+
+  const third = await put("judges", w.rookie);
+  assert.equal(third.status, 409);
+  assert.equal(third.body.error, `Judges already has its 2 winners in ${ES}. Clear one first.`);
+  assert.deepEqual(await holders("judges"), [w.hawks.id, w.bolts.id].sort(), "the third was not stored");
+
+  await put("design", w.hawks);
+  assert.equal((await put("design", w.bolts)).status, 200, "Design has one place, so it replaces");
+  assert.deepEqual(await holders("design"), [w.bolts.id]);
+
+  const cleared = await winnersApi(ADMIN, "DELETE", { awardId: "judges", division: ES, teamId: w.hawks.id });
+  assert.deepEqual(cleared.body, { ok: true, removed: true });
+  assert.deepEqual(await holders("judges"), [w.bolts.id], "only the named team was cleared");
+  assert.equal((await put("judges", w.rookie)).status, 200, "a place is free again");
+
+  const lines = (await w.db.listActivity()).filter((a) => a.kind === "award").map((a) => [a.action, a.detail ?? ""]);
+  assert.ok(lines.some((l) => l[0] === "cleared Judges" && l[1] === `${ES} · was 9882K`), "the log names the cleared team");
+  assert.ok(lines.some((l) => l[0] === "gave Judges to 7700B" && l[1] === ES), "a second winner is not 'instead of' anyone");
 });
 
 /** Referees flag a team `kind` once each time. */
