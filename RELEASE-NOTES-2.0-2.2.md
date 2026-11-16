@@ -145,7 +145,7 @@ auto-assigner all use. Every change below is local and not pushed.
 | [Review fixes: booked time no longer wraps; coordinator tabs open at the top](#review-fixes) | `ac9a4bf` | Not yet (browser phone size only) | Local, not pushed |
 | [The Coordinator door moves after Queue desk](#door-order) | `aecd28c` | Not yet (browser phone size only) | Local, not pushed |
 | [Coordinator avatar](#coordinator-avatar) | `7612f0b` | Not yet (browser phone size only) | Local, not pushed |
-| [Over-engineering audit fixes (all 15)](#audit-fixes) | `df61a87`..`f1b04e4` | Not yet (browser phone size only) | Local, not pushed |
+| [Over-engineering audit fixes (all 15)](#audit-fixes) | `df61a87`..`f1b04e4` | iPhone simulator only (not a real iPhone) | Local, not pushed |
 | [Team door picture](#team-door-picture) | `599d84c` | Not yet (browser phone size only) | Local, not pushed |
 
 ### Your decisions for 2.1.0
@@ -372,6 +372,8 @@ and sixth (language) columns. Files: `src/components/door/DoorPage.tsx`,
 Net: about −220 src/CSS lines and −157 test lines.
 
 **How it was tested.** `npm test` 1689 pass, 1 skip, 0 fail (down from 1704 because duplicated tests were removed). `tsc --noEmit`, `eslint src tests` and `next build` are clean. Browser check on a fresh demo-data copy, at 375 and 1280, light and dark: `/coordinator` (a chip saves; on the Slots tab an EN+TH team on the EN-only Panel A shows EN), the queue desk (tags only), `/team/1129`, the JA Teams tab and drawer ("Doesn't cover Thai. You can keep it."), and the Floor. The check found the clipped TH tag, which `76252b5` fixes.
+
+**iPhone simulator check.** Safari on the iPhone 18 Pro Max simulator (iOS 27.2), light and dark, on a scratch demo-data copy. `/coordinator`: a chip fades while it saves and then lights; the dashed "Ask" chips; "Request · English" / "Request · Thai"; the "ask the queue desk" note; a full booking (Book a time → pick 12:18 → Booked, saved as English). `/team/1157` shows the slot, "English" and "Interview in EN". JA Floor, Teams tab and drawer ("Doesn't cover Thai. You can keep it."). Nothing broken. Not checked on the phone: the queue desk, and a real iPhone.
 
 **Commit and branch.** `df61a87`..`76252b5`, then `f1b04e4`, on `claude/v21-audit-fixes-4ac63c` (cut from `claude/v21-coordinator-c9e080` at `4e59854`). Local, not pushed.
 
