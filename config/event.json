@@ -146,7 +146,8 @@
       "id": "judges",
       "label": "Judges",
       "short": "Jdg",
-      "blurb": "Qualities worth recognising that may not fit another award."
+      "blurb": "Qualities worth recognising that may not fit another award.",
+      "winners": 2
     },
     {
       "id": "inspire",

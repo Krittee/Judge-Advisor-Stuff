@@ -1317,7 +1317,7 @@ function listWinners(): WinnerRow[] {
   return state().winners.map((w) => ({ ...w }));
 }
 
-/** Awards are decided per division, so (award, division) holds one team and a second replaces it. */
+/** Awards are decided per division. With `places` 1, (award, division) holds one team and a second replaces it; with more, teams are added beside each other. */
 function setWinner(input: NewWinner): WinnerRow {
   if (!state().teams.some((t) => t.id === input.teamId)) throw new StoreError("That team no longer exists.", 404);
 
@@ -1328,7 +1328,14 @@ function setWinner(input: NewWinner): WinnerRow {
     decided_by: input.decidedBy,
     decided_at: new Date().toISOString(),
   };
-  const at = state().winners.findIndex((w) => w.award_id === row.award_id && w.division === row.division);
+  if (input.places <= 1) {
+    state().winners = state().winners.filter(
+      (w) => !(w.award_id === row.award_id && w.division === row.division && w.team_id !== row.team_id),
+    );
+  }
+  const at = state().winners.findIndex(
+    (w) => w.award_id === row.award_id && w.division === row.division && w.team_id === row.team_id,
+  );
   if (at >= 0) state().winners[at] = row;
   else state().winners.push(row);
 
@@ -1336,9 +1343,11 @@ function setWinner(input: NewWinner): WinnerRow {
   return { ...row };
 }
 
-function clearWinner(awardId: string, division: string): boolean {
+function clearWinner(awardId: string, division: string, teamId?: string): boolean {
   const before = state().winners.length;
-  state().winners = state().winners.filter((w) => !(w.award_id === awardId && w.division === division));
+  state().winners = state().winners.filter(
+    (w) => !(w.award_id === awardId && w.division === division && (!teamId || w.team_id === teamId)),
+  );
   const removed = state().winners.length < before;
   if (removed) save();
   return removed;
@@ -1628,7 +1637,7 @@ export const fileStore: Store = {
   removeNomination: async (id) => removeNomination(id),
   listWinners: async () => listWinners(),
   setWinner: async (input) => setWinner(input),
-  clearWinner: async (awardId, division) => clearWinner(awardId, division),
+  clearWinner: async (awardId, division, teamId) => clearWinner(awardId, division, teamId),
 
   resetDay: async () => resetDay(),
   resetAll: async () => resetAll(),

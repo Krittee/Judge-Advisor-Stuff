@@ -23,6 +23,7 @@ import {
   decidedText,
   detailFor,
   distinctTeams,
+  fullText,
   giveAfterAsking,
   hasText,
   hiddenNote,
@@ -772,6 +773,8 @@ export function NomineePanel({
             Clear winner
           </button>
         </div>
+      ) : detail.full ? (
+        <p className="ja-aw-note">{fullText(award, team)}</p>
       ) : detail.nominated ? (
         <>
           <button type="button" className="ja-aw-prim" disabled={busy} onClick={() => onGive(detail)}>
