@@ -64,7 +64,11 @@ export async function PUT(request: Request) {
   const before = (await db.listWinners()).find((w) => w.award_id === awardId && w.division === division);
   if (before?.team_id === teamId) return NextResponse.json({ winner: before });
 
+  // A team given an award marked "No winner" takes the mark off it.
+  const marked = (await db.listNoWinners()).some((n) => n.award_id === awardId && n.division === division);
+
   try {
+    if (marked) await db.clearNoWinner(awardId, division);
     const winner = await db.setWinner({ awardId, division, teamId, decidedBy: session!.name });
     const previous = before && teams.find((t) => t.id === before.team_id)?.number;
     await db.logActivity({
@@ -72,7 +76,7 @@ export async function PUT(request: Request) {
       kind: "award",
       ...actorParts(session),
       action: `gave ${award.label} to ${team.number}`,
-      detail: previous ? `${division} · instead of ${previous}` : division,
+      detail: previous ? `${division} · instead of ${previous}` : marked ? `${division} · instead of No winner` : division,
     });
     return NextResponse.json({ winner });
   } catch (e) {

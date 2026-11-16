@@ -249,7 +249,7 @@ export type NoWinnerRow = {
  * A judge's reply is `AwardsJudgeView` and has no `winners` key at all, so
  * `"winners" in reply` tells the two apart.
  */
-export type AwardsAdminView = { awards: AwardView[]; nominations: NominationRow[]; winners: WinnerRow[] };
+export type AwardsAdminView = { awards: AwardView[]; nominations: NominationRow[]; winners: WinnerRow[]; noWinners: NoWinnerRow[] };
 /** GET /api/awards for a judge: their own panel's nominations only, and never a winner. */
 export type AwardsJudgeView = { awards: AwardView[]; nominations: NominationRow[] };
 
@@ -259,6 +259,8 @@ export type NominateReply = { nomination: NominationRow };
 export type RemoveReply = { ok: true; removed: boolean };
 /** PUT /api/awards/winners. */
 export type WinnerReply = { winner: WinnerRow };
+/** PUT /api/awards/no-winner. Its DELETE replies with `RemoveReply`. */
+export type NoWinnerReply = { noWinner: NoWinnerRow };
 
 export type ActivityKind = "request" | "referee" | "conflict" | "setup" | "award";
 
