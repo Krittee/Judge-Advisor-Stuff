@@ -555,17 +555,6 @@ export function AwardLists({
           <header className="ja-aw-aph">
             <h2 title={award.blurb}>{award.label}</h2>
             <span className={decided ? "ja-aw-cst ja-aw-ok" : "ja-aw-cst"}>{status}</span>
-            {noWinner ? (
-              marked ? (
-                <button type="button" className="ja-aw-lnk" disabled={noWinner.busy} aria-label={`Clear No winner on ${award.label}`} onClick={() => noWinner.onClear(award.id)}>
-                  Clear
-                </button>
-              ) : (
-                <button type="button" className="ja-aw-lnk" disabled={noWinner.busy} aria-label={`Mark no winner for ${award.label}`} onClick={() => noWinner.onMark(award.id)}>
-                  Mark no winner
-                </button>
-              )
-            ) : null}
           </header>
           {nominees.length ? (
             <ul>
@@ -624,6 +613,19 @@ export function AwardLists({
                 </select>
                 <ChevronDown />
               </div>
+            </div>
+          ) : null}
+          {noWinner ? (
+            <div className="ja-aw-nw">
+              {marked ? (
+                <button type="button" className="ja-aw-lnk" disabled={noWinner.busy} aria-label={`Clear No winner on ${award.label}`} onClick={() => noWinner.onClear(award.id)}>
+                  Clear
+                </button>
+              ) : (
+                <button type="button" className="ja-aw-lnk" disabled={noWinner.busy} aria-label={`Mark no winner for ${award.label}`} onClick={() => noWinner.onMark(award.id)}>
+                  Mark no winner
+                </button>
+              )}
             </div>
           ) : null}
         </section>
