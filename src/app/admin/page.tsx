@@ -191,6 +191,7 @@ export default function AdminPage() {
           flags={state.flags}
           flagKinds={state.flagKinds}
           ask={ask}
+          canFixNotes
           onClose={() => {
             setSheetId(null);
             // Scores shows the totals the sheet just wrote; its own poll is up to 15 s away.

@@ -79,6 +79,11 @@ export type Note = {
   author: string;
   body: string;
   created_at: string;
+  /** Set when the Judge Advisor corrected the text. Notes from before this existed have none. */
+  edited_at?: string | null;
+  edited_by?: string | null;
+  /** Set when the Judge Advisor deleted it. The row stays so the deletion can be undone. */
+  deleted_at?: string | null;
 };
 
 /**
