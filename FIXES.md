@@ -4,7 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ja-edit-notes` branch | Not yet | Local only |
+| 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ef84422` | Not yet | Local only |
 | 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `259cabb` | Simulator only | Live in 2.1.2 |
 | 2026-11-13 | [Coordinator sign-in: COORDINATOR word clipped](#coordinator-sign-in-coordinator-word-clipped-2026-11-13) | `f4793fb` | Not needed | Live in 2.1.2 |
 | 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Live in 2.1.1 |
@@ -69,7 +69,7 @@ Not a bug: notes were append-only by design. `/api/notes` had only GET and POST,
 
 ### Branch / commit
 
-`claude/ja-edit-notes-a9614a`, local commit only.
+`claude/ja-edit-notes-a9614a`, commit `ef84422` (local only).
 
 ### Status
 
