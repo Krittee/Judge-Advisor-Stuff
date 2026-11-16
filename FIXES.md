@@ -4,10 +4,10 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Local only |
-| 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ef84422` | Not yet | Local only |
-| 2026-11-16 | [Judges Award can have two winners](#judges-award-can-have-two-winners-2026-11-16) | `c04c9b3` | Not needed | Local only |
-| 2026-11-16 | [Awards: mark an award "No winner"](#awards-mark-an-award-no-winner-2026-11-16) | `1d9aa15`..`c68fecd` | Not yet (phone-width preview only) | Local only |
+| 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
+| 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ef84422` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
+| 2026-11-16 | [Judges Award can have two winners](#judges-award-can-have-two-winners-2026-11-16) | `c04c9b3` | Not needed | Live in 2.1.4 (PR #18, 2026-11-16) |
+| 2026-11-16 | [Awards: mark an award "No winner"](#awards-mark-an-award-no-winner-2026-11-16) | `1d9aa15`..`c68fecd` | Not yet (phone-width preview only) | Live in 2.1.4 (PR #18, 2026-11-16) |
 | 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `259cabb` | Simulator only | Live in 2.1.2 |
 | 2026-11-13 | [Coordinator sign-in: COORDINATOR word clipped](#coordinator-sign-in-coordinator-word-clipped-2026-11-13) | `f4793fb` | Not needed | Live in 2.1.2 |
 | 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Live in 2.1.1 |
@@ -58,7 +58,7 @@ The user chose "each its own colour". Every flag box wears its kind's colour, fr
 
 ### Status
 
-Local only. Not merged, pushed or deployed.
+Live in 2.1.4 (PR #18, merged `ff04220`, 2026-11-16). Not checked on an iPhone.
 
 ### Follow-ups
 
@@ -118,7 +118,7 @@ Not a bug: notes were append-only by design. `/api/notes` had only GET and POST,
 
 ### Status
 
-Local only: not pushed, not merged, not deployed. The Postgres columns are added on the first start against a database (additive).
+Live in 2.1.4 (PR #18, merged `ff04220`, 2026-11-16). The Postgres columns were added on the first request after deploy (additive). Not checked on an iPhone.
 
 ### Follow-ups
 
@@ -163,7 +163,7 @@ Decisions agreed with the user: the count is fixed in config, it applies per div
 
 ### Status
 
-Local only. It merges with the "No winner" change (`no-winner-award`), which touches the same files. Before deploying, run the conformance suite against the Neon test database, since the live Supabase migration changes the primary key.
+Live in 2.1.4 (PR #18, merged `ff04220`, 2026-11-16). Combined with the "No winner" change in merge `130a8d3`. The real-Postgres suite passed on Neon first (1835/1835), then the live Supabase key change applied on deploy.
 
 ### Follow-ups
 
@@ -200,7 +200,7 @@ The user chose: any award can be marked (even one with nominees), the wording is
 
 ### Status
 
-Local only. Not pushed, merged or deployed.
+Live in 2.1.4 (PR #18, merged `ff04220`, 2026-11-16). Combined with the two-winner change in merge `130a8d3`. Not checked on an iPhone.
 
 ### Follow-ups
 

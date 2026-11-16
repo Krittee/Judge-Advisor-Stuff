@@ -21,7 +21,7 @@ Newest first. Each version links to its section below.
 
 | Version | Live on | PR | Merge commit | What |
 |---|---|---|---|---|
-| [2.1.4](#version-214-four-fixes-from-16-november) | (pending) | (pending) | (pending) | Good conduct green; JA fixes notes; Judges Award two winners; No winner |
+| [2.1.4](#version-214-four-fixes-from-16-november) | 2026-11-16 | [#18](https://github.com/Krittee/Judge-Advisor-Stuff/pull/18) | `ff04220` | Good conduct green; JA fixes notes; Judges Award two winners; No winner |
 | [2.1.3](#version-213-slot-windows-open-to-end-per-day-with-a-break) | 2026-11-14 | [#17](https://github.com/Krittee/Judge-Advisor-Stuff/pull/17) | `a4ee1b4` | Slot windows: per-panel days with open, end and an optional break |
 | [2.1.2](#version-212-two-coordinator-fixes) | 2026-11-13 | [#16](https://github.com/Krittee/Judge-Advisor-Stuff/pull/16) | `aa4a433` | Two Coordinator fixes |
 | [2.1.1](#version-211-onboarding-guides-and-new-teams-start-ungraded) | 2026-11-08 | [#15](https://github.com/Krittee/Judge-Advisor-Stuff/pull/15) | `97ef20a` | Onboarding guides; new teams start Ungraded |
@@ -37,7 +37,7 @@ first numbered 2.2.0 and shipped as 2.1.3. Individual bug fixes are logged in
 
 ## Version 2.1.4: four fixes from 16 November
 
-Not yet live: branch `version-2.1.4`. Four fixes the user reported on 2026-11-16,
+Live 2026-11-16 via PR #18, merged as `ff04220`; version bump `dfa709c`. Four fixes the user reported on 2026-11-16,
 each built in its own session and merged locally on the default branch:
 
 - **Good conduct is green in the team sheet.** Each referee flag now wears its
@@ -67,7 +67,9 @@ block that only fires while the old key exists; new table `award_no_winner`
 Checked: 1770 tests pass (1 skipped) locally; **real Postgres on Neon at
 `130a8d3`: 1835/1835, 0 skipped**; tsc, eslint and `npm run build` clean; all
 four checked in the browser on a copy of the data as the JA, and the judge
-refusals checked by API. Not checked on an iPhone. Details in
+refusals checked by API. After deploy: live `/api/health` ok, `/api/state` loads (so the migrations ran on
+Supabase), the new endpoints answer 403 when signed out, and the new CSS is live.
+Not checked on an iPhone. Details in
 [FIXES.md](FIXES.md#team-sheet-good-conduct-shows-as-a-warning-2026-11-16).
 
 ---
