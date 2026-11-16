@@ -1052,6 +1052,50 @@ test("both award tables are locked down like every other", () => {
   }
 });
 
+test("migrate() creates award_no_winner, one row per (award, division), additive and locked down", () => {
+  assert.match(
+    migrateBody,
+    /create table if not exists award_no_winner \(\s*award_id\s+text not null,\s*division\s+text not null,\s*decided_by text not null,\s*decided_at timestamptz not null default now\(\),\s*primary key \(award_id, division\)\s*\);/,
+  );
+  assert.ok(migrateBody.includes("alter table award_no_winner enable row level security;"));
+});
+
+test("setNoWinner upserts on (award, division); clearNoWinner deletes by the same key; the list is oldest first", async () => {
+  calls.length = 0;
+  answer = () => [{ award_id: "design", division: "Middle School", decided_by: "Alex", decided_at: new Date("2026-10-24T09:00:00.000Z") }];
+  const made = await postgresStore.setNoWinner({ awardId: "design", division: "Middle School", decidedBy: "Alex" });
+  const [upsert] = sent(/^insert into award_no_winner/);
+  assert.match(
+    upsert.sql,
+    /^insert into award_no_winner \(award_id, division, decided_by\) values \(\$1, \$2, \$3\) on conflict \(award_id, division\) do update set decided_by = excluded\.decided_by, decided_at = now\(\) returning \*$/,
+  );
+  assert.deepEqual(upsert.params, ["design", "Middle School", "Alex"]);
+  assert.equal(made.decided_at, "2026-10-24T09:00:00.000Z");
+
+  calls.length = 0;
+  await postgresStore.listNoWinners();
+  assert.equal(sent(/from award_no_winner/)[0].sql, "select * from award_no_winner order by decided_at, award_id, division");
+
+  calls.length = 0;
+  answer = () => [{ award_id: "design" }];
+  assert.equal(await postgresStore.clearNoWinner("design", "Middle School"), true);
+  const [del] = sent(/^delete from award_no_winner/);
+  assert.equal(del.sql, "delete from award_no_winner where award_id = $1 and division = $2 returning award_id");
+  assert.deepEqual(del.params, ["design", "Middle School"]);
+  answer = () => [];
+  assert.equal(await postgresStore.clearNoWinner("design", "Middle School"), false);
+});
+
+test("a day reset and a full wipe both name award_no_winner (it has no team to cascade from)", async () => {
+  answer = () => [];
+  calls.length = 0;
+  await postgresStore.resetDay();
+  assert.match(sent(/^truncate/)[0].sql, /\baward_no_winner\b/);
+  calls.length = 0;
+  await postgresStore.resetAll();
+  assert.match(sent(/^truncate/)[0].sql, /\baward_no_winner\b/);
+});
+
 const NOMINATION = { id: "n1", award_id: "excellence", team_id: "t1", panel_id: "p1", judge: "Amy", reason: null, created_at: new Date("2026-10-24T08:00:00.000Z"), updated_at: new Date("2026-10-24T08:00:00.000Z") };
 
 test("nominate is one upsert on the full non-null key, the judge as lower(btrim(name)): no reason keeps the stored one, a reason (or null) sets it", async () => {

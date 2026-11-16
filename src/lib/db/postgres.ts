@@ -11,6 +11,7 @@ import type {
   ScoreRow,
   Team,
   WinnerRow,
+  NoWinnerRow,
 } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { randomPanelCode } from "../panelCode";
@@ -33,6 +34,7 @@ import {
   type NewRefereeSetup,
   type NewRequest,
   type NewWinner,
+  type NewNoWinner,
   type NominationKey,
   type SaveScore,
   type Store,
@@ -386,6 +388,16 @@ async function migrate(): Promise<void> {
       primary key (award_id, division)
     );
 
+    -- The Judge Advisor's decision that an award goes to no team: one mark per
+    -- award per division. No team, so nothing to cascade from.
+    create table if not exists award_no_winner (
+      award_id   text not null,
+      division   text not null,
+      decided_by text not null,
+      decided_at timestamptz not null default now(),
+      primary key (award_id, division)
+    );
+
     create table if not exists activity (
       id         uuid primary key default gen_random_uuid(),
       request_id uuid references requests(id) on delete cascade,
@@ -469,6 +481,7 @@ async function migrate(): Promise<void> {
     alter table scores    enable row level security;
     alter table nominations enable row level security;
     alter table award_winners enable row level security;
+    alter table award_no_winner enable row level security;
     alter table activity  enable row level security;
     alter table referee_setup enable row level security;
   `);
@@ -1619,6 +1632,32 @@ export const postgresStore: Store = {
     return gone.length > 0;
   },
 
+  async listNoWinners() {
+    return rows(await query<NoWinnerRow>("select * from award_no_winner order by decided_at, award_id, division"));
+  },
+
+  async setNoWinner(input: NewNoWinner) {
+    return one(
+      await query<NoWinnerRow>(
+        `insert into award_no_winner (award_id, division, decided_by)
+         values ($1, $2, $3)
+         on conflict (award_id, division) do update set
+           decided_by = excluded.decided_by,
+           decided_at = now()
+         returning *`,
+        [input.awardId, input.division, input.decidedBy],
+      ),
+    )!;
+  },
+
+  async clearNoWinner(awardId, division) {
+    const gone = await query<{ award_id: string }>(
+      "delete from award_no_winner where award_id = $1 and division = $2 returning award_id",
+      [awardId, division],
+    );
+    return gone.length > 0;
+  },
+
   async logActivity(entry: NewActivity) {
     // The log is a convenience, not a record of account. Never let a
     // failed audit write break the thing the user actually asked for.
@@ -1644,7 +1683,7 @@ export const postgresStore: Store = {
   async resetDay() {
     // Referee flags intentionally survive a day reset: repeat history is
     // event-wide, including at multi-day events. So does the referee setup.
-    await query("truncate activity, notes, scores, nominations, award_winners, requests");
+    await query("truncate activity, notes, scores, nominations, award_winners, award_no_winner, requests");
   },
 
   async resetAll() {
@@ -1652,8 +1691,9 @@ export const postgresStore: Store = {
     // boundary and must be used before importing the next event's roster.
     // The referee setup is the event's too, so it goes with them.
     // cascade also takes nominations and award_winners: both reference teams.
+    // award_no_winner has no team, so it is named.
     await query(
-      "truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup cascade",
+      "truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup, award_no_winner cascade",
     );
   },
 };

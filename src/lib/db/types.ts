@@ -12,6 +12,7 @@ import type {
   ScoreRow,
   Team,
   WinnerRow,
+  NoWinnerRow,
 } from "../types";
 
 /** Thrown for rule violations we want to show the user verbatim. */
@@ -154,6 +155,12 @@ export type NewWinner = {
   awardId: string;
   division: string;
   teamId: string;
+  decidedBy: string;
+};
+
+export type NewNoWinner = {
+  awardId: string;
+  division: string;
   decidedBy: string;
 };
 
@@ -303,6 +310,12 @@ export type Store = {
   setWinner(input: NewWinner): Promise<WinnerRow>;
   /** Returns whether there was one. */
   clearWinner(awardId: string, division: string): Promise<boolean>;
+  /** Awards the Judge Advisor decided go to no team, per division. Secret until the ceremony. */
+  listNoWinners(): Promise<NoWinnerRow[]>;
+  /** One mark per (awardId, division): marking again refreshes who and when. */
+  setNoWinner(input: NewNoWinner): Promise<NoWinnerRow>;
+  /** Returns whether there was one. */
+  clearNoWinner(awardId: string, division: string): Promise<boolean>;
 
   resetDay(): Promise<void>;
   resetAll(): Promise<void>;

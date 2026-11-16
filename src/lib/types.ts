@@ -236,6 +236,14 @@ export type WinnerRow = {
   decided_at: string;
 };
 
+/** The Judge Advisor's decision that one award in one division goes to no team. Secret until the ceremony, like a winner. */
+export type NoWinnerRow = {
+  award_id: string;
+  division: string;
+  decided_by: string;
+  decided_at: string;
+};
+
 /**
  * GET /api/awards for the Judge Advisor: every nomination and every winner.
  * A judge's reply is `AwardsJudgeView` and has no `winners` key at all, so
