@@ -9,7 +9,7 @@ import { ScoreRowItem, ScoresBoard, ScoresTab } from "../src/components/admin/Sc
 import { NO_SCORE_FILTERS, withRanks, worstConduct, type ScoreFilters } from "../src/components/admin/scoresLogic";
 import { TeamsBoard } from "../src/components/admin/TeamsTab";
 import { startDraft } from "../src/components/admin/teamsLogic";
-import { TeamSheet } from "../src/components/judge/TeamSheet";
+import { NoteItem, TeamSheet } from "../src/components/judge/TeamSheet";
 import { rankTeams } from "../src/lib/ranking";
 import { rubrics } from "../src/lib/rubrics";
 import type { AppState, FlagRow, ScoreRow, Team, TeamCategoryView } from "../src/lib/types";
@@ -582,6 +582,9 @@ test("the judge console still mounts the same TeamSheet, and the Judge Advisor's
   const judgePage = read("src/app/judge/page.tsx");
   const sheetProps = (src: string) => [...(src.match(/<TeamSheet\s[\s\S]*?\/>/)?.[0] ?? "").matchAll(/^\s+(\w+)=/gm)].map((m) => m[1]).sort();
   assert.deepEqual(sheetProps(page), sheetProps(judgePage), "no admin-only prop, no judge-only chrome");
+  // The one difference is a bare boolean, which the prop scan above cannot see.
+  assert.match(page.match(/<TeamSheet\s[\s\S]*?\/>/)![0], /^\s+canFixNotes$/m, "the Judge Advisor can fix notes");
+  assert.doesNotMatch(judgePage, /canFixNotes/, "a judge never gets Edit and Delete");
   assert.ok(judgePage.includes('import { TeamSheet } from "@/components/judge/TeamSheet"'));
   // The sheet's own file is not forked: it still comes from one place and has no admin branch.
   const sheet = read("src/components/judge/TeamSheet.tsx");
@@ -675,4 +678,22 @@ test("the Scores block: its own prefix, after the import block, tokens only, no 
   assert.match(block, /\.ja-sc-cin:focus-visible \+ \.ja-sc-box \{ outline: 2px solid var\(--accent\)/, "the checkbox shows its focus on the visible box");
   // Chips use the accent for the selected one, as the Teams and Referee chips do.
   assert.match(block, /\.ja-sc-chip\[aria-pressed="true"\] \{[^}]*background: var\(--accent\)/);
+});
+
+/* ---- the Judge Advisor can fix a note; a judge cannot ---- */
+
+test("a note shows Edit and Delete only with canFix, and says when it was edited", () => {
+  const note = { id: "n1", team_id: "t1", request_id: null, panel_id: null, author: "Pim", body: "Great pitch", created_at: "2026-10-20T09:00:00Z" };
+  const item = (n: typeof note & { edited_at?: string; edited_by?: string }, canFix?: boolean) =>
+    renderToStaticMarkup(<ul><NoteItem note={n} canFix={canFix} onEdit={async () => true} onDelete={noop} /></ul>);
+
+  const judge = item(note);
+  assert.doesNotMatch(judge, /Edit|Delete|edited by/);
+  const advisor = item(note, true);
+  assert.match(advisor, /aria-label="Edit note by Pim"/);
+  assert.match(advisor, /aria-label="Delete note by Pim"/);
+
+  const edited = item({ ...note, edited_at: "2026-10-20T09:30:00Z", edited_by: "Judge Advisor" });
+  assert.match(text(edited), /edited by Judge Advisor · /, "a judge sees that it was edited");
+  assert.doesNotMatch(edited, /aria-label="Delete note/);
 });

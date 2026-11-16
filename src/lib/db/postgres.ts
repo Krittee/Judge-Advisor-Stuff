@@ -508,6 +508,12 @@ async function migrate(): Promise<void> {
       alter table flags add column if not exists match_number text;
       alter table flags add column if not exists field text;
 
+      -- The Judge Advisor can correct or delete a note. A delete only sets
+      -- deleted_at, so it can be undone.
+      alter table notes add column if not exists edited_at timestamptz;
+      alter table notes add column if not exists edited_by text;
+      alter table notes add column if not exists deleted_at timestamptz;
+
       -- Which Quick Reference rule(s) a violation flag was against (comma-joined).
       alter table flags add column if not exists rule text;
 
@@ -755,10 +761,10 @@ export const postgresStore: Store = {
     return rows(
       teamId
         ? await query<Note>(
-            "select * from notes where team_id = $1 order by created_at desc limit 400",
+            "select * from notes where team_id = $1 and deleted_at is null order by created_at desc limit 400",
             [teamId],
           )
-        : await query<Note>("select * from notes order by created_at desc limit 400"),
+        : await query<Note>("select * from notes where deleted_at is null order by created_at desc limit 400"),
     );
   },
 
@@ -1217,6 +1223,38 @@ export const postgresStore: Store = {
         [input.teamId, input.requestId, input.panelId, input.author, input.body],
       ),
     )!;
+  },
+
+  async getNote(id) {
+    return one(await query<Note>("select * from notes where id = $1", [id]));
+  },
+
+  async updateNote(id, body, editedBy) {
+    return one(
+      await query<Note>(
+        `update notes set body = $2, edited_at = now(), edited_by = $3
+         where id = $1 and deleted_at is null returning *`,
+        [id, body, editedBy],
+      ),
+    );
+  },
+
+  async deleteNote(id) {
+    return one(
+      await query<Note>(
+        "update notes set deleted_at = now() where id = $1 and deleted_at is null returning *",
+        [id],
+      ),
+    );
+  },
+
+  async restoreNote(id) {
+    return one(
+      await query<Note>(
+        "update notes set deleted_at = null where id = $1 and deleted_at is not null returning *",
+        [id],
+      ),
+    );
   },
 
   async listConflicts() {

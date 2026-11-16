@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ja-edit-notes` branch | Not yet | Local only |
 | 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `259cabb` | Simulator only | Live in 2.1.2 |
 | 2026-11-13 | [Coordinator sign-in: COORDINATOR word clipped](#coordinator-sign-in-coordinator-word-clipped-2026-11-13) | `f4793fb` | Not needed | Live in 2.1.2 |
 | 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Live in 2.1.1 |
@@ -15,6 +16,69 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Judge Advisor can fix or delete a judge's note (2026-11-16)
+
+### Problem / request
+
+Reported on Version 2.1.3. Judges cannot delete or change a note once it is saved, which is intended, but sometimes a note is added by mistake (wrong team, wrong text) and nobody could fix it. Request: keep judges unable to change notes, and let the Judge Advisor correct or delete any judge's note.
+
+Decisions made with the user before building:
+- An edited note keeps its author and time, and shows "edited by <JA> · <time>" to everyone, judges included.
+- The old text is kept in the Activity log, which only the Judge Advisor can read.
+- Delete asks first, and can be undone.
+
+### Root cause
+
+Not a bug: notes were append-only by design. `/api/notes` had only GET and POST, and neither store had a way to update or remove a note.
+
+### What changed
+
+- `src/app/api/notes/route.ts`:
+  - New `PATCH` (`{ id, body }` edits, `{ id, restore: true }` undoes a delete) and `DELETE ?id=` (soft delete).
+  - Only the Judge Advisor role passes (`canAdminister`). Judges and signed-out callers get 403 "Only the Judge Advisor can change or delete a note." An unknown note gets 404, and empty text gets 400.
+  - Each change writes an Activity line naming the JA and the note's author: "edited a note by X" (detail "Was: <old text>"), "deleted a note by X" and "restored a note by X" (detail: the text). GET and POST are unchanged.
+- `src/lib/types.ts`: `Note` gets optional `edited_at`, `edited_by`, `deleted_at`.
+- `src/lib/db/types.ts`, `src/lib/db/file.ts` and `src/lib/db/postgres.ts`:
+  - New `getNote`, `updateNote`, `deleteNote` and `restoreNote`.
+  - `listNotes` skips deleted notes, so judges, the Scores note counts and everything else stop seeing a note once it is deleted.
+  - Postgres gets three `alter table notes add column if not exists` lines (nullable, no default) in the store's own migration, so it is additive and existing notes are untouched. Old file-store rows work without the new fields.
+- `src/components/useTeamRecord.ts`: `editNote`, `deleteNote` and `restoreNote`, plus the list of notes deleted while the sheet is open.
+- `src/components/judge/TeamSheet.tsx`:
+  - New `canFixNotes` prop (set only by `src/app/admin/page.tsx`). Each note gets Edit and Delete.
+  - Edit swaps in a focused text box with Save and Cancel.
+  - Delete asks "Delete this note by X?" through the existing confirm dialog, then shows "Note by X deleted · Undo" in its place until the sheet closes.
+  - The note row is now `NoteItem`.
+- `src/app/globals.css`: small `.jg-nacts`, `.jg-nact`, `.jg-ne` and `.jg-nx` rules using existing tokens only, so they work in light and dark.
+
+### How it was tested
+
+- New `tests/notesFix.runtime.test.ts`: judge PATCH and DELETE get 403, signed-out gets 403, JA edit records the old text in the Activity log, 400 for empty text, 404 for an unknown note, and delete then restore as seen by the JA and a judge.
+- `tests/storeConformance.runtime.ts`: update, delete, restore, and list skipping deleted notes, for both stores.
+- `tests/adminScores.runtime.test.tsx`: Edit and Delete render only with `canFix`; the "edited by" line shows for judges; the judge page never passes `canFixNotes`. `tests/coordinator.runtime.test.ts` now also covers the new PATCH and DELETE handlers.
+- `npm test`: 1745 pass, 0 fail, 1 skipped. The skipped one is the real-Postgres suite: **not run**, because `TEST_DATABASE_URL` was not set. `tsc` and `eslint` are clean.
+- Browser preview on a scratch copy of the data (never `.data/`), signed in as the JA, on desktop width in dark mode and phone width in light mode:
+  - Edit, then Save: the text changed and showed "edited by".
+  - Delete asked first, then showed the Undo line, and the tab count changed to "no notes".
+  - Undo brought the note back.
+  - All three changes appeared in the Activity log with the old text.
+- Against the same server, signed in with a real judge code: PATCH and DELETE gave 403, a signed-out call gave 403, and the judge still read the note with its "edited by" marker.
+- Not checked on a real iPhone, and not yet confirmed by the user.
+
+### Branch / commit
+
+`claude/ja-edit-notes-a9614a`, local commit only.
+
+### Status
+
+Local only: not pushed, not merged, not deployed. The Postgres columns are added on the first start against a database (additive).
+
+### Follow-ups
+
+- There is no screen listing notes deleted in earlier sessions. Undo lasts only while the sheet stays open, after which the text survives in the Activity log and the database row.
+- Run the real-Postgres conformance suite (`TEST_DATABASE_URL`) before release.
 
 ---
 

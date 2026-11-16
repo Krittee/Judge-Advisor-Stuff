@@ -506,7 +506,7 @@ function listRequests(): RequestRow[] {
 
 function listNotes(teamId?: string): Note[] {
   return state().notes
-    .filter((n) => !teamId || n.team_id === teamId)
+    .filter((n) => !n.deleted_at && (!teamId || n.team_id === teamId))
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, 400);
 }
@@ -975,6 +975,36 @@ function createNote(input: NewNote): Note {
     created_at: new Date().toISOString(),
   };
   state().notes.push(note);
+  save();
+  return note;
+}
+
+function getNote(id: string): Note | null {
+  return state().notes.find((n) => n.id === id) ?? null;
+}
+
+function updateNote(id: string, body: string, editedBy: string): Note | null {
+  const note = getNote(id);
+  if (!note || note.deleted_at) return null;
+  note.body = body;
+  note.edited_at = new Date().toISOString();
+  note.edited_by = editedBy;
+  save();
+  return note;
+}
+
+function deleteNote(id: string): Note | null {
+  const note = getNote(id);
+  if (!note || note.deleted_at) return null;
+  note.deleted_at = new Date().toISOString();
+  save();
+  return note;
+}
+
+function restoreNote(id: string): Note | null {
+  const note = getNote(id);
+  if (!note?.deleted_at) return null;
+  note.deleted_at = null;
   save();
   return note;
 }
@@ -1598,6 +1628,10 @@ export const fileStore: Store = {
   generatePanelCode: async () => generatePanelCode(),
 
   createNote: async (input) => createNote(input),
+  getNote: async (id) => getNote(id),
+  updateNote: async (id, body, editedBy) => updateNote(id, body, editedBy),
+  deleteNote: async (id) => deleteNote(id),
+  restoreNote: async (id) => restoreNote(id),
 
   listFlags: async (teamId) => listFlags(teamId),
   createFlag: async (input) => createFlag(input),

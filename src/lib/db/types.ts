@@ -241,6 +241,14 @@ export type Store = {
   generatePanelCode(): Promise<string>;
 
   createNote(input: NewNote): Promise<Note>;
+  /** One note by id, deleted or not: the route needs the old text for the log. */
+  getNote(id: string): Promise<Note | null>;
+  /** Correct a note's text. null if there is no such note, or it is deleted. */
+  updateNote(id: string, body: string, editedBy: string): Promise<Note | null>;
+  /** Soft delete: the note leaves listNotes but can be restored. null if missing or already deleted. */
+  deleteNote(id: string): Promise<Note | null>;
+  /** Undo deleteNote. null if missing or not deleted. */
+  restoreNote(id: string): Promise<Note | null>;
 
   /** Referee observations. Optionally narrowed to one team. */
   listFlags(teamId?: string): Promise<FlagRow[]>;

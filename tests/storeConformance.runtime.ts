@@ -388,6 +388,40 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     );
   });
 
+  it("a note can be edited, soft-deleted and restored; a deleted note is not listed", async (store) => {
+    await store.upsertTeams([teamInput("1001")]);
+    const team = await store.findTeamByNumber("1001");
+    assert.ok(team);
+    const made = await store.createNote({ teamId: team.id, requestId: null, panelId: null, author: "Pim", body: "first" });
+    assert.ok(!made.edited_at && !made.deleted_at, "a new note is untouched");
+
+    const edited = await store.updateNote(made.id, "second", "JA");
+    assert.equal(edited?.body, "second");
+    assert.equal(edited?.edited_by, "JA");
+    assert.ok(edited?.edited_at);
+    assert.equal((await store.listNotes(team.id))[0].body, "second");
+
+    const gone = await store.deleteNote(made.id);
+    assert.ok(gone?.deleted_at);
+    assert.deepEqual(await store.listNotes(team.id), []);
+    assert.deepEqual(await store.listNotes(), []);
+    assert.equal((await store.getNote(made.id))?.body, "second", "getNote still finds it");
+    assert.equal(await store.deleteNote(made.id), null, "already deleted");
+    assert.equal(await store.updateNote(made.id, "third", "JA"), null, "a deleted note is not edited");
+
+    const back = await store.restoreNote(made.id);
+    assert.equal(back?.deleted_at ?? null, null);
+    assert.equal(back?.edited_by, "JA", "the edit survives the round trip");
+    assert.equal((await store.listNotes(team.id)).length, 1);
+    assert.equal(await store.restoreNote(made.id), null, "not deleted any more");
+
+    const ghost = "00000000-0000-4000-8000-000000000000";
+    assert.equal(await store.updateNote(ghost, "x", "JA"), null);
+    assert.equal(await store.deleteNote(ghost), null);
+    assert.equal(await store.restoreNote(ghost), null);
+    assert.equal(await store.getNote(ghost), null);
+  });
+
   it("deleting a panel orphans its teams rather than losing them", async (store) => {
     const panel = await store.createPanel(panelInput());
     await store.upsertTeams([teamInput("1001")]);
