@@ -4,17 +4,17 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `259cabb` | Simulator only | Merged locally, not pushed |
-| 2026-11-13 | [Coordinator sign-in: COORDINATOR word clipped](#coordinator-sign-in-coordinator-word-clipped-2026-11-13) | `f4793fb` | Not needed | Merged locally, not pushed |
-| 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Local, not pushed |
-| 2026-10-31 | [Blended division shows as BLN](#blended-division-shows-as-bln-2026-10-31) | `600a5e8` | Not needed | Local, not pushed |
-| 2026-10-31 | [Judging Board: colour key above Unassigned](#judging-board-colour-key-above-unassigned-2026-10-31) | `4a001a8` | Not needed | Local, not pushed |
-| 2026-10-31 | [Team page: a way back, and no details strip](#team-page-a-way-back-and-no-details-strip-2026-10-31) | `be78288` | Not yet | Local, not pushed |
-| 2026-10-31 | [Head referee can remove a flag](#head-referee-can-remove-a-flag-2026-10-31) | `ebbd0ab` | Not yet | Local, not pushed |
-| 2026-10-31 | [Referee: keyboard hides the team being typed](#referee-keyboard-hides-the-team-being-typed-2026-10-31) | `cf7d3a5` | Skipped | Local, not pushed |
-| 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Local, not pushed |
-| 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Local, not pushed |
-| 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Local, not pushed |
+| 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `259cabb` | Simulator only | Live in 2.1.2 |
+| 2026-11-13 | [Coordinator sign-in: COORDINATOR word clipped](#coordinator-sign-in-coordinator-word-clipped-2026-11-13) | `f4793fb` | Not needed | Live in 2.1.2 |
+| 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Live in 2.1.1 |
+| 2026-10-31 | [Blended division shows as BLN](#blended-division-shows-as-bln-2026-10-31) | `600a5e8` | Not needed | Live in 2.0.1 |
+| 2026-10-31 | [Judging Board: colour key above Unassigned](#judging-board-colour-key-above-unassigned-2026-10-31) | `4a001a8` | Not needed | Live in 2.0.1 |
+| 2026-10-31 | [Team page: a way back, and no details strip](#team-page-a-way-back-and-no-details-strip-2026-10-31) | `be78288` | Not yet | Live in 2.0.1 |
+| 2026-10-31 | [Head referee can remove a flag](#head-referee-can-remove-a-flag-2026-10-31) | `ebbd0ab` | Not yet | Live in 2.0.1 |
+| 2026-10-31 | [Referee: keyboard hides the team being typed](#referee-keyboard-hides-the-team-being-typed-2026-10-31) | `cf7d3a5` | Skipped | Live in 2.0.1 |
+| 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
+| 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
+| 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
 
 ---
 
@@ -50,7 +50,7 @@ It was not the iOS 100vh issue: the shell already uses `100dvh`. Only the Coordi
 
 ### Status
 
-Merged locally into `claude/event-judge-booking-app-kcprxn` on 2026-11-13. NOT pushed or deployed.
+Live in 2.1.2 (PR #16, 2026-11-13).
 
 ### Follow-ups
 
@@ -87,7 +87,7 @@ From 768px up, the band (`.si-band`) is always 240px wide with 28px padding, lea
 
 ### Status
 
-Merged locally into `claude/event-judge-booking-app-kcprxn` on 2026-11-13. Not pushed or deployed.
+Live in 2.1.2 (PR #16, 2026-11-13).
 
 ### Follow-ups
 
@@ -123,7 +123,7 @@ No app code changed. A re-import with a blank notebook cell still keeps the team
 
 ### Status
 
-Committed locally. NOT pushed or deployed. The 32 teams already on the live site keep their stored type.
+Live in 2.1.1 (PR #15, 2026-11-08). The 32 teams already on the live site keep their stored type.
 
 ---
 
@@ -152,7 +152,7 @@ Every short division label already goes through `divisionTag`, so there was no h
 
 ### Status
 
-Committed locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -189,7 +189,7 @@ The Pit floor view and the `.bd-pkey` status line are unchanged.
 
 ### Status
 
-Committed locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -232,7 +232,7 @@ The user chose to drop pit, division and notebook category: they now show nowher
 
 ### Status
 
-Committed locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -253,7 +253,7 @@ The user: "add head ref - remove flag - authorization". Only the Judge Advisor c
 - `src/app/api/flags/route.ts`: DELETE uses `canRemoveFlag`; the 403 now reads "Only the head referee or the Judge Advisor can remove a flag."; doc comments updated. The Activity log entry is unchanged and names whoever removed it.
 - `src/components/Flags.tsx`: `FlagList` takes an optional `onRemove` and shows a red **Remove** next to **Edit**; the two wrap together at the right on a phone.
 - `src/app/referee/page.tsx`: the head referee gets Remove on every flag (Today tab and "Already on <team>"), behind the same confirm the JA gets.
-- `README.md`, `RELEASE-NOTES-2.0-2.2.md`: the permission text and API table now say head referee or JA removes.
+- `README.md`, `RELEASE-NOTES-2.x.md`: the permission text and API table now say head referee or JA removes.
 - `tests/flagsRoute.runtime.test.ts`, `tests/flags.test.mjs`, `tests/flagsRendering.runtime.test.tsx`, `tests/refereePage.source.test.mjs`: new and updated tests.
 
 ### Who can do what now
@@ -286,7 +286,7 @@ The confirm reads "Remove this flag? The judges will stop seeing it." with **Can
 
 ### Status
 
-Committed locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -332,7 +332,7 @@ It works with the earlier `min-h-dvh` body fix (`4415991`): the page still can't
 
 ### Status
 
-Committed locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -381,7 +381,7 @@ This is the root layout, so it covers every page. The judge console and the Judg
 
 ### Status
 
-Committed locally and merged into the main branch locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -448,8 +448,7 @@ to Today and back. Report and All teams are unchanged. No CSS changes.
 
 ### Status
 
-Committed locally and merged into the main branch
-(`claude/event-judge-booking-app-kcprxn`) locally. **Not pushed or deployed.**
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
@@ -501,7 +500,7 @@ The bug itself could not be reproduced on this Mac: Chromium and this Mac's newe
 
 ### Status
 
-Committed locally, and merged into the main branch locally. NOT pushed or deployed.
+Live in 2.0.1 (PRs #10–#13, 2026-10-31).
 
 ### Follow-ups
 
