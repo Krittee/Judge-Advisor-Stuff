@@ -52,7 +52,7 @@ The user chose "each its own colour". Every flag box wears its kind's colour, fr
 
 ### Commit and branch
 
-- Change: on `claude/conduct-green-695821` (this entry is in the same commit).
+- Change: `claude/conduct-green-695821`, commit `fa039dd` (this entry is in the same commit).
 
 ### Status
 
