@@ -266,6 +266,15 @@ export type AwardReleaseRow = ReleaseSnapshot & {
   changed_at: string | null;
 };
 
+export type ReleasedAward = { id: string; label: string; order: number; places: number };
+/** GET /api/awards/released: the award list, the divisions and the sends, never a nomination or a winner. */
+export type ReleasedView = { awards: ReleasedAward[]; divisions: string[]; releases: AwardReleaseRow[] };
+export type ReleaseReply = { release: AwardReleaseRow };
+export type SendAllReply = {
+  sent: AwardReleaseRow[];
+  skipped: { awardId: string; division: string; reason: "not ready" | "already sent" }[];
+};
+
 /**
  * GET /api/awards for the Judge Advisor: every nomination and every winner.
  * A judge's reply is `AwardsJudgeView` and has no `winners` key at all, so

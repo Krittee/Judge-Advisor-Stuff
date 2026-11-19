@@ -18,7 +18,14 @@ import {
   canReadNotes,
   type Session,
 } from "./auth";
-import type { AppState, ViewerCapabilities } from "./types";
+import type { AppState, Panel, Team, ViewerCapabilities } from "./types";
+
+/** Every division the event runs: the configured ones, plus any a panel or team has. */
+export function eventDivisions(panels: Panel[], teams: Team[]): string[] {
+  return [
+    ...new Set([...presetDivisions(), ...panels.map((p) => p.division), ...teams.map((t) => t.division)]),
+  ].filter(Boolean);
+}
 
 /**
  * Server-only. Imports the store, which reaches for node:fs — keep this
@@ -140,13 +147,7 @@ export async function loadState(session: Session | null): Promise<AppState> {
   // than a roster of who was working which desk.
   const includeStaffFields = session !== null && session.role !== "marketing";
 
-  const divisions = [
-    ...new Set([
-      ...presetDivisions(),
-      ...panels.map((p) => p.division),
-      ...teams.map((t) => t.division),
-    ]),
-  ].filter(Boolean);
+  const divisions = eventDivisions(panels, teams);
 
   return {
     panels: visiblePanels.map(stripCode),

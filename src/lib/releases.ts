@@ -1,3 +1,4 @@
+import { compareTeamNumbers } from "./teamNumber";
 import type { AwardReleaseRow, AwardView, NoWinnerRow, ReleaseSnapshot, Team, WinnerRow } from "./types";
 
 /** What the Judge Advisor has decided for one award in one division, or null while it is still open. */
@@ -15,7 +16,7 @@ export function decisionFor(
   return {
     teams: holders
       .map((t) => ({ id: t.id, number: t.number, name: t.name }))
-      .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true })),
+      .sort((a, b) => compareTeamNumbers(a.number, b.number)),
     no_winner: false,
   };
 }
