@@ -166,11 +166,20 @@ test("touch targets: doors 64px or more, the board link 56px, the back link 44px
   assert.match(css, /\.lp-back \{[^}]*min-height: 44px/);
 });
 
-test("layout: tiles go 3 + 2 on a phone and one row of five from 1024px; doors one column then 3 x 2", () => {
+test("layout: tiles go 3 + 2 on a phone and one row of five from 1024px; doors one column then 4 + 3 centred", () => {
   assert.match(bare, /\.dp-sg \{[^}]*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/);
   assert.match(bare, /\.dp-tl:nth-child\(n\+4\) \{ grid-column: span 3; \}/);
   const wide = bare.slice(bare.indexOf("@media (min-width: 1024px)"));
   assert.match(wide, /\.dp-sg \{[^}]*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
-  assert.match(wide, /\.dp-doors \{ display: grid; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); gap: 36px 16px;/);
+  // Eight half-columns: each door spans two, and the fifth starts at column 2 so doors 5-7 sit centred under 1-4.
+  assert.match(wide, /\.dp-doors \{ display: grid; grid-template-columns: repeat\(8, minmax\(0, 1fr\)\); gap: 36px 16px;/);
+  assert.match(wide, /\.dp-cell \{[^}]*grid-column: span 2;/);
+  assert.match(wide, /\.dp-cell:nth-child\(5\) \{ grid-column: 2 \/ span 2; \}/);
+  assert.match(wide, /\.dp-card \{[^}]*min-height: 224px/);
   assert.match(bare, /\.dp-doors \{ display: flex; flex-direction: column;/);
+});
+
+test("the Marketing placeholder is a dashed 1.5px outline like the sign-in pass's, with no ring fill", () => {
+  assert.match(bare, /\.dp-av--ph \{[^}]*padding: 0; background: none; box-sizing: border-box; border: 1\.5px dashed var\(--rc\);/);
+  assert.match(bare, /\.dp-av--ph \{[^}]*--rc: var\(--si-desk\)/);
 });

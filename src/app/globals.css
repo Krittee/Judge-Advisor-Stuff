@@ -1198,6 +1198,8 @@ body:has(.landing) > .theme-toggle { top: 0; }
 .dp-av { --s: 48px; display: block; flex: none; width: var(--s); height: var(--s); padding: 2px; border-radius: 25%; background: var(--rc); }
 .dp-av img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 22%; }
 .dp-av--team { padding: 0; background: none; }
+/* A door with no art yet (Marketing): the sign-in pass's dashed outline, no ring fill. */
+.dp-av--ph { --rc: var(--si-desk); padding: 0; background: none; box-sizing: border-box; border: 1.5px dashed var(--rc); }
 .dp-r-judge { --rc: var(--accent); }
 .dp-r-desk { --rc: var(--si-desk); }
 /* The Coordinator wears the queue desk's teal (its sign-in pass does too) until it has a colour of its own. */
@@ -1244,10 +1246,12 @@ body:has(.landing) > .theme-toggle { top: 0; }
   .dp-head { margin: 0 0 28px; text-align: center; }
   .dp-title { font-size: 40px; }
   .dp-intro { margin-top: 8px; font-size: 17px; }
-  /* 3 x 2; the row gap leaves room for the Team door's caption under its card. */
-  .dp-doors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px 16px; }
-  .dp-cell { min-width: 0; }
-  .dp-card { height: 100%; min-height: 220px; flex-direction: column; align-items: center; gap: 0; padding: 22px 16px 16px; text-align: center; }
+  /* 4 + 3: eight half-columns, each door spans two, and the fifth starts at column 2 so the second row sits centred.
+     The row gap leaves room for the Team door's caption under its card. */
+  .dp-doors { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 36px 16px; }
+  .dp-cell { min-width: 0; grid-column: span 2; }
+  .dp-cell:nth-child(5) { grid-column: 2 / span 2; }
+  .dp-card { height: 100%; min-height: 224px; flex-direction: column; align-items: center; gap: 0; padding: 22px 16px 16px; text-align: center; }
   .dp-av { --s: 72px; }
   .dp-rt { flex: 1 0 auto; margin-top: 16px; }
   .dp-dt { font-size: 19px; }
