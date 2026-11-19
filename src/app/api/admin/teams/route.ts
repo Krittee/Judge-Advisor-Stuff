@@ -7,6 +7,7 @@ import { normalizePit } from "@/lib/pit";
 import { store, StoreError } from "@/lib/db";
 import { isPanelBlocked, loadBlocks } from "@/lib/conflicts";
 import type { Team } from "@/lib/types";
+import { teamLockMessage } from "../../awards/shared";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,14 @@ export async function POST(request: Request) {
   try {
     // Counted against what is stored now, before the write. `teams` holds
     // one row per number, so a number pasted twice is one team, not two.
-    const known = new Set((await store().listTeams()).map((t) => t.number));
+    const stored = await store().listTeams();
+    const known = new Set(stored.map((t) => t.number));
+    // A line naming another division for a team in a sent award would move it; a blank one leaves it alone.
+    for (const line of teams) {
+      const old = stored.find((t) => t.number === line.number);
+      const locked = old && line.division && line.division !== old.division ? await teamLockMessage(old.id) : null;
+      if (locked) return NextResponse.json({ error: locked }, { status: 409 });
+    }
     await store().upsertTeams(teams);
     const assigned = autoAssign ? await store().autoAssignTeams(perPanel) : 0;
     const updated = teams.filter((t) => known.has(t.number)).length;
@@ -194,6 +202,9 @@ export async function PATCH(request: Request) {
     if ("division" in body) {
       const moved = resolveDivision(body.division);
       patch.division = moved;
+      const current = (await store().listTeams()).find((t) => t.id === teamId);
+      const locked = current && current.division !== moved ? await teamLockMessage(teamId) : null;
+      if (locked) return NextResponse.json({ error: locked }, { status: 409 });
       // Changing division normally puts the team on the far side of the
       // wall from whichever panel held it, so the assignment goes. Not if
       // the panel may still judge them: moving a team to Blended must not
@@ -253,6 +264,9 @@ export async function DELETE(request: Request) {
 
   const teamId = new URL(request.url).searchParams.get("teamId");
   if (!teamId) return NextResponse.json({ error: "teamId required." }, { status: 400 });
+
+  const locked = await teamLockMessage(teamId);
+  if (locked) return NextResponse.json({ error: locked }, { status: 409 });
 
   const team = (await store().listTeams()).find((t) => t.id === teamId);
   await store().deleteTeam(teamId);

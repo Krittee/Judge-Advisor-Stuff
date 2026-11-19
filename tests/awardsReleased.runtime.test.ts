@@ -75,7 +75,7 @@ type Handlers = Record<string, (request: Request) => Promise<Response>>;
 
 async function hit(
   load: () => Promise<unknown>,
-  method: "GET" | "POST" | "PUT" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
   session: Session | null,
   path: string,
   body?: unknown,
@@ -341,5 +341,97 @@ test("/api/state carries no releases, whoever asks", async () => {
     assert.equal(state.status, 200, who);
     for (const key of Object.keys(state.body)) assert.ok(!/release/i.test(key), `${who}: ${key}`);
     assert.doesNotMatch(JSON.stringify(state.body), /released|sent_by|sent_at/i, who);
+  }
+});
+
+/* ===== the lock =========================================================== */
+
+const LOCKED = "Recall it from Marketing first.";
+const winnersRoute = () => import("../src/app/api/awards/winners/route");
+const noWinnerRoute = () => import("../src/app/api/awards/no-winner/route");
+const teamsRoute = () => import("../src/app/api/admin/teams/route");
+const winners = (method: "PUT" | "DELETE", body: unknown) => hit(winnersRoute, method, ADMIN, "/api/awards/winners", body);
+const noWinner = (method: "PUT" | "DELETE", body: unknown) => hit(noWinnerRoute, method, ADMIN, "/api/awards/no-winner", body);
+const teamsApi = (method: "POST" | "PATCH" | "DELETE", body: unknown, path = "/api/admin/teams") =>
+  hit(teamsRoute, method, ADMIN, path, body);
+
+test("while sent, winners and no-winner writes are 409 and change nothing; another division is free; after recall it is editable", async () => {
+  const w = await world();
+  await win(w, "excellence", w.hawks);
+  await w.db.setNoWinner({ awardId: "design", division: ES, decidedBy: "Alex" });
+  await send(ADMIN, "excellence", ES);
+  await send(ADMIN, "design", ES);
+  const before = JSON.stringify([await w.db.listWinners(), await w.db.listNoWinners()]);
+  const logged = (await w.db.listActivity()).length;
+
+  const exc = { awardId: "excellence", division: ES };
+  for (const reply of [
+    await winners("PUT", { ...exc, teamId: w.bolts.id }),
+    await winners("PUT", { ...exc, teamId: w.hawks.id }),
+    await winners("DELETE", exc),
+    await noWinner("PUT", exc),
+    await noWinner("DELETE", { awardId: "design", division: ES }),
+    await noWinner("PUT", { awardId: "design", division: ES }),
+  ]) {
+    assert.deepEqual([reply.status, reply.body.error], [409, LOCKED]);
+  }
+  assert.equal(JSON.stringify([await w.db.listWinners(), await w.db.listNoWinners()]), before);
+  assert.equal((await w.db.listActivity()).length, logged);
+
+  // The same award in another division is not locked.
+  assert.equal((await noWinner("PUT", { awardId: "excellence", division: MS })).status, 200);
+  assert.equal((await noWinner("DELETE", { awardId: "excellence", division: MS })).status, 200);
+
+  await recall(ADMIN, "excellence", ES);
+  await w.db.nominateAsAdmin({ awardId: "excellence", teamId: w.bolts.id, judge: "Alex" });
+  assert.equal((await winners("PUT", { ...exc, teamId: w.bolts.id })).status, 200);
+  assert.equal((await winners("DELETE", exc)).status, 200);
+  assert.equal((await noWinner("PUT", exc)).status, 200);
+  assert.equal((await noWinner("DELETE", exc)).status, 200);
+});
+
+test("a team in a sent snapshot cannot be deleted or moved; a rename or pit change works; after recall it can be deleted", async () => {
+  const w = await world();
+  await win(w, "design", w.hawks);
+  await send(ADMIN, "design", ES);
+  const blocked = "Recall Design from Marketing first.";
+  const stays = async () => assert.ok((await w.db.listTeams()).some((t) => t.id === w.hawks.id && t.division === ES));
+
+  const del = await teamsApi("DELETE", undefined, `/api/admin/teams?teamId=${w.hawks.id}`);
+  assert.deepEqual([del.status, del.body.error], [409, blocked]);
+  await stays();
+
+  const move = await teamsApi("PATCH", { teamId: w.hawks.id, division: MS });
+  assert.deepEqual([move.status, move.body.error], [409, blocked]);
+  await stays();
+
+  const paste = await teamsApi("POST", { text: `9882K, Hawks, , ${MS}` });
+  assert.deepEqual([paste.status, paste.body.error], [409, blocked]);
+  await stays();
+
+  // Not locked: the same division, a rename, a pit change, a paste that leaves the division alone or names it again.
+  assert.equal((await teamsApi("PATCH", { teamId: w.hawks.id, division: ES })).status, 200);
+  assert.equal((await teamsApi("PATCH", { teamId: w.hawks.id, name: "Falcons", pit: "12" })).status, 200);
+  assert.equal((await teamsApi("POST", { text: "9882K, Hawks 2, 14" })).status, 200);
+  assert.equal((await teamsApi("POST", { text: `9882K, Hawks 3, 14, ${ES}` })).status, 200);
+  // Another team moving in the same paste is not what is locked, but the paste is refused whole.
+  const mixed = await teamsApi("POST", { text: `7700B, Bolts, , ${MS}\n9882K, Hawks, , ${MS}` });
+  assert.equal(mixed.status, 409);
+  assert.equal((await w.db.listTeams()).find((t) => t.id === w.bolts.id)?.division, ES);
+  await stays();
+
+  await recall(ADMIN, "design", ES);
+  assert.equal((await teamsApi("DELETE", undefined, `/api/admin/teams?teamId=${w.hawks.id}`)).status, 200);
+  assert.ok(!(await w.db.listTeams()).some((t) => t.id === w.hawks.id));
+});
+
+test("reset the day and wipe everything clear releases", async () => {
+  for (const action of ["resetDay", "resetAll"]) {
+    const w = await world();
+    await win(w, "excellence", w.hawks);
+    await send(ADMIN, "excellence", ES);
+    assert.equal((await w.db.listReleases()).length, 1);
+    assert.equal((await teamsApi("PATCH", { action })).status, 200, action);
+    assert.deepEqual(await w.db.listReleases(), [], action);
   }
 });

@@ -4,7 +4,7 @@ import { canAdminister, getSession } from "@/lib/auth";
 import { goodConductTeams, SPORTSMANSHIP } from "@/lib/awards";
 import { store, StoreError } from "@/lib/db";
 import { awards } from "@/lib/presets";
-import { awardLabel, fields } from "../shared";
+import { awardLabel, fields, refuseIfSent } from "../shared";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +37,8 @@ export async function PUT(request: Request) {
   if (!award) {
     return NextResponse.json({ error: "That award does not exist." }, { status: 400 });
   }
+  const locked = await refuseIfSent(awardId, division);
+  if (locked) return locked;
 
   const db = store();
   const teams = await db.listTeams();
@@ -108,6 +110,8 @@ export async function DELETE(request: Request) {
   if (!awardId || !division) {
     return NextResponse.json({ error: "An award and a division are required." }, { status: 400 });
   }
+  const locked = await refuseIfSent(awardId, division);
+  if (locked) return locked;
 
   const db = store();
   const teamId = String(body.teamId ?? "");

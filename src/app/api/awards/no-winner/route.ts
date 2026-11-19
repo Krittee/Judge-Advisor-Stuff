@@ -3,7 +3,7 @@ import { actorParts } from "@/lib/activity";
 import { canAdminister, getSession } from "@/lib/auth";
 import { store } from "@/lib/db";
 import { awards } from "@/lib/presets";
-import { awardLabel, fields } from "../shared";
+import { awardLabel, fields, refuseIfSent } from "../shared";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +29,8 @@ export async function PUT(request: Request) {
   if (!awards().some((a) => a.id === awardId)) {
     return NextResponse.json({ error: "That award does not exist." }, { status: 400 });
   }
+  const locked = await refuseIfSent(awardId, division);
+  if (locked) return locked;
 
   const db = store();
   // Every team holding it: the Judges Award can have two.
@@ -64,6 +66,8 @@ export async function DELETE(request: Request) {
   if (!awardId || !division) {
     return NextResponse.json({ error: "An award and a division are required." }, { status: 400 });
   }
+  const locked = await refuseIfSent(awardId, division);
+  if (locked) return locked;
 
   const db = store();
   const removed = await db.clearNoWinner(awardId, division);
