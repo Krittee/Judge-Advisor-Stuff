@@ -13,6 +13,8 @@ import type {
   Team,
   WinnerRow,
   NoWinnerRow,
+  AwardReleaseRow,
+  ReleaseSnapshot,
 } from "../types";
 
 /** Thrown for rule violations we want to show the user verbatim. */
@@ -164,6 +166,15 @@ export type NewNoWinner = {
   awardId: string;
   division: string;
   decidedBy: string;
+};
+
+export type SendRelease = {
+  awardId: string;
+  division: string;
+  snapshot: ReleaseSnapshot;
+  previous: ReleaseSnapshot | null;
+  changedAt: string | null;
+  sentBy: string;
 };
 
 export type NewActivity = {
@@ -330,6 +341,12 @@ export type Store = {
   setNoWinner(input: NewNoWinner): Promise<NoWinnerRow>;
   /** Returns whether there was one. */
   clearNoWinner(awardId: string, division: string): Promise<boolean>;
+  /** Awards the Awards Desk has sent, oldest send first. */
+  listReleases(): Promise<AwardReleaseRow[]>;
+  /** One row per (awardId, division): sending again overwrites it as `sent`, stamped now. */
+  sendRelease(input: SendRelease): Promise<AwardReleaseRow>;
+  /** Sets status `recalled`, keeping the snapshot. Null if that award was never sent. */
+  recallRelease(awardId: string, division: string): Promise<AwardReleaseRow | null>;
 
   resetDay(): Promise<void>;
   resetAll(): Promise<void>;

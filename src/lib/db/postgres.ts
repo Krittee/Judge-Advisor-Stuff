@@ -12,6 +12,7 @@ import type {
   Team,
   WinnerRow,
   NoWinnerRow,
+  AwardReleaseRow,
 } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { randomPanelCode } from "../panelCode";
@@ -35,6 +36,7 @@ import {
   type NewRequest,
   type NewWinner,
   type NewNoWinner,
+  type SendRelease,
   type NominationKey,
   type SaveScore,
   type Store,
@@ -399,6 +401,21 @@ async function migrate(): Promise<void> {
       primary key (award_id, division)
     );
 
+    -- What the Awards Desk has sent: one row per award per division. The
+    -- snapshot is jsonb, so there is no team to cascade from.
+    create table if not exists award_releases (
+      award_id   text not null,
+      division   text not null,
+      teams      jsonb not null default '[]'::jsonb,
+      no_winner  boolean not null default false,
+      previous   jsonb,
+      status     text not null check (status in ('sent', 'recalled')),
+      sent_at    timestamptz not null default now(),
+      sent_by    text not null,
+      changed_at timestamptz,
+      primary key (award_id, division)
+    );
+
     create table if not exists activity (
       id         uuid primary key default gen_random_uuid(),
       request_id uuid references requests(id) on delete cascade,
@@ -483,6 +500,7 @@ async function migrate(): Promise<void> {
     alter table nominations enable row level security;
     alter table award_winners enable row level security;
     alter table award_no_winner enable row level security;
+    alter table award_releases enable row level security;
     alter table activity  enable row level security;
     alter table referee_setup enable row level security;
   `);
@@ -1718,6 +1736,46 @@ export const postgresStore: Store = {
     return gone.length > 0;
   },
 
+  async listReleases() {
+    return rows(await query<AwardReleaseRow>("select * from award_releases order by sent_at, award_id, division"));
+  },
+
+  async sendRelease(input: SendRelease) {
+    return one(
+      await query<AwardReleaseRow>(
+        `insert into award_releases (award_id, division, teams, no_winner, previous, status, sent_by, changed_at)
+         values ($1, $2, $3::jsonb, $4, $5::jsonb, 'sent', $6, $7)
+         on conflict (award_id, division) do update set
+           teams = excluded.teams,
+           no_winner = excluded.no_winner,
+           previous = excluded.previous,
+           status = 'sent',
+           sent_at = now(),
+           sent_by = excluded.sent_by,
+           changed_at = excluded.changed_at
+         returning *`,
+        [
+          input.awardId,
+          input.division,
+          JSON.stringify(input.snapshot.teams),
+          input.snapshot.no_winner,
+          input.previous ? JSON.stringify(input.previous) : null,
+          input.sentBy,
+          input.changedAt,
+        ],
+      ),
+    )!;
+  },
+
+  async recallRelease(awardId, division) {
+    return one(
+      await query<AwardReleaseRow>(
+        "update award_releases set status = 'recalled' where award_id = $1 and division = $2 returning *",
+        [awardId, division],
+      ),
+    );
+  },
+
   async logActivity(entry: NewActivity) {
     // The log is a convenience, not a record of account. Never let a
     // failed audit write break the thing the user actually asked for.
@@ -1743,7 +1801,7 @@ export const postgresStore: Store = {
   async resetDay() {
     // Referee flags intentionally survive a day reset: repeat history is
     // event-wide, including at multi-day events. So does the referee setup.
-    await query("truncate activity, notes, scores, nominations, award_winners, award_no_winner, requests");
+    await query("truncate activity, notes, scores, nominations, award_winners, award_no_winner, award_releases, requests");
   },
 
   async resetAll() {
@@ -1751,9 +1809,9 @@ export const postgresStore: Store = {
     // boundary and must be used before importing the next event's roster.
     // The referee setup is the event's too, so it goes with them.
     // cascade also takes nominations and award_winners: both reference teams.
-    // award_no_winner has no team, so it is named.
+    // award_no_winner and award_releases have no team, so they are named.
     await query(
-      "truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup, award_no_winner cascade",
+      "truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup, award_no_winner, award_releases cascade",
     );
   },
 };

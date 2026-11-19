@@ -1507,6 +1507,38 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     assert.deepEqual(await store.listNoWinners(), []);
   });
 
+  it("an award release round-trips, one row per (award, division); recall keeps the teams; resets clear releases", async (store) => {
+    const a = { id: "11111111-1111-4111-8111-111111111111", number: "1001", name: "Team 1001" };
+    const prev = { teams: [{ id: "22222222-2222-4222-8222-222222222222", number: "1002", name: "Team 1002" }], no_winner: false };
+    const sent = await store.sendRelease({
+      awardId: "design", division: ES, snapshot: { teams: [a], no_winner: false },
+      previous: prev, changedAt: "2026-11-19T09:30:00.000Z", sentBy: "Alex",
+    });
+    assert.equal(sent.status, "sent");
+    const [got] = await store.listReleases();
+    assert.deepEqual([got.award_id, got.division, got.teams, got.no_winner, got.status, got.sent_by], ["design", ES, [a], false, "sent", "Alex"]);
+    assert.deepEqual(got.previous, prev);
+    assert.equal(new Date(got.changed_at!).toISOString(), "2026-11-19T09:30:00.000Z");
+    assert.ok(got.sent_at);
+
+    await store.sendRelease({ awardId: "design", division: ES, snapshot: { teams: [], no_winner: true }, previous: null, changedAt: null, sentBy: "Sam" });
+    const all = await store.listReleases();
+    assert.equal(all.length, 1, "sending again on the same key is one row");
+    assert.deepEqual([all[0].teams, all[0].no_winner, all[0].previous, all[0].changed_at, all[0].sent_by], [[], true, null, null, "Sam"]);
+
+    await store.sendRelease({ awardId: "design", division: MS, snapshot: { teams: [a], no_winner: false }, previous: null, changedAt: null, sentBy: "Alex" });
+    const recalled = await store.recallRelease("design", MS);
+    assert.deepEqual([recalled?.status, recalled?.teams], ["recalled", [a]]);
+    assert.equal((await store.listReleases()).find((r) => r.division === MS)?.status, "recalled");
+    assert.equal(await store.recallRelease("create", ES), null, "no such release");
+
+    await store.resetDay();
+    assert.deepEqual(await store.listReleases(), []);
+    await store.sendRelease({ awardId: "design", division: ES, snapshot: { teams: [a], no_winner: false }, previous: null, changedAt: null, sentBy: "Alex" });
+    await store.resetAll();
+    assert.deepEqual(await store.listReleases(), []);
+  });
+
   it("deleting a team takes its nominations and wins with it, and no other team's", async (store) => {
     const panel = await store.createPanel(panelInput());
     await store.upsertTeams([teamInput("1001"), teamInput("1002")]);

@@ -251,6 +251,21 @@ export type NoWinnerRow = {
   decided_at: string;
 };
 
+export type ReleaseTeam = { id: string; number: string; name: string };
+/** What was announced for one award in one division: the winning teams, or "no winner". */
+export type ReleaseSnapshot = { teams: ReleaseTeam[]; no_winner: boolean };
+export type ReleaseStatus = "sent" | "recalled";
+/** The Awards Desk's send of one award in one division. `previous` is the decision it replaced, when it was recalled and changed. */
+export type AwardReleaseRow = ReleaseSnapshot & {
+  award_id: string;
+  division: string;
+  previous: ReleaseSnapshot | null;
+  status: ReleaseStatus;
+  sent_at: string;
+  sent_by: string;
+  changed_at: string | null;
+};
+
 /**
  * GET /api/awards for the Judge Advisor: every nomination and every winner.
  * A judge's reply is `AwardsJudgeView` and has no `winners` key at all, so

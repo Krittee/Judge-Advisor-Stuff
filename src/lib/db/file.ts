@@ -22,6 +22,7 @@ import type {
   Team,
   WinnerRow,
   NoWinnerRow,
+  AwardReleaseRow,
 } from "../types";
 import type { Status } from "../status";
 import { readActivity, type StoredActivity } from "../activity";
@@ -53,6 +54,7 @@ import {
   type NewNomination,
   type NewWinner,
   type NewNoWinner,
+  type SendRelease,
   type NominationKey,
   type FlagEdit,
   type NewRefereeSetup,
@@ -95,6 +97,8 @@ type Data = {
   winners: WinnerRow[];
   /** Awards the Judge Advisor marked "No winner", per division. */
   noWinners: NoWinnerRow[];
+  /** What the Awards Desk has sent, per (award, division). */
+  awardReleases: AwardReleaseRow[];
   conflicts: ConflictRow[];
   /** The judge roster, in the order judges were added. */
   judges: JudgeRow[];
@@ -174,6 +178,7 @@ function empty(): Data {
     nominations: [],
     winners: [],
     noWinners: [],
+    awardReleases: [],
     conflicts: [],
     judges: [],
     flags: [],
@@ -261,6 +266,7 @@ function migrate(data: Data): Data {
   for (const n of data.nominations) n.role ??= "judge";
   data.winners ??= [];
   data.noWinners ??= [];
+  data.awardReleases ??= [];
   data.conflicts ??= [];
   data.judges ??= [];
   data.flags ??= [];
@@ -1417,6 +1423,38 @@ function clearNoWinner(awardId: string, division: string): boolean {
   return removed;
 }
 
+function listReleases(): AwardReleaseRow[] {
+  return state().awardReleases.map((r) => ({ ...r }));
+}
+
+/** One row per (award, division); sending again overwrites it. */
+function sendRelease(input: SendRelease): AwardReleaseRow {
+  const row: AwardReleaseRow = {
+    award_id: input.awardId,
+    division: input.division,
+    teams: input.snapshot.teams.map((t) => ({ ...t })),
+    no_winner: input.snapshot.no_winner,
+    previous: input.previous && { teams: input.previous.teams.map((t) => ({ ...t })), no_winner: input.previous.no_winner },
+    status: "sent",
+    sent_at: new Date().toISOString(),
+    sent_by: input.sentBy,
+    changed_at: input.changedAt,
+  };
+  const at = state().awardReleases.findIndex((r) => r.award_id === row.award_id && r.division === row.division);
+  if (at >= 0) state().awardReleases[at] = row;
+  else state().awardReleases.push(row);
+  save();
+  return { ...row };
+}
+
+function recallRelease(awardId: string, division: string): AwardReleaseRow | null {
+  const row = state().awardReleases.find((r) => r.award_id === awardId && r.division === division);
+  if (!row) return null;
+  row.status = "recalled";
+  save();
+  return { ...row };
+}
+
 function logActivity(entry: NewActivity): void {
   state().activity.push({
     id: randomUUID(),
@@ -1448,6 +1486,7 @@ function resetDay(): void {
   state().nominations = [];
   state().winners = [];
   state().noWinners = [];
+  state().awardReleases = [];
   state().activity = [];
   save();
 }
@@ -1622,6 +1661,7 @@ function demoData(): Data {
     nominations: [],
     winners: [],
     noWinners: [],
+    awardReleases: [],
     conflicts: [],
     judges,
     flags: [],
@@ -1711,6 +1751,9 @@ export const fileStore: Store = {
   listNoWinners: async () => listNoWinners(),
   setNoWinner: async (input) => setNoWinner(input),
   clearNoWinner: async (awardId, division) => clearNoWinner(awardId, division),
+  listReleases: async () => listReleases(),
+  sendRelease: async (input) => sendRelease(input),
+  recallRelease: async (awardId, division) => recallRelease(awardId, division),
 
   resetDay: async () => resetDay(),
   resetAll: async () => resetAll(),
