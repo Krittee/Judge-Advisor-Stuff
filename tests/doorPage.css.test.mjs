@@ -179,7 +179,7 @@ test("layout: tiles go 3 + 2 on a phone and one row of five from 1024px; doors o
   assert.match(bare, /\.dp-doors \{ display: flex; flex-direction: column;/);
 });
 
-test("the Marketing placeholder is a dashed 1.5px outline like the sign-in pass's, with no ring fill", () => {
-  assert.match(bare, /\.dp-av--ph \{[^}]*padding: 0; background: none; box-sizing: border-box; border: 1\.5px dashed var\(--rc\);/);
-  assert.match(bare, /\.dp-av--ph \{[^}]*--rc: var\(--si-desk\)/);
+test("the Marketing placeholder is a dashed 1.5px outline in the neutral line-strong, with no ring fill", () => {
+  assert.match(bare, /\.dp-av--ph \{[^}]*padding: 0; background: none; box-sizing: border-box; border: 1\.5px dashed var\(--line-strong\);/);
+  assert.doesNotMatch(bare.match(/\.dp-av--ph \{[^}]*\}/)[0], /--rc|--si-desk/, "neutral: a teal outline would read as the Queue desk");
 });
