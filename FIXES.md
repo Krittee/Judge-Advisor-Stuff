@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-11-19 | [Awards Desk backend (2.2.0)](#awards-desk-backend-220-2026-11-19) | `d5b1807`..`f9cc675` | Not needed (no UI yet) | Built on `claude/awards-desk-backend-921f59`, UI pending |
 | 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
 | 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ef84422` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
 | 2026-11-16 | [Judges Award can have two winners](#judges-award-can-have-two-winners-2026-11-16) | `c04c9b3` | Not needed | Live in 2.1.4 (PR #18, 2026-11-16) |
@@ -19,6 +20,48 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Awards Desk backend (2.2.0) (2026-11-19)
+
+### Problem / request
+
+At the last event marketing waited for the Judge Advisor to finish every award and send one late list, which delayed the ceremony backdrop. 2.2.0 adds a read-only Marketing role whose Awards Desk shows only the awards the JA has sent. This entry covers the server side only; the pages come in a separate UI session.
+
+### Root cause
+
+Not a bug: there was no way to hand a finished award to marketing without also exposing every undecided pick.
+
+### What changed
+
+Spec `docs/superpowers/specs/2026-11-19-awards-desk-design.md`, plan `docs/superpowers/plans/2026-11-19-awards-desk-backend.md`.
+
+- Role: `marketing`, signed in with `MARKETING_CODE` (dev default `MKTG01`, refused in production like every published code; listed in `scripts/doctor.mjs` and `.env.example`). Name optional. Every `can*` helper and every existing route refuses it. `/api/state` now nulls staff names for marketing, as it does for the public.
+- Storage (both stores): `award_releases`, one row per award per division, with a snapshot of the teams sent (id, number, name), `no_winner`, `previous`, `status` sent/recalled, `sent_at`, `sent_by`, `changed_at`. Postgres: `create table if not exists`, RLS on; both resets name it. Old state files load with `awardReleases` = `[]`.
+- API: `/api/awards/released` — GET for marketing and the JA (`no-store`; a recalled row is emptied for marketing), PUT sends one award (409 unless every place is filled or No winner), POST sends every ready award not already sent, DELETE recalls. Sends and recalls go to Activity (`award`). Send rules in `src/lib/releases.ts`.
+- Lock: while sent, winners and No winner PUT/DELETE answer 409 "Recall it from Marketing first."; deleting a team in a sent award, or moving it to another division (edit or paste), answers 409 "Recall <award> from Marketing first."
+- Reset the day and Wipe everything both clear the sends.
+- One placeholder outside the server: `src/components/SignInForm.tsx` has a `marketing` entry (coordinator avatar) so the role map compiles; the UI session must route marketing to the Awards Desk and give it its own avatar.
+
+### How it was tested
+
+- `npm test` with `DATA_FILE` on a scratch copy of `.data/state.json`: 1801 tests, 1800 pass, 1 skipped (real-Postgres suite, run separately below). `tsc` and eslint (`--ignore-pattern '.claude/**'`) clean.
+- Real Postgres on the Neon test project: `tests/storePostgres.runtime.test.ts` 66/66 pass, release conformance included.
+- New tests: `tests/marketing.runtime.test.ts`, `tests/releases.test.ts`, `tests/releasesMigration.runtime.test.ts`, `tests/awardsReleased.runtime.test.ts`; additions to `tests/storeConformance.runtime.ts` and `tests/postgres-sql.test.mjs`.
+
+### Branch / commits
+
+`claude/awards-desk-backend-921f59`: `d5b1807` (role), `305852a` (store), `ac72726` (routes), `f9cc675` (lock), plus this entry.
+
+### Status
+
+Built and committed locally. Not pushed. Waiting on the UI session.
+
+### Follow-ups
+
+- UI: `/marketing` and `/marketing/login`, the JA's Send / Recall / Send all ready controls, and the sign-in routing for marketing.
+- The lock is check-then-write (a `ponytail:` note in `src/app/api/awards/shared.ts`); a send landing in between could slip one change through.
 
 ---
 
