@@ -921,6 +921,10 @@ test("notReadyLines: what is missing, one line per award of the division that is
   assert.ok(lines.includes("Judges isn't ready: only one winner."));
   assert.ok(!lines.some((l) => l.startsWith("Amaze")), "a sent award is not missing anything");
   assert.equal(lines.length, awards.length - 1, "every other award is waiting for a winner");
+  // A recalled award that is not decided again is left out of Send all too, so it is listed; a sent one is not.
+  const recalled = notReadyLines(awards, MS, [], [], [release("energy", null, { status: "recalled" }), release("think", breakers)]);
+  assert.ok(recalled.includes("Energy isn't ready: no winner yet."), "recalled and undecided");
+  assert.ok(!recalled.some((l) => l.startsWith("Think")), "sent");
   assert.deepEqual(notReadyLines(awards, MS, [], awards.map((a) => ({ award_id: a.id, division: MS })), []), [], "all marked No winner");
 });
 

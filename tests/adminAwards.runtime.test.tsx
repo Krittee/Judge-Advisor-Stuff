@@ -896,10 +896,11 @@ test("By award: a sent award shows Sent with its time, a Recall button and the l
   assert.match(button(energy, "Clear No winner on Energy"), /disabled=""[^>]*title="Recall it from Marketing first\."/);
 });
 
-test("By award: a recalled award shows Recalled with its time, Send again, and what Marketing had", () => {
+test("By award: a recalled award shows Recalled (no time), Send again, and what Marketing had", () => {
   const recalled = release("amaze", sparkPlugs, { status: "recalled", sent_at: at(10, 51) });
   const a = award(board({ view: "award", released: view(recalled) }), "Amaze");
-  assert.match(a, /<span class="ja-aw-cst">Recalled 10:51<\/span>/);
+  assert.match(a, /<span class="ja-aw-cst">Recalled<\/span>/, "no time: the server records none for a recall");
+  assert.doesNotMatch(a, /Recalled \d/);
   assert.match(a, /<button type="button" class="ja-aw-snd"[^>]*>Send again<svg/);
   assert.doesNotMatch(button(a, "Send Amaze to Marketing again"), /disabled/, "decided, so Send again is on");
   assert.match(a, /<p class="ja-aw-cwarn">[\s\S]*?<\/svg><span>Marketing had <b>4455F Spark Plugs<\/b><\/span><\/p>/);

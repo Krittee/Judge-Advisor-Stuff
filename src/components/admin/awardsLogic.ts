@@ -608,11 +608,11 @@ export function sendAllLines(
 /** What a header says in place of Send while an award is not decided: the Judges Award, once one of its two is picked, asks for the other. */
 export const pickText = (award: Pick<AwardView, "places">, held: number): string => (award.places > 1 && held > 0 ? "Pick both winners to send" : "Pick a winner to send");
 
-/** The awards of one division that cannot go yet, and why: "Energy isn't ready: no winner yet." */
+/** The awards of one division that cannot go yet (not decided, and not sent; a recalled one counts), and why: "Energy isn't ready: no winner yet." */
 export function notReadyLines(awards: AwardView[], division: string, winners: WinnerRow[], noWinners: Marks, releases: AwardReleaseRow[]): string[] {
   const decided = winnersOf(winners, division);
   return awards
-    .filter((a) => sendState(a, division, winners, noWinners, releases) === "not-ready")
+    .filter((a) => !isReady(a, division, winners, noWinners) && releaseOf(releases, a.id, division)?.status !== "sent")
     .map((a) => {
       const n = decided.get(a.id)?.length ?? 0;
       return `${a.label} isn't ready: ${n === 0 ? "no winner yet" : n === 1 ? "only one winner" : `only ${n} winners`}.`;

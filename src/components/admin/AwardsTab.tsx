@@ -714,7 +714,7 @@ export function AwardLists({
                 {locked ? <Locked /> : null}
               </h2>
               {state === "recalled" && row ? (
-                <span className="ja-aw-cst">Recalled {hhmm(row.sent_at)}</span>
+                <span className="ja-aw-cst">Recalled</span>
               ) : (
                 <span className={decided ? "ja-aw-cst ja-aw-ok" : "ja-aw-cst"}>{status}</span>
               )}
