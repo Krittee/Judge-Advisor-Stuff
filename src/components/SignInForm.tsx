@@ -24,6 +24,8 @@ const ROLES: Record<Role, { label: string; avatar: string; tone: string }> = {
   admin: { label: "Judge Advisor", avatar: "/avatars/judge-advisor.jpg", tone: "r-ja" },
   referee: { label: "Referee", avatar: "/avatars/referee.jpg", tone: "r-ref" },
   coordinator: { label: "Coordinator", avatar: "/avatars/coordinator.jpg", tone: "r-desk" },
+  // Placeholder until the Awards Desk page and a marketing avatar exist: keeps Record<Role, ...> compiling.
+  marketing: { label: "Marketing", avatar: "/avatars/coordinator.jpg", tone: "r-desk" },
 };
 const CREW: Role[] = ["judge", "queuer", "admin", "coordinator"];
 

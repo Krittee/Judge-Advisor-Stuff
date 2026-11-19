@@ -328,7 +328,7 @@ export type AppState = {
 };
 
 export type ViewerCapabilities = {
-  role: "team" | "queuer" | "judge" | "referee" | "admin" | "coordinator";
+  role: "team" | "queuer" | "judge" | "referee" | "admin" | "coordinator" | "marketing";
   name: string | null;
   /** Set for a judge: the only panel they may act on. */
   panelId: string | null;

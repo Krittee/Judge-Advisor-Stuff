@@ -37,6 +37,9 @@ import type { AppState, ViewerCapabilities } from "./types";
  *   referee everything the board shows, minus those notes — a referee
  *           files flags; nothing about their job involves what a team
  *           wrote to its judges
+ *   marketing
+ *           exactly what a team gets: signed in, but not staff, so no
+ *           staff names either.
  *   team    the same, and without the staff names on each request
  *           (who created, acknowledged or interviewed it, and the
  *           outcome) — the big board never shows them
@@ -135,7 +138,7 @@ export async function loadState(session: Session | null): Promise<AppState> {
   // out, is staff metadata. The board and team pages show none of it, so
   // an anonymous caller (anyone on the venue wifi) gets it nulled rather
   // than a roster of who was working which desk.
-  const includeStaffFields = session !== null;
+  const includeStaffFields = session !== null && session.role !== "marketing";
 
   const divisions = [
     ...new Set([
