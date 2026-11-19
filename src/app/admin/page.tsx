@@ -134,6 +134,7 @@ export default function AdminPage() {
             <AwardsTab
               state={state}
               data={awards.data}
+              released={awards.released}
               error={awards.error}
               reload={awards.reload}
               division={division}

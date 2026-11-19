@@ -4,7 +4,7 @@ import { goodConductTeams, GOOD_CONDUCT, GOOD_CONDUCT_MIN, SPORTSMANSHIP } from 
 import { matchReference } from "@/lib/match";
 import { judgeKey } from "@/lib/roster";
 import type { Rubric } from "@/lib/rubrics";
-import type { AwardView, FlagRow, NominationRow, NoWinnerRow, PublicPanel, Team, WinnerRow } from "@/lib/types";
+import type { AwardReleaseRow, AwardView, FlagRow, NominationRow, NoWinnerRow, PublicPanel, ReleaseSnapshot, SendAllReply, Team, WinnerRow } from "@/lib/types";
 import { teamCount } from "./floorLogic";
 import { compareLines, type RankedRow } from "./scoresLogic";
 import type { Call } from "./teamsLogic";
@@ -546,3 +546,89 @@ export async function clearNoWinnerAfterAsking(ask: Ask, call: Call, pick: { awa
   await call("/api/awards/no-winner", { method: "DELETE", body: { awardId: award.id, division } });
   return true;
 }
+
+/* ---- sending to Marketing ----------------------------------------------------------------- */
+
+/** Where an award stands with Marketing. `sent` wins over `ready`; a `recalled` one is being updated, whether or not it is decided again. */
+export type SendState = "sent" | "recalled" | "ready" | "not-ready";
+
+/** Decided and so sendable: all of an award's winners picked, or "No winner". The same test the "decided" counts use. */
+export function isReady(award: Pick<AwardView, "id" | "places">, division: string, winners: WinnerRow[], noWinners: Marks): boolean {
+  return isFull(award, winnersOf(winners, division).get(award.id)) || noWinnersOf(noWinners, division).has(award.id);
+}
+
+/** What was sent for one award in one division, or null when it never was. */
+export const releaseOf = (releases: AwardReleaseRow[], awardId: string, division: string): AwardReleaseRow | null =>
+  releases.find((r) => r.award_id === awardId && r.division === division) ?? null;
+
+export function sendState(award: Pick<AwardView, "id" | "places">, division: string, winners: WinnerRow[], noWinners: Marks, releases: AwardReleaseRow[]): SendState {
+  const sent = releaseOf(releases, award.id, division);
+  if (sent) return sent.status;
+  return isReady(award, division, winners, noWinners) ? "ready" : "not-ready";
+}
+
+/** What "Send all ready" will send: every award of every division that is decided and not sent (a recalled one is back in). Its length is the button's number. */
+export function readyToSend(awards: AwardView[], divisions: string[], winners: WinnerRow[], noWinners: Marks, releases: AwardReleaseRow[]): { award: AwardView; division: string }[] {
+  return divisions.flatMap((division) =>
+    awards.filter((award) => isReady(award, division, winners, noWinners) && releaseOf(releases, award.id, division)?.status !== "sent").map((award) => ({ award, division })),
+  );
+}
+
+/** How many of the config's awards one division has sent: "· N sent to Marketing". */
+export const sentCountIn = (releases: AwardReleaseRow[], awards: Pick<AwardView, "id">[], division: string): number =>
+  releases.filter((r) => r.status === "sent" && r.division === division && awards.some((a) => a.id === r.award_id)).length;
+
+/** "4455F Spark Plugs", "1234A Gear Grinders, 60601D Iron Owls" or "No winner". */
+export const snapshotLine = (s: ReleaseSnapshot): string => (s.no_winner || !s.teams.length ? "No winner" : s.teams.map((t) => `${t.number} ${t.name}`).join(", "));
+
+/**
+ * One line of the Send all dialog per award. `was` is what Marketing had when the award was sent before and the decision has since changed
+ * (the caution sub-line); null for one never sent, or sent and decided the same again.
+ */
+export function sendAllLines(
+  items: { award: Pick<AwardView, "id" | "label">; division: string }[],
+  winners: WinnerRow[],
+  noWinners: Marks,
+  teams: Pick<Team, "id" | "number" | "name">[],
+  releases: AwardReleaseRow[],
+): { key: string; text: string; was: string | null }[] {
+  return items.map(({ award, division }) => {
+    const held = winnersOf(winners, division).get(award.id) ?? [];
+    const named = held.flatMap((w) => teams.filter((t) => t.id === w.team_id));
+    const sent = releaseOf(releases, award.id, division);
+    const same = (r: AwardReleaseRow) => r.no_winner === !held.length && [...r.teams.map((t) => t.id)].sort().join() === held.map((w) => w.team_id).sort().join();
+    return {
+      key: `${award.id}|${division}`,
+      text: `${award.label} · ${division} · ${named.length ? named.map((t) => `${t.number} ${t.name}`).join(", ") : "No winner"}`,
+      was: sent && !same(sent) ? snapshotLine(sent) : null,
+    };
+  });
+}
+
+/** What a header says in place of Send while an award is not decided: the Judges Award, once one of its two is picked, asks for the other. */
+export const pickText = (award: Pick<AwardView, "places">, held: number): string => (award.places > 1 && held > 0 ? "Pick both winners to send" : "Pick a winner to send");
+
+/** The awards of one division that cannot go yet, and why: "Energy isn't ready: no winner yet." */
+export function notReadyLines(awards: AwardView[], division: string, winners: WinnerRow[], noWinners: Marks, releases: AwardReleaseRow[]): string[] {
+  const decided = winnersOf(winners, division);
+  return awards
+    .filter((a) => sendState(a, division, winners, noWinners, releases) === "not-ready")
+    .map((a) => {
+      const n = decided.get(a.id)?.length ?? 0;
+      return `${a.label} isn't ready: ${n === 0 ? "no winner yet" : n === 1 ? "only one winner" : `only ${n} winners`}.`;
+    });
+}
+
+/** The banner after Send all: one line per award the server skipped that the dialog had listed (an award it was never asked to send is not news). Null when none. */
+export function skippedText(skipped: SendAllReply["skipped"], asked: Set<string>, awards: Pick<AwardView, "id" | "label">[]): string | null {
+  const lines = skipped
+    .filter((s) => asked.has(`${s.awardId}|${s.division}`))
+    .map((s) => `${awards.find((a) => a.id === s.awardId)?.label ?? s.awardId} · ${s.division} was not sent: it changed while you were sending. Check it and send again.`);
+  return lines.length ? lines.join("\n") : null;
+}
+
+/** The Recall dialog: what Marketing will see in the meantime. */
+export const recallQuestion = (label: string, division: string): { question: string; body: string } => ({
+  question: `Recall ${label} from Marketing?`,
+  body: `Marketing will see ${label} · ${division} as "Being updated" until you send it again. You can then change the winner.`,
+});

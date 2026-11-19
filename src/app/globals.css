@@ -4054,7 +4054,7 @@ body:has(.admin) > .theme-toggle:hover {
    Colour is signal: green is a winner or a decided award, amber is a team that already holds another award or has a referee caution, accent is chrome (buttons,
    the chosen chip and toggle, the selected cell); a nomination is an ink dot with no hue, except the green one referees' Good conduct alone makes for
    Sportsmanship. Tints are color-mix in srgb. No motion at all. */
-.ja-aw-h, .ja-aw-chip, .ja-aw-seg button, .ja-aw-tm b, .ja-aw-aph h2, .ja-aw-nr b, .ja-aw-dr h2, .ja-aw-oth p b, .ja-aw-prim {
+.ja-aw-h, .ja-aw-chip, .ja-aw-seg button, .ja-aw-tm b, .ja-aw-aph h2, .ja-aw-nr b, .ja-aw-dr h2, .ja-aw-oth p b, .ja-aw-prim, .ja-aw-sall, .ja-aw-snd {
   font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
 .ja-aw { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
@@ -4087,6 +4087,16 @@ body:has(.admin) > .theme-toggle:hover {
 /* The board and, beside it from 1024px, the side panel */
 .ja-aw-cols { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
 .ja-aw-view { min-width: 0; }
+
+/* Marketing: Send all ready sits with the view toggle (full width, under it, on a phone) */
+.ja-aw-fr { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
+.ja-aw-fr .ja-aw-seg { margin-left: 0; }
+.ja-aw-sall {
+  display: inline-flex; width: 100%; height: 52px; flex: none; align-items: center; justify-content: center; gap: 7px; padding: 0 14px; border-radius: 12px;
+  background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 17px; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.ja-aw-sall:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, var(--ink)); }
+.ja-aw-sall:disabled { opacity: 0.5; }
 
 /* The matrix: the box scrolls, the page does not. The team column stays; borders sit on the cells so they travel with it. */
 .ja-aw-mxw { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
@@ -4132,9 +4142,10 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-aw-aps { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 12px; }
 .ja-aw-ap { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .ja-aw-ap.ja-aw-dec { border-color: color-mix(in srgb, var(--done) 55%, transparent); }
-.ja-aw-aph { display: flex; min-height: 48px; align-items: center; gap: 10px; padding: 8px 14px; }
-.ja-aw-aph h2 { flex: 1; min-width: 0; font-weight: 700; font-size: 16px; line-height: 1.2; }
-.ja-aw-cst { flex: none; color: var(--ink-subtle); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
+/* The title, its state under it, and (once the sends are known) the Send controls on the right across both rows */
+.ja-aw-aph { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; row-gap: 1px; min-height: 64px; align-content: center; align-items: center; padding: 8px 8px 8px 14px; }
+.ja-aw-aph h2 { display: flex; grid-column: 1; min-width: 0; align-items: center; gap: 7px; font-weight: 700; font-size: 16px; line-height: 1.2; white-space: nowrap; }
+.ja-aw-cst { grid-column: 1; color: var(--ink-subtle); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
 .ja-aw-cst.ja-aw-ok { color: var(--done-quiet); }
 .ja-aw-cnone { margin: 0; padding: 12px 14px; border-top: 1px solid var(--line); color: var(--ink-subtle); font-size: 13.5px; }
 .ja-aw-ap li { border-top: 1px solid var(--line); }
@@ -4157,6 +4168,40 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-aw-add .ja-in, .ja-aw-dr .ja-selw .ja-in { height: 44px; }
 .ja-aw-nw { display: flex; justify-content: flex-end; padding: 0 4px; border-top: 1px solid var(--line); }
 .ja-aw-nw .ja-aw-lnk { white-space: nowrap; }
+
+/* A sent award's lock, by its title (and over its matrix column), and where the award stands with Marketing on the right of its header.
+   Green is sent, caution is "Marketing had …", accent is the button; not ready is plain grey words. */
+.ja-aw-lk { display: inline-flex; color: var(--ink-subtle); }
+.ja-aw-lk svg { width: 14px; height: 14px; }
+.ja-aw-hr { display: flex; grid-column: 2; grid-row: 1 / span 2; align-items: center; gap: 2px; }
+.ja-aw-snd {
+  display: inline-flex; height: 44px; flex: none; align-items: center; justify-content: center; gap: 6px; padding: 0 14px; border: 1.5px solid var(--accent); border-radius: 10px;
+  background: transparent; color: var(--accent); font-weight: 600; font-size: 14px; white-space: nowrap;
+}
+.ja-aw-snd:hover:not(:disabled) { background: var(--ja-accent-t); }
+.ja-aw-snd:disabled { opacity: 0.5; }
+.ja-aw-sent {
+  display: inline-flex; height: 32px; flex: none; align-items: center; gap: 5px; padding: 0 10px 0 8px; border: 1px solid color-mix(in srgb, var(--done) 55%, transparent); border-radius: 999px;
+  background: color-mix(in srgb, var(--done) 14%, transparent); color: var(--done-quiet); font-weight: 500; font-size: 13.5px; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.ja-aw-rcl { min-width: 60px; min-height: 44px; flex: none; padding: 0 6px; background: transparent; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
+.ja-aw-rcl:hover:not(:disabled) { color: var(--ink); }
+.ja-aw-rcl:disabled { opacity: 0.5; }
+.ja-aw-nsend { max-width: 130px; margin-right: 6px; color: var(--ink-subtle); font-size: 12.5px; line-height: 1.3; text-align: right; }
+.ja-aw-cwarn {
+  display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 14px; border-top: 1px solid color-mix(in srgb, var(--caution) 40%, transparent);
+  background: color-mix(in srgb, var(--caution) 13%, transparent); color: var(--caution-quiet); font-size: 13px; line-height: 1.35;
+}
+.ja-aw-cwarn svg { flex: none; }
+.ja-aw-cwarn b { font-weight: 500; }
+
+/* The Send all ready dialog's body (the confirm dialog's own box holds it): a list, a caution under what changes, and what is left out */
+.ja-aw-sl { margin: 12px 0 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--jg-field); list-style: none; }
+.ja-aw-sl li { display: flex; flex-direction: column; gap: 3px; padding: 10px 14px; font-size: 14.5px; line-height: 1.35; }
+.ja-aw-sl li + li { border-top: 1px solid var(--line); }
+.ja-aw-cw { display: flex; align-items: flex-start; gap: 6px; color: var(--caution-quiet); font-size: 12.5px; }
+.ja-aw-cw svg { flex: none; margin-top: 2px; }
+.ja-aw-dnote { margin: 12px 0 0; padding: 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.4; list-style: none; }
 
 /* The side panel: the same in both views */
 .ja-aw-dr { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
@@ -4196,6 +4241,11 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-aw-lnk:hover:not(:disabled) { color: var(--ink); }
 .ja-aw-lnk:disabled { opacity: 0.5; }
 
+/* Why a sent award's winner cannot change, under the disabled controls */
+.ja-aw-lockn { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--jg-field); color: var(--ink-subtle); font-size: 13.5px; line-height: 1.4; }
+.ja-aw-lockn svg { flex: none; margin-top: 2px; }
+.ja-aw-lockn b { display: block; color: var(--ink); font-weight: 500; }
+
 /* On a phone the panel is the bottom sheet's body, under a grab handle and a Close at its corner */
 .ja-aw-sheet .ja-aw-dr { flex: auto; min-height: 0; padding: 16px 20px max(20px, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; border: 0; border-radius: 0; background: transparent; }
 .ja-aw-sheet .ja-aw-eyebrow { padding-right: 48px; }
@@ -4212,12 +4262,17 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-aw-fbar { flex-flow: row wrap; align-items: center; gap: 10px 28px; }
   .ja-aw-fg { flex-direction: row; align-items: center; gap: 10px; }
   .ja-aw-chip { height: 40px; }
-  .ja-aw-seg { margin-left: auto; }
+  .ja-aw-fr { flex-direction: row; align-items: center; margin-left: auto; }
+  .ja-aw-sall { width: auto; height: 40px; border-radius: 10px; font-size: 14px; }
   .ja-aw-seg button { flex: none; height: 38px; }
 
   .ja-aw-cols { flex-direction: row; align-items: flex-start; gap: 20px; }
   .ja-aw-view { flex: 1; }
   .ja-aw-aps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ja-aw-aph { min-height: 58px; }
+  .ja-aw-snd { height: 34px; padding: 0 12px; font-size: 13.5px; }
+  .ja-aw-sent { height: 28px; font-size: 13px; }
+  .ja-aw-rcl { min-width: 48px; min-height: 34px; font-size: 13.5px; }
   .ja-aw-dr { position: sticky; top: 12px; flex: none; width: 340px; max-height: calc(100dvh - 80px); overflow-y: auto; }
 
   /* A mouse has no swipe: from here the box keeps a thin scrollbar for the narrow windows where it scrolls at all */

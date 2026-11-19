@@ -9,9 +9,9 @@ import { ALL_PANELS, buildAwardPanels, buildMatrix, detailFor, hiddenNote, nomin
 import { withRanks } from "../src/components/admin/scoresLogic";
 import { rankTeams } from "../src/lib/ranking";
 import { rubrics } from "../src/lib/rubrics";
-import type { AppState, AwardsAdminView, FlagRow } from "../src/lib/types";
+import type { AppState, AwardsAdminView, FlagRow, ReleasedView } from "../src/lib/types";
 import {
-  adminNom, awards, byteMe, divisions, gearGrinders, labRats, MS, nominations, panels, quiet, teams, torque, winners, HS,
+  adminNom, at, awards, breakers, byteMe, divisions, gearGrinders, hexAppeal, labRats, MS, nominations, panels, quiet, release, team, teams, torque, win, winners, HS,
 } from "./adminAwards.fixtures";
 
 /* The Judge Advisor Awards board, rendered to markup. Behaviour that needs a
@@ -64,10 +64,11 @@ const conductFlags = [
 ];
 const excellence7700B: Sel = { awardId: "excellence", teamId: byteMe.id };
 
-function board(over: { data?: AwardsAdminView; division?: string; panelId?: string; view?: View; sel?: Sel | null; wide?: boolean; busy?: boolean; rows?: typeof rows; flags?: FlagRow[] } = {}) {
+function board(over: { released?: ReleasedView | null; data?: AwardsAdminView; division?: string; panelId?: string; view?: View; sel?: Sel | null; wide?: boolean; busy?: boolean; rows?: typeof rows; flags?: FlagRow[] } = {}) {
   return renderToStaticMarkup(
     <AwardsBoard
       data={over.data ?? data}
+      released={over.released}
       state={over.flags ? { ...state, flags: over.flags } : state}
       rows={over.rows ?? rows}
       rubricList={rubricList}
@@ -707,7 +708,7 @@ test("replacing or clearing a winner asks through useConfirm; there is no window
   assert.ok(tab.includes("clearAfterAsking(ask, call, { award: d.award, team: d.team })"));
   assert.ok(!tab.includes("window.confirm") && !/(^|[^\w.])confirm\(/m.test(tab.replace(/\/\*[\s\S]*?\*\//g, "")));
   // The writes are the two routes the API already has, and only through the logic.
-  assert.ok(!tab.replace(/\/\*[\s\S]*?\*\//g, "").includes("/api/awards"), "the markup sends nothing; awardsLogic does");
+  assert.ok(!tab.replace(/\/\*[\s\S]*?\*\//g, "").replaceAll("/api/awards/released", "").includes("/api/awards"), "the markup sends nothing; awardsLogic does (but for the Marketing sends)");
   const logic = read("src/components/admin/awardsLogic.ts");
   assert.ok(logic.includes('"/api/awards/winners", { method: "PUT"') && logic.includes('"/api/awards/winners", { method: "DELETE"'));
   assert.match(logic, /await ask\(giveQuestion\(award, team, current\), \{ confirmLabel: "Replace winner" \}\)/);
@@ -755,7 +756,7 @@ test("the page fetches the awards for every section once signed in, gives the ra
   assert.ok(page.includes("useAwards({ enabled: Boolean(session) })"));
   assert.match(page, /\.\.\.\(awards\.data\?\.awards\.length \? \{ awards: decidedText\(awards\.data\.winners, awards\.data\.awards, division, awards\.data\.noWinners\) \} : \{\}\)/);
   assert.ok(page.includes("pickDivision(awardDivision, state.divisions, awards.data?.nominations ?? [], state.teams)"));
-  assert.match(page, /tab === "awards" \? \(\s*<AwardsTab\s+state=\{state\}\s+data=\{awards\.data\}\s+error=\{awards\.error\}\s+reload=\{awards\.reload\}\s+division=\{division\}\s+onDivision=\{setAwardDivision\}\s+onError=\{setError\}/);
+  assert.match(page, /tab === "awards" \? \(\s*<AwardsTab\s+state=\{state\}\s+data=\{awards\.data\}\s+released=\{awards\.released\}\s+error=\{awards\.error\}\s+reload=\{awards\.reload\}\s+division=\{division\}\s+onDivision=\{setAwardDivision\}\s+onError=\{setError\}/);
   assert.match(page, /tab === "awards" \|\| tab === "scores"/, "Awards fills the width the rail leaves");
   const hook = read("src/components/admin/useAwards.ts");
   assert.ok(hook.includes('"/api/awards", { method: "GET" }') && hook.includes("15_000"));
@@ -844,4 +845,166 @@ test("the award names, short names and the hidden-column words come from the con
     }
   }
   assert.match(hiddenNote([{ label: "Whatever" }], null), /^Whatever has no nominations yet/);
+});
+
+/* ---- sending to Marketing ------------------------------------------------------------------------------------- */
+
+const sparkPlugs = team("4455F", "Spark Plugs", { panel_id: "p2" });
+const view = (...releases: ReleasedView["releases"]): ReleasedView => ({ awards: [], divisions, releases });
+const lockLabel = 'aria-label="Locked: sent to Marketing"';
+/** One award's section of the By award list. */
+const award = (markup: string, name: string) => sections(markup).find((s) => s.name === `${name} Award`)!.body;
+/** The opening tag of the button with this aria-label. */
+const button = (markup: string, label: string) => markup.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`))?.[0] ?? "";
+const sentAmaze = release("amaze", gearGrinders, { sent_at: at(10, 58) });
+const judgeOne: AwardsAdminView = { ...data, winners: [...winners, win("judges", hexAppeal)] };
+
+test("By award: a decided award offers Send to Marketing; one that is not says what it needs and has no button", () => {
+  const m = board({ view: "award", released: view() });
+  assert.match(award(m, "Amaze"), /<button type="button" class="ja-aw-snd"[^>]*>Send to Marketing<svg/);
+  assert.doesNotMatch(award(m, "Amaze"), /Recall|Sent \d/);
+  assert.match(award(m, "Energy"), /Pick a winner to send/);
+  assert.doesNotMatch(award(m, "Energy"), /ja-aw-snd/, "no button on an award with no winner");
+  assert.match(award(board({ view: "award", released: view(), data: judgeOne }), "Judges"), /Pick both winners to send/);
+  assert.match(award(m, "Judges"), /Pick a winner to send/, "with none picked the Judges Award asks for a winner");
+  assert.doesNotMatch(award(board({ view: "award", released: view(), data: judgeOne }), "Judges"), /ja-aw-snd/);
+});
+
+test("without the sends (not loaded yet) the board draws no Marketing control at all", () => {
+  const m = board({ view: "award" });
+  assert.doesNotMatch(m, /Marketing|ja-aw-snd|Send all/);
+  assert.match(m, /<p class="ja-aw-meta">Middle School · all panels · <b>3 of 11<\/b> decided · 18 nominations for 9 teams<\/p>/);
+});
+
+test("By award: a sent award shows Sent with its time, a Recall button and the lock, and its No winner control is off with the reason", () => {
+  const m = board({ view: "award", released: view(sentAmaze) });
+  const a = award(m, "Amaze");
+  assert.match(a, /<span class="ja-aw-sent">[\s\S]*?<\/svg>Sent 10:58<\/span>/);
+  assert.match(a, /<button type="button" class="ja-aw-rcl"[^>]*>Recall<\/button>/);
+  assert.ok(a.includes(`<span class="ja-aw-lk" role="img" ${lockLabel}>`), "the lock sits by the title, labelled");
+  assert.doesNotMatch(a, /ja-aw-snd/);
+  const mark = button(a, "Mark no winner for Amaze");
+  assert.match(mark, /disabled=""/);
+  assert.match(mark, /title="Recall it from Marketing first\."/);
+  // Other awards are untouched, and the nominee rows still open the panel.
+  assert.ok(!award(m, "Design").includes("Locked"));
+  assert.doesNotMatch(button(award(m, "Design"), "Mark no winner for Design"), /disabled/);
+  assert.doesNotMatch(button(a, "[^\"]*Amaze, winner"), /disabled/);
+  // A sent No winner locks its Clear the same way.
+  const none = { ...data, noWinners: [{ award_id: "energy", division: MS, decided_by: "Alex Morgan", decided_at: "2026-10-20T15:00:00Z" }] };
+  const energy = award(board({ view: "award", data: none, released: view(release("energy", null)) }), "Energy");
+  assert.match(button(energy, "Clear No winner on Energy"), /disabled=""[^>]*title="Recall it from Marketing first\."/);
+});
+
+test("By award: a recalled award shows Recalled with its time, Send again, and what Marketing had", () => {
+  const recalled = release("amaze", sparkPlugs, { status: "recalled", sent_at: at(10, 51) });
+  const a = award(board({ view: "award", released: view(recalled) }), "Amaze");
+  assert.match(a, /<span class="ja-aw-cst">Recalled 10:51<\/span>/);
+  assert.match(a, /<button type="button" class="ja-aw-snd"[^>]*>Send again<svg/);
+  assert.doesNotMatch(button(a, "Send Amaze to Marketing again"), /disabled/, "decided, so Send again is on");
+  assert.match(a, /<p class="ja-aw-cwarn">[\s\S]*?<\/svg><span>Marketing had <b>4455F Spark Plugs<\/b><\/span><\/p>/);
+  assert.doesNotMatch(a, /Locked/, "a recalled award is not locked");
+  // Recalled and then undecided: Send again is off, and a "No winner" snapshot reads as that.
+  const energy = award(board({ view: "award", released: view(release("energy", null, { status: "recalled" })) }), "Energy");
+  assert.match(button(energy, "Send Energy to Marketing again"), /disabled=""/);
+  assert.match(energy, /Marketing had <b>No winner<\/b>/);
+});
+
+test("the header counts what this division has sent, and Send all ready counts what every division could send; at nothing it is off", () => {
+  const m = board({ released: view(sentAmaze, release("think", breakers, { division: HS })) });
+  assert.match(m, /<p class="ja-aw-meta">[^<]*<b>3 of 11<\/b> decided · 18 nominations for 9 teams · 1 sent to Marketing<\/p>/);
+  assert.match(m, /<button type="button" class="ja-aw-sall"[^>]*>Send all ready \(2\)<svg/);
+  assert.doesNotMatch(button(m, "Send all ready"), /disabled/);
+  // Design and Think (and Amaze, here, since it is not sent) are ready; with all three sent there is nothing.
+  const all = board({ released: view(sentAmaze, release("design", labRats), release("think", breakers)) });
+  assert.match(all, /Send all ready \(0\)/);
+  assert.match(all, /<button[^>]*class="ja-aw-sall"[^>]*disabled=""[^>]*title="Nothing is ready to send"|<button[^>]*title="Nothing is ready to send"[^>]*disabled=""/);
+  assert.match(all, /· 3 sent to Marketing<\/p>/);
+  // A division's chip keeps its decided count; the rail's count is not the sent count.
+  assert.match(m, /3\/11/);
+});
+
+test("the matrix: a sent award's column header carries the lock after its tick", () => {
+  const m = board({ released: view(sentAmaze) });
+  assert.equal(m.split(lockLabel).length - 1, 1, "one sent award, one lock");
+  const head = m.match(/<th scope="col"[^>]*><abbr[^>]*>Amz<\/abbr><span class="ja-aw-hk">([\s\S]*?)<\/span><\/th>/)![1];
+  assert.ok(head.indexOf('aria-label="decided"') < head.indexOf(lockLabel), "the tick, then the lock");
+  assert.equal(board({ released: view() }).includes("Locked"), false);
+});
+
+test("the side panel on a sent award: Clear winner and Give are off, the lock note says why and when, and Remove stays on", () => {
+  const released = view(release("design", labRats, { sent_at: at(10, 31) }));
+  const held = aside(board({ released, sel: { awardId: "design", teamId: labRats.id } }));
+  assert.match(held, /<button type="button" class="ja-aw-lnk" disabled=""[^>]*>Clear winner<\/button>/);
+  assert.match(text(held), /Recall it from Marketing first\. Sent to Marketing at 10:31\./);
+  assert.match(held, /<p class="ja-aw-lockn"[^>]*><svg/);
+  const give = aside(board({ released, sel: { awardId: "design", teamId: byteMe.id } }));
+  assert.match(give, /<button type="button" class="ja-aw-prim" disabled=""[^>]*>Give Design to 7700B<\/button>/);
+  assert.doesNotMatch(give, /You can change it until the ceremony/, "it cannot be changed while sent");
+  assert.match(text(give), /Recall it from Marketing first\. Sent to Marketing at 10:31\./);
+  // Nominations are not part of the sent decision: Remove is not locked.
+  const remove = held.match(/<button[^>]*>Remove<\/button>/g);
+  assert.ok(remove?.length, "a Remove link is there");
+  assert.ok(remove.every((r) => !r.includes("disabled")));
+  // Not sent: neither the note nor a disabled button.
+  const free = aside(board({ released: view(), sel: { awardId: "design", teamId: labRats.id } }));
+  assert.doesNotMatch(free, /lockn|Recall it from/);
+  assert.doesNotMatch(free, /Clear winner<\/button>[\s\S]*disabled/);
+  assert.match(free, /<button type="button" class="ja-aw-lnk">Clear winner<\/button>/);
+});
+
+test("NomineePanel takes the time it was sent, and is unlocked without one", () => {
+  const d = detailFor({ awardId: "design", teamId: labRats.id }, { awards, nominations, winners, teams, panels })!;
+  const props = { detail: d, row: undefined, rubricList, flags: [], flagKinds, titleId: "t", busy: false, onGive: noop, onClear: noop, onNominate: noop, onRemove: noop };
+  assert.match(renderToStaticMarkup(NomineePanel({ ...props, sentAt: at(9, 5) })), /Sent to Marketing at 09:05\./);
+  assert.doesNotMatch(renderToStaticMarkup(NomineePanel({ ...props })), /Marketing/);
+});
+
+test("the buttons hand the award to the board: Send, Recall and Send all", () => {
+  const calls: string[] = [];
+  const lists = buildAwardPanels(awards, nominationsIn(nominations, teams, MS), winnersOf(winners, MS), teams.filter((t) => t.division === MS), panels);
+  const states = new Map(awards.map((a) => [a.id, a.id === "amaze" ? "sent" as const : a.id === "design" ? "ready" as const : "not-ready" as const]));
+  const send = { states, releases: [sentAmaze], held: winnersOf(winners, MS), division: MS, busy: false, onSend: (id: string) => calls.push(`send ${id}`), onRecall: (id: string) => calls.push(`recall ${id}`) };
+  const els = walk(AwardLists({ lists, sel: null, onSelect: noop, send }));
+  click(els.find((e) => e.props["aria-label"] === "Send Design to Marketing")!);
+  click(els.find((e) => e.props["aria-label"] === "Recall Amaze from Marketing")!);
+  assert.deepEqual(calls, ["send design", "recall amaze"]);
+  // Busy turns every one off, like every other write.
+  const busy = walk(AwardLists({ lists, sel: null, onSelect: noop, send: { ...send, busy: true } })).filter((e) => /^(Send|Recall) /.test(String(e.props["aria-label"] ?? "")));
+  assert.equal(busy.length, 2);
+  assert.ok(busy.every((e) => e.props.disabled === true));
+});
+
+test("send and recall go through write(): the release routes are called only inside write jobs, and Send all reports what was skipped after the reload", () => {
+  const code = tab.replace(/\/\*[\s\S]*?\*\//g, "");
+  const uses = [...code.matchAll(/\/api\/awards\/released/g)].map((m) => m.index!);
+  assert.equal(uses.length, 3, "send (PUT), recall (DELETE) and send all (POST)");
+  const guard = code.indexOf("const write = async");
+  for (const use of uses) {
+    const from = code.lastIndexOf("write(", use);
+    assert.ok(from > guard && use - from < 900, "inside a write() job, not in the markup");
+  }
+  assert.match(code, /method: "PUT", body: \{ awardId, division \}/);
+  assert.match(code, /method: "DELETE", body: \{ awardId, division \}/);
+  assert.match(code, /method: "POST"/);
+  assert.match(code, /await ask\(question, \{ body, confirmLabel: "Recall", danger: true \}\)/);
+  assert.match(code, /await write\([\s\S]*?\);\s*if \(skipped\.text\) onError\(skipped\.text\);/, "the banner is set after the write has reloaded");
+  const hook = read("src/components/admin/useAwards.ts");
+  assert.ok(hook.includes('"/api/awards/released", { method: "GET" }') && hook.includes("Promise.all"), "the hook asks for both at once");
+  assert.ok(hook.includes("return { data, released, error, reload }"));
+});
+
+test("the Marketing styles live in the Awards block, with the touch sizes, no motion and tokens only", () => {
+  const block = css.slice(css.indexOf("/* @ja-block awards */"), css.indexOf("/* @ja-block activity */"));
+  const phone = block.slice(0, block.indexOf("@media (min-width: 1024px)"));
+  const wide = block.slice(block.indexOf("@media (min-width: 1024px)"));
+  assert.match(phone, /\.ja-aw-snd \{[^}]*height: 44px[^}]*border: 1\.5px solid var\(--accent\)/, "Send is an accent outline, 44px on a phone");
+  assert.match(phone, /\.ja-aw-rcl \{[^}]*min-height: 44px/);
+  assert.match(phone, /\.ja-aw-sall \{[^}]*width: 100%; height: 52px/, "Send all ready is full width on a phone");
+  assert.match(wide, /\.ja-aw-snd \{[^}]*height: 34px/);
+  assert.match(wide, /\.ja-aw-sall \{[^}]*width: auto; height: 40px/);
+  assert.match(block, /\.ja-aw-sent \{[^}]*color: var\(--done-quiet\)/, "sent is green");
+  assert.match(block, /\.ja-aw-cwarn \{[^}]*color: var\(--caution-quiet\)/, "Marketing had is caution");
+  assert.match(block, /\.ja-aw-lockn \{/);
+  assert.doesNotMatch(block, /transition|animation/);
 });
