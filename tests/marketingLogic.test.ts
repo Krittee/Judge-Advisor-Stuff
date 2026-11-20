@@ -37,8 +37,8 @@ test("rowState: recalled ignores teams", () => {
   assert.deepEqual(row?.teams, []);
 });
 
-test("deskRows: every config award by order, and no row for an award that is not in the config", () => {
-  const rows = deskRows({ ...view, awards: [...awards].reverse() }, MS, unseen);
+test("deskRows: every config award in config order, and no row for an award that is not in the config", () => {
+  const rows = deskRows(view, MS, unseen);
   assert.deepEqual(rows.map((r) => r.award.label), LABELS);
   assert.equal(rows.find((r) => r.award.id === "think")?.state, "not-sent");
   assert.equal(rows.some((r) => r.award.id === "ghost"), false);
@@ -234,7 +234,7 @@ const blendedView: ReleasedView = {
 };
 
 test("sectionsOf: the view's sections in order, each with its awards in config order", () => {
-  const s = sectionsOf({ ...blendedView, awards: [...awards].reverse() });
+  const s = sectionsOf(blendedView);
   assert.deepEqual(s.map((x) => x.key), [ES, MS, WE]);
   assert.deepEqual(s[0].awards.map((a) => a.label), ["Excellence", "Design"]);
   assert.deepEqual(s[2].awards.map((a) => a.label), LABELS.filter((l) => l !== "Excellence" && l !== "Design"));

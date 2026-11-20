@@ -1,4 +1,5 @@
 import type { Status } from "./status";
+import type { Program } from "./presets";
 import type { MatchType } from "./rules";
 
 /** One day of a panel's booking window. Both breaks are set or both null. */
@@ -258,32 +259,29 @@ export type NoWinnerRow = {
   decided_at: string;
 };
 
-/** `division` is the team's division at send time; recorded only when an event setup is saved (the desk tags Whole event rows with it). */
+/** `division` is the team's division at send time, always recorded; older stored snapshots lack it. The desk tags only Whole event rows with a saved setup. */
 export type ReleaseTeam = { id: string; number: string; name: string; division?: string };
 /** What was announced for one award in one division: the winning teams, or "no winner". */
 export type ReleaseSnapshot = { teams: ReleaseTeam[]; no_winner: boolean };
-export type ReleaseStatus = "sent" | "recalled";
 /** The Awards Desk's send of one award in one division. `previous` is the decision it replaced, when it was recalled and changed. */
 export type AwardReleaseRow = ReleaseSnapshot & {
   award_id: string;
   division: string;
   previous: ReleaseSnapshot | null;
-  status: ReleaseStatus;
+  status: "sent" | "recalled";
   sent_at: string;
   sent_by: string;
   changed_at: string | null;
 };
 
-export type ReleasedAward = { id: string; label: string; order: number; places: number };
-/** One tab on the Awards Desk: a label and the divisions it shows (a division may be in more than one tab). */
-export type ReleasedProgram = { label: string; divisions: string[] };
+export type ReleasedAward = { id: string; label: string; places: number };
 /** One section of the desk: a key (a division, or "Whole event") and the ids of the awards decided under it. */
 export type ReleasedSection = { key: string; awardIds: string[] };
 /** GET /api/awards/released: the award list, the divisions, the tabs and the sends, never a nomination or a winner. */
 export type ReleasedView = {
   awards: ReleasedAward[];
   divisions: string[];
-  programs: ReleasedProgram[];
+  programs: Program[];
   releases: AwardReleaseRow[];
   /** Only when an event setup is saved; absent, the desk is exactly as before. */
   setup?: Pick<EventSetup, "program" | "format">;

@@ -95,7 +95,7 @@ test("an award without its winners is 409; a single winner or No winner sends; t
   assert.equal(sent.status, 200);
   const r = sent.body.release;
   assert.deepEqual([r.award_id, r.division, r.status, r.sent_by, r.no_winner, r.previous, r.changed_at], ["excellence", ES, "sent", "Alex", false, null, null]);
-  assert.deepEqual(r.teams, [{ id: w.hawks.id, number: "9882K", name: "Hawks" }]);
+  assert.deepEqual(r.teams, [{ id: w.hawks.id, number: "9882K", name: "Hawks", division: ES }]);
 
   await w.db.setNoWinner({ awardId: "design", division: ES, decidedBy: "Alex" });
   const none = await send(ADMIN, "design", ES);
@@ -106,12 +106,12 @@ test("an award without its winners is 409; a single winner or No winner sends; t
   assert.deepEqual([entry.actor, entry.team_id], ["Alex", w.hawks.id]);
 });
 
-test("a send with a saved event setup stores each team's division on the snapshot; without one it does not", async () => {
+test("a send stores each team's division on the snapshot, with or without a saved event setup", async () => {
   const w = await world();
   await win(w, "excellence", w.hawks);
   const plain = await send(ADMIN, "excellence", ES);
   assert.equal(plain.status, 200);
-  assert.ok(!("division" in plain.body.release.teams[0]), "no setup: the snapshot is as before");
+  assert.equal(plain.body.release.teams[0].division, ES, "no setup: the division is still recorded");
   await w.db.resetAll();
   const again = await world();
   await again.db.saveEventSetup({ program: "VEX IQ", format: "blended", setBy: "Alex" });
@@ -261,8 +261,7 @@ test("the released read carries award list, divisions, tabs and rows only", asyn
     const read = await released(session, "GET");
     assert.deepEqual(Object.keys(read.body).sort(), ["awards", "divisions", "programs", "releases"]);
     assert.equal(read.headers.get("cache-control"), "no-store");
-    assert.deepEqual(Object.keys(read.body.awards[0]).sort(), ["id", "label", "order", "places"]);
-    assert.deepEqual(read.body.awards.map((a: { order: number }) => a.order), read.body.awards.map((_: unknown, i: number) => i));
+    assert.deepEqual(Object.keys(read.body.awards[0]).sort(), ["id", "label", "places"]);
     assert.equal(read.body.awards.find((a: { id: string }) => a.id === "judges").places, 2);
     assert.ok(read.body.divisions.includes(ES) && read.body.divisions.includes(MS));
   }

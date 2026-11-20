@@ -1,5 +1,6 @@
+import type { Program } from "@/lib/presets";
 import { sentUnder } from "@/lib/releases";
-import type { AwardReleaseRow, ReleasedAward, ReleasedProgram, ReleasedSection, ReleasedView, ReleaseSnapshot, ReleaseTeam } from "@/lib/types";
+import type { AwardReleaseRow, ReleasedAward, ReleasedSection, ReleasedView, ReleaseSnapshot, ReleaseTeam } from "@/lib/types";
 
 /**
  * The Awards Desk's decisions, as plain functions: what each award row says,
@@ -61,29 +62,27 @@ function changeOf(award: DeskRow["award"], r: AwardReleaseRow, isSeen: (key: str
 
 /** One row per award in `awards` (config order), with what (if anything) was sent for it under `key`. */
 function rowsFor(view: ReleasedView, awards: ReleasedAward[], key: string, isSeen: (key: string) => boolean): DeskRow[] {
-  return [...awards]
-    .sort((a, b) => a.order - b.order)
-    .map((award) => {
-      const release = view.releases.find((r) => r.award_id === award.id && r.division === key) ?? null;
-      const state = rowState(release);
-      return {
-        award,
-        release,
-        state,
-        teams: state === "sent" && release ? release.teams : [],
-        change: release ? changeOf(award, release, isSeen) : null,
-      };
-    });
+  return awards.map((award) => {
+    const release = view.releases.find((r) => r.award_id === award.id && r.division === key) ?? null;
+    const state = rowState(release);
+    return {
+      award,
+      release,
+      state,
+      teams: state === "sent" && release ? release.teams : [],
+      change: release ? changeOf(award, release, isSeen) : null,
+    };
+  });
 }
 
-/** Every config award in `order`, one row each, with what (if anything) was sent for it in `division`. */
+/** Every config award, in config order, one row each, with what (if anything) was sent for it in `division`. */
 export const deskRows = (view: ReleasedView, division: string, isSeen: (key: string) => boolean): DeskRow[] => rowsFor(view, view.awards, division, isSeen);
 
 /** A saved setup's sections in the server's order, each with its awards in config order; none without a setup. */
 export function sectionsOf(view: ReleasedView): { key: string; awards: ReleasedAward[] }[] {
   return (view.sections ?? []).map((s) => ({
     key: s.key,
-    awards: view.awards.filter((a) => s.awardIds.includes(a.id)).sort((a, b) => a.order - b.order),
+    awards: view.awards.filter((a) => s.awardIds.includes(a.id)),
   }));
 }
 
@@ -109,7 +108,7 @@ export function changesOf(view: ReleasedView, isSeen: (key: string) => boolean):
 }
 
 /** The tabs to draw: the server's, or one "All" tab over every division (an older answer, or no programs configured). */
-export function tabsOf(view: ReleasedView): ReleasedProgram[] {
+export function tabsOf(view: ReleasedView): Program[] {
   return view.programs?.length ? view.programs : [{ label: "All", divisions: view.divisions }];
 }
 
@@ -117,13 +116,13 @@ export function tabsOf(view: ReleasedView): ReleasedProgram[] {
 export const tabKey = (label: string) => label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 /** The key of the tab to show: the saved one while it still exists, else the first. */
-export function pickTab(tabs: ReleasedProgram[], saved: string | null): string {
+export function pickTab(tabs: Program[], saved: string | null): string {
   const keys = tabs.map((t) => tabKey(t.label));
   return saved && keys.includes(saved) ? saved : (keys[0] ?? "");
 }
 
 /** "7 of 22 sent": sent rows over awards × divisions; a division in two tabs counts in each. */
-export function tabCount(view: ReleasedView, tab: ReleasedProgram): string {
+export function tabCount(view: ReleasedView, tab: Program): string {
   const ids = view.awards.map((a) => a.id);
   const n = tab.divisions.reduce((sum, d) => sum + sentUnder(view.releases, d, ids), 0);
   return countText(n, view.awards.length * tab.divisions.length);

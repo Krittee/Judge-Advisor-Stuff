@@ -9,8 +9,6 @@ export function decisionFor(
   winners: WinnerRow[],
   noWinners: NoWinnerRow[],
   teams: Team[],
-  /** Record each team's division too: true only when an event setup is saved, so a no-setup snapshot stays as it was. */
-  withDivision = false,
 ): ReleaseSnapshot | null {
   if (noWinners.some((n) => n.award_id === award.id && n.division === division)) return { teams: [], no_winner: true };
   const ids = new Set(winners.filter((w) => w.award_id === award.id && w.division === division).map((w) => w.team_id));
@@ -18,7 +16,7 @@ export function decisionFor(
   if (holders.length !== award.places) return null;
   return {
     teams: holders
-      .map((t) => ({ id: t.id, number: t.number, name: t.name, ...(withDivision && { division: t.division }) }))
+      .map((t) => ({ id: t.id, number: t.number, name: t.name, division: t.division }))
       .sort((a, b) => compareTeamNumbers(a.number, b.number)),
     no_winner: false,
   };

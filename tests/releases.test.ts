@@ -18,22 +18,19 @@ const row = (over: Partial<AwardReleaseRow> = {}): AwardReleaseRow => ({
   award_id: "design", division: ES, teams: [A], no_winner: false, previous: null, status: "sent",
   sent_at: "2026-11-19T09:00:00.000Z", sent_by: "Alex", changed_at: null, ...over,
 });
+const inEs = (t: ReleaseSnapshot["teams"][number]) => ({ ...t, division: ES });
 const teams = [team("a", "1001"), team("b", "1002"), team("c", "1003")];
 
 test("decisionFor: nothing decided is null, one of two places is null, a full set is a snapshot sorted by number", () => {
   assert.equal(decisionFor(award("design"), ES, [], [], teams), null);
   assert.equal(decisionFor(award("judges", 2), ES, [win("judges", "a")], [], teams), null);
-  assert.deepEqual(decisionFor(award("design"), ES, [win("design", "a")], [], teams), snap([A]));
-  assert.deepEqual(decisionFor(award("judges", 2), ES, [win("judges", "b"), win("judges", "a")], [], teams), snap([A, B]));
+  assert.deepEqual(decisionFor(award("design"), ES, [win("design", "a")], [], teams), snap([inEs(A)]));
+  assert.deepEqual(decisionFor(award("judges", 2), ES, [win("judges", "b"), win("judges", "a")], [], teams), snap([inEs(A), inEs(B)]));
   assert.deepEqual(decisionFor(award("design"), ES, [win("design", "a", "Middle School")], [], teams), null, "another division's win does not count");
 });
 
-test("decisionFor: each team carries its division only when asked (a saved setup), and the default is as before", () => {
-  const w = [win("design", "a")];
-  assert.deepEqual(decisionFor(award("design"), ES, w, [], teams, true), snap([{ ...A, division: ES }]));
-  assert.deepEqual(decisionFor(award("design"), ES, w, [], teams, false), snap([A]));
-  assert.deepEqual(decisionFor(award("design"), ES, w, [], teams), snap([A]));
-  assert.ok(!("division" in decisionFor(award("design"), ES, w, [], teams)!.teams[0]));
+test("decisionFor: each team always carries its division", () => {
+  assert.deepEqual(decisionFor(award("design"), ES, [win("design", "a")], [], teams), snap([inEs(A)]));
 });
 
 test("decisionFor: a no-winner mark is {[], true}", () => {

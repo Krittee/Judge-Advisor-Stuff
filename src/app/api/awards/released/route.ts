@@ -7,7 +7,7 @@ import { awards, blendedDivisions, presetPrograms, programTabs } from "@/lib/pre
 import { decisionFor, nextSend, sentRelease } from "@/lib/releases";
 import { eventDivisions } from "@/lib/server-state";
 import type { AwardReleaseRow, AwardView, ReleaseReply, ReleasedView, ReleaseSnapshot, SendAllReply } from "@/lib/types";
-import { fields } from "../shared";
+import { awardLabel, fields } from "../shared";
 
 export const dynamic = "force-dynamic";
 
@@ -28,14 +28,17 @@ type Decisions = {
 
 async function decisions(): Promise<Decisions> {
   const db = store();
-  const [releases, winners, noWinners, teams, setup] = await Promise.all([
-    db.listReleases(),
-    db.listWinners(),
-    db.listNoWinners(),
-    db.listTeams(),
-    db.getEventSetup(),
-  ]);
-  return { releases, decide: (award, division) => decisionFor(award, division, winners, noWinners, teams, Boolean(setup)) };
+  const [releases, winners, noWinners, teams] = await Promise.all([db.listReleases(), db.listWinners(), db.listNoWinners(), db.listTeams()]);
+  return { releases, decide: (award, division) => decisionFor(award, division, winners, noWinners, teams) };
+}
+
+/** The award and division a PUT or DELETE names, or the 400 when either is missing. */
+async function parseTarget(request: Request): Promise<{ awardId: string; division: string } | NextResponse> {
+  const body = await fields(request);
+  const awardId = String(body.awardId ?? "");
+  const division = String(body.division ?? "").trim();
+  if (!awardId || !division) return NextResponse.json({ error: "An award and a division are required." }, { status: 400 });
+  return { awardId, division };
 }
 
 /** Send one decided award, once: a sent one comes back as it is, and only a real send is logged. */
@@ -78,7 +81,7 @@ export async function GET() {
   const [releases, panels, teams, setup] = await Promise.all([db.listReleases(), db.listPanels(), db.listTeams(), db.getEventSetup()]);
   const divisions = eventDivisions(panels, teams, setup);
   const view: ReleasedView = {
-    awards: awards().map((a, order) => ({ id: a.id, label: a.label, order, places: a.places })),
+    awards: awards().map((a) => ({ id: a.id, label: a.label, places: a.places })),
     divisions,
     // A saved setup picks the program, so the desk needs no tabs.
     programs: setup ? programTabs(divisions, [], []) : programTabs(divisions, presetPrograms(), blendedDivisions()),
@@ -103,12 +106,9 @@ export async function PUT(request: Request) {
   const session = await getSession();
   if (!canAdminister(session)) return NextResponse.json(FORBIDDEN, { status: 403 });
 
-  const body = await fields(request);
-  const awardId = String(body.awardId ?? "");
-  const division = String(body.division ?? "").trim();
-  if (!awardId || !division) {
-    return NextResponse.json({ error: "An award and a division are required." }, { status: 400 });
-  }
+  const target = await parseTarget(request);
+  if (target instanceof NextResponse) return target;
+  const { awardId, division } = target;
   const award = awards().find((a) => a.id === awardId);
   if (!award) return NextResponse.json({ error: "That award does not exist." }, { status: 400 });
   const wrongKey = keyError(award, division, await store().getEventSetup());
@@ -133,15 +133,12 @@ export async function DELETE(request: Request) {
   const session = await getSession();
   if (!canAdminister(session)) return NextResponse.json(FORBIDDEN, { status: 403 });
 
-  const body = await fields(request);
-  const awardId = String(body.awardId ?? "");
-  const division = String(body.division ?? "").trim();
-  if (!awardId || !division) {
-    return NextResponse.json({ error: "An award and a division are required." }, { status: 400 });
-  }
+  const target = await parseTarget(request);
+  if (target instanceof NextResponse) return target;
+  const { awardId, division } = target;
 
   const db = store();
-  const label = awards().find((a) => a.id === awardId)?.label ?? awardId;
+  const label = awardLabel(awardId);
   const current = (await db.listReleases()).find((r) => r.award_id === awardId && r.division === division);
   if (!current) {
     return NextResponse.json({ error: `${label} has not been sent to Marketing.` }, { status: 404 });

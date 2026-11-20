@@ -177,7 +177,7 @@ test("the app's existing full wipe remains the active-event boundary", () => {
   assert.ok(fileStoreSrc.includes("loaded = empty()"));
   assert.match(
     postgresSrc,
-    /truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup, award_no_winner, award_releases cascade/,
+    /truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup, event_setup, award_no_winner, award_releases cascade/,
     "a full wipe must clear the referee setup, and the judge roster, with the rest of the event",
   );
   assert.ok(!/resetDay\(\)[\s\S]*truncate[^\n]*flags/.test(postgresSrc));

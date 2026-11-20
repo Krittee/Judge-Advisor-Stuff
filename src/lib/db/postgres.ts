@@ -1854,9 +1854,7 @@ export const postgresStore: Store = {
     // cascade also takes nominations and award_winners: both reference teams.
     // award_no_winner and award_releases have no team, so they are named.
     await query(
-      "truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup, award_no_winner, award_releases cascade",
+      "truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup, event_setup, award_no_winner, award_releases cascade",
     );
-    // A separate statement: tests pin the list above.
-    await query("truncate event_setup");
   },
 };
