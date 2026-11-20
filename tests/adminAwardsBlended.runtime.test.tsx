@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import type { ReactElement, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { AwardLists } from "../src/components/admin/AwardsTab";
-import { BlendedBoard, BlendedLists, blendedMatrix } from "../src/components/admin/BlendedAwards";
+import { AwardLists, MatrixView } from "../src/components/admin/AwardsTab";
+import { BlendedBoard, BlendedLists, blendedMatrix, toBlendedSel } from "../src/components/admin/BlendedAwards";
 import {
   ALL_PANELS, buildAwardPanels, heldByTeam, nominationsIn, noWinnersOf, winnersOf, type BlendedSel, type View,
 } from "../src/components/admin/awardsLogic";
@@ -342,6 +342,16 @@ test("Nominees from filters matrix rows too, but a team that holds an award stay
   assert.ok(nums.includes("7700B"));
 });
 
+test("tapping a matrix cell opens it under its key: a division's for Excellence, Whole event for Innovate", () => {
+  const calls: unknown[] = [];
+  const matrix = blendedMatrix({ awards, nominations, winners, noWinners, teams: all, panels, flags: [], divisions: [ES, MS], panelId: ALL_PANELS });
+  const els = walk(MatrixView({ matrix, sel: null, note: "", none: "", tags: true, onSelect: (s) => calls.push(toBlendedSel(s)) }));
+  click(els.find((e) => e.props["aria-label"] === "3030T, Innovate: nominated")!);
+  click(els.find((e) => e.props["aria-label"] === "41111A, Excellence · Elementary School: winner")!);
+  assert.deepEqual(calls, [{ awardId: "innovate", teamId: titans.id, key: WHOLE_EVENT }, { awardId: "excellence", teamId: levers.id, key: ES }]);
+  assert.equal(toBlendedSel(null), null);
+});
+
 test("a selected matrix cell highlights its own column only", () => {
   const m = board({ view: "matrix", sel: { awardId: "excellence", teamId: byteMe.id, key: MS } });
   assert.match(m, /<th scope="col" class="ja-aw-on" aria-label="Excellence MS"/);
@@ -407,7 +417,7 @@ test("the rail's Awards count is event-wide in a blended event, and unchanged ot
   assert.match(page, /eventDecidedText\(awards\.data\.winners, awards\.data\.awards, [^)]*, awards\.data\.noWinners, "blended"\)/);
 });
 
-test("the blended styles live in the Awards block: one column of blocks, halves side by side from 1024px, tokens only, no motion, 44px taps on a phone", () => {
+test("the blended styles live in the Awards block: one column of blocks, halves side by side from 1280px, tokens only, no motion, 44px taps on a phone", () => {
   const block = css.slice(css.indexOf("/* @ja-block awards */"), css.indexOf("/* @ja-block activity */"));
   const phone = block.slice(0, block.indexOf("@media (min-width: 1024px)"));
   const wide = block.slice(block.indexOf("@media (min-width: 1024px)"));

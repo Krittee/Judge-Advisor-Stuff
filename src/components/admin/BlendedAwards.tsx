@@ -51,7 +51,7 @@ import type { RankedRow } from "./scoresLogic";
 
 /**
  * The Awards board in a blended event, "Award order": one column of blocks in the config's order, the ceremony order. An award given in each division
- * (Excellence, Design) is one block with a half per division, side by side from 1024px and stacked on a phone; every other award is one full-width
+ * (Excellence, Design) is one block with a half per division, side by side from 1280px and stacked below it (a phone, and a narrow desktop beside the side panel); every other award is one full-width
  * block for the whole event. Each half and each whole-event block is decided, sent, recalled and cleared on its own, under its own key (a division,
  * or "Whole event"), so every write here takes the key. Everything is the standard board's, only the markup around it differs: the award bodies
  * are the same pieces (`awardBody`, `sendControls`), the matrix has a column per key, and the side panel names the key.
@@ -72,6 +72,11 @@ export function scopedHas(winners: Pick<WinnerRow, "award_id" | "team_id" | "div
         })
         .join(", ")}`,
   };
+}
+
+/** A matrix tap as a blended selection: a column with no key (a whole-event award's) is decided under "Whole event". */
+export function toBlendedSel(s: (Sel & { key?: string }) | null): BlendedSel | null {
+  return s ? { ...s, key: s.key ?? WHOLE_EVENT } : null;
 }
 
 /** The key an award is named under on screen: "Excellence · Middle School", or just "Innovate" for the whole event. */
@@ -463,7 +468,7 @@ export function BlendedBoard({
               none={`No nominations in ${setupLabel(setup)}${panel ? ` from ${panel.name}` : ""} yet. Judges nominate the teams they have interviewed.`}
               sent={sent}
               tags
-              onSelect={(s) => onSelect(s?.key ? (s as BlendedSel) : null)}
+              onSelect={(s) => onSelect(toBlendedSel(s))}
             />
           ) : (
             <BlendedLists
