@@ -39,6 +39,19 @@ test("/: seven doors in order, each a link to its sign-in", () => {
   ]);
 });
 
+test("/: two labelled groups, Team with the one /team door and Staff with the six role doors in order", () => {
+  const groups = [...door.matchAll(/<section class="dp-grp dp-grp--(\w+)"><h2 class="dp-gt" id="(dp-g-\w+)">([^<]+)<\/h2><ul class="dp-doors dp-doors--\w+" aria-labelledby="(dp-g-\w+)">([\s\S]*?)<\/ul><\/section>/g)];
+  assert.deepEqual(groups.map((g) => [g[1], g[2], g[3], g[4]]), [
+    ["team", "dp-g-team", "Team", "dp-g-team"],
+    ["staff", "dp-g-staff", "Staff", "dp-g-staff"],
+  ]);
+  const links = (g: RegExpMatchArray) => [...g[5].matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(links(groups[0]), ["/team"]);
+  assert.deepEqual(links(groups[1]), ["/judge/login", "/referee/login", "/queue/login", "/coordinator/login", "/admin/login", "/marketing/login"]);
+  assert.ok(door.indexOf('class="dp-split"') > door.indexOf("dp-title") && door.indexOf('class="dp-split"') < door.indexOf('class="dp-below"'));
+  assert.ok(!door.includes('<ul class="dp-doors" '), "no single list of seven doors is left");
+});
+
 test("/: the Live board is the one other link, and /login is not linked", () => {
   assert.deepEqual(hrefs.slice(7), ["/board"]);
   assert.ok(!hrefs.includes("/login"));
