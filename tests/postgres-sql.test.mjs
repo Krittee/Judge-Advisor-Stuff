@@ -1331,3 +1331,66 @@ test("a day reset names the nominations and winners (and still spares flags and 
   assert.ok(wipe.sql.endsWith("cascade"));
   assert.match(migrateBody, /nominations \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*award_id\s+text not null,\s*team_id\s+uuid not null references teams\(id\)/);
 });
+
+/* ---- the event setup (no database here either) ---- */
+
+test("migrate() creates the single-row event_setup table, and locks it down", () => {
+  assert.match(
+    migrateBody,
+    /create table if not exists event_setup \(\s*id\s+int primary key default 1 check \(id = 1\),\s*program\s+text not null,\s*format\s+text not null check \(format in \('standard', 'blended'\)\),\s*set_by\s+text not null,\s*updated_at\s+timestamptz not null default now\(\)\s*\);/,
+  );
+  assert.ok(migrateBody.includes("alter table event_setup enable row level security;"), "RLS must cover the new table");
+});
+
+test("saving the event setup upserts the one row and deletes the recalled releases in the same transaction", async () => {
+  const row = { program: "VEX IQ", format: "blended", set_by: "Alex", updated_at: new Date("2026-11-20T01:02:03.456Z") };
+  calls.length = 0;
+  answer = (sql) => (sql.startsWith("insert into event_setup") ? [row] : []);
+  const saved = await postgresStore.saveEventSetup({ program: "VEX IQ", format: "blended", setBy: "Alex" });
+  const [upsert] = sent(/^insert into event_setup/);
+  assert.match(
+    upsert.sql,
+    /^insert into event_setup \(id, program, format, set_by\) values \(1, \$1, \$2, \$3\) on conflict \(id\) do update set program = excluded\.program, format = excluded\.format, set_by = excluded\.set_by, updated_at = now\(\) returning program, format, set_by, updated_at$/,
+  );
+  assert.deepEqual(upsert.params, ["VEX IQ", "blended", "Alex"]);
+  assert.deepEqual(saved, { ...row, updated_at: "2026-11-20T01:02:03.456Z" });
+  assert.equal(sent(/^delete from award_releases where status = 'recalled'$/).length, 1);
+  const sqls = calls.map((c) => c.sql);
+  assert.ok(sqls.indexOf("begin") < sqls.findIndex((s) => s.startsWith("insert into event_setup")) && sqls.indexOf("commit") > sqls.findIndex((s) => s.startsWith("delete from award_releases")), "both writes sit inside one begin/commit");
+
+  calls.length = 0;
+  answer = (sql) => (sql.startsWith("select program") ? [row] : []);
+  assert.deepEqual(await postgresStore.getEventSetup(), saved);
+  assert.equal(sent(/from event_setup/)[0].sql, "select program, format, set_by, updated_at from event_setup");
+  answer = () => [];
+  assert.equal(await postgresStore.getEventSetup(), null);
+});
+
+test("a full wipe truncates the event setup; a day reset keeps it", async () => {
+  answer = () => [];
+  calls.length = 0;
+  await postgresStore.resetAll();
+  assert.ok(sent(/^truncate/).some((c) => /\bevent_setup\b/.test(c.sql)));
+  calls.length = 0;
+  await postgresStore.resetDay();
+  assert.ok(!sent(/^truncate/).some((c) => /event_setup/.test(c.sql)));
+});
+
+test("a team import defaults to the setup's first division, and a Blended event widens $8 to every division", async () => {
+  const { blendedDivisions } = await import("../src/lib/presets");
+  const { WHOLE_EVENT } = await import("../src/lib/eventSetup");
+  const setup = (format) => (sql) => (sql.startsWith("select program") ? [{ program: "V5RC", format, set_by: "Alex", updated_at: new Date() }] : []);
+  for (const format of ["blended", "standard"]) {
+    calls.length = 0;
+    answer = setup(format);
+    await postgresStore.upsertTeams([{ number: "1001", pit: null }]);
+    const [upsert] = sent(/insert into teams/);
+    assert.equal(upsert.params[5], "Middle School", "V5RC's first division, not the config's");
+    assert.equal(upsert.params.length, 9);
+    assert.deepEqual(upsert.params[7], format === "blended" ? [...blendedDivisions(), "Middle School", "High School", WHOLE_EVENT] : blendedDivisions());
+  }
+  calls.length = 0;
+  answer = () => [];
+  await postgresStore.upsertTeams([{ number: "1001", pit: null }]);
+  assert.deepEqual(sent(/insert into teams/)[0].params[7], blendedDivisions(), "no setup behaves as standard");
+});
