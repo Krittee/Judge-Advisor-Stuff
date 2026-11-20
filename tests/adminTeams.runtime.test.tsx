@@ -555,7 +555,7 @@ test("the page renders the Teams tab from its own file, in the wide layout, and 
 });
 
 test("every write goes through a logic function that asks first; nothing is sent from the markup", () => {
-  assert.ok(tab.includes("await saveTeamAfterAsking(ask, call, team, draft, state.panels)"), "Save is one saveTeamAfterAsking, which asks before a division move takes the panel off");
+  assert.ok(tab.includes("await saveTeamAfterAsking(ask, call, team, draft, state.panels, state.eventSetup?.format)"), "Save is one saveTeamAfterAsking, which asks before a division move takes the panel off");
   assert.ok(tab.includes("resetStatusAfterAsking(ask, call, team, request, status)"));
   assert.ok(tab.includes("removeTeamAfterAsking(ask, call, team)"));
   assert.ok(tab.includes("openInRefereeAfterAsking(ask, team, draft, onOpenFlags)"));
@@ -579,9 +579,9 @@ test("closing the drawer, picking another row and Escape all go through the unsa
 
 test("the panel choice is the Floor's rule, not a new conflict check", () => {
   const logic = read("src/components/admin/teamsLogic.ts");
-  assert.ok(logic.includes("allowedPanels({ ...team, division }, held, panels, conflicts, judges)"));
-  assert.ok(logic.includes("divisionsCompatible(division, held.division)"), "the client only asks; the same compatibility the server uses");
-  assert.ok(logic.includes("strandedTeams(teams, panels, panelBlocks(conflicts, judges))"));
+  assert.ok(logic.includes("allowedPanels({ ...team, division }, held, panels, conflicts, judges, format)"));
+  assert.ok(logic.includes("divisionsCompatible(division, held.division, format)"), "the client only asks; the same compatibility the server uses");
+  assert.ok(logic.includes("strandedTeams(teams, panels, panelBlocks(conflicts, judges), format)"));
   assert.ok(!/panel_id ===|\.panel_id\s*===/.test(logic.replace(/team\.panel_id \?\? ""/g, "")), "no panel_id comparison of its own");
   assert.ok(!/c\.panel_id|conflicts?\.(?:some|find)/.test(tab + logic), "no read of a conflict's panel_id");
 });

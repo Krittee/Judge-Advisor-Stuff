@@ -7,6 +7,7 @@ import { call } from "@/components/useAppState";
 import type { AppState, JudgeRow, Panel, PublicPanel } from "@/lib/types";
 import { divisionTag, teamCount } from "./floorLogic";
 import { slotTimes } from "@/lib/data";
+import { divisionChoices } from "@/lib/eventSetup";
 import {
   addBreak,
   addDay,
@@ -64,7 +65,7 @@ const DotsIcon = () => (
   </svg>
 );
 
-type Slice = Pick<AppState, "judges" | "panels" | "teams" | "conflicts" | "divisions" | "languages">;
+type Slice = Pick<AppState, "judges" | "panels" | "teams" | "conflicts" | "divisions" | "languages" | "eventSetup">;
 type View = "judges" | "panels";
 type JudgeForm = { kind: "new" } | { kind: "rename"; judge: JudgeRow };
 
@@ -394,7 +395,11 @@ export function PanelsBoard({
   children?: React.ReactNode;
 }) {
   const uid = useId();
-  const { judges, panels, teams, conflicts, divisions, languages } = state;
+  const { judges, panels, teams, conflicts, languages } = state;
+  // A saved setup lists its divisions (a blended event adds "Whole event", and a new panel starts there).
+  const { options: divisions, fallback } = state.eventSetup
+    ? divisionChoices(state.eventSetup, true)
+    : { options: state.divisions, fallback: state.divisions[0] ?? "" };
   const groups = useMemo(() => rosterGroups(judges, panels), [judges, panels]);
   const held = useMemo(() => teamsByPanel(teams), [teams]);
 
@@ -521,7 +526,7 @@ export function PanelsBoard({
               No judge panels yet. Add one below, or load your presets — judges sign in with a panel&apos;s code.
             </p>
           )}
-          <AddPanelForm divisions={divisions} busy={busy} onAdd={onAddPanel} />
+          <AddPanelForm divisions={divisions} fallback={fallback} busy={busy} onAdd={onAddPanel} />
         </div>
       </div>
 
@@ -726,10 +731,12 @@ function PanelCard({
 /** Name and division; the panel is added with no judges, they come from the roster. */
 function AddPanelForm({
   divisions,
+  fallback,
   busy,
   onAdd,
 }: {
   divisions: string[];
+  fallback: string;
   busy: boolean;
   onAdd: (name: string, division: string) => Promise<boolean>;
 }) {
@@ -740,7 +747,7 @@ function AddPanelForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (busy || !name.trim()) return;
-    if (await onAdd(name, division)) {
+    if (await onAdd(name, division || fallback)) {
       setName("");
       setDivision("");
     }
@@ -759,7 +766,7 @@ function AddPanelForm({
           Division
         </label>
         <div className="ja-selw">
-          <select id={`${uid}-d`} className="ja-in ja-sel" value={division || divisions[0] || ""} onChange={(e) => setDivision(e.target.value)}>
+          <select id={`${uid}-d`} className="ja-in ja-sel" value={division || fallback} onChange={(e) => setDivision(e.target.value)}>
             {divisions.map((d) => (
               <option key={d} value={d}>
                 {d}

@@ -298,3 +298,10 @@ test("the phone chip is spoken as the panel, its teams, who is waiting and any l
   assert.equal(chipSpeech({ panel: p1, cards: [] }, languages), "Panel 1, 0 teams");
 });
 
+
+test("with format blended an Elementary School team may move to a Middle School panel; without, it may not", () => {
+  const es = team("2468E", "p4", "Elementary School");
+  assert.deepEqual(allowedPanels(es, "p4", panels, []).map((p) => p.id), ["p4"]);
+  assert.deepEqual(allowedPanels(es, "p4", panels, [], [], "standard").map((p) => p.id), ["p4"]);
+  assert.deepEqual(allowedPanels(es, "p4", panels, [], [], "blended").map((p) => p.id), ["p1", "p2", "p3", "p4"]);
+});

@@ -10,7 +10,7 @@ import { isPanelBlocked, panelBlocks } from "@/lib/roster";
 import { canTransition, STATUS_META, type Status } from "@/lib/status";
 import type { formTimes } from "@/lib/stepTimes";
 import { normalizeTeamNumber } from "@/lib/teamNumber";
-import type { AppState, ConflictRow, FlagRow, JudgeRow, PublicPanel, RequestRow, Slot, Team } from "@/lib/types";
+import type { AppState, ConflictRow, EventFormat, FlagRow, JudgeRow, PublicPanel, RequestRow, Slot, Team } from "@/lib/types";
 import { strandedTeams } from "./conflictsLogic";
 import { allowedPanels } from "./floorLogic";
 
@@ -108,8 +108,8 @@ export function interviewTime(request: RequestRow | null): { label: "Booked" | "
 export type PanelCell = { kind: "panel"; name: string } | { kind: "unassigned" } | { kind: "none-left" };
 
 /** The ids of the teams with no panel left to judge them. */
-export function strandedIds(teams: Team[], panels: PublicPanel[], conflicts: ConflictRow[], judges: JudgeRow[]): Set<string> {
-  return new Set(strandedTeams(teams, panels, panelBlocks(conflicts, judges)).map((t) => t.id));
+export function strandedIds(teams: Team[], panels: PublicPanel[], conflicts: ConflictRow[], judges: JudgeRow[], format?: EventFormat | null): Set<string> {
+  return new Set(strandedTeams(teams, panels, panelBlocks(conflicts, judges), format).map((t) => t.id));
 }
 
 export function panelCell(team: Team, panels: Pick<PublicPanel, "id" | "name">[], stranded: Set<string>): PanelCell {
@@ -164,9 +164,9 @@ export const isDirty = (team: Team, draft: TeamDraft): boolean => teamPatch(team
  * The panel a move to `division` takes the team off: the one it holds, when it can't judge that
  * division. The server clears it (PATCH with a division and no panelId); this only says so, to ask first.
  */
-export function panelLeft(team: Team, division: string, panels: PublicPanel[]): PublicPanel | null {
+export function panelLeft(team: Team, division: string, panels: PublicPanel[], format?: EventFormat | null): PublicPanel | null {
   const held = panels.find((p) => p.id === team.panel_id);
-  return held && division !== team.division && !divisionsCompatible(division, held.division) ? held : null;
+  return held && division !== team.division && !divisionsCompatible(division, held.division, format) ? held : null;
 }
 
 export const moveQuestion = (team: Pick<Team, "number">, division: string, left: Pick<PublicPanel, "name" | "division">): string =>
@@ -177,16 +177,16 @@ export const moveQuestion = (team: Pick<Team, "number">, division: string, left:
  * server's refusal is thrown. A division move that takes the team off the panel it holds asks first, unless the
  * panel was changed in the same edit (then the Judge Advisor has already chosen); a no sends nothing.
  */
-export async function saveTeamAfterAsking(ask: Ask, call: Call, team: Team, draft: TeamDraft, panels: PublicPanel[]): Promise<boolean> {
+export async function saveTeamAfterAsking(ask: Ask, call: Call, team: Team, draft: TeamDraft, panels: PublicPanel[], format?: EventFormat | null): Promise<boolean> {
   // A panel picked before the division moved can fall out of the select ("— none —") while the draft still holds it.
   // The Judge Advisor can't see it, so it counts as not picked: the held panel is asked about, and the server's rule applies.
   const picked = panels.find((p) => p.id === draft.panelId);
-  if (draft.panelId && draft.panelId !== (team.panel_id ?? "") && picked && !divisionsCompatible(draft.division, picked.division)) {
+  if (draft.panelId && draft.panelId !== (team.panel_id ?? "") && picked && !divisionsCompatible(draft.division, picked.division, format)) {
     draft = { ...draft, panelId: team.panel_id ?? "" };
   }
   const patch = teamPatch(team, draft);
   if (!patch) return false;
-  const left = draft.panelId === (team.panel_id ?? "") ? panelLeft(team, draft.division, panels) : null;
+  const left = draft.panelId === (team.panel_id ?? "") ? panelLeft(team, draft.division, panels, format) : null;
   if (left && !(await ask(moveQuestion(team, draft.division, left), { confirmLabel: "Move team" }))) return false;
   await call("/api/admin/teams", { method: "PATCH", body: { teamId: team.id, ...patch } });
   return true;
@@ -204,10 +204,11 @@ export function panelOptions(
   conflicts: ConflictRow[],
   judges: JudgeRow[],
   division: string = team.division,
+  format?: EventFormat | null,
 ): { id: string; name: string; blocked: boolean }[] {
   const blocks = panelBlocks(conflicts, judges);
-  const held = panelLeft(team, division, panels) ? null : team.panel_id;
-  const allowed = new Set(allowedPanels({ ...team, division }, held, panels, conflicts, judges).map((p) => p.id));
+  const held = panelLeft(team, division, panels, format) ? null : team.panel_id;
+  const allowed = new Set(allowedPanels({ ...team, division }, held, panels, conflicts, judges, format).map((p) => p.id));
   return panels
     .filter((p) => allowed.has(p.id) || p.id === held)
     .map((p) => ({ id: p.id, name: p.name, blocked: isPanelBlocked(blocks, p.id, team.id) }));

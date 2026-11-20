@@ -5,7 +5,7 @@ import { divisionsCompatible } from "@/lib/presets";
 import type { Status } from "@/lib/status";
 import { compareTeamNumbers } from "@/lib/teamNumber";
 import { isPanelBlocked, panelBlocks } from "@/lib/roster";
-import type { AppState, ConflictRow, JudgeRow, PublicPanel, RequestRow, Team } from "@/lib/types";
+import type { AppState, ConflictRow, EventFormat, JudgeRow, PublicPanel, RequestRow, Team } from "@/lib/types";
 
 /* The Judge Advisor Floor's decisions, kept out of the markup so they run as
    plain functions in tests/adminFloor.logic.test.mjs. */
@@ -115,11 +115,12 @@ export function allowedPanels(
   panels: PublicPanel[],
   conflicts: Pick<ConflictRow, "id" | "panel_id" | "judge_id" | "team_id">[],
   judges: Pick<JudgeRow, "id" | "panel_id">[] = [],
+  format?: EventFormat | null,
 ): PublicPanel[] {
   const blocks = panelBlocks(conflicts, judges);
   return panels.filter(
     (p) =>
-      !isPanelBlocked(blocks, p.id, team.id) && (p.id === currentPanelId || divisionsCompatible(team.division, p.division)),
+      !isPanelBlocked(blocks, p.id, team.id) && (p.id === currentPanelId || divisionsCompatible(team.division, p.division, format)),
   );
 }
 
