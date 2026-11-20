@@ -4,13 +4,13 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-21 | [Awards send time shows NaN:NaN, and audit cleanup](#awards-send-time-shows-nannan-and-audit-cleanup-2026-11-21) | `bb0ef0f`..`fcd4930` | Not needed (no layout change) | Built on `claude/audit-cuts-22-13220b`, not pushed |
-| 2026-11-20 | [Event setup and blended awards (UI)](#event-setup-and-blended-awards-ui-2026-11-20) | `e2e1ad6`..`89b0d7c` | Not yet (375 preview only) | Built on `claude/blended-ui-d3aac8`, not pushed |
-| 2026-11-20 | [Event setup and blended awards (backend)](#event-setup-and-blended-awards-backend-2026-11-20) | `f22f50e`..`84d586a` | Not needed (no UI yet) | Built on `claude/blended-backend-c6182b`, not pushed |
-| 2026-11-20 | [Door page: Team \| Staff groups](#door-page-team--staff-groups-2026-11-20) | `7f0d2de` | Not yet (375px preview only) | Built on `claude/door-team-staff-258f85`, not pushed |
-| 2026-11-20 | [Referee: Major removed, DQ stands alone](#referee-major-removed-dq-stands-alone-2026-11-20) | `329fcc8` | Not yet (375 preview) | Built on `claude/referee-dq-major-92956f`, not pushed |
-| 2026-11-20 | [Awards Desk UI (2.2.0)](#awards-desk-ui-220-2026-11-20) | `c02e7c3`..`2d83b19` | iPhone Simulator only | Built on `claude/awards-desk-ui-e125c3`, not pushed |
-| 2026-11-19 | [Awards Desk backend (2.2.0)](#awards-desk-backend-220-2026-11-19) | `d5b1807`..`f9cc675` | Not needed (no UI yet) | Built on `claude/awards-desk-backend-921f59`, UI built on `claude/awards-desk-ui-e125c3` |
+| 2026-11-21 | [Awards send time shows NaN:NaN, and audit cleanup](#awards-send-time-shows-nannan-and-audit-cleanup-2026-11-21) | `bb0ef0f`..`fcd4930` | Not needed (no layout change) | Live in 2.2.0 (PR #19, 2026-11-21) |
+| 2026-11-20 | [Event setup and blended awards (UI)](#event-setup-and-blended-awards-ui-2026-11-20) | `e2e1ad6`..`89b0d7c` | Not yet (375 preview only) | Live in 2.2.0 (PR #19, 2026-11-21) |
+| 2026-11-20 | [Event setup and blended awards (backend)](#event-setup-and-blended-awards-backend-2026-11-20) | `f22f50e`..`84d586a` | Not needed (no UI yet) | Live in 2.2.0 (PR #19, 2026-11-21) |
+| 2026-11-20 | [Door page: Team \| Staff groups](#door-page-team--staff-groups-2026-11-20) | `7f0d2de` | Not yet (375px preview only) | Live in 2.2.0 (PR #19, 2026-11-21) |
+| 2026-11-20 | [Referee: Major removed, DQ stands alone](#referee-major-removed-dq-stands-alone-2026-11-20) | `329fcc8` | Not yet (375 preview) | Live in 2.2.0 (PR #19, 2026-11-21) |
+| 2026-11-20 | [Awards Desk UI (2.2.0)](#awards-desk-ui-220-2026-11-20) | `c02e7c3`..`2d83b19` | iPhone Simulator only | Live in 2.2.0 (PR #19, 2026-11-21) |
+| 2026-11-19 | [Awards Desk backend (2.2.0)](#awards-desk-backend-220-2026-11-19) | `d5b1807`..`f9cc675` | Not needed (no UI yet) | Live in 2.2.0 (PR #19, 2026-11-21) |
 | 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
 | 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ef84422` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
 | 2026-11-16 | [Judges Award can have two winners](#judges-award-can-have-two-winners-2026-11-16) | `c04c9b3` | Not needed | Live in 2.1.4 (PR #18, 2026-11-16) |
