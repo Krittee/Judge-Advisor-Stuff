@@ -32,8 +32,8 @@ export async function refuseIfSent(awardId: string, division: string): Promise<N
   return NextResponse.json({ error: "Recall it from Marketing first." }, { status: 409 });
 }
 
-/** Why a team cannot be deleted or moved: it is in a sent award's snapshot. Null when it is free. */
-export async function teamLockMessage(teamId: string): Promise<string | null> {
-  const held = sentHolding(await store().listReleases(), teamId);
+/** Why a team cannot be deleted or moved: it is in a sent award's snapshot. Null when it is free. A division change (`divisionChange`) is not held by a Whole event release. */
+export async function teamLockMessage(teamId: string, divisionChange = false): Promise<string | null> {
+  const held = sentHolding(await store().listReleases(), teamId, divisionChange);
   return held ? `Recall ${awardLabel(held.award_id)} from Marketing first.` : null;
 }

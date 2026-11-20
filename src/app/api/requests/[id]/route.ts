@@ -130,7 +130,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     // Divisions are a hard wall: a team may only be handed to a panel that
     // may judge its division (see divisionsCompatible).
     const db = store();
-    const [panels, teams] = await Promise.all([db.listPanels(), db.listTeams()]);
+    const [panels, teams, eventSetup] = await Promise.all([db.listPanels(), db.listTeams(), db.getEventSetup()]);
     const target = panels.find((p) => p.id === panelId);
     const team = teams.find((t) => t.id === current.team_id);
 
@@ -146,7 +146,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
     // A blended team may be handed to any panel -- it competes across age
     // groups, so no single division's panel owns it.
-    if (team && !divisionsCompatible(team.division, target.division)) {
+    if (team && !divisionsCompatible(team.division, target.division, eventSetup?.format)) {
       return NextResponse.json(
         {
           error:

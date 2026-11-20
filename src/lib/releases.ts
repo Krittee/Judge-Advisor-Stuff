@@ -1,3 +1,4 @@
+import { WHOLE_EVENT } from "./eventSetup";
 import { compareTeamNumbers } from "./teamNumber";
 import type { AwardReleaseRow, AwardView, NoWinnerRow, ReleaseSnapshot, Team, WinnerRow } from "./types";
 
@@ -43,6 +44,7 @@ export function sentRelease(releases: AwardReleaseRow[], awardId: string, divisi
   return releases.find((r) => r.status === "sent" && r.award_id === awardId && r.division === division);
 }
 
-export function sentHolding(releases: AwardReleaseRow[], teamId: string): AwardReleaseRow | undefined {
-  return releases.find((r) => r.status === "sent" && r.teams.some((t) => t.id === teamId));
+/** The sent release holding a team. `divisionScopedOnly` skips Whole event rows: a division change cannot alter those. */
+export function sentHolding(releases: AwardReleaseRow[], teamId: string, divisionScopedOnly = false): AwardReleaseRow | undefined {
+  return releases.find((r) => r.status === "sent" && r.teams.some((t) => t.id === teamId) && !(divisionScopedOnly && r.division === WHOLE_EVENT));
 }

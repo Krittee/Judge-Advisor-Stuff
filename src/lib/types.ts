@@ -344,6 +344,8 @@ export type AppState = {
   matchTypes: MatchType[];
   /** Null until a referee or the Judge Advisor sets the event up. */
   refereeSetup: RefereeSetup | null;
+  /** The program and format the Judge Advisor set for this event: null until set, and for an anonymous caller; `set_by` is blank for marketing. */
+  eventSetup: EventSetup | null;
   /** The kinds of flag a referee can record, with their colours. */
   flagKinds: {
     id: string;
