@@ -4,7 +4,8 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-19 | [Awards Desk backend (2.2.0)](#awards-desk-backend-220-2026-11-19) | `d5b1807`..`f9cc675` | Not needed (no UI yet) | Built on `claude/awards-desk-backend-921f59`, UI pending |
+| 2026-11-20 | [Awards Desk UI (2.2.0)](#awards-desk-ui-220-2026-11-20) | `c02e7c3`..`6925842` | Not yet (375 preview only) | Built on `claude/awards-desk-ui-e125c3`, not pushed |
+| 2026-11-19 | [Awards Desk backend (2.2.0)](#awards-desk-backend-220-2026-11-19) | `d5b1807`..`f9cc675` | Not needed (no UI yet) | Built on `claude/awards-desk-backend-921f59`, UI built on `claude/awards-desk-ui-e125c3` |
 | 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
 | 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ef84422` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
 | 2026-11-16 | [Judges Award can have two winners](#judges-award-can-have-two-winners-2026-11-16) | `c04c9b3` | Not needed | Live in 2.1.4 (PR #18, 2026-11-16) |
@@ -20,6 +21,49 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Awards Desk UI (2.2.0) (2026-11-20)
+
+### Problem / request
+
+The pages for the Awards Desk backend above: Marketing's read-only Awards Desk, the Judge Advisor's controls to send and recall awards, and a door for Marketing on "/".
+
+### Root cause
+
+Not a bug: new feature (Version 2.2.0).
+
+### What changed
+
+Build spec `design/awards-desk/PROMPT.md` (boards `design/awards-desk/reference-*.dc.html`), plan `docs/superpowers/plans/2026-11-19-awards-desk-ui.md`.
+
+- `/marketing/login` and `/marketing`. Marketing lands on its own desk. Its avatar is a dashed placeholder until the art is drawn. The desk shows one section per division ("N of M sent") with one line per award: the team(s), "No winner", "Being updated" (recalled, never a team) or "Not sent yet". It checks every 15 s while the tab is visible and keeps the last good answer when a check fails. A "Changed since sent" box sits above the divisions and each changed row is tagged "Changed — was …"; Seen hides it and is kept only in that browser. Search covers team number, name and award, and never the old team. Logic is in `src/components/marketing/marketingLogic.ts`.
+- JA Awards tab, By award: each award's header shows Send to Marketing (when decided), Sent HH:MM · Recall with a lock, Recalled · Send again with "Marketing had …", or "Pick a winner to send". A sent award's Mark no winner / Clear and the side panel's Clear winner / Give are disabled ("Recall it from Marketing first."). The matrix shows the lock on sent columns. Recall and Send all ready (N, event-wide) ask first through `useConfirm`. Send all refusals show in the danger banner. `ConfirmOptions` gained `body?: ReactNode`, and `Banner` keeps line breaks.
+- Recalled shows no time: the server records only the send time, and the recall is in Activity.
+- Door page: seventh door "Marketing" after Judge Advisor. The wide layout is 4 + 3, centred.
+
+### How it was tested
+
+- `npm test`: 1860 tests, 1859 pass, 1 skipped (the real-Postgres suite). `tsc`, eslint (`--ignore-pattern '.claude/**'`) and `npm run build` clean.
+- New and changed tests: `tests/marketingLogic.test.ts`, `tests/marketingPage.runtime.test.tsx`, plus additions to `tests/adminAwards.logic.test.mjs`, `tests/adminAwards.runtime.test.tsx`, `tests/confirmDialog.test.tsx`, `tests/doorPage.runtime.test.tsx`, `tests/doorPage.css.test.mjs` and `tests/mobile.test.mjs`.
+- Browser (file store, a scratch copy of `.data/state.json`), at 1280 dark and 375 light:
+  - Marketing signed in with `MKTG01`. The desk showed sent, recalled, No winner, two-team Judges, not-sent and changed rows. Search hid the recalled and old teams. Seen survived a reload. The division heading stuck on the phone.
+  - JA: Send, Recall (dialog then DELETE), Send all ready (dialog then POST, count to 0 and disabled), and the lock on Mark no winner / Clear and in the side panel / phone sheet. Buttons are 44px on the phone.
+  - Door at both widths.
+
+### Branch / commits
+
+`claude/awards-desk-ui-e125c3` (on top of the backend branch): `34edfd7` (spec), `fe4f21a` (plan), `c02e7c3` (desk), `4a574e6` + `f32e3bf` (JA tab), `8a123da` + `6925842` (door), plus this entry.
+
+### Status
+
+Built and committed locally. Not pushed. Not checked on a real iPhone.
+
+### Follow-ups
+
+- Marketing avatar art (the user will draw it). Swap it into `ROLES.marketing` in `SignInForm.tsx`, the door's `DOORS` entry and `.mk-av`.
+- If the JA wants the recall time, the backend needs a `recalled_at` field.
 
 ---
 
