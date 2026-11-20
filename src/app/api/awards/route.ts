@@ -52,7 +52,8 @@ export async function GET() {
   const barred = blockedTeams(await loadBlocks(), judge.panelId);
   return NextResponse.json(
     {
-      awards: awards(),
+      // Judges nominate the same way in any format, so the scope stays with the Judge Advisor.
+      awards: awards().map((a) => ({ ...a, blendedScope: undefined })),
       nominations: nominations.filter((n) => n.role === "judge" && n.panel_id === judge.panelId && !barred.has(n.team_id)),
     },
     noStore,

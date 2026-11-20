@@ -199,6 +199,11 @@ export type ScoreRow = {
   updated_at: string;
 };
 
+/** How the event runs: "blended" decides most awards once for the whole event. */
+export type EventFormat = "standard" | "blended";
+/** The Judge Advisor's saved event setup: a program label from config/event.json and its format. */
+export type EventSetup = { program: string; format: EventFormat; set_by: string; updated_at: string };
+
 /** One of config/event.json's awards, as the browser receives it (judges and the Judge Advisor only). */
 export type AwardView = {
   id: string;
@@ -207,6 +212,8 @@ export type AwardView = {
   blurb: string;
   /** How many teams can win it per division: 1 unless config/event.json says more (the Judges Award has 2). */
   places: number;
+  /** "division": still given in each division in a Blended event; absent means once for the whole event. */
+  blendedScope?: "division";
 };
 
 /** Whose nomination a row is: a judge's, or the Judge Advisor's own. */

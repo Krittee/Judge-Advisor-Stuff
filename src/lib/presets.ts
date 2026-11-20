@@ -1,7 +1,7 @@
 import presetFile from "../../config/event.json";
 import { normalizePanelCode } from "./panelCode";
 import { getRuleset, type MatchType } from "./rules";
-import type { AwardView, Panel, Team } from "./types";
+import type { AwardView, EventFormat, Panel, Team } from "./types";
 
 /**
  * Preset panels, read from config/event.json.
@@ -136,10 +136,11 @@ export function programTabs(divisions: string[], programs: Program[], blended: s
  * auto-assign, and what a judge can see — so the rule cannot drift
  * between them. Exact match is the normal answer; a blended division on
  * either side is the exception that makes Blend a usable category
- * instead of one that has to be lied about at the keyboard.
+ * instead of one that has to be lied about at the keyboard. A Blended event
+ * (`format`) has no wall at all: every panel judges every team.
  */
-export function divisionsCompatible(teamDivision: string, panelDivision: string): boolean {
-  if (teamDivision === panelDivision) return true;
+export function divisionsCompatible(teamDivision: string, panelDivision: string, format?: EventFormat | null): boolean {
+  if (format === "blended" || teamDivision === panelDivision) return true;
   const blended = blendedDivisions();
   return blended.includes(teamDivision) || blended.includes(panelDivision);
 }
@@ -470,6 +471,7 @@ export function parseAwards(list: unknown): AwardView[] {
       short: String(o.short ?? "").trim() || label,
       blurb: String(o.blurb ?? "").trim(),
       places: clamp(o.winners, 1, 10, 1),
+      ...(o.blendedScope === "division" ? { blendedScope: "division" as const } : {}),
     });
   }
 
