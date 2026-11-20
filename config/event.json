@@ -21,6 +21,8 @@
     "division. The order here is the order everywhere. Keep the ids stable once a",
     "nomination has been made; label, short and blurb can be reworded freely.",
     "",
+    "An award with \"blendedScope\": \"division\" is given in each division even in a Blended event; every other award is given once for the whole event.",
+    "",
     "`programs` are the tabs on Marketing's Awards Desk: each has a label and the divisions",
     "it shows (a division may be in more than one, as Middle School is). Blended divisions",
     "get their own Blended tab and any division in no program lands in Other. Leave",
@@ -105,13 +107,15 @@
       "id": "excellence",
       "label": "Excellence",
       "short": "Exc",
-      "blurb": "Overall excellence in the Engineering Notebook, Team Interview and competition performance."
+      "blurb": "Overall excellence in the Engineering Notebook, Team Interview and competition performance.",
+      "blendedScope": "division"
     },
     {
       "id": "design",
       "label": "Design",
       "short": "Des",
-      "blurb": "An organized, student-driven Engineering Design Process."
+      "blurb": "An organized, student-driven Engineering Design Process.",
+      "blendedScope": "division"
     },
     {
       "id": "innovate",

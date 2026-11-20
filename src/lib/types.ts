@@ -199,6 +199,11 @@ export type ScoreRow = {
   updated_at: string;
 };
 
+/** How the event runs: "blended" decides most awards once for the whole event. */
+export type EventFormat = "standard" | "blended";
+/** The Judge Advisor's saved event setup: a program label from config/event.json and its format. */
+export type EventSetup = { program: string; format: EventFormat; set_by: string; updated_at: string };
+
 /** One of config/event.json's awards, as the browser receives it (judges and the Judge Advisor only). */
 export type AwardView = {
   id: string;
@@ -207,6 +212,8 @@ export type AwardView = {
   blurb: string;
   /** How many teams can win it per division: 1 unless config/event.json says more (the Judges Award has 2). */
   places: number;
+  /** "division": still given in each division in a Blended event; absent means once for the whole event. */
+  blendedScope?: "division";
 };
 
 /** Whose nomination a row is: a judge's, or the Judge Advisor's own. */
@@ -269,8 +276,19 @@ export type AwardReleaseRow = ReleaseSnapshot & {
 export type ReleasedAward = { id: string; label: string; order: number; places: number };
 /** One tab on the Awards Desk: a label and the divisions it shows (a division may be in more than one tab). */
 export type ReleasedProgram = { label: string; divisions: string[] };
+/** One section of the desk: a key (a division, or "Whole event") and the ids of the awards decided under it. */
+export type ReleasedSection = { key: string; awardIds: string[] };
 /** GET /api/awards/released: the award list, the divisions, the tabs and the sends, never a nomination or a winner. */
-export type ReleasedView = { awards: ReleasedAward[]; divisions: string[]; programs: ReleasedProgram[]; releases: AwardReleaseRow[] };
+export type ReleasedView = {
+  awards: ReleasedAward[];
+  divisions: string[];
+  programs: ReleasedProgram[];
+  releases: AwardReleaseRow[];
+  /** Only when an event setup is saved; absent, the desk is exactly as before. */
+  setup?: Pick<EventSetup, "program" | "format">;
+  /** The desk's sections in order; present with `setup`. */
+  sections?: ReleasedSection[];
+};
 export type ReleaseReply = { release: AwardReleaseRow };
 export type SendAllReply = {
   sent: AwardReleaseRow[];
@@ -337,6 +355,8 @@ export type AppState = {
   matchTypes: MatchType[];
   /** Null until a referee or the Judge Advisor sets the event up. */
   refereeSetup: RefereeSetup | null;
+  /** The program and format the Judge Advisor set for this event: null until set, and for an anonymous caller; `set_by` is blank for marketing. */
+  eventSetup: EventSetup | null;
   /** The kinds of flag a referee can record, with their colours. */
   flagKinds: {
     id: string;

@@ -14,6 +14,8 @@ import type {
   WinnerRow,
   NoWinnerRow,
   AwardReleaseRow,
+  EventFormat,
+  EventSetup,
   ReleaseSnapshot,
 } from "../types";
 
@@ -282,6 +284,11 @@ export type Store = {
   getRefereeSetup(): Promise<RefereeSetup | null>;
   /** Replaces the one record. resetDay keeps it, resetAll clears it. */
   saveRefereeSetup(input: NewRefereeSetup): Promise<RefereeSetup>;
+
+  /** The event's program and format; null until one is saved. */
+  getEventSetup(): Promise<EventSetup | null>;
+  /** Replaces the one record and deletes every `recalled` award_releases row, in one write. resetDay keeps it, resetAll clears it. */
+  saveEventSetup(input: { program: string; format: EventFormat; setBy: string }): Promise<EventSetup>;
 
   /**
    * The judge roster, in the order judges were added. A panel's `judges`

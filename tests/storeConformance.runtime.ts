@@ -942,6 +942,57 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     assert.equal(await store.getRefereeSetup(), null, "a full wipe clears it");
   });
 
+  it("the event setup is one record per event: absent, saved, replaced; a day reset keeps it, a full wipe clears it", async (store) => {
+    assert.equal(await store.getEventSetup(), null, "nothing is set up on a fresh event");
+
+    const first = await store.saveEventSetup({ program: "V5RC", format: "standard", setBy: "Dana" });
+    assert.deepEqual([first.program, first.format, first.set_by], ["V5RC", "standard", "Dana"]);
+    assert.ok(!Number.isNaN(Date.parse(first.updated_at)), "updated_at is a timestamp");
+    assert.deepEqual(await store.getEventSetup(), first, "and it reads back as saved");
+
+    const second = await store.saveEventSetup({ program: "VEX IQ", format: "blended", setBy: "Judge Advisor" });
+    assert.deepEqual([second.program, second.format, second.set_by], ["VEX IQ", "blended", "Judge Advisor"], "a second save replaces the first");
+    assert.deepEqual(await store.getEventSetup(), second);
+
+    await store.resetDay();
+    assert.deepEqual(await store.getEventSetup(), second, "a day reset keeps it");
+    await store.resetAll();
+    assert.equal(await store.getEventSetup(), null, "a full wipe clears it");
+  });
+
+  it("saving the event setup deletes recalled award releases and keeps sent ones", async (store) => {
+    for (const division of [ES, MS]) {
+      await store.sendRelease({ awardId: "design", division, snapshot: { teams: [], no_winner: true }, previous: null, changedAt: null, sentBy: "Alex" });
+    }
+    await store.recallRelease("design", MS);
+
+    await store.saveEventSetup({ program: "VEX IQ", format: "standard", setBy: "Dana" });
+    assert.deepEqual((await store.listReleases()).map((r) => [r.division, r.status]), [[ES, "sent"]]);
+  });
+
+  it("a new team with no division lands in the saved program's first division", async (store) => {
+    await store.saveEventSetup({ program: "V5RC", format: "standard", setBy: "Dana" });
+    await store.upsertTeams([{ number: "1001", name: "New", pit: null }]);
+    assert.equal((await store.findTeamByNumber("1001"))?.division, MS);
+  });
+
+  it("in a blended event, a team that changes division keeps its panel, and so does a panel that changes division", async (store) => {
+    await store.saveEventSetup({ program: "VEX IQ", format: "blended", setBy: "Dana" });
+    const whole = await store.createPanel(panelInput({ division: "Whole event" }));
+    const es = await store.createPanel(panelInput({ name: "Panel B", code: "CONF02", division: ES }));
+    await store.upsertTeams([teamInput("1001", { division: ES }), teamInput("1002", { division: ES })]);
+    const [a, b] = [await store.findTeamByNumber("1001"), await store.findTeamByNumber("1002")];
+    assert.ok(a && b);
+    await store.updateTeam(a.id, { panel_id: whole.id });
+    await store.updateTeam(b.id, { panel_id: es.id });
+
+    await store.upsertTeams([teamInput("1001", { division: MS })]);
+    assert.equal((await store.findTeamByNumber("1001"))?.panel_id, whole.id, "no wall: the Whole event panel still judges it");
+
+    await store.updatePanel(es.id, { division: MS });
+    assert.equal((await store.findTeamByNumber("1002"))?.panel_id, es.id, "no wall: the ES team stays on the moved panel");
+  });
+
   it("a conflict is declared once, however many times it is asked for", async (store) => {
     const panel = await store.createPanel(panelInput());
     await store.upsertTeams([teamInput("1001")]);

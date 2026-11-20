@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { actorParts } from "@/lib/activity";
 import { canAdminister, getSession, type Session } from "@/lib/auth";
 import { store } from "@/lib/db";
+import { awardPairs, awardsUnder, keyError, scopeKeys } from "@/lib/eventSetup";
 import { awards, blendedDivisions, presetPrograms, programTabs } from "@/lib/presets";
 import { decisionFor, nextSend, sentRelease } from "@/lib/releases";
 import { eventDivisions } from "@/lib/server-state";
@@ -73,12 +74,20 @@ export async function GET() {
     return NextResponse.json(FORBIDDEN, { status: 403 });
   }
   const db = store();
-  const [releases, panels, teams] = await Promise.all([db.listReleases(), db.listPanels(), db.listTeams()]);
-  const divisions = eventDivisions(panels, teams);
+  const [releases, panels, teams, setup] = await Promise.all([db.listReleases(), db.listPanels(), db.listTeams(), db.getEventSetup()]);
+  const divisions = eventDivisions(panels, teams, setup);
   const view: ReleasedView = {
     awards: awards().map((a, order) => ({ id: a.id, label: a.label, order, places: a.places })),
     divisions,
-    programs: programTabs(divisions, presetPrograms(), blendedDivisions()),
+    // A saved setup picks the program, so the desk needs no tabs.
+    programs: setup ? programTabs(divisions, [], []) : programTabs(divisions, presetPrograms(), blendedDivisions()),
+    ...(setup && {
+      setup: { program: setup.program, format: setup.format },
+      sections: scopeKeys(divisions, setup.format).map((key) => ({
+        key,
+        awardIds: awardsUnder(awards(), key, setup.format).map((a) => a.id),
+      })),
+    }),
     // A recalled decision is the Judge Advisor's business; Marketing sees only that it is withdrawn.
     releases:
       session?.role === "marketing"
@@ -101,6 +110,8 @@ export async function PUT(request: Request) {
   }
   const award = awards().find((a) => a.id === awardId);
   if (!award) return NextResponse.json({ error: "That award does not exist." }, { status: 400 });
+  const wrongKey = keyError(award, division, await store().getEventSetup());
+  if (wrongKey) return NextResponse.json({ error: wrongKey }, { status: 400 });
 
   const { releases, decide } = await decisions();
   const snapshot = decide(award, division);
@@ -154,15 +165,13 @@ export async function POST() {
   if (!canAdminister(session)) return NextResponse.json(FORBIDDEN, { status: 403 });
 
   const db = store();
-  const [{ releases, decide }, panels, teams] = await Promise.all([decisions(), db.listPanels(), db.listTeams()]);
+  const [{ releases, decide }, panels, teams, setup] = await Promise.all([decisions(), db.listPanels(), db.listTeams(), db.getEventSetup()]);
   const reply: SendAllReply = { sent: [], skipped: [] };
-  for (const division of eventDivisions(panels, teams)) {
-    for (const award of awards()) {
-      const snapshot = decide(award, division);
-      if (!snapshot) reply.skipped.push({ awardId: award.id, division, reason: "not ready" });
-      else if (sentRelease(releases, award.id, division)) reply.skipped.push({ awardId: award.id, division, reason: "already sent" });
-      else reply.sent.push(await sendOne(session!, award, division, snapshot, releases));
-    }
+  for (const { award, division } of awardPairs(awards(), eventDivisions(panels, teams, setup), setup?.format)) {
+    const snapshot = decide(award, division);
+    if (!snapshot) reply.skipped.push({ awardId: award.id, division, reason: "not ready" });
+    else if (sentRelease(releases, award.id, division)) reply.skipped.push({ awardId: award.id, division, reason: "already sent" });
+    else reply.sent.push(await sendOne(session!, award, division, snapshot, releases));
   }
   return NextResponse.json(reply);
 }
