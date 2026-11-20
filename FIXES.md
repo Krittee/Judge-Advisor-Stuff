@@ -4,7 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-20 | [Awards Desk UI (2.2.0)](#awards-desk-ui-220-2026-11-20) | `c02e7c3`..(this commit) | Not yet (375 preview only) | Built on `claude/awards-desk-ui-e125c3`, not pushed |
+| 2026-11-20 | [Awards Desk UI (2.2.0)](#awards-desk-ui-220-2026-11-20) | `c02e7c3`..`2d83b19` | iPhone Simulator only | Built on `claude/awards-desk-ui-e125c3`, not pushed |
 | 2026-11-19 | [Awards Desk backend (2.2.0)](#awards-desk-backend-220-2026-11-19) | `d5b1807`..`f9cc675` | Not needed (no UI yet) | Built on `claude/awards-desk-backend-921f59`, UI built on `claude/awards-desk-ui-e125c3` |
 | 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
 | 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ef84422` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
@@ -43,6 +43,7 @@ Build spec `design/awards-desk/PROMPT.md` (boards `design/awards-desk/reference-
 - Recalled shows no time: the server records only the send time, and the recall is in Activity.
 - Door page: seventh door "Marketing" after Judge Advisor. The wide layout is 4 + 3, centred.
 - Marketing avatar: the user's art, cropped inside its frame to 320 × 320 (`public/avatars/marketing.jpg`), on the sign-in pass, the door (desk teal ring, like the Coordinator) and the desk's top bar.
+- Program tabs (user request, 2026-11-20): the desk has VEX IQ (Elementary + Middle School), V5RC (Middle + High School) and Blended tabs at every size; Middle School shows in both programs. Set in `config/event.json` `programs`; Blended is the event's blended divisions, and a division in neither lands in an Other tab. GET `/api/awards/released` gained `programs` (additive). Each tab shows "N of M sent"; the tab is remembered on the device (`mk-tab`). Changed since sent stays above the tabs for every division; a search looks across all tabs and lists each division once. Commits `319b1c7`, `2d83b19`.
 
 ### How it was tested
 
