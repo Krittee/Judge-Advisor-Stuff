@@ -168,3 +168,43 @@
 - [ ] Review each task's diff against PROMPT.md and the boards before the next task starts.
 - [ ] Browser check on a **copy** of the data: copy `.data/state.json` to the scratchpad, add a `.claude/launch.json` entry `awards-ui` (`DATA_FILE=<copy>`, `npm run dev -- -p 3700`, port 3700) from this worktree. At 1280 and 375, dark and light: Marketing sign-in with `MKTG01`; desk with sent / recalled / never-sent / changed rows, search, Seen; JA tab Send, Recall dialog, lock message, Send all ready dialog. Screenshots of the desk and the JA tab.
 - [ ] Add a FIXES.md row and section "Awards Desk UI (2.2.0)" in the backend entry's format; commit `Awards Desk UI: fix record`.
+
+---
+
+## Follow-up (2026-11-20): split the Awards Desk by program
+
+User request: the Marketing Awards Desk is split into **VEX IQ** and **V5RC**, as **tabs at every size**. VEX IQ = Elementary School + Middle School. V5RC = Middle School + High School, so Middle School shows in both tabs with the same awards. **Blended** gets a tab of its own, holding the blended divisions as set up for the event.
+
+### Task 5: Program tabs on the Awards Desk
+
+**Files:**
+- Modify: `config/event.json` (new key `programs`, plus a `_comment` line)
+- Modify: `src/lib/presets.ts` (`presetPrograms()`)
+- Modify: `src/lib/types.ts` (`ReleasedView.programs`)
+- Modify: `src/app/api/awards/released/route.ts` (GET adds `programs`; nothing else changes)
+- Modify: `src/components/marketing/marketingLogic.ts`, `src/components/marketing/AwardsDesk.tsx`, `src/app/marketing/page.tsx`, `src/app/globals.css` (`.mk-*`)
+- Test: `tests/marketingLogic.test.ts`, `tests/marketingPage.runtime.test.tsx`, `tests/awardsReleased.runtime.test.ts`
+
+**Interfaces:**
+- `config/event.json`: `"programs": [{ "label": "VEX IQ", "divisions": ["Elementary School", "Middle School"] }, { "label": "V5RC", "divisions": ["Middle School", "High School"] }]`
+- `presetPrograms(): { label: string; divisions: string[] }[]`: from config, trimmed and de-duplicated; `[]` when the key is missing.
+- `ReleasedView.programs: { label: string; divisions: string[] }[]`: the server builds the tabs in this order.
+  1. Each configured program, keeping only the divisions in `eventDivisions` (in event order), dropped if empty.
+  2. `"Blended"` = `blendedDivisions()` that are in the event (the existing JA/config setting), dropped if empty.
+  3. `"Other"` = any event division in no program and not blended, dropped if empty, so a division the JA adds is never lost.
+  With no `programs` config: `[{ label: "All", divisions }]`, and the desk draws no tab bar.
+- `marketingLogic.ts`: `tabKey(label: string): string` (lower-case slug), `pickTab(programs, saved: string | null): string` (the saved one if it still exists, else the first).
+
+**Behaviour (desk):**
+- A tab bar under the status line: one tab per program (`role="tablist"`, each `role="tab"` with `aria-selected`), styled like the JA's Matrix | By award toggle (`.ja-aw-vt` look, `.mk-tabs` classes). ≥44px on phone, 36px on desktop. The label carries its sent count: "VEX IQ · 7 of 22 sent", where Middle School counts once per tab it is in.
+- The tab is remembered on this device: `localStorage` key `mk-tab`, with try/catch like Seen.
+- The **Changed since sent** box stays above the tabs and lists changes from **every** division (safety signal, unchanged).
+- Only the selected tab's division sections show, in its order.
+- **Search** looks across **all** tabs while a query is set. The tab bar is hidden and results are grouped by division, each division once (Middle School not doubled). "N results" counts each award row once. Clearing the query brings the tabs back on the same tab.
+- One tab only (no `programs` config): no tab bar, same page as today.
+
+- [ ] Step 1: failing tests:
+  - route GET returns `programs` with VEX IQ [ES, MS], V5RC [MS, HS], Blended [Blended]; an extra division "Open" lands in "Other".
+  - `pickTab`: falls back to the first tab when the saved one is gone.
+  - markup: the tab bar shows 3 tabs with the counts; the V5RC tab shows Middle School and High School only; a search for an MS team shows Middle School once and no tab bar.
+- [ ] Step 2: implement. Step 3: full gate. Step 4: commit "Awards Desk: VEX IQ, V5RC and Blended tabs".
