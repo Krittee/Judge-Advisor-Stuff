@@ -118,7 +118,7 @@ export default function AdminPage() {
             <FloorTab state={state} refresh={refresh} onError={setError} onNotes={(team) => setSheetId(team.id)} />
           ) : null}
           {tab === "event" ? (
-            <EventTab state={state} awards={awards.data} released={awards.released} refresh={refresh} onError={setError} onOpenTab={setTab} />
+            <EventTab state={state} awards={awards.data} released={awards.released} refresh={refresh} reloadAwards={awards.reload} onError={setError} onOpenTab={setTab} />
           ) : null}
           {tab === "scores" ? (
             <ScoresTab

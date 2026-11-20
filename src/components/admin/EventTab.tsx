@@ -27,7 +27,6 @@ const GO_TAB = { awards: "awards", teams: "teams", panels: "panels" } as const;
 
 function ChecklistRow({ row, onOpenTab }: { row: Row; onOpenTab: (t: AdminTab) => void }) {
   const lead = "Clear the awards first.";
-  const lines = row.id === "panels" ? row.items : null;
   return (
     <li className={`ja-es-cr${row.ok === false ? " ja-es-warn" : ""}`}>
       <span
@@ -70,19 +69,12 @@ function ChecklistRow({ row, onOpenTab }: { row: Row; onOpenTab: (t: AdminTab) =
             ))}
           </ul>
         ) : null}
-        {lines?.length ? (
-          <ul className="ja-es-pl">
-            {lines.map((p) => (
-              <li key={p.id}>{p.main}</li>
-            ))}
-          </ul>
-        ) : null}
-        {row.ok === false ? (
-          <button type="button" className="ja-es-go" onClick={() => onOpenTab(GO_TAB[row.id])}>
-            Open {ROW_LABEL[row.id]}
-          </button>
-        ) : null}
       </div>
+      {row.ok === false ? (
+        <button type="button" className="ja-es-go" onClick={() => onOpenTab(GO_TAB[row.id])}>
+          Open {ROW_LABEL[row.id]}
+        </button>
+      ) : null}
     </li>
   );
 }
@@ -99,6 +91,7 @@ export function EventTab({
   awards,
   released,
   refresh,
+  reloadAwards,
   onError,
   onOpenTab,
 }: {
@@ -106,21 +99,32 @@ export function EventTab({
   awards: AwardsAdminView | null;
   released: ReleasedView | null;
   refresh: () => Promise<void> | void;
+  /** Asks /api/awards again now: a refused save says the awards changed, and the Awards row should too. */
+  reloadAwards: () => Promise<void>;
   onError: (m: string | null) => void;
   onOpenTab: (t: AdminTab) => void;
 }) {
   const saved = state.eventSetup;
   const awardList = awards?.awards ?? presetAwards();
   const tileList = tiles(presetPrograms(), awardList);
-  const [picked, setPicked] = useState<Pick2 | null>(() =>
-    saved && tileList.some((t) => same(t, saved)) ? { program: saved.program, format: saved.format } : null,
-  );
-  /* The 409's `outside` list: replaces the Teams and Panels rows until the pick changes. */
-  const [outside, setOutside] = useState<Outside | null>(null);
+  const fromSaved = () => (saved && tileList.some((t) => same(t, saved)) ? { program: saved.program, format: saved.format } : null);
+  const [picked, setPicked] = useState<Pick2 | null>(fromSaved);
+  /* A save from elsewhere, or state arriving late, moves the pick to the new saved setup. */
+  const savedKey = saved ? `${saved.program}|${saved.format}` : "";
+  const [seenSaved, setSeenSaved] = useState(savedKey);
+  if (seenSaved !== savedKey) {
+    setSeenSaved(savedKey);
+    setPicked(fromSaved());
+  }
+  /* The 409's `outside` list: replaces the Teams and Panels rows until the pick changes or the teams or panels do. */
+  const rosterKey = [...state.teams.map((t) => `${t.id}:${t.division}`), "|", ...state.panels.map((p) => `${p.id}:${p.division}`)].join(",");
+  const [refused, setOutside] = useState<{ list: Outside; key: string } | null>(null);
+  const outside = refused?.key === rosterKey ? refused.list : null;
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const hintId = useId();
+  const uid = useId();
 
   const pickedTile = tileList.find((t) => same(t, picked)) ?? null;
   const choose = (t: { program: string; format: Pick2["format"] }) => {
@@ -173,7 +177,8 @@ export function EventTab({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         onError(data.error || `Request failed (${res.status})`);
-        if (data.outside) setOutside(data.outside);
+        if (data.outside) setOutside({ list: data.outside, key: rosterKey });
+        await reloadAwards();
         return;
       }
       setOutside(null);
@@ -231,15 +236,17 @@ export function EventTab({
               type="button"
               role="radio"
               aria-checked={on}
+              aria-labelledby={`${uid}-t${i}`}
+              aria-describedby={same(t, saved) ? `${uid}-s${i}` : undefined}
               tabIndex={on || (!picked && i === 0) ? 0 : -1}
               className="ja-es-tile"
               onClick={() => choose(t)}
             >
               <span className="ja-es-tt">
                 <span className="ja-es-tn">
-                  <b>{t.title}</b>
+                  <b id={`${uid}-t${i}`}>{t.title}</b>
                   {same(t, saved) ? (
-                    <span className="ja-es-sv">
+                    <span className="ja-es-sv" id={`${uid}-s${i}`}>
                       <Tick size={11} width={3} />
                       Saved
                     </span>

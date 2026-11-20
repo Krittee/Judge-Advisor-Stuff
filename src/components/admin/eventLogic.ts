@@ -61,7 +61,7 @@ function teamsRow(outside: { id: string; number: string; name: string; division:
 
 function panelsRow(outside: { id: string; name: string; division: string }[]): Row {
   if (!outside.length) return { id: "panels", ok: true, text: FINE };
-  return { id: "panels", ok: false, text: "", items: outside.map((p) => ({ id: p.id, main: `${p.name} · ${p.division}` })) };
+  return { id: "panels", ok: false, text: outside.map((p) => `${p.name} · ${p.division}`).join(", ") };
 }
 
 const same = (a: Pick2 | null | undefined, b: Pick2 | null | undefined) => Boolean(a && b && a.program === b.program && a.format === b.format);
@@ -93,6 +93,8 @@ export function checklist(
         ? { id: "awards", ok: false, text: `Clear the awards first. ${counts}` }
         : { id: "awards", ok: true, text: "none decided" };
   }
+  // The saved setup picked again changes nothing, so every row is fine whatever the data says.
+  if (same(next, released?.setup)) return [row, teamsRow([], next.program), panelsRow([])];
   const divisions = divisionChoices(next, false).options;
   const panelOptions = divisionChoices(next, true).options;
   return [

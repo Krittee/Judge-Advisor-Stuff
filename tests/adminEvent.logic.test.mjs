@@ -74,7 +74,8 @@ test("checklist: teams and panels outside the picked program are listed", () => 
   assert.equal(rows[1].text, "1 team is in High School, which VEX IQ doesn't have");
   assert.deepEqual(rows[1].items, [{ id: "a", main: "1010M", sub: "Team 1010M", tag: "HS" }]);
   assert.equal(rows[2].ok, false);
-  assert.deepEqual(rows[2].items?.map((i) => i.main), ["Panel 3 · High School", "Panel 1 · Whole event"]);
+  assert.equal(rows[2].text, "Panel 3 · High School, Panel 1 · Whole event");
+  assert.equal(rows[2].items, undefined);
   // blended lets a panel sit under "Whole event"
   const blended = checklist(IQ, ctx({ panels: [panel("p2", "Panel 1", "Whole event")] }));
   assert.equal(blended[2].ok, true);
@@ -95,6 +96,15 @@ test("checklist: the saved setup picked again shows the awards row green even wi
   assert.equal(rows[0].ok, true);
 });
 
+test("checklist: the saved setup picked again is three green rows whatever the awards, teams and panels say", () => {
+  const rows = checklist(
+    IQ,
+    ctx({ awards: view({ winners: [win("excellence", ES)] }), released: released({ setup: IQ, releases: [sent("design", MS)] }), teams: [team("a", "1010M", HS)], panels: [panel("p1", "Panel 3", HS)] }),
+  );
+  assert.deepEqual(rows.map((r) => r.ok), [true, true, true]);
+  assert.deepEqual(rows.map((r) => r.items), [undefined, undefined, undefined]);
+});
+
 test("checklist: a saved program the config no longer lists falls back without throwing", () => {
   const rows = checklist(IQ_STD, ctx({ released: released({ setup: { program: "Gone", format: "blended" } }), awards: view({ winners: [win("excellence", ES)] }) }));
   assert.equal(rows[0].ok, false);
@@ -110,7 +120,7 @@ test("outsideRows rebuilds Teams and Panels from a 409 reply, names from the tea
   assert.deepEqual(rows.map((r) => [r.id, r.ok]), [["teams", false], ["panels", false]]);
   assert.equal(rows[0].text, "1 team is in Elementary School, which V5RC doesn't have");
   assert.deepEqual(rows[0].items, [{ id: "a", main: "1010M", sub: "Team 1010M", tag: "ES" }]);
-  assert.deepEqual(rows[1].items, [{ id: "p1", main: "Panel 3 · Elementary School" }]);
+  assert.equal(rows[1].text, "Panel 3 · Elementary School");
   assert.deepEqual(outsideRows({ teams: [], panels: [] }, []).map((r) => r.ok), [true, true]);
 });
 

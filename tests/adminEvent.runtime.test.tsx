@@ -19,7 +19,7 @@ const state = (over: Partial<AppState> = {}) => ({ teams: [], panels: [], eventS
 const view: AwardsAdminView = { awards: awards(), nominations: [], winners: [], noWinners: [] };
 const released: ReleasedView = { awards: [], divisions: [], programs: [], releases: [] };
 const tab = (s: AppState, over: Partial<Parameters<typeof EventTab>[0]> = {}) =>
-  renderToStaticMarkup(<EventTab state={s} awards={view} released={released} refresh={noop} onError={noop} onOpenTab={noop} {...over} />);
+  renderToStaticMarkup(<EventTab state={s} awards={view} released={released} refresh={noop} reloadAwards={async () => {}} onError={noop} onOpenTab={noop} {...over} />);
 
 test("not set up yet: the notice, no picked tile, an empty preview, Save disabled with its hint", () => {
   const m = tab(state());
@@ -48,6 +48,22 @@ test("four tiles in one radiogroup; the saved one is picked, tagged Saved, with 
   assert.ok(!m.includes("Fix the items above to save."));
 });
 
+test("each tile is named by its title, and the saved one is described by its Saved tag", () => {
+  const m = tab(state({ eventSetup }));
+  const radios = [...m.matchAll(/<button[^>]*role="radio"[^>]*>/g)].map((x) => x[0]);
+  assert.equal(radios.length, 4);
+  const nameOf = (r: string) => {
+    const id = /aria-labelledby="([^"]+)"/.exec(r)![1];
+    return text(new RegExp(`<b id="${id.replace(/[:]/g, "\\$&")}">[\\s\\S]*?</b>`).exec(m)![0]);
+  };
+  assert.deepEqual(radios.map(nameOf), ["VEX IQ · Standard", "VEX IQ · Blended", "V5RC · Standard", "V5RC · Blended"]);
+  const described = radios.filter((r) => r.includes("aria-describedby"));
+  assert.equal(described.length, 1);
+  assert.ok(described[0].includes("aria-checked=\"true\""));
+  const sid = /aria-describedby="([^"]+)"/.exec(described[0])![1];
+  assert.ok(m.includes(`id="${sid}"`) && text(new RegExp(`id="${sid}"[\\s\\S]*?</span>`).exec(m)![0]).includes("Saved"));
+});
+
 test("a saved setup with a decided award: the saved tile picked again stays green", () => {
   const decided = { ...view, winners: [{ award_id: "excellence", division: "Elementary School", team_id: "a", decided_by: "x", decided_at: "" }] };
   assert.equal((tab(state({ eventSetup }), { awards: decided, released: { ...released, setup: eventSetup } }).match(/aria-label="Fine"/g) ?? []).length, 3);
@@ -56,6 +72,7 @@ test("a saved setup with a decided award: the saved tile picked again stays gree
 test("the checklist waits for the awards: Checking, Save disabled", () => {
   const m = tab(state({ eventSetup }), { awards: null });
   assert.ok(m.includes('aria-label="Checking"') && m.includes("checking…"));
+  assert.match(m, /<button[^>]*class="ja-es-prim"[^>]*disabled=""|<button[^>]*disabled=""[^>]*class="ja-es-prim"/);
 });
 
 test("the 409's outside list rebuilds the Teams and Panels rows with number, name, tag and the panel lines", () => {
@@ -66,7 +83,7 @@ test("the 409's outside list rebuilds the Teams and Panels rows with number, nam
   );
   assert.equal(rows[0].text, "1 team is in Elementary School, which V5RC doesn't have");
   assert.deepEqual(rows[0].items, [{ id: "a", main: "41111A", sub: "Team 41111A", tag: "ES" }]);
-  assert.deepEqual(rows[1].items, [{ id: "p3", main: "Panel 3 · Elementary School" }]);
+  assert.equal(rows[1].text, "Panel 3 · Elementary School");
 });
 
 test("the rail's Setup group is Event, Teams, Panels, Conflicts, Import", () => {
