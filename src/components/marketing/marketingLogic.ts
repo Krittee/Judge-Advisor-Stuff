@@ -1,3 +1,4 @@
+import { sentUnder } from "@/lib/releases";
 import type { AwardReleaseRow, ReleasedAward, ReleasedProgram, ReleasedSection, ReleasedView, ReleaseSnapshot, ReleaseTeam } from "@/lib/types";
 
 /**
@@ -21,8 +22,6 @@ export type Change = {
   nowText: string;
   /** What it was, numbers only: "1234A", "1234A, 5150X" or "No winner". */
   wasText: string;
-  /** The same, for the row's "Changed — was …" tag. */
-  wasNumbers: string;
 };
 
 export type DeskRow = {
@@ -57,8 +56,7 @@ function changeOf(award: DeskRow["award"], r: AwardReleaseRow, isSeen: (key: str
   if (r.status !== "sent" || !r.previous || !r.changed_at) return null;
   const key = seenKey(r);
   if (isSeen(key)) return null;
-  const was = snapshotText(r.previous, false);
-  return { awardId: award.id, label: award.label, division: r.division, key, nowText: snapshotText(r, true), wasText: was, wasNumbers: was };
+  return { awardId: award.id, label: award.label, division: r.division, key, nowText: snapshotText(r, true), wasText: snapshotText(r.previous, false) };
 }
 
 /** One row per award in `awards` (config order), with what (if anything) was sent for it under `key`. */
@@ -94,12 +92,8 @@ export function sectionRows(view: ReleasedView, section: ReleasedSection, isSeen
   return rowsFor(view, view.awards.filter((a) => section.awardIds.includes(a.id)), section.key, isSeen);
 }
 
-/** Sent rows under the section's key, for the awards it holds. */
-export const sectionSent = (view: ReleasedView, section: ReleasedSection): number =>
-  view.releases.filter((r) => r.division === section.key && r.status === "sent" && section.awardIds.includes(r.award_id)).length;
-
 /** "5 of 9 sent": sent rows under the section's key over the awards it holds. */
-export const sectionCount = (view: ReleasedView, section: ReleasedSection): string => countText(sectionSent(view, section), section.awardIds.length);
+export const sectionCount = (view: ReleasedView, section: ReleasedSection): string => countText(sentUnder(view.releases, section.key, section.awardIds), section.awardIds.length);
 
 /** The event title's muted line. Blended names the per-division awards (the first section's); Standard says every award. */
 export function eventLine(view: ReleasedView): string {
@@ -112,12 +106,6 @@ export function eventLine(view: ReleasedView): string {
 export function changesOf(view: ReleasedView, isSeen: (key: string) => boolean): Change[] {
   const rows = view.sections ? view.sections.flatMap((s) => sectionRows(view, s, isSeen)) : view.divisions.flatMap((d) => deskRows(view, d, isSeen));
   return rows.flatMap((r) => (r.change ? [r.change] : []));
-}
-
-/** Sent rows in a division for awards still in the config; a recalled row is not sent. */
-export function sentCount(view: ReleasedView, division: string): number {
-  const ids = new Set(view.awards.map((a) => a.id));
-  return view.releases.filter((r) => r.division === division && r.status === "sent" && ids.has(r.award_id)).length;
 }
 
 /** The tabs to draw: the server's, or one "All" tab over every division (an older answer, or no programs configured). */
@@ -136,12 +124,10 @@ export function pickTab(tabs: ReleasedProgram[], saved: string | null): string {
 
 /** "7 of 22 sent": sent rows over awards × divisions; a division in two tabs counts in each. */
 export function tabCount(view: ReleasedView, tab: ReleasedProgram): string {
-  const n = tab.divisions.reduce((sum, d) => sum + sentCount(view, d), 0);
+  const ids = view.awards.map((a) => a.id);
+  const n = tab.divisions.reduce((sum, d) => sum + sentUnder(view.releases, d, ids), 0);
   return countText(n, view.awards.length * tab.divisions.length);
 }
-
-/** "VEX IQ · 7 of 22 sent": the tab's whole label, for one line. */
-export const tabLabel = (view: ReleasedView, tab: ReleasedProgram) => `${tab.label} · ${tabCount(view, tab)}`;
 
 export const countText = (n: number, m: number) => `${n} of ${m} sent`;
 
@@ -167,45 +153,26 @@ export function highlight(text: string, query: string): { text: string; hit: boo
 
 export const resultsText = (n: number) => `${n} ${n === 1 ? "result" : "results"}`;
 
-/** Local "HH:MM" of an ISO time. */
+/** Local "HH:MM" of an ISO time; blank for one that does not parse. */
 export function hhmm(iso: string): string {
   const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return Number.isNaN(d.getTime()) ? "" : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-/* Seen lives only in this browser. Storage can throw (Safari private mode, blocked site data):
-   then nothing is remembered and the flag shows again after a reload, which is the safe way to be wrong. */
-export function readSeen(store: Pick<Storage, "getItem"> | null, key: string): boolean {
+/* Seen and the remembered tab live only in this browser. Storage can throw (Safari private mode, blocked site data):
+   then nothing is remembered, the Seen flag shows again after a reload and the first tab shows, which is the safe way to be wrong. */
+export function storeGet(store: Pick<Storage, "getItem"> | null, key: string): string | null {
   try {
-    return store?.getItem(key) === "1";
-  } catch {
-    return false;
-  }
-}
-
-export function writeSeen(store: Pick<Storage, "setItem"> | null, key: string): void {
-  try {
-    store?.setItem(key, "1");
-  } catch {
-    /* nothing to do: the flag will show again next load */
-  }
-}
-
-/* The tab is remembered on this device, guarded like Seen: with storage blocked the first tab shows. */
-export const TAB_KEY = "mk-tab";
-
-export function readTab(store: Pick<Storage, "getItem"> | null): string | null {
-  try {
-    return store?.getItem(TAB_KEY) ?? null;
+    return store?.getItem(key) ?? null;
   } catch {
     return null;
   }
 }
 
-export function writeTab(store: Pick<Storage, "setItem"> | null, key: string): void {
+export function storeSet(store: Pick<Storage, "setItem"> | null, key: string, val: string): void {
   try {
-    store?.setItem(TAB_KEY, key);
+    store?.setItem(key, val);
   } catch {
-    /* nothing to do: the first tab shows next load */
+    /* nothing to do: it is forgotten, and shows as new next load */
   }
 }

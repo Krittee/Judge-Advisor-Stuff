@@ -2,6 +2,7 @@ import { kindCounts, type FlagKind } from "@/components/Flags";
 import type { Ask } from "@/components/judge/logic";
 import { goodConductTeams, GOOD_CONDUCT, GOOD_CONDUCT_MIN, SPORTSMANSHIP } from "@/lib/awards";
 import { matchReference } from "@/lib/match";
+import { sameDecision } from "@/lib/releases";
 import { judgeKey } from "@/lib/roster";
 import { awardKey, awardPairs, awardsUnder, scopeKeys, WHOLE_EVENT } from "@/lib/eventSetup";
 import type { Rubric } from "@/lib/rubrics";
@@ -130,7 +131,7 @@ export function alreadyHas(awards: AwardView[], decided: Map<string, WinnerRow[]
 
 /* ---- the words ----------------------------------------------------------------- */
 
-const byNumber = (a: string, b: string): number => a.localeCompare(b, undefined, { numeric: true });
+export const byNumber = (a: string, b: string): number => a.localeCompare(b, undefined, { numeric: true });
 
 /** Teams by number, 1234A before 7700B: the Add team picker's order. */
 export const teamsByNumber = (teams: Team[]): Team[] => [...teams].sort((a, b) => byNumber(a.number, b.number));
@@ -605,14 +606,6 @@ export function readyToSend(awards: AwardView[], divisions: string[], winners: W
   return awardPairs(awards, divisions, format).filter(({ award, division }) => isReady(award, division, winners, noWinners) && releaseOf(releases, award.id, division)?.status !== "sent");
 }
 
-/** How many of the config's awards one division has sent: "· N sent to Marketing". */
-export const sentCountIn = (releases: AwardReleaseRow[], awards: Pick<AwardView, "id">[], division: string): number =>
-  releases.filter((r) => r.status === "sent" && r.division === division && awards.some((a) => a.id === r.award_id)).length;
-
-/** How many awards the event has sent, over every key: "· N sent to Marketing". */
-export const eventSentCount = (releases: AwardReleaseRow[], awards: Pick<AwardView, "id" | "blendedScope">[], divisions: string[], format?: EventFormat | null): number =>
-  scopeKeys(divisions, format).reduce((n, key) => n + sentCountIn(releases, awardsUnder(awards, key, format), key), 0);
-
 /** "4455F Spark Plugs", "1234A Gear Grinders, 60601D Iron Owls" or "No winner". */
 export const snapshotLine = (s: ReleaseSnapshot): string => (s.no_winner || !s.teams.length ? "No winner" : s.teams.map((t) => `${t.number} ${t.name}`).join(", "));
 
@@ -631,17 +624,14 @@ export function sendAllLines(
     const held = winnersOf(winners, division).get(award.id) ?? [];
     const named = held.flatMap((w) => teams.filter((t) => t.id === w.team_id));
     const sent = releaseOf(releases, award.id, division);
-    const same = (r: AwardReleaseRow) => r.no_winner === !held.length && [...r.teams.map((t) => t.id)].sort().join() === held.map((w) => w.team_id).sort().join();
+    const now = { teams: named, no_winner: !held.length };
     return {
       key: `${award.id}|${division}`,
-      text: `${award.label} · ${division} · ${named.length ? named.map((t) => `${t.number} ${t.name}`).join(", ") : "No winner"}`,
-      was: sent && !same(sent) ? snapshotLine(sent) : null,
+      text: `${award.label} · ${division} · ${snapshotLine(now)}`,
+      was: sent && !sameDecision(sent, now) ? snapshotLine(sent) : null,
     };
   });
 }
-
-/** What a header says in place of Send while an award is not decided: the Judges Award, once one of its two is picked, asks for the other. */
-export const pickText = (award: Pick<AwardView, "places">, held: number): string => (award.places > 1 && held > 0 ? "Pick both winners to send" : "Pick a winner to send");
 
 /** The awards of one division that cannot go yet (not decided, and not sent; a recalled one counts), and why: "Energy isn't ready: no winner yet." */
 export function notReadyLines(awards: AwardView[], division: string, winners: WinnerRow[], noWinners: Marks, releases: AwardReleaseRow[], format?: EventFormat | null): string[] {

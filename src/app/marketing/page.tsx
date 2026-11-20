@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { call } from "@/components/useAppState";
 import { AwardsDesk } from "@/components/marketing/AwardsDesk";
-import { hhmm, readSeen, readTab, writeSeen, writeTab } from "@/components/marketing/marketingLogic";
+import { hhmm, storeGet, storeSet } from "@/components/marketing/marketingLogic";
 import { homeFor } from "@/components/SignInForm";
 import type { Session } from "@/lib/auth";
 import type { ReleasedView } from "@/lib/types";
@@ -36,7 +36,7 @@ export default function MarketingPage() {
   const [failed, setFailed] = useState(false);
   const [query, setQuery] = useState("");
   // Read once on this device; the first render here is "Loading…", so nothing differs between server and browser.
-  const [tab, setTab] = useState<string | null>(() => readTab(browserStore()));
+  const [tab, setTab] = useState<string | null>(() => storeGet(browserStore(), "mk-tab"));
   const [seen, setSeen] = useState<Set<string>>(() => new Set());
   const live = useRef(true);
 
@@ -88,14 +88,14 @@ export default function MarketingPage() {
   }, [signedIn, reload]);
 
   // The set holds what was tapped this visit; the store holds what an earlier visit tapped.
-  const isSeen = (key: string) => seen.has(key) || readSeen(browserStore(), key);
+  const isSeen = (key: string) => seen.has(key) || storeGet(browserStore(), key) === "1";
   const onSeen = (key: string) => {
-    writeSeen(browserStore(), key);
+    storeSet(browserStore(), key, "1");
     setSeen((s) => new Set(s).add(key));
   };
 
   const onTab = (key: string) => {
-    writeTab(browserStore(), key);
+    storeSet(browserStore(), "mk-tab", key);
     setTab(key);
   };
 

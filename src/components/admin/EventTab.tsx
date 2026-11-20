@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
+import { hhmm } from "@/components/marketing/marketingLogic";
 import { presetDivisions, presetPrograms, awards as presetAwards } from "@/lib/presets";
 import type { AppState, AwardsAdminView, EventSetup, ReleasedView } from "@/lib/types";
 import type { AdminTab } from "./AdminFrame";
@@ -16,10 +17,6 @@ const Tick = ({ size, width }: { size: number; width: number }) => (
   </svg>
 );
 
-const hhmm = (iso: string) => {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
 const same = (a: Pick2 | null, b: Pick2 | null) => Boolean(a && b && a.program === b.program && a.format === b.format);
 
 const ROW_LABEL = { awards: "Awards", teams: "Teams", panels: "Panels" } as const;

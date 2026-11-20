@@ -1,7 +1,8 @@
 "use client";
 
 import { useId } from "react";
-import { awardKeys, scopeKeys, setupDivisions, setupLabel, WHOLE_EVENT } from "@/lib/eventSetup";
+import { awardKeys, awardsUnder, scopeKeys, setupDivisions, setupLabel, WHOLE_EVENT } from "@/lib/eventSetup";
+import { sentUnder } from "@/lib/releases";
 import type { Rubric } from "@/lib/rubrics";
 import type { AwardReleaseRow, AwardsAdminView, AwardView, EventSetup, FlagRow, NoWinnerRow, PublicPanel, ReleasedView, Team, WinnerRow } from "@/lib/types";
 import {
@@ -22,12 +23,12 @@ import {
 import {
   ALL_PANELS,
   buildAwardPanels,
+  byNumber,
   buildMatrix,
   conductIn,
   detailFor,
   distinctTeams,
   eventDecided,
-  eventSentCount,
   heldByTeam,
   hiddenNote,
   nominationsIn,
@@ -274,7 +275,7 @@ export function blendedMatrix({
       ...row,
       cells: from.map(({ key, index }) => byKey.get(key)!.rows.find((r) => r.team.id === row.team.id)?.cells[index] ?? ("none" as const)),
     }))
-    .sort((a, b) => b.count - a.count || a.team.number.localeCompare(b.team.number, undefined, { numeric: true }));
+    .sort((a, b) => b.count - a.count || byNumber(a.team.number, b.team.number));
 
   const shown = new Set(columns.map((c) => c.award.id));
   return { columns, rows, hidden: awards.filter((a) => !shown.has(a.id)) };
@@ -406,7 +407,7 @@ export function BlendedBoard({
         <h2 className="ja-aw-h">Awards</h2>
         <p className="ja-aw-meta">
           {setupLabel(setup)} · {panel ? panel.name : "all panels"} · <b>{decided} of {total}</b> decided · {nominationsText(scoped.length + conduct.size, distinctTeams(scoped, conduct.keys()))}
-          {released ? ` · ${eventSentCount(releases, awards, divisions, "blended")} sent to Marketing` : null}
+          {released ? ` · ${scopeKeys(divisions, "blended").reduce((n, key) => n + sentUnder(releases, key, awardsUnder(awards, key, "blended").map((a) => a.id)), 0)} sent to Marketing` : null}
         </p>
         <p className="ja-aw-priv">
           <LockIcon />

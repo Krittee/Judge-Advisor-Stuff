@@ -50,10 +50,11 @@ import {
   winnersOf,
 } from "../src/components/admin/awardsLogic";
 import {
-  isReady, notReadyLines, readyToSend, recallQuestion, releaseOf, sendAllLines, sendState, sentCountIn, skippedText, snapshotLine,
+  isReady, notReadyLines, readyToSend, recallQuestion, releaseOf, sendAllLines, sendState, skippedText, snapshotLine,
 } from "../src/components/admin/awardsLogic";
 import { withRanks } from "../src/components/admin/scoresLogic";
 import { rankTeams } from "../src/lib/ranking";
+import { sentUnder } from "../src/lib/releases";
 import { rubrics } from "../src/lib/rubrics";
 import {
   adminNom, at, awards, breakers, byteMe, divisions, gearGrinders, hexAppeal, HS, labRats, MS, momentum, monitors, nom, nominations, panels, quiet, roboraptors, teams, torque, release, win, winners,
@@ -873,11 +874,12 @@ test("readyToSend only considers the config's awards and the divisions asked", (
   assert.deepEqual(readyToSend(awards, [], w, noMarks, []), []);
 });
 
-test("sentCountIn counts the sent (not recalled) rows of one division", () => {
+test("sentUnder counts the sent (not recalled) rows of one division", () => {
   const rels = [release("amaze", gearGrinders), release("design", labRats, { status: "recalled" }), release("think", breakers, { division: HS }), release("gone", gearGrinders)];
-  assert.equal(sentCountIn(rels, awards, MS), 1);
-  assert.equal(sentCountIn(rels, awards, HS), 1);
-  assert.equal(sentCountIn([], awards, MS), 0);
+  const ids = awards.map((a) => a.id);
+  assert.equal(sentUnder(rels, MS, ids), 1);
+  assert.equal(sentUnder(rels, HS, ids), 1);
+  assert.equal(sentUnder([], MS, ids), 0);
 });
 
 test("snapshotLine: number and name, both teams, or No winner", () => {

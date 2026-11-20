@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  buildAwardPanels, buildMatrix, clearAfterAsking, conductIn, decidedCount, decidedText, detailFor, eventDecided, eventDecidedText, eventNotReadyLines, eventSentCount, giveAfterAsking, heldByTeam, nominationsIn, notReadyLines, readyToSend, winnersOf,
+  buildAwardPanels, buildMatrix, clearAfterAsking, conductIn, decidedCount, decidedText, detailFor, eventDecided, eventDecidedText, eventNotReadyLines, giveAfterAsking, heldByTeam, nominationsIn, notReadyLines, readyToSend, winnersOf,
 } from "../src/components/admin/awardsLogic";
-import { WHOLE_EVENT } from "../src/lib/eventSetup";
+import { awardsUnder, scopeKeys, WHOLE_EVENT } from "../src/lib/eventSetup";
+import { sentUnder } from "../src/lib/releases";
 import { awards as awardList, gearGrinders, nom, nominations, panels, release, roboraptors, team, teams, win } from "./adminAwards.fixtures";
 
 const ES = "Elementary School";
@@ -103,15 +104,18 @@ test("eventDecided and eventDecidedText count every key: 12 of 13 with Energy op
   assert.equal(eventDecidedText([win("excellence", esTeam)], awards, [ES, MS], [], "standard"), "1/22");
 });
 
-test("eventSentCount counts the sent rows across ES, MS and Whole event, not a recalled one", () => {
+// BlendedAwards.tsx's "· N sent to Marketing": sentUnder summed over every key of the blended setup.
+const eventSent = (releases, divisions) => scopeKeys(divisions, "blended").reduce((n, key) => n + sentUnder(releases, key, awardsUnder(awards, key, "blended").map((a) => a.id)), 0);
+
+test("the event's sent count adds up the sent rows across ES, MS and Whole event, not a recalled one", () => {
   const releases = [
     release("excellence", esTeam, { division: ES }),
     release("excellence", gearGrinders, { division: MS }),
     release("innovate", gearGrinders, { division: WHOLE_EVENT }),
     release("think", gearGrinders, { division: WHOLE_EVENT, status: "recalled" }),
   ];
-  assert.equal(eventSentCount(releases, awards, [ES, MS], "blended"), 3);
-  assert.equal(eventSentCount([], awards, [ES, MS], "blended"), 0);
+  assert.equal(eventSent(releases, [ES, MS]), 3);
+  assert.equal(eventSent([], [ES, MS]), 0);
 });
 
 test("eventNotReadyLines names each key, so two halves of one award do not read alike", () => {

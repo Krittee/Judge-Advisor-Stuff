@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { changesOf, countText, deskRows, eventLine, sectionCount, sectionRows, sectionsOf, highlight, matchRow, pickTab, readSeen, readTab, resultsText, rowState, seenKey, sentCount, tabKey, tabCount, tabLabel, writeSeen, writeTab } from "../src/components/marketing/marketingLogic";
+import { changesOf, countText, deskRows, eventLine, sectionCount, sectionRows, sectionsOf, highlight, hhmm, matchRow, pickTab, resultsText, rowState, seenKey, storeGet, storeSet, tabKey, tabCount } from "../src/components/marketing/marketingLogic";
 import { programTabs } from "../src/lib/presets";
+import { sentUnder } from "../src/lib/releases";
 import type { AwardReleaseRow, ReleasedView, ReleaseTeam } from "../src/lib/types";
 import { CHANGED_AT, LABELS, MS, T, awards, release } from "./marketing.fixtures";
 
@@ -43,15 +44,17 @@ test("deskRows: every config award by order, and no row for an award that is not
   assert.equal(rows.some((r) => r.award.id === "ghost"), false);
 });
 
-test("countText(sentCount): recalled is not counted", () => {
-  assert.equal(countText(sentCount(view, MS), 11), "4 of 11 sent");
+const ids = view.awards.map((a) => a.id);
+
+test("countText(sentUnder): recalled is not counted", () => {
+  assert.equal(countText(sentUnder(view.releases, MS, ids), 11), "4 of 11 sent");
   assert.equal(countText(0, 11), "0 of 11 sent");
 });
 
-test("sentCount ignores unknown awards", () => {
-  assert.equal(sentCount(view, MS), 4); // excellence, design, create (no winner), judges; not ghost, not innovate
-  assert.equal(sentCount(view, "High School"), 1);
-  assert.equal(sentCount(view, "Elementary School"), 0);
+test("sentUnder ignores unknown awards", () => {
+  assert.equal(sentUnder(view.releases, MS, ids), 4); // excellence, design, create (no winner), judges; not ghost, not innovate
+  assert.equal(sentUnder(view.releases, "High School", ids), 1);
+  assert.equal(sentUnder(view.releases, "Elementary School", ids), 0);
 });
 
 test("changesOf: the replaced decision, in words", () => {
@@ -133,20 +136,26 @@ test("resultsText", () => {
   assert.equal(resultsText(0), "0 results");
 });
 
+test("hhmm: local HH:MM, blank for a time that does not parse", () => {
+  const d = new Date(2026, 10, 21, 9, 5);
+  assert.equal(hhmm(d.toISOString()), "09:05");
+  assert.equal(hhmm("not a time"), "");
+});
+
 test("seen store survives a throwing storage", () => {
   const k = "mk-seen:x:y:z";
-  assert.equal(readSeen({ getItem() { throw new Error("blocked"); } }, k), false);
-  assert.doesNotThrow(() => writeSeen({ setItem() { throw new Error("blocked"); } }, k));
-  assert.equal(readSeen(null, k), false);
-  assert.doesNotThrow(() => writeSeen(null, k));
+  assert.equal(storeGet({ getItem() { throw new Error("blocked"); } }, k), null);
+  assert.doesNotThrow(() => storeSet({ setItem() { throw new Error("blocked"); } }, k, "1"));
+  assert.equal(storeGet(null, k), null);
+  assert.doesNotThrow(() => storeSet(null, k, "1"));
 });
 
 test("seen store reads back what it wrote", () => {
   const m = new Map<string, string>();
   const store = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) };
-  assert.equal(readSeen(store, "k"), false);
-  writeSeen(store, "k");
-  assert.equal(readSeen(store, "k"), true);
+  assert.equal(storeGet(store, "k"), null);
+  storeSet(store, "k", "1");
+  assert.equal(storeGet(store, "k"), "1");
   assert.equal(m.get("k"), "1");
 });
 
@@ -177,24 +186,22 @@ test("tabKey is a lower-case slug; pickTab keeps the saved tab only while it exi
   assert.equal(pickTab(tabs, null), "vex-iq");
 });
 
-test("tabLabel counts sent rows over awards x divisions; Middle School counts in each tab it is in", () => {
+test("tabCount counts sent rows over awards x divisions; Middle School counts in each tab it is in", () => {
   const v: ReleasedView = { ...view, programs: [IQ, V5] };
   // Middle School has 4 sent (excellence, design, create, judges); High School 1; the "ghost" award is not counted.
-  assert.equal(tabLabel(v, IQ), "VEX IQ · 4 of 22 sent");
-  assert.equal(tabLabel(v, V5), "V5RC · 5 of 22 sent");
   assert.equal(tabCount(v, IQ), "4 of 22 sent");
   assert.equal(tabCount(v, V5), "5 of 22 sent");
 });
 
 test("the remembered tab survives a throwing storage", () => {
   const broken = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } };
-  assert.equal(readTab(broken), null);
-  assert.equal(readTab(null), null);
-  assert.doesNotThrow(() => writeTab(broken, "v5rc"));
+  assert.equal(storeGet(broken, "mk-tab"), null);
+  assert.equal(storeGet(null, "mk-tab"), null);
+  assert.doesNotThrow(() => storeSet(broken, "mk-tab", "v5rc"));
   const mem = new Map<string, string>();
   const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v) };
-  writeTab(store, "v5rc");
-  assert.equal(readTab(store), "v5rc");
+  storeSet(store, "mk-tab", "v5rc");
+  assert.equal(storeGet(store, "mk-tab"), "v5rc");
   assert.equal(mem.has("mk-tab"), true);
 });
 

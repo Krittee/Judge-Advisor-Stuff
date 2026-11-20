@@ -46,6 +46,10 @@ export function sentRelease(releases: AwardReleaseRow[], awardId: string, divisi
   return releases.find((r) => r.status === "sent" && r.award_id === awardId && r.division === division);
 }
 
+/** How many releases are sent under `key` for an award in `ids`: "N sent to Marketing". */
+export const sentUnder = (releases: AwardReleaseRow[], key: string, ids: string[]): number =>
+  releases.filter((r) => r.status === "sent" && r.division === key && ids.includes(r.award_id)).length;
+
 /** The sent release holding a team. `divisionScopedOnly` skips Whole event rows: a division change cannot alter those. */
 export function sentHolding(releases: AwardReleaseRow[], teamId: string, divisionScopedOnly = false): AwardReleaseRow | undefined {
   return releases.find((r) => r.status === "sent" && r.teams.some((t) => t.id === teamId) && !(divisionScopedOnly && r.division === WHOLE_EVENT));

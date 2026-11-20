@@ -1,9 +1,10 @@
 "use client";
 
 import { SignOutButton } from "@/components/judging";
-import { countText, deskRows, changesOf, eventLine, sectionCount, sectionRows, sectionSent, highlight, hhmm, matchRow, pickTab, resultsText, sentCount, tabCount, tabKey, tabsOf, type Change, type DeskRow } from "./marketingLogic";
+import { countText, deskRows, changesOf, eventLine, sectionCount, sectionRows, highlight, hhmm, matchRow, pickTab, resultsText, tabCount, tabKey, tabsOf, type Change, type DeskRow } from "./marketingLogic";
 import { divisionTag } from "@/components/admin/floorLogic";
 import { setupLabel, WHOLE_EVENT } from "@/lib/eventSetup";
+import { sentUnder } from "@/lib/releases";
 import type { ReleasedView } from "@/lib/types";
 
 /**
@@ -159,7 +160,7 @@ function Row({ row, query, tagged, onSeen }: { row: DeskRow; query: string; tagg
       </span>
       {change ? (
         <span className="mk-fl">
-          <span className="mk-tag">Changed — was {change.wasNumbers}</span>
+          <span className="mk-tag">Changed — was {change.wasText}</span>
           <SeenButton label={`Mark ${award.label} as seen`} onClick={() => onSeen(change.key)} />
         </span>
       ) : null}
@@ -179,11 +180,12 @@ export function AwardsDesk(p: AwardsDeskProps) {
   const tabbed = !setup && !q && tabs.length > 1;
   const shown = view ? (q ? view.divisions : (tabs.find((t) => tabKey(t.label) === active) ?? tabs[0]).divisions) : [];
   // Search hides what does not match, and a section with nothing left. A section is a division (as today) or, with a setup, a setup section.
+  const awardIds = view?.awards.map((a) => a.id) ?? [];
   const sections = !view
     ? []
     : (setup
-        ? view.sections!.map((s, i) => ({ i, key: s.key, rows: sectionRows(view, s, p.isSeen), count: sectionCount(view, s), n: sentOf(sectionSent(view, s), s.awardIds.length) }))
-        : shown.map((division) => ({ i: view.divisions.indexOf(division), key: division, rows: deskRows(view, division, p.isSeen), count: countText(sentCount(view, division), view.awards.length), n: sentOf(sentCount(view, division), view.awards.length) }))
+        ? view.sections!.map((s, i) => ({ i, key: s.key, rows: sectionRows(view, s, p.isSeen), count: sectionCount(view, s), n: sentOf(sentUnder(view.releases, s.key, s.awardIds), s.awardIds.length) }))
+        : shown.map((division) => ({ i: view.divisions.indexOf(division), key: division, rows: deskRows(view, division, p.isSeen), count: countText(sentUnder(view.releases, division, awardIds), view.awards.length), n: sentOf(sentUnder(view.releases, division, awardIds), view.awards.length) }))
       )
         .map((s) => ({ ...s, rows: s.rows.filter((r) => matchRow(r, q)) }))
         .filter((s) => !q || s.rows.length > 0);

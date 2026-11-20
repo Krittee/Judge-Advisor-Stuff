@@ -4,6 +4,7 @@ import { Fragment, useEffect, useId, useMemo, useRef, useState, useSyncExternalS
 import { useConfirm } from "@/components/ConfirmDialog";
 import { BandPill, ChevronDown, CloseIcon } from "@/components/judge/parts";
 import { hhmm } from "@/components/marketing/marketingLogic";
+import { sentUnder } from "@/lib/releases";
 import { Banner } from "@/components/ui";
 import { call, useScores } from "@/components/useAppState";
 import { rankTeams } from "@/lib/ranking";
@@ -41,7 +42,6 @@ import {
   nominationsText,
   notReadyLines,
   panelChips,
-  pickText,
   readyToSend,
   recallQuestion,
   refereeLine,
@@ -51,7 +51,6 @@ import {
   scoreParts,
   sendAllLines,
   sendState,
-  sentCountIn,
   skippedText,
   snapshotLine,
   teamsByNumber,
@@ -470,7 +469,7 @@ export function AwardsBoard({
         <h2 className="ja-aw-h">Awards</h2>
         <p className="ja-aw-meta">
           {division} · {panel ? panel.name : "all panels"} · <b>{decidedCount(winners, awards, division, noWinners)} of {awards.length}</b> decided · {nominationsText(scoped.length + conduct.size, distinctTeams(scoped, conduct.keys()))}
-          {released ? ` · ${sentCountIn(releases, awards, division)} sent to Marketing` : null}
+          {released ? ` · ${sentUnder(releases, division, awards.map((a) => a.id))} sent to Marketing` : null}
         </p>
         <p className="ja-aw-priv">
           <LockIcon />
@@ -841,7 +840,7 @@ export function sendControls(award: AwardView, name: string, state: SendState | 
           </button>
         </>
       ) : (
-        <span className="ja-aw-nsend">{pickText(award, held)}</span>
+        <span className="ja-aw-nsend">{award.places > 1 && held > 0 ? "Pick both winners to send" : "Pick a winner to send"}</span>
       )}
     </div>
   );
