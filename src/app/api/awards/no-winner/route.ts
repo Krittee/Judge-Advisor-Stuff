@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { actorParts } from "@/lib/activity";
 import { canAdminister, getSession } from "@/lib/auth";
 import { store } from "@/lib/db";
+import { keyError } from "@/lib/eventSetup";
 import { awards } from "@/lib/presets";
 import { awardLabel, fields, refuseIfSent } from "../shared";
 
@@ -26,13 +27,16 @@ export async function PUT(request: Request) {
   if (!awardId || !division) {
     return NextResponse.json({ error: "An award and a division are required." }, { status: 400 });
   }
-  if (!awards().some((a) => a.id === awardId)) {
+  const award = awards().find((a) => a.id === awardId);
+  if (!award) {
     return NextResponse.json({ error: "That award does not exist." }, { status: 400 });
   }
+  const db = store();
+  const wrongKey = keyError(award, division, await db.getEventSetup());
+  if (wrongKey) return NextResponse.json({ error: wrongKey }, { status: 400 });
   const locked = await refuseIfSent(awardId, division);
   if (locked) return locked;
 
-  const db = store();
   // Every team holding it: the Judges Award can have two.
   const holders = (await db.listWinners()).filter((w) => w.award_id === awardId && w.division === division);
   // Already marked and nobody holds it: nothing changes, so nothing is written or logged.
