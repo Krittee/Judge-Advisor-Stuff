@@ -153,7 +153,10 @@ export function AwardsDesk(p: AwardsDeskProps) {
 
       <main className="mk-page">
         <div className="mk-id">
-          <span className="mk-av mk-av--ph" aria-hidden="true" />
+          <span className="mk-av">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a 320 px static JPEG; next/image buys nothing here. */}
+            <img src="/avatars/marketing.jpg" alt="" width={48} height={48} />
+          </span>
           <div className="mk-id-t">
             <h1>Awards Desk</h1>
             <span>{p.name === "Marketing" ? "Marketing" : `Marketing · signed in as ${p.name}`}</span>

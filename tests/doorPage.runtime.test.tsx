@@ -71,11 +71,11 @@ test("/: the Team door has the team picture with no ring and a caption; the othe
   assert.equal([...door.matchAll(/class="dp-cap"/g)].length, 1);
 });
 
-test("/: Marketing is the seventh door, a dashed placeholder with no picture and no ticket caption", () => {
+test("/: Marketing is the seventh door, with its own picture in the desk teal ring and no ticket caption", () => {
   const cards = [...door.matchAll(/<a class="dp-card"[^>]*>[\s\S]*?<\/a>/g)].map((m) => m[0]);
   assert.match(cards[6], /^<a class="dp-card" href="\/marketing\/login">/);
-  assert.match(cards[6], /<span class="dp-av dp-av--ph" aria-hidden="true"><\/span>/);
-  assert.ok(!/<img/.test(cards[6]), "no picture until the art exists");
+  assert.match(cards[6], /dp-r-mk"><img src="\/avatars\/marketing\.jpg" alt=""/);
+  assert.doesNotMatch(door, /dp-av--ph/, "no placeholder is left on the door");
   assert.ok(!/aria-describedby/.test(cards[6]));
   assert.match(cards[4], /<img src="\/avatars\/coordinator\.jpg"/);
   assert.equal([...door.matchAll(/Opens the team ticket/g)].length, 1);

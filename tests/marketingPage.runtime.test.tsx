@@ -57,8 +57,8 @@ test("the header: title, who is signed in, sign out", () => {
   assert.doesNotMatch(text(desk({ name: "Marketing" })), /signed in as/);
   assert.match(text(desk({ name: "Marketing" })), /Marketing/);
   assert.match(m, /Sign out/);
-  assert.match(m, /mk-av--ph/);
-  assert.doesNotMatch(m, /<img/, "the Marketing avatar is a dashed placeholder, no picture");
+  assert.match(m, /<span class="mk-av"><img src="\/avatars\/marketing\.jpg" alt="" width="48" height="48"\/><\/span>/);
+  assert.doesNotMatch(m, /mk-av--ph/);
 });
 
 test("a recalled row says Being updated and shows no team", () => {
@@ -170,10 +170,11 @@ test("the Seen set reads localStorage behind its own try/catch", () => {
   assert.match(read("src/app/marketing/page.tsx"), /try \{\s*return window\.localStorage;\s*\} catch \{\s*return null;\s*\}/);
 });
 
-test("sign-in: Marketing has a door, a home and a placeholder avatar", () => {
+test("sign-in: Marketing has a door, a home and its own avatar", () => {
   assert.equal(homeFor("marketing"), "/marketing");
   const form = read("src/components/SignInForm.tsx");
-  assert.match(form, /si-av si-av--ph/);
+  assert.match(form, /marketing: \{ label: "Marketing", avatar: "\/avatars\/marketing\.jpg"/);
+  assert.doesNotMatch(form, /si-av--ph/);
   assert.doesNotMatch(form, /Placeholder until the Awards Desk/);
   const login = read("src/app/marketing/login/page.tsx");
   assert.match(login, /Marketing sign in/);
@@ -195,6 +196,6 @@ test("the CSS: page-scoped, no motion, outside the Judge Advisor blocks", () => 
   const block = css.slice(css.lastIndexOf("/* ----", start), css.lastIndexOf("/* ----", css.indexOf("Coordinator console (")));
   assert.ok(block.length > 3000);
   assert.doesNotMatch(block.replace(/\/\*[\s\S]*?\*\//g, ""), /@keyframes|animation|transform: (?!none)|(?<!over)scroll-behavior/);
-  assert.match(css, /\.si-av--ph \{[^}]*border: 1\.5px dashed/);
-  assert.match(block, /\.mk-av--ph \{[^}]*border: 1\.5px dashed/);
+  assert.doesNotMatch(css, /si-av--ph|dp-av--ph|mk-av--ph/);
+  assert.match(block, /\.mk-av img \{[^}]*object-fit: cover/);
 });

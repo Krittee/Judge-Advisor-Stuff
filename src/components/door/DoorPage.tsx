@@ -22,8 +22,7 @@ const DOORS: Door[] = [
   { name: "Queue desk", line: "Check teams in and book times", href: "/queue/login", ring: "desk", avatar: "queue-desk" },
   { name: "Coordinator", line: "Walk the pits: languages and bookings", href: "/coordinator/login", ring: "co", avatar: "coordinator" },
   { name: "Judge Advisor", line: "Runs judging for the event", href: "/admin/login", ring: "ja", avatar: "judge-advisor" },
-  // No art yet: the door draws a dashed placeholder until there is an avatar to point at.
-  { name: "Marketing", line: "Awards as the Judge Advisor sends them", href: "/marketing/login", ring: "mk" },
+  { name: "Marketing", line: "Awards as the Judge Advisor sends them", href: "/marketing/login", ring: "mk", avatar: "marketing" },
 ];
 
 /** One sample team in each colour a tile can wear on the board, in the order a visit happens. */
@@ -62,13 +61,9 @@ export function DoorPage() {
             {DOORS.map((d) => (
               <li key={d.href} className="dp-cell">
                 <Link href={d.href} className="dp-card" aria-describedby={d.ring ? undefined : "dp-cap"}>
-                  {d.avatar ? (
-                    <span className={d.ring ? `dp-av dp-r-${d.ring}` : "dp-av dp-av--team"}>
-                      <img src={`/avatars/${d.avatar}.jpg`} alt="" width={48} height={48} />
-                    </span>
-                  ) : (
-                    <span className="dp-av dp-av--ph" aria-hidden="true" />
-                  )}
+                  <span className={d.ring ? `dp-av dp-r-${d.ring}` : "dp-av dp-av--team"}>
+                    <img src={`/avatars/${d.avatar}.jpg`} alt="" width={48} height={48} />
+                  </span>
                   <span className="dp-rt">
                     <span className="dp-dt">{d.name}</span>
                     <span className="dp-s">{d.line}</span>
