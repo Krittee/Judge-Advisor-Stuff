@@ -258,7 +258,8 @@ export type NoWinnerRow = {
   decided_at: string;
 };
 
-export type ReleaseTeam = { id: string; number: string; name: string };
+/** `division` is the team's division at send time; recorded only when an event setup is saved (the desk tags Whole event rows with it). */
+export type ReleaseTeam = { id: string; number: string; name: string; division?: string };
 /** What was announced for one award in one division: the winning teams, or "no winner". */
 export type ReleaseSnapshot = { teams: ReleaseTeam[]; no_winner: boolean };
 export type ReleaseStatus = "sent" | "recalled";

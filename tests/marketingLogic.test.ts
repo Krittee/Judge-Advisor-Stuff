@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { changesOf, countText, deskRows, highlight, matchRow, pickTab, readSeen, readTab, resultsText, rowState, seenKey, sentCount, tabKey, tabCount, tabLabel, writeSeen, writeTab } from "../src/components/marketing/marketingLogic";
+import { changesOf, countText, deskRows, eventLine, sectionCount, sectionRows, sectionsOf, highlight, matchRow, pickTab, readSeen, readTab, resultsText, rowState, seenKey, sentCount, tabKey, tabCount, tabLabel, writeSeen, writeTab } from "../src/components/marketing/marketingLogic";
 import { programTabs } from "../src/lib/presets";
 import type { AwardReleaseRow, ReleasedView, ReleaseTeam } from "../src/lib/types";
 
@@ -206,4 +206,74 @@ test("the remembered tab survives a throwing storage", () => {
   writeTab(store, "v5rc");
   assert.equal(readTab(store), "v5rc");
   assert.equal(mem.has("mk-tab"), true);
+});
+
+/* ---- a saved event setup: sections instead of tabs ---------------------- */
+
+const WE = "Whole event";
+const ES = "Elementary School";
+const PER = ["excellence", "design"];
+const blendedView: ReleasedView = {
+  awards,
+  divisions: [ES, MS],
+  programs: [{ label: "All", divisions: [ES, MS] }],
+  setup: { program: "VEX IQ", format: "blended" },
+  sections: [
+    { key: ES, awardIds: PER },
+    { key: MS, awardIds: PER },
+    { key: WE, awardIds: awards.filter((a) => !PER.includes(a.id)).map((a) => a.id) },
+  ],
+  releases: [
+    release("excellence", { division: ES, teams: [T("41111A", "Little Levers")] }),
+    release("excellence", { teams: [T("7700B", "Polar Bots")], previous: { teams: [T("1234A", "Gear Grinders")], no_winner: false }, changed_at: CHANGED_AT }),
+    release("design"),
+    release("innovate", { division: WE, teams: [T("5150X", "Short Circuit")], previous: { teams: [T("9090Z", "Old")], no_winner: false }, changed_at: CHANGED_AT }),
+    release("think", { division: WE }),
+    release("build", { division: WE }),
+    release("create", { division: WE, teams: [], no_winner: true }),
+    release("judges", { division: WE, teams: [T("1234A", "Gear Grinders"), T("12021B", "Blue Bolts")] }),
+    release("energy", { division: WE, status: "recalled", teams: [] }),
+  ],
+};
+
+test("sectionsOf: the view's sections in order, each with its awards in config order", () => {
+  const s = sectionsOf({ ...blendedView, awards: [...awards].reverse() });
+  assert.deepEqual(s.map((x) => x.key), [ES, MS, WE]);
+  assert.deepEqual(s[0].awards.map((a) => a.label), ["Excellence", "Design"]);
+  assert.deepEqual(s[2].awards.map((a) => a.label), LABELS.filter((l) => l !== "Excellence" && l !== "Design"));
+  assert.deepEqual(sectionsOf(view), [], "no setup, no sections");
+});
+
+test("sectionRows: only the section's awards, read under the section's key", () => {
+  const [es, ms, we] = blendedView.sections!;
+  assert.deepEqual(sectionRows(blendedView, es, unseen).map((r) => [r.award.label, r.state]), [["Excellence", "sent"], ["Design", "not-sent"]]);
+  const msRows = sectionRows(blendedView, ms, unseen);
+  assert.equal(msRows[0].teams[0].number, "7700B");
+  assert.equal(msRows[0].change?.wasText, "1234A");
+  const weRows = sectionRows(blendedView, we, unseen);
+  assert.equal(weRows.length, 9);
+  assert.equal(weRows.find((r) => r.award.id === "energy")?.state, "recalled");
+  assert.equal(weRows.find((r) => r.award.id === "think")?.state, "sent");
+});
+
+test("sectionCount: sent rows under the key over the section's awards", () => {
+  const [es, , we] = blendedView.sections!;
+  assert.equal(sectionCount(blendedView, es), "1 of 2 sent");
+  assert.equal(sectionCount(blendedView, we), "5 of 9 sent", "a recalled row is not counted");
+});
+
+test("eventLine: Blended names the per-division awards, Standard says every award", () => {
+  assert.equal(eventLine(blendedView), "Excellence and Design for each division · every other award for the whole event");
+  assert.equal(eventLine({ ...blendedView, setup: { program: "V5RC", format: "standard" }, sections: [{ key: MS, awardIds: awards.map((a) => a.id) }] }), "Every award for each division");
+});
+
+test("changesOf with sections: a whole-event change is listed under Whole event, in section order", () => {
+  const c = changesOf(blendedView, unseen);
+  assert.deepEqual(c.map((x) => `${x.division} · ${x.label}`), [`${MS} · Excellence`, `${WE} · Innovate`]);
+  assert.equal(changesOf(blendedView, (k) => k.includes(`:${WE}:`)).length, 1);
+});
+
+test("a snapshot's division stays on the row's team for the desk to tag", () => {
+  const r = sectionRows({ ...blendedView, releases: [release("think", { division: WE, teams: [{ ...T("5150X", "Short Circuit"), division: MS }] })] }, blendedView.sections![2], unseen);
+  assert.equal(r.find((x) => x.award.id === "think")?.teams[0].division, MS);
 });

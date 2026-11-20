@@ -28,6 +28,14 @@ test("decisionFor: nothing decided is null, one of two places is null, a full se
   assert.deepEqual(decisionFor(award("design"), ES, [win("design", "a", "Middle School")], [], teams), null, "another division's win does not count");
 });
 
+test("decisionFor: each team carries its division only when asked (a saved setup), and the default is as before", () => {
+  const w = [win("design", "a")];
+  assert.deepEqual(decisionFor(award("design"), ES, w, [], teams, true), snap([{ ...A, division: ES }]));
+  assert.deepEqual(decisionFor(award("design"), ES, w, [], teams, false), snap([A]));
+  assert.deepEqual(decisionFor(award("design"), ES, w, [], teams), snap([A]));
+  assert.ok(!("division" in decisionFor(award("design"), ES, w, [], teams)!.teams[0]));
+});
+
 test("decisionFor: a no-winner mark is {[], true}", () => {
   assert.deepEqual(decisionFor(award("design"), ES, [], [none("design")], teams), snap([], true));
   assert.equal(decisionFor(award("design"), ES, [], [none("design", "Middle School")], teams), null);

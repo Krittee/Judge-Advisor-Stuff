@@ -1,7 +1,9 @@
 "use client";
 
 import { SignOutButton } from "@/components/judging";
-import { countText, deskRows, changesOf, highlight, hhmm, matchRow, pickTab, resultsText, sentCount, tabCount, tabKey, tabsOf, type Change, type DeskRow } from "./marketingLogic";
+import { countText, deskRows, changesOf, eventLine, sectionCount, sectionRows, sectionSent, highlight, hhmm, matchRow, pickTab, resultsText, sentCount, tabCount, tabKey, tabsOf, type Change, type DeskRow } from "./marketingLogic";
+import { divisionTag } from "@/components/admin/floorLogic";
+import { setupLabel, WHOLE_EVENT } from "@/lib/eventSetup";
 import type { ReleasedView } from "@/lib/types";
 
 /**
@@ -30,6 +32,9 @@ export type AwardsDeskProps = {
   isSeen: (key: string) => boolean;
   onSeen: (key: string) => void;
 };
+
+/** The progress bar's share: sent over total, 0 when there is no total. */
+const sentOf = (sent: number, total: number) => (total ? sent / total : 0);
 
 const icon = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 
@@ -126,7 +131,8 @@ function TabBar({ view, active, onTab }: { view: ReleasedView; active: string; o
   );
 }
 
-function Row({ row, query, onSeen }: { row: DeskRow; query: string; onSeen: (key: string) => void }) {
+/** `tagged`: a Whole event row, whose teams each carry a small neutral division tag (when the snapshot has one). */
+function Row({ row, query, tagged, onSeen }: { row: DeskRow; query: string; tagged?: boolean; onSeen: (key: string) => void }) {
   const { award, release, state, change } = row;
   return (
     <li className={`mk-r${state === "not-sent" ? " is-ns" : ""}${change ? " is-ch" : ""}`}>
@@ -136,6 +142,7 @@ function Row({ row, query, onSeen }: { row: DeskRow; query: string; onSeen: (key
           <span key={t.id} className="mk-tl">
             <b><Hl text={t.number} query={query} /></b>
             <span className="mk-nm"><Hl text={t.name} query={query} /></span>
+            {tagged && t.division ? <span className="mk-dv" title={t.division}>{divisionTag(t.division)}</span> : null}
           </span>
         ))}
         {state === "no-winner" ? <span className="mk-mu">No winner</span> : null}
@@ -165,17 +172,21 @@ export function AwardsDesk(p: AwardsDeskProps) {
   const q = p.query.trim();
   const view = p.view;
   const changes = view ? changesOf(view, p.isSeen) : [];
+  const setup = view?.setup && view.sections ? view.setup : null;
   const tabs = view ? tabsOf(view) : [];
   const active = pickTab(tabs, p.tab);
-  // A search looks across every tab, so the bar goes while there is one and each division is listed once.
-  const tabbed = !q && tabs.length > 1;
+  // A saved setup picks the program, so it has no tabs. Otherwise a search looks across every tab, so the bar goes while there is one and each division is listed once.
+  const tabbed = !setup && !q && tabs.length > 1;
   const shown = view ? (q ? view.divisions : (tabs.find((t) => tabKey(t.label) === active) ?? tabs[0]).divisions) : [];
-  // Search hides what does not match, and a division with nothing left.
-  const sections = view
-    ? shown
-        .map((division) => ({ i: view.divisions.indexOf(division), division, rows: deskRows(view, division, p.isSeen).filter((r) => matchRow(r, q)) }))
-        .filter((s) => !q || s.rows.length > 0)
-    : [];
+  // Search hides what does not match, and a section with nothing left. A section is a division (as today) or, with a setup, a setup section.
+  const sections = !view
+    ? []
+    : (setup
+        ? view.sections!.map((s, i) => ({ i, key: s.key, rows: sectionRows(view, s, p.isSeen), count: sectionCount(view, s), n: sentOf(sectionSent(view, s), s.awardIds.length) }))
+        : shown.map((division) => ({ i: view.divisions.indexOf(division), key: division, rows: deskRows(view, division, p.isSeen), count: countText(sentCount(view, division), view.awards.length), n: sentOf(sentCount(view, division), view.awards.length) }))
+      )
+        .map((s) => ({ ...s, rows: s.rows.filter((r) => matchRow(r, q)) }))
+        .filter((s) => !q || s.rows.length > 0);
   const found = sections.reduce((n, s) => n + s.rows.length, 0);
 
   return (
@@ -188,7 +199,7 @@ export function AwardsDesk(p: AwardsDeskProps) {
             </svg>
           </span>
           <span className="mk-brand-n">Judge Queue</span>
-          <span className="mk-brand-s">VEX IQ · V5RC</span>
+          <span className="mk-brand-s">{setup ? setupLabel(setup) : "VEX IQ · V5RC"}</span>
         </div>
         {/* Room for the theme toggle, which docks into the top-right corner here. */}
       </header>
@@ -233,6 +244,12 @@ export function AwardsDesk(p: AwardsDeskProps) {
           ) : null}
         </div>
         <p className="mk-poll">Checks every 15 s{p.lastGood ? ` · last ${p.lastGood}` : ""}</p>
+        {view && setup ? (
+          <div className="mk-ev">
+            <h2>{setupLabel(setup)}</h2>
+            <p>{eventLine(view)}</p>
+          </div>
+        ) : null}
         {p.failed ? (
           <p className="mk-err" role="alert">
             Couldn&apos;t reach the server.{p.lastGood ? ` Showing what you had at ${p.lastGood}.` : ""}
@@ -262,26 +279,23 @@ export function AwardsDesk(p: AwardsDeskProps) {
                     <p className="mk-empty" role="status">{`No award or team matches "${q}".`}</p>
                   )
                 ) : null}
-                <div role={tabbed ? "tabpanel" : undefined} id={tabbed ? "mk-tp" : undefined} aria-labelledby={tabbed ? `mk-tab-${active}` : undefined}>
-                {sections.map(({ i, division, rows }) => {
-                  const n = sentCount(view, division);
-                  return (
-                    <section key={division} className="mk-sec" aria-labelledby={`mk-h-${i}`}>
-                      <div className="mk-dh">
-                        <h2 id={`mk-h-${i}`}>{division}</h2>
-                        <span className="mk-cnt">{countText(n, view.awards.length)}</span>
-                        <span className="mk-pg" aria-hidden="true">
-                          <i style={{ width: `${(n / view.awards.length) * 100}%` }} />
-                        </span>
-                      </div>
-                      <ul className="mk-rows" aria-label={`${division} awards`}>
-                        {rows.map((row) => (
-                          <Row key={row.award.id} row={row} query={q} onSeen={p.onSeen} />
-                        ))}
-                      </ul>
-                    </section>
-                  );
-                })}
+                <div className={setup ? "mk-set" : undefined} role={tabbed ? "tabpanel" : undefined} id={tabbed ? "mk-tp" : undefined} aria-labelledby={tabbed ? `mk-tab-${active}` : undefined}>
+                {sections.map(({ i, key, rows, count, n }) => (
+                  <section key={key} className="mk-sec" aria-labelledby={`mk-h-${i}`}>
+                    <div className="mk-dh">
+                      <h2 id={`mk-h-${i}`}>{key}</h2>
+                      <span className="mk-cnt">{count}</span>
+                      <span className="mk-pg" aria-hidden="true">
+                        <i style={{ width: `${n * 100}%` }} />
+                      </span>
+                    </div>
+                    <ul className="mk-rows" aria-label={`${key} awards`}>
+                      {rows.map((row) => (
+                        <Row key={row.award.id} row={row} query={q} tagged={setup !== null && key === WHOLE_EVENT} onSeen={p.onSeen} />
+                      ))}
+                    </ul>
+                  </section>
+                ))}
                 </div>
               </>
             )}

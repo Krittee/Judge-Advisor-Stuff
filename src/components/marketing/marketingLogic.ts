@@ -1,4 +1,4 @@
-import type { AwardReleaseRow, ReleasedProgram, ReleasedView, ReleaseSnapshot, ReleaseTeam } from "@/lib/types";
+import type { AwardReleaseRow, ReleasedAward, ReleasedProgram, ReleasedSection, ReleasedView, ReleaseSnapshot, ReleaseTeam } from "@/lib/types";
 
 /**
  * The Awards Desk's decisions, as plain functions: what each award row says,
@@ -61,12 +61,12 @@ function changeOf(award: DeskRow["award"], r: AwardReleaseRow, isSeen: (key: str
   return { awardId: award.id, label: award.label, division: r.division, key, nowText: snapshotText(r, true), wasText: was, wasNumbers: was };
 }
 
-/** Every config award in `order`, one row each, with what (if anything) was sent for it in `division`. */
-export function deskRows(view: ReleasedView, division: string, isSeen: (key: string) => boolean): DeskRow[] {
-  return [...view.awards]
+/** One row per award in `awards` (config order), with what (if anything) was sent for it under `key`. */
+function rowsFor(view: ReleasedView, awards: ReleasedAward[], key: string, isSeen: (key: string) => boolean): DeskRow[] {
+  return [...awards]
     .sort((a, b) => a.order - b.order)
     .map((award) => {
-      const release = view.releases.find((r) => r.award_id === award.id && r.division === division) ?? null;
+      const release = view.releases.find((r) => r.award_id === award.id && r.division === key) ?? null;
       const state = rowState(release);
       return {
         award,
@@ -78,9 +78,40 @@ export function deskRows(view: ReleasedView, division: string, isSeen: (key: str
     });
 }
 
-/** The unseen changes across every division, division order then award order. */
+/** Every config award in `order`, one row each, with what (if anything) was sent for it in `division`. */
+export const deskRows = (view: ReleasedView, division: string, isSeen: (key: string) => boolean): DeskRow[] => rowsFor(view, view.awards, division, isSeen);
+
+/** A saved setup's sections in the server's order, each with its awards in config order; none without a setup. */
+export function sectionsOf(view: ReleasedView): { key: string; awards: ReleasedAward[] }[] {
+  return (view.sections ?? []).map((s) => ({
+    key: s.key,
+    awards: view.awards.filter((a) => s.awardIds.includes(a.id)).sort((a, b) => a.order - b.order),
+  }));
+}
+
+/** Like `deskRows`, but only the section's awards, read under the section's key. */
+export function sectionRows(view: ReleasedView, section: ReleasedSection, isSeen: (key: string) => boolean): DeskRow[] {
+  return rowsFor(view, view.awards.filter((a) => section.awardIds.includes(a.id)), section.key, isSeen);
+}
+
+/** Sent rows under the section's key, for the awards it holds. */
+export const sectionSent = (view: ReleasedView, section: ReleasedSection): number =>
+  view.releases.filter((r) => r.division === section.key && r.status === "sent" && section.awardIds.includes(r.award_id)).length;
+
+/** "5 of 9 sent": sent rows under the section's key over the awards it holds. */
+export const sectionCount = (view: ReleasedView, section: ReleasedSection): string => countText(sectionSent(view, section), section.awardIds.length);
+
+/** The event title's muted line. Blended names the per-division awards (the first section's); Standard says every award. */
+export function eventLine(view: ReleasedView): string {
+  if (view.setup?.format !== "blended") return "Every award for each division";
+  const labels = sectionsOf(view)[0]?.awards.map((a) => a.label) ?? [];
+  return `${labels.join(" and ")} for each division · every other award for the whole event`;
+}
+
+/** The unseen changes across every division (or, with a setup, every section), in order. */
 export function changesOf(view: ReleasedView, isSeen: (key: string) => boolean): Change[] {
-  return view.divisions.flatMap((d) => deskRows(view, d, isSeen).flatMap((r) => (r.change ? [r.change] : [])));
+  const rows = view.sections ? view.sections.flatMap((s) => sectionRows(view, s, isSeen)) : view.divisions.flatMap((d) => deskRows(view, d, isSeen));
+  return rows.flatMap((r) => (r.change ? [r.change] : []));
 }
 
 /** Sent rows in a division for awards still in the config; a recalled row is not sent. */

@@ -2192,7 +2192,7 @@ body:has(.judge) > .theme-toggle:hover {
   --mk-field-line: oklch(0.640 0.012 265);
 }
 .mk :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.mk-brand-n, .mk-id-t h1, .mk-chg-h h2, .mk-cw .d b, .mk-seen, .mk-dh h2, .mk-tl b, .mk-res {
+.mk-brand-n, .mk-id-t h1, .mk-ev h2, .mk-chg-h h2, .mk-cw .d b, .mk-seen, .mk-dh h2, .mk-tl b, .mk-res {
   font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -2290,6 +2290,22 @@ body:has(.mk) > .theme-toggle:hover {
 .mk-tabs button:hover:not([aria-selected="true"]) { background: var(--surface-2); color: var(--ink); }
 .mk-tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
 
+/* A saved event setup: the event title under the poll line, and the neutral division tag on Whole event rows */
+.mk-ev { margin-top: 14px; }
+.mk-ev h2 { margin: 0; font-weight: 700; font-size: 19px; line-height: 1.25; letter-spacing: -0.01em; }
+.mk-ev p { margin: 2px 0 0; color: var(--ink-subtle); font-size: 13px; }
+.mk-dv {
+  display: inline-flex; flex: none; align-self: center; align-items: center; height: 20px; margin-left: 6px; padding: 0 6px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--ink-subtle);
+  font-weight: 500; font-size: 11.5px; line-height: 1; white-space: nowrap;
+}
+/* On a phone a setup's rows give the award column a little less so the number, name and tag share one line */
+@media (max-width: 1023.98px) {
+  .mk-set .mk-r { grid-template-columns: 96px minmax(0, 1fr); }
+  .mk-set .mk-tl { gap: 6px; }
+  .mk-set .mk-tl b { min-width: 70px; }
+}
+
 /* One division: its heading pins on a phone, hairline under it */
 .mk-sec { margin-top: 14px; }
 .mk-dh {
@@ -2346,6 +2362,10 @@ body:has(.mk) > .theme-toggle:hover {
   .mk-tab-c { color: inherit; font-weight: inherit; font-size: inherit; }
   .mk-tab-c::before { content: " \00b7 "; white-space: pre; }
 
+  .mk-ev { margin-top: 20px; }
+  .mk-ev h2 { font-size: 22px; }
+  .mk-ev p { font-size: 14px; }
+  .mk-dv { margin-left: 10px; padding: 0 8px; font-size: 12px; }
   .mk-sec { margin-top: 32px; }
   .mk-dh { position: static; height: auto; min-height: 32px; margin: 0 0 10px; padding: 0; border-bottom: 0; background: none; gap: 12px; }
   .mk-dh h2 { font-size: 22px; }

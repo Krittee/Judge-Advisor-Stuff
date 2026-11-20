@@ -28,13 +28,14 @@ type Decisions = {
 
 async function decisions(): Promise<Decisions> {
   const db = store();
-  const [releases, winners, noWinners, teams] = await Promise.all([
+  const [releases, winners, noWinners, teams, setup] = await Promise.all([
     db.listReleases(),
     db.listWinners(),
     db.listNoWinners(),
     db.listTeams(),
+    db.getEventSetup(),
   ]);
-  return { releases, decide: (award, division) => decisionFor(award, division, winners, noWinners, teams) };
+  return { releases, decide: (award, division) => decisionFor(award, division, winners, noWinners, teams, Boolean(setup)) };
 }
 
 /** Send one decided award, once: a sent one comes back as it is, and only a real send is logged. */

@@ -183,6 +183,22 @@ test("an award without its winners is 409; a single winner or No winner sends; t
   assert.deepEqual([entry.actor, entry.team_id], ["Alex", w.hawks.id]);
 });
 
+test("a send with a saved event setup stores each team's division on the snapshot; without one it does not", async () => {
+  const w = await world();
+  await win(w, "excellence", w.hawks);
+  const plain = await send(ADMIN, "excellence", ES);
+  assert.equal(plain.status, 200);
+  assert.ok(!("division" in plain.body.release.teams[0]), "no setup: the snapshot is as before");
+  await w.db.resetAll();
+  const again = await world();
+  await again.db.saveEventSetup({ program: "VEX IQ", format: "blended", setBy: "Alex" });
+  await win(again, "excellence", again.hawks);
+  const sent = await send(ADMIN, "excellence", ES);
+  assert.equal(sent.status, 200);
+  assert.deepEqual(sent.body.release.teams, [{ id: again.hawks.id, number: "9882K", name: "Hawks", division: ES }]);
+  assert.deepEqual((await again.db.listReleases())[0].teams, sent.body.release.teams, "stored, not only replied");
+});
+
 test("the Judges Award needs both places: one is 409, two sends both teams", async () => {
   const w = await world();
   await judgesWin(w, w.hawks);

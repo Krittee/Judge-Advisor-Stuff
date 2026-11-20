@@ -274,3 +274,90 @@ test("the tab is remembered on this device behind its own try/catch, and the tab
   assert.match(css, /\.mk-tab-c \{[^}]*white-space: nowrap/);
   assert.doesNotMatch(read("src/components/marketing/AwardsDesk.tsx"), /ja-aw-/);
 });
+
+/* ---- a saved event setup: no tabs, an event title, sections ------------ */
+
+const WE = "Whole event";
+const ES = "Elementary School";
+const PER = ["excellence", "design"];
+const TAGGED = (n: string, name: string, division?: string): ReleaseTeam => ({ ...T(n, name), ...(division && { division }) });
+const SETUP_VIEW: ReleasedView = {
+  awards,
+  divisions: [ES, MS],
+  programs: [{ label: "All", divisions: [ES, MS] }],
+  setup: { program: "VEX IQ", format: "blended" },
+  sections: [
+    { key: ES, awardIds: PER },
+    { key: MS, awardIds: PER },
+    { key: WE, awardIds: awards.filter((a) => !PER.includes(a.id)).map((a) => a.id) },
+  ],
+  releases: [
+    release("excellence", { division: ES, teams: [TAGGED("41111A", "Little Levers", ES)] }),
+    release("excellence", { teams: [TAGGED("7700B", "Polar Bots", MS)], previous: { teams: [T("1234A", "Gear Grinders")], no_winner: false }, changed_at: "2026-11-19T03:58:00.000Z" }),
+    release("design", { teams: [TAGGED("2381C", "Byte Size", MS)] }),
+    release("think", { division: WE, teams: [TAGGED("5150X", "Short Circuit", MS)] }),
+    release("build", { division: WE, teams: [T("88012A", "Torque Team")] }),
+    release("create", { division: WE, teams: [], no_winner: true }),
+    release("judges", { division: WE, teams: [TAGGED("1234A", "Gear Grinders", MS), TAGGED("12021B", "Blue Bolts", ES)] }),
+    release("sportsmanship", { division: WE, teams: [TAGGED("3388K", "Kind Robots", MS)] }),
+    release("energy", { division: WE, status: "recalled", teams: [] }),
+  ],
+};
+const setupDesk = (over: Partial<React.ComponentProps<typeof AwardsDesk>> = {}) => desk({ view: SETUP_VIEW, ...over });
+
+test("a saved setup: no tab bar, the setup label as the brand line and the event title", () => {
+  const m = setupDesk();
+  assert.doesNotMatch(m, /role="tablist"|role="tab"/);
+  assert.match(m, /<span class="mk-brand-s">VEX IQ · Blended<\/span>/);
+  assert.match(m, /<div class="mk-ev"><h2>VEX IQ · Blended<\/h2><p>Excellence and Design for each division · every other award for the whole event<\/p><\/div>/);
+  assert.ok(m.indexOf("Checks every") < m.indexOf('class="mk-ev"'), "the title sits under the poll line");
+  assert.ok(m.indexOf('class="mk-ev"') < m.indexOf("Changed since sent"), "and above the changed box");
+  assert.match(setupDesk({ view: { ...SETUP_VIEW, setup: { program: "V5RC", format: "standard" }, sections: [{ key: MS, awardIds: awards.map((a) => a.id) }] } }), /<h2>V5RC · Standard<\/h2><p>Every award for each division<\/p>/);
+  assert.doesNotMatch(desk(), /class="mk-ev"/, "no setup, no title");
+});
+
+test("a saved setup: the sections in order, each with its count and bar", () => {
+  const m = setupDesk();
+  assert.deepEqual(headings(m), [ES, MS, WE]);
+  assert.match(text(m), /Elementary School1 of 2 sent/);
+  assert.match(text(m), /Whole event5 of 9 sent/);
+  assert.match(m, /<i style="width:55\.5+\d*%"><\/i>/);
+  assert.equal([...m.matchAll(/<li class="mk-r/g)].length, 2 + 2 + 9);
+});
+
+test("a saved setup: Whole event rows tag each team with its division; a row without one shows none; division sections show none", () => {
+  const m = setupDesk();
+  assert.match(rowOf(m, WE, "Think"), /5150X[^]*<span class="mk-dv" title="Middle School">MS<\/span>/);
+  const judges = rowOf(m, WE, "Judges");
+  assert.match(judges, /1234A[^]*>MS<\/span>[^]*12021B[^]*>ES<\/span>/);
+  assert.equal([...judges.matchAll(/class="mk-dv"/g)].length, 2);
+  assert.doesNotMatch(rowOf(m, WE, "Build"), /mk-dv/, "an old row without a division");
+  assert.doesNotMatch(rowOf(m, ES, "Excellence"), /mk-dv/);
+  assert.doesNotMatch(rowOf(m, MS, "Design"), /mk-dv/);
+  assert.match(rowOf(m, WE, "Create"), /No winner/);
+  assert.match(rowOf(m, WE, "Energy"), /Being updated/);
+  assert.match(rowOf(m, WE, "Inspire"), /Not sent yet/);
+});
+
+test("a saved setup: the changed box is above the sections and reads scope · award", () => {
+  const m = setupDesk();
+  assert.match(text(m), /Middle School · Excellencenow 7700B Polar Bots · was 1234A/);
+  assert.ok(m.indexOf("Changed since sent") < m.indexOf('aria-label="Elementary School awards"'));
+  const wholeChange: ReleasedView = { ...SETUP_VIEW, releases: [...SETUP_VIEW.releases, release("innovate", { division: WE, teams: [T("9090Z", "New")], previous: { teams: [T("1111Z", "Old")], no_winner: false }, changed_at: "2026-11-19T04:10:00.000Z" })] };
+  assert.match(text(setupDesk({ view: wholeChange })), /Whole event · Innovate/);
+});
+
+test("a saved setup: search groups results by section and hides sections with nothing", () => {
+  const m = setupDesk({ query: "5150X" });
+  assert.deepEqual(headings(m), [WE]);
+  assert.match(text(m), /1 result(?!s)/);
+  assert.deepEqual(headings(setupDesk({ query: "Excellence" })), [ES, MS]);
+  assert.match(text(setupDesk({ query: "nothing here" })), /No award or team matches/);
+});
+
+test("the CSS: the event title and the division tag are plain styles under .mk, no motion", () => {
+  const css = read("src/app/globals.css");
+  assert.match(css, /\.mk-ev h2 \{[^}]*font-size: 19px/);
+  assert.match(css, /\.mk-dv \{[^}]*border-radius: 999px/);
+  assert.match(css, /\.mk-ev h2 \{[^}]*font-size: 22px/);
+});
