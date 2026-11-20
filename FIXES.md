@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-11-20 | [Door page: Team \| Staff groups](#door-page-team--staff-groups-2026-11-20) | `7f0d2de` | Not yet (375px preview only) | Built on `claude/door-team-staff-258f85`, not pushed |
 | 2026-11-20 | [Awards Desk UI (2.2.0)](#awards-desk-ui-220-2026-11-20) | `c02e7c3`..`2d83b19` | iPhone Simulator only | Built on `claude/awards-desk-ui-e125c3`, not pushed |
 | 2026-11-19 | [Awards Desk backend (2.2.0)](#awards-desk-backend-220-2026-11-19) | `d5b1807`..`f9cc675` | Not needed (no UI yet) | Built on `claude/awards-desk-backend-921f59`, UI built on `claude/awards-desk-ui-e125c3` |
 | 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
@@ -21,6 +22,44 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Door page: Team | Staff groups (2026-11-20)
+
+### Problem / request
+
+The user: "since we have 7 pages including team page and staffs page can it be separate like -> Team | Staffs to make it more symmetrical". The door page "/" showed seven doors in one list (Team, then six staff roles), laid out 4 + 3 on wide screens, which looked lopsided.
+
+### Root cause
+
+Not a bug: the 2.2.0 Marketing door made it seven, and the 8-half-column 4 + 3 grid was the old layout for an odd count.
+
+### Decision
+
+The user picked "Side by side" for wide screens and "Two wide" for phones from two sketches each.
+
+### What changed
+
+- `src/components/door/DoorPage.tsx`: the doors are split into two `<section>`s, each with an `<h2>` label (Team, Staff) and its own list labelled by it. Card markup, the Team caption, the Live board and the colour key are unchanged, and so is the link order.
+- `src/app/globals.css` (door block):
+  - New `.dp-split`, `.dp-gt` (quiet uppercase label in `--ink-subtle`, not accent), `.dp-grp--*` and `.dp-doors--*`.
+  - Phone (< 1024px): the Team row as before, then the staff doors two across as avatar over name. The hint and chevron are clipped visually but kept for screen readers.
+  - Wide (≥ 1024px): Team | 1px divider | Staff 3 × 2. The Team card fills both rows and is exactly one staff card wide (`calc((100% - 81px) / 4)`). The old 4 + 3 rules are gone.
+- `tests/doorPage.runtime.test.tsx`: new test for the two labelled groups and which doors each holds.
+- `tests/doorPage.css.test.mjs`: the 4 + 3 layout test is replaced by tests for the split, the two-wide phone grid, the clipped hint and the label colour.
+
+### How it was tested
+
+- `npm test`: 1875 tests, 1874 pass, 0 fail, 1 skipped (the same skip as before). `npx tsc --noEmit`: clean. `npx eslint src tests --ignore-pattern '.claude/**'`: clean. `npm run build`: clean.
+- Browser preview on a copy of `.data/state.json` in the session scratchpad (never `.data/`):
+  - 1280px, dark and light: all seven cards measure 259.8px wide, the staff cards are 224px tall, and the Team card is 464px (both rows).
+  - 375px, light and dark: the Team card is 343 × 72, and the staff cards are 168 × 98. No name is clipped, there is no horizontal scroll, and the hints are still in the accessibility tree.
+  - No console errors.
+
+### Commit
+
+`7f0d2de` on `claude/door-team-staff-258f85`. Not pushed.
 
 ---
 
