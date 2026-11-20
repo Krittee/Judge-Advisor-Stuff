@@ -145,6 +145,12 @@ test("Nominees from replaces Division: All, ES and MS, with All pressed, and the
   assert.match(m, /Send all ready \(\d+\)/);
 });
 
+test("a stored Nominees from that the setup no longer has reads as All: the All chip is pressed and the nominee rows show", () => {
+  const stale = board({ from: "High School" });
+  assert.match(stale, /class="ja-aw-chip" aria-pressed="true"[^>]*>\s*All/);
+  assert.deepEqual(nominee(stale), nominee(board()));
+});
+
 test("Send all ready counts what is ready in every key: the decided, unsent halves and whole-event awards", () => {
   // Ready: Excellence ES, Excellence MS, Design ES, Innovate (recalled, decided), Amaze, Build, Create (No winner), Judges, Inspire. Sent ones are not.
   assert.match(board(), /Send all ready \(9\)/);

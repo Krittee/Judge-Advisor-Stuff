@@ -144,7 +144,9 @@ export function EventTab({
     ? (() => {
         const base = checklist(picked, {
           awards,
-          released: released ? { ...released, setup: saved ? { program: saved.program, format: saved.format } : undefined } : null,
+          released,
+          saved,
+          divisions: state.divisions,
           teams: state.teams,
           panels: state.panels,
         });

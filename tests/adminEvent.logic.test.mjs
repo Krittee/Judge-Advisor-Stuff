@@ -46,10 +46,20 @@ test("checklist: decided awards block it with the counts; the saved setup is wha
   assert.equal(rows[0].ok, false);
   assert.ok(rows[0].text.includes("Clear the awards first."));
   assert.ok(rows[0].text.includes("1 of 13 decided, 1 sent to Marketing"), rows[0].text);
-  // with no saved setup it counts under the picked one
-  const none = checklist(IQ_STD, ctx({ awards: view({ winners: [win("excellence", ES)] }), released: released({ releases: [sent("design", MS)] }) }));
+  // with no saved setup it counts every award in each of today's divisions
+  const none = checklist(IQ_STD, ctx({ awards: view({ winners: [win("excellence", ES)] }), released: released({ releases: [sent("design", MS)] }), divisions: [ES, MS] }));
   assert.ok(none[0].text.includes("1 of 22 decided, 1 sent to Marketing"), none[0].text);
   assert.deepEqual(rows.map((r) => r.id), ["awards", "teams", "panels"]);
+});
+
+test("checklist: no setup saved, y is the current event's total whatever tile is picked", () => {
+  const rows = checklist(IQ, ctx({ awards: view({ winners: [win("excellence", ES), win("excellence", MS)] }), divisions: [ES, MS] }));
+  assert.ok(rows[0].text.includes("2 of 22 decided"), rows[0].text);
+});
+
+test("checklist: the saved setup comes from ctx.saved, so a failed released read still shows three green rows", () => {
+  const rows = checklist(IQ, ctx({ awards: view({ winners: [win("excellence", ES)] }), released: null, saved: IQ, teams: [team("a", "1010M", HS)] }));
+  assert.deepEqual(rows.map((r) => r.ok), [true, true, true]);
 });
 
 test("checklist: decisions under a division outside the program are counted, once per (award, division)", () => {

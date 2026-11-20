@@ -68,33 +68,37 @@ const same = (a: Pick2 | null | undefined, b: Pick2 | null | undefined) => Boole
 
 /**
  * The three rows, in order. Awards are counted under the saved setup (that is
- * the key they were decided under), else under the picked one; picking the
- * saved setup again changes nothing, so its Awards row is green.
+ * the key they were decided under), else today's divisions; picking the saved
+ * setup again changes nothing, so its Awards row is green.
  */
 export function checklist(
   next: Pick2,
-  ctx: { awards: AwardsAdminView | null; released: ReleasedView | null; teams: Team[]; panels: PublicPanel[] },
+  ctx: { awards: AwardsAdminView | null; released: ReleasedView | null; saved?: Pick2 | null; divisions?: string[]; teams: Team[]; panels: PublicPanel[] },
 ): Row[] {
   const { awards, released } = ctx;
+  // The tab passes the saved setup (null when none), so a failed /released read cannot hide it; callers that leave it out get the release view's.
+  const saved = ctx.saved === undefined ? released?.setup : ctx.saved;
   const sentCount = released?.releases.filter((r) => r.status === "sent").length ?? 0;
   let row: Row;
   if (!awards) row = { id: "awards", ok: null, text: "checking…" };
   else {
     const busy = awards.winners.length > 0 || awards.noWinners.length > 0 || sentCount > 0;
-    const basis = released?.setup && setupDivisions(released.setup) ? released.setup : next;
-    const keys = scopeKeys(setupDivisions(basis) ?? presetDivisions(), basis.format);
-    const total = keys.reduce((n, k) => n + awardsUnder(awards.awards, k, basis.format).length, 0);
+    // y is the current event's total: the saved setup's keys, else every award in each of today's divisions (the picked tile's keys only if the caller gave none).
+    const savedDivs = saved ? setupDivisions(saved) : null;
+    const under = (b: Pick2, divs: string[]) => scopeKeys(divs, b.format).reduce((n, k) => n + awardsUnder(awards.awards, k, b.format).length, 0);
+    const total =
+      saved && savedDivs ? under(saved, savedDivs) : ctx.divisions ? awards.awards.length * ctx.divisions.length : under(next, setupDivisions(next) ?? presetDivisions());
     // Every decision actually on file, whatever key it sits under: one outside the picked program still blocks, and is counted.
     const done = new Set([...awards.winners, ...awards.noWinners].map((d) => `${d.award_id}|${d.division}`)).size;
     const counts = `${done} of ${total} decided, ${sentCount} sent to Marketing.`;
-    row = same(next, released?.setup)
+    row = same(next, saved)
       ? { id: "awards", ok: true, text: busy ? counts : "none decided" }
       : busy
         ? { id: "awards", ok: false, text: `Clear the awards first. ${counts}` }
         : { id: "awards", ok: true, text: "none decided" };
   }
   // The saved setup picked again changes nothing, so every row is fine whatever the data says.
-  if (same(next, released?.setup)) return [row, teamsRow([], next.program), panelsRow([])];
+  if (same(next, saved)) return [row, teamsRow([], next.program), panelsRow([])];
   const divisions = divisionChoices(next, false).options;
   const panelOptions = divisionChoices(next, true).options;
   return [

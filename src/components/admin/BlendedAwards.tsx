@@ -292,7 +292,7 @@ export function BlendedBoard({
   setup,
   rows,
   rubricList,
-  from = "",
+  from: fromProp = "",
   onFrom,
   panelId = ALL_PANELS,
   onPanel,
@@ -348,6 +348,8 @@ export function BlendedBoard({
   const { awards, nominations, winners, noWinners } = data;
   const { teams, panels, flags, flagKinds } = state;
   const divisions = setupDivisions(setup) ?? [];
+  // A division another console's save took out of the setup reads as All.
+  const from = divisions.includes(fromProp) ? fromProp : "";
 
   if (!awards.length) return <p className="ja-empty">No awards are set up. They are listed in config/event.json.</p>;
   if (!divisions.length) return <p className="ja-empty">No divisions yet.</p>;
