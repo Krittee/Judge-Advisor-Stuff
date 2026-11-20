@@ -191,7 +191,7 @@ test("severity buttons are a 2-column grid of 56px toneSolid buttons that only s
   assert.ok(severitySrc.includes("toneSolid(k.color)"));
   assert.ok(severitySrc.includes("aria-pressed={on}"));
   assert.ok(severitySrc.includes("onClick={() => onChange(k.id)}"), "a tap selects");
-  assert.ok(severitySrc.includes("DISQUALIFIED_KIND") && severitySrc.includes("rf-sv--wide"), "Disqualified spans both columns");
+  assert.ok(severitySrc.includes("k.requiresRule ? \"rf-sv--wide\"") , "Minor and Disqualified each span both columns");
   assert.ok(severitySrc.includes("{on ? ("), "the selected one shows a check");
   assert.ok(severitySrc.includes("escalateId === k.id"), "the escalation highlight stays");
   assert.match(rule(".rf-sev {"), /grid-template-columns: 1fr 1fr; gap: 8px/);

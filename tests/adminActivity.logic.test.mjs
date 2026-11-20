@@ -37,7 +37,6 @@ const kinds = [
   { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },
   { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
   { id: "minor", label: "Minor violation", short: "Minor", color: "orange", severity: 2, requiresRule: true },
-  { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3, requiresRule: true },
   { id: "dq", label: "Disqualified", short: "DQ", color: "black", severity: 4, requiresRule: true },
 ];
 
@@ -213,7 +212,7 @@ test("the flag kinds inside a referee action are pulled out, to be drawn as seve
 });
 
 test("an entry names the severity of the last kind in its action", () => {
-  assert.equal(namedFlag("flagged major", kinds)?.id, "major");
+  assert.equal(namedFlag("flagged major", kinds)?.id, "dq", "an old Major log line reads as DQ");
   assert.equal(namedFlag("corrected a flag: warning → minor", kinds)?.id, "minor", "a correction takes the kind it corrected to");
   assert.equal(namedFlag("removed a flag: dq", kinds)?.id, "dq");
   assert.equal(namedFlag("corrected a flag", kinds), null);
@@ -230,7 +229,7 @@ test("the dot: request neutral, conflict caution, setup an outline, referee the 
   assert.equal(dot("referee", "flagged good"), "ja-ac-d-referee bg-done");
   assert.equal(dot("referee", "flagged warning"), "ja-ac-d-referee bg-caution");
   assert.equal(dot("referee", "flagged minor"), "ja-ac-d-referee bg-waiting");
-  assert.equal(dot("referee", "flagged major"), "ja-ac-d-referee bg-danger");
+  assert.equal(dot("referee", "flagged major"), "ja-ac-d-referee bg-ink", "an old Major log line is a DQ dot");
   assert.equal(dot("referee", "flagged dq"), "ja-ac-d-referee bg-ink");
   assert.equal(dot("referee", "corrected a flag: warning → minor"), "ja-ac-d-referee bg-waiting");
   // No severity named: neutral, not the colour of some other kind.

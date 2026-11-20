@@ -202,7 +202,7 @@ export function ruleChipIds(rulesetId: string, picked: string[]): string[] {
  * match type must be one the flag's ruleset offers (or the flag's own, if
  * old), the number the right shape once tidied the way the server tidies it,
  * the field 1..N (or the flag's own, if
- * old), and Minor, Major and Disqualified need a rule -- except that a flag
+ * old), and Minor and Disqualified need a rule -- except that a flag
  * recorded with none may keep its own kind.
  */
 export function correctionBlocker(p: { flag: FlagRow; draft: Correction; kinds: FlagKind[]; fieldCount: number }): string | null {
@@ -226,7 +226,7 @@ export function correctionBlocker(p: { flag: FlagRow; draft: Correction; kinds: 
 /**
  * The body of the PATCH, as the inline correction has always sent it: the
  * flag keeps the ruleset it was recorded under. Match affecting only rides
- * along for Minor and Major.
+ * along for Minor.
  */
 export function correctionReport(flag: FlagRow, draft: Correction): FlagReport {
   return {
@@ -259,5 +259,5 @@ export async function saveCorrection(p: {
   return true;
 }
 
-/** Whether the match-affecting switch is offered: Minor and Major only. */
+/** Whether the match-affecting switch is offered: Minor only. */
 export const canAffectMatch = (kind: string): boolean => MATCH_AFFECTING_KINDS.includes(kind);

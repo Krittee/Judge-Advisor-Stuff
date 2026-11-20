@@ -421,12 +421,12 @@ test("referee flags: Good conduct and the worst of the rest, or none", () => {
   const kinds = [
     { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },
     { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
-    { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3, requiresRule: true },
+    { id: "dq", label: "Disqualified", short: "DQ", color: "black", severity: 4, requiresRule: true },
   ];
   const flag = (kind) => ({ team_id: byteMe.id, kind });
   assert.deepEqual(refereeLine([], kinds), { good: null, caution: null });
   assert.deepEqual(refereeLine([flag("good"), flag("good"), flag("good")], kinds), { good: "Good conduct ×3", caution: null });
-  assert.deepEqual(refereeLine([flag("good"), flag("warning"), flag("warning"), flag("major")], kinds), { good: "Good conduct ×1", caution: "Major violation ×1" });
+  assert.deepEqual(refereeLine([flag("good"), flag("warning"), flag("warning"), flag("dq")], kinds), { good: "Good conduct ×1", caution: "Disqualified ×1" });
   assert.deepEqual(refereeLine([flag("warning")], kinds), { good: null, caution: "Warning ×1" }, "a flag of a kind the config dropped says nothing");
 });
 

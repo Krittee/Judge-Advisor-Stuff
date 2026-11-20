@@ -17,7 +17,7 @@ import type {
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { randomPanelCode } from "../panelCode";
 import { readActivity, type StoredActivity } from "../activity";
-import { blendedDivisions, defaultCategory, divisionsCompatible, presetDivisions, presetPanels } from "../presets";
+import { blendedDivisions, canonicalFlagKind, defaultCategory, divisionsCompatible, presetDivisions, presetPanels } from "../presets";
 import { hasNearbyBooking } from "../data";
 import { judgeKey, panelBlocks, planAssignments } from "../roster";
 import {
@@ -1377,12 +1377,14 @@ export const postgresStore: Store = {
   /** Declaring the same pair twice returns the one already recorded. */
   async listFlags(teamId?: string) {
     // Newest first: on a busy field the last thing seen matters most.
-    return teamId
+    const rows = teamId
       ? await query<FlagRow>(
           "select * from flags where team_id = $1 order by created_at desc",
           [teamId],
         )
       : await query<FlagRow>("select * from flags order by created_at desc");
+    // A retired kind ("major") reads as what it became; the stored row is untouched.
+    return rows.map((f) => ({ ...f, kind: canonicalFlagKind(f.kind) }));
   },
 
   async createFlag(input: NewFlag) {

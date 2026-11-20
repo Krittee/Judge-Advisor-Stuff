@@ -75,7 +75,7 @@ export function matchIsSet(match: CurrentMatch, rulesetId: string, fieldCount: n
 /**
  * What is still missing before a flag can be recorded, as the one line shown
  * above the Record button; null when nothing is. Match first, then the team,
- * then the severity, and last the rule that Minor, Major and Disqualified need.
+ * then the severity, and last the rule that Minor and Disqualified need.
  */
 export function recordBlocker(p: {
   match: CurrentMatch;

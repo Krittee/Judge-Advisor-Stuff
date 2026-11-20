@@ -25,7 +25,6 @@ const kinds: FlagKind[] = [
   { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },
   { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
   { id: "minor", label: "Minor violation", short: "Minor", color: "orange", severity: 2, requiresRule: true },
-  { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3, requiresRule: true },
   { id: "dq", label: "Disqualified", short: "DQ", color: "black", severity: 4, requiresRule: true },
 ];
 
@@ -101,7 +100,7 @@ test("the phone's section bar says '9 flags' on Referee, and the rail marks Refe
 
 /* ---- the strip and the caption --------------------------------------------------- */
 
-test("the count strip has the five severities, worst first, each with its dot, count and both labels", () => {
+test("the count strip has the four severities, worst first, each with its dot, count and both labels", () => {
   const m = board();
   const strip = m.match(/<section class="ja-cs ja-rf-cs" aria-label="Flags by severity">[\s\S]*?<\/section>/)?.[0] ?? "";
   const cells = [...strip.matchAll(/<div><b>(\d+)<\/b><span><i aria-hidden="true" class="ja-rf-dot ([^"]+)"><\/i><em class="ja-rf-long">(.*?)<\/em><em class="ja-rf-short">(.*?)<\/em>/g)];
@@ -109,7 +108,6 @@ test("the count strip has the five severities, worst first, each with its dot, c
     cells.map((c) => [c[1], c[2], c[3], c[4]]),
     [
       ["1", "bg-ink", "Disqualified", "DQ"],
-      ["0", "bg-danger", "Major violation", "Major"],
       ["2", "bg-waiting", "Minor violation", "Minor"],
       ["4", "bg-caution", "Warning", "Warning"],
       ["2", "bg-done", "Good conduct", "Good"],
@@ -122,7 +120,7 @@ test("with no flags the strip shows zeros and the page says no referee has flagg
   const m = board({ flags: [] });
   assert.match(m, /<p class="ja-empty">No referee has flagged anything yet\.<\/p>/);
   assert.doesNotMatch(m, /ja-rf-cols|ja-rf-jr/);
-  assert.equal([...m.matchAll(/<div><b>0<\/b>/g)].length, 5);
+  assert.equal([...m.matchAll(/<div><b>0<\/b>/g)].length, 4);
   assert.match(m, /Recorded by referees on their own page/);
 });
 
@@ -314,8 +312,8 @@ test("an old flag keeps its old field and match type, marked (old); nothing else
   assert.doesNotMatch(sheet({ flag: q19 }), /\(old\)/);
 });
 
-test("the match-affecting switch is for Minor and Major, or once a rule is picked", () => {
-  assert.match(sheet(), /<label class="ja-rf-row"><span>Match affecting<small>Minor and Major only<\/small><\/span><input type="checkbox" role="switch" class="ja-rf-sw" checked=""\/>/);
+test("the match-affecting switch is for Minor, or once a rule is picked", () => {
+  assert.match(sheet(), /<label class="ja-rf-row"><span>Match affecting<small>Minor only<\/small><\/span><input type="checkbox" role="switch" class="ja-rf-sw" checked=""\/>/);
   const warning = flag(titans, "warning", { rule: null });
   assert.doesNotMatch(sheet({ flag: warning }), /ja-rf-row/, "a Warning with no rule has nothing to say about the match");
   assert.match(sheet({ flag: flag(titans, "warning", { rule: "GG17" }) }), /ja-rf-row/);
@@ -329,11 +327,11 @@ test("the note is there with its text, and the whole group locks while a save is
   assert.ok(body.includes("<fieldset disabled={busy}"));
 });
 
-test("there are five compact severity buttons, the flag's own pressed, none of them a submit", () => {
+test("there are four compact severity buttons, the flag's own pressed, none of them a submit", () => {
   const m = sheet();
   const group = m.match(/<div class="ja-sev5" role="group"[\s\S]*?<\/div><\/div>/)?.[0] ?? "";
   const buttons = [...group.matchAll(/<button type="(\w+)" aria-pressed="(true|false)"[^>]*>(?:<i[^>]*><\/i>)?([^<]+)<\/button>/g)];
-  assert.deepEqual(buttons.map((b) => [b[3], b[2]]), [["Good", "false"], ["Warning", "false"], ["Minor", "true"], ["Major", "false"], ["DQ", "false"]]);
+  assert.deepEqual(buttons.map((b) => [b[3], b[2]]), [["Good", "false"], ["Warning", "false"], ["Minor", "true"], ["DQ", "false"]]);
   assert.ok(buttons.every((b) => b[1] === "button"), "tapping one cannot submit the form");
   assert.match(group, /class="ja-sv bg-waiting text-waiting-ink[^"]*"/, "the chosen one is filled in its severity colour");
   assert.match(m, /<div class="ja-lab" id="[^"]+">Severity<\/div>/);
@@ -456,7 +454,7 @@ test("the Referee styles are page-scoped, use tokens for both themes, and have n
   assert.doesNotMatch(block, /--caution/);
 });
 
-/* ---- colour: the Major pill ---------------------------------------------------------- */
+/* ---- colour: the severity pills ---------------------------------------------------------- */
 
 /* oklch -> linear sRGB -> WCAG contrast, so the pills can be checked against the real tokens. */
 function linear(oklch: string): [number, number, number] {
@@ -487,9 +485,9 @@ function tokens(theme: "dark" | "light"): Record<string, string> {
   return Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(oklch\([^)]+\))/g)].map((m) => [m[1], m[2]]));
 }
 
-test("every severity pill reads at 4.5:1 or better, in both themes -- the Major one included", () => {
+test("every severity pill reads at 4.5:1 or better, in both themes -- the solid DQ one included", () => {
   const configured = JSON.parse(read("config/event.json")).refereeFlags as { id: string; color: string }[];
-  assert.deepEqual(configured.map((k) => k.id), ["good", "warning", "minor", "major", "dq"]);
+  assert.deepEqual(configured.map((k) => k.id), ["good", "warning", "minor", "dq"]);
   for (const theme of ["dark", "light"] as const) {
     const t = tokens(theme);
     for (const { id, color } of configured) {
@@ -503,12 +501,12 @@ test("every severity pill reads at 4.5:1 or better, in both themes -- the Major 
 });
 
 test("the contrast check does catch the failure it guards against: white on a lighter red is 3.5:1", () => {
-  // The Referee mock's Major fill with white text, as the spec measured it.
+  // The Referee mock's red fill with white text, as the spec measured it.
   const lighterRed = "oklch(0.640 0.200 18)";
   const white = "oklch(0.985 0.010 18)";
   assert.ok(contrast(lighterRed, white) < 4.5);
   assert.ok(contrast(lighterRed, "oklch(0.165 0.012 265)") >= 4.5, "dark ink is what that red needs");
-  // The app's own Major fill is deeper, so its near-white ink clears the bar.
+  // The app's own danger fill is deeper, so its near-white ink clears the bar.
   const dark = tokens("dark");
   assert.ok(contrast(dark.danger, dark["danger-ink"]) >= 4.5);
   assert.ok(contrast(dark.danger, dark.canvas) < 4.5, "dark ink on the app's red would be worse, so the pair stays");

@@ -35,7 +35,6 @@ const kinds = [
   { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },
   { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
   { id: "minor", label: "Minor violation", short: "Minor", color: "orange", severity: 2, requiresRule: true },
-  { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3, requiresRule: true },
   { id: "dq", label: "Disqualified", short: "DQ", color: "black", severity: 4, requiresRule: true },
 ];
 
@@ -100,9 +99,9 @@ test("a team that was removed is still listed, last among equals, with no team o
 test("the count strip lists every kind, worst first, and shows a 0 for one nobody has", () => {
   assert.deepEqual(
     severityTotals(mock, kinds).map(({ kind, count }) => [kind.short, count]),
-    [["DQ", 1], ["Major", 0], ["Minor", 2], ["Warning", 4], ["Good", 2]],
+    [["DQ", 1], ["Minor", 2], ["Warning", 4], ["Good", 2]],
   );
-  assert.deepEqual(severityTotals([], kinds).map((t) => t.count), [0, 0, 0, 0, 0]);
+  assert.deepEqual(severityTotals([], kinds).map((t) => t.count), [0, 0, 0, 0]);
 });
 
 /* ---- which team is open ----------------------------------------------------------- */
@@ -268,14 +267,14 @@ test("a correction starts as the flag is, and only Save correction sends it", as
   // Picking a severity is a change of the draft, not a send: nothing here can call onSave.
   const calls = [];
   const onSave = async (id, report) => void calls.push([id, report]);
-  const picked = { ...draft, kind: "major" };
+  const picked = { ...draft, kind: "dq" };
   assert.equal(correctionBlocker(open({ draft: picked })), null);
   assert.deepEqual(calls, []);
 
   assert.equal(await saveCorrection({ ...open({ draft: picked }), onSave }), true);
   assert.equal(calls.length, 1);
   assert.equal(calls[0][0], recorded.id);
-  assert.equal(calls[0][1].kind, "major");
+  assert.equal(calls[0][1].kind, "dq");
 });
 
 test("the PATCH body is the one the inline correction always sent", () => {
@@ -291,9 +290,10 @@ test("the PATCH body is the one the inline correction always sent", () => {
   });
   // The flag keeps the ruleset it was recorded under; an old one with none is VEX IQ.
   assert.equal(correctionReport(flag(titans, "warning", { ruleset: null, match_type: "Q" }), startCorrection(flag(titans, "warning", { ruleset: null }))).ruleset, "viqrc");
-  // Match affecting only rides along for Minor and Major.
+  // Match affecting only rides along for Minor.
   assert.equal(correctionReport(recorded, { ...startCorrection(recorded), kind: "warning" }).matchAffecting, false);
-  assert.equal(correctionReport(recorded, { ...startCorrection(recorded), kind: "major" }).matchAffecting, true);
+  assert.equal(correctionReport(recorded, { ...startCorrection(recorded), kind: "dq" }).matchAffecting, false);
+  assert.equal(correctionReport(recorded, { ...startCorrection(recorded), kind: "minor" }).matchAffecting, true);
 });
 
 test("a blocked correction sends nothing, and says what is missing", async () => {
@@ -317,7 +317,7 @@ test("a flag recorded with no rule may be corrected in its own kind, but not mov
   const legacy = flag(titans, "minor", { rule: null, match_type: "Q", match_number: "5", field: "1" });
   const ctx = { flag: legacy, kinds, fieldCount: 3 };
   assert.equal(correctionBlocker({ ...ctx, draft: startCorrection(legacy) }), null);
-  assert.match(correctionBlocker({ ...ctx, draft: { ...startCorrection(legacy), kind: "major" } }), /Major violation needs at least one rule/);
+  assert.match(correctionBlocker({ ...ctx, draft: { ...startCorrection(legacy), kind: "dq" } }), /Disqualified needs at least one rule/);
   assert.equal(correctionBlocker({ ...ctx, draft: { ...startCorrection(legacy), kind: "warning" } }), null);
 });
 
