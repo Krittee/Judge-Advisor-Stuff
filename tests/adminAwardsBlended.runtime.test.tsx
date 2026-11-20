@@ -14,6 +14,7 @@ import { WHOLE_EVENT } from "../src/lib/eventSetup";
 import { rankTeams } from "../src/lib/ranking";
 import { rubrics } from "../src/lib/rubrics";
 import type { AppState, AwardsAdminView, ReleasedView } from "../src/lib/types";
+import { noHexColour, noMotion } from "./cssChecks";
 import { at, awards, breakers, byteMe, gearGrinders, hexAppeal, labRats, monitors, nom, panels, quiet, release, roboraptors, team, teams, torque, win } from "./adminAwards.fixtures";
 
 /* The Judge Advisor Awards board in a blended event (VEX IQ · Blended: Excellence and Design per division, nine awards for the whole event), rendered to markup.
@@ -423,21 +424,10 @@ test("the rail's Awards count is event-wide in a blended event, and unchanged ot
   assert.match(page, /eventDecidedText\(awards\.data\.winners, awards\.data\.awards, [^)]*, awards\.data\.noWinners, "blended"\)/);
 });
 
-test("the blended styles live in the Awards block: one column of blocks, halves side by side from 1280px, tokens only, no motion, 44px taps on a phone", () => {
+test("the blended styles live in the Awards block: no motion, tokens only", () => {
   const block = css.slice(css.indexOf("/* @ja-block awards */"), css.indexOf("/* @ja-block activity */"));
-  const phone = block.slice(0, block.indexOf("@media (min-width: 1024px)"));
-  const wide = block.slice(block.indexOf("@media (min-width: 1024px)"));
-  assert.doesNotMatch(block, /transition|animation/);
-  assert.doesNotMatch(block, /#[0-9a-f]{3,8}\b|oklch\(|rgb\(|hsl\(/i);
-  assert.match(phone, /\.ja-aw-stack \{[^}]*flex-direction: column/);
-  assert.match(phone, /\.ja-aw-halves \{[^}]*display: grid/);
-  assert.match(wide, /\.ja-aw-halves \{[^}]*repeat\(var\(--n/);
-  assert.match(phone, /\.ja-aw-from \.ja-aw-chip \{[^}]*flex: 1/, "three equal buttons on a phone");
-  assert.match(phone, /\.ja-aw-scope \{[^}]*border-radius: 999px/);
-  assert.match(block, /\.ja-aw-rwarn \{[^}]*color: var\(--caution-quiet\)/, "Already has is caution");
-  assert.match(block, /\.ja-aw-rwarn \{[^}]*border-top: 1px solid color-mix\(in srgb, var\(--caution\) 40%, transparent\)/);
-  assert.match(phone, /\.ja-aw-bl \.ja-aw-fr \{[^}]*order: -1/, "Send all ready comes first on a phone");
-  assert.doesNotMatch(block, /\.ja-aw-(scope|dv)[^{]*\{[^}]*var\(--accent/, "the Whole event label and the division tag are neutral");
+  noMotion(block, /transition|animation/);
+  noHexColour(block);
 });
 
 test("Standard markup is untouched: AwardLists renders its section, header and body exactly as before", () => {

@@ -4,21 +4,11 @@ import test from "node:test";
 import { changesOf, countText, deskRows, eventLine, sectionCount, sectionRows, sectionsOf, highlight, matchRow, pickTab, readSeen, readTab, resultsText, rowState, seenKey, sentCount, tabKey, tabCount, tabLabel, writeSeen, writeTab } from "../src/components/marketing/marketingLogic";
 import { programTabs } from "../src/lib/presets";
 import type { AwardReleaseRow, ReleasedView, ReleaseTeam } from "../src/lib/types";
+import { CHANGED_AT, LABELS, MS, T, awards, release } from "./marketing.fixtures";
 
 /* The Awards Desk's decisions as plain functions: what a row says, the "N of M
    sent" count, the changes list, the search, and the Seen key. The page draws
    them (marketingPage.runtime.test.tsx). */
-
-const MS = "Middle School";
-const T = (number: string, name: string): ReleaseTeam => ({ id: `t-${number}`, number, name });
-const LABELS = ["Excellence", "Design", "Innovate", "Think", "Amaze", "Build", "Create", "Judges", "Inspire", "Sportsmanship", "Energy"];
-const awards = LABELS.map((label, i) => ({ id: label.toLowerCase(), label, order: i + 1, places: label === "Judges" ? 2 : 1 }));
-
-const release = (award_id: string, over: Partial<AwardReleaseRow> = {}): AwardReleaseRow => ({
-  award_id, division: MS, teams: [T("2381C", "Byte Size")], no_winner: false, previous: null, status: "sent",
-  sent_at: "2026-11-19T03:31:00.000Z", sent_by: "Pat", changed_at: null, ...over,
-});
-const CHANGED_AT = "2026-11-19T03:58:00.000Z";
 
 const releases: AwardReleaseRow[] = [
   release("excellence", { teams: [T("7700B", "Polar Bots")], previous: { teams: [T("1234A", "Gear Grinders")], no_winner: false }, changed_at: CHANGED_AT }),

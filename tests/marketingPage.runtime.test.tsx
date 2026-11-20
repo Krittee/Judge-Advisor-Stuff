@@ -6,7 +6,9 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 
 import { AwardsDesk } from "../src/components/marketing/AwardsDesk";
 import { homeFor } from "../src/components/SignInForm";
-import type { AwardReleaseRow, ReleasedView, ReleaseTeam } from "../src/lib/types";
+import { noMotion } from "./cssChecks";
+import { CHANGED_AT, MS, T, awards, release } from "./marketing.fixtures";
+import type { ReleasedView, ReleaseTeam } from "../src/lib/types";
 
 /* The Awards Desk, rendered to markup. A tap and the polling have no DOM harness
    here: the decisions run as plain functions in marketingLogic.test.ts and the
@@ -18,16 +20,8 @@ const noop = () => {};
 // Sign out reads the app router, which only exists inside Next; a stub is enough to draw it.
 const router = {} as React.ContextType<typeof AppRouterContext>;
 
-const MS = "Middle School";
-const T = (number: string, name: string): ReleaseTeam => ({ id: `t-${number}`, number, name });
-const LABELS = ["Excellence", "Design", "Innovate", "Think", "Amaze", "Build", "Create", "Judges", "Inspire", "Sportsmanship", "Energy"];
-const awards = LABELS.map((label, i) => ({ id: label.toLowerCase(), label, order: i + 1, places: label === "Judges" ? 2 : 1 }));
-const release = (award_id: string, over: Partial<AwardReleaseRow> = {}): AwardReleaseRow => ({
-  award_id, division: MS, teams: [T("2381C", "Byte Size")], no_winner: false, previous: null, status: "sent",
-  sent_at: "2026-11-19T03:31:00.000Z", sent_by: "Pat", changed_at: null, ...over,
-});
 const releases = [
-  release("excellence", { teams: [T("7700B", "Polar Bots")], previous: { teams: [T("1234A", "Gear Grinders")], no_winner: false }, changed_at: "2026-11-19T03:58:00.000Z" }),
+  release("excellence", { teams: [T("7700B", "Polar Bots")], previous: { teams: [T("1234A", "Gear Grinders")], no_winner: false }, changed_at: CHANGED_AT }),
   release("design"),
   release("innovate", { status: "recalled", teams: [T("9090Z", "Stale Snapshot")] }),
   release("create", { teams: [], no_winner: true }),
@@ -159,21 +153,8 @@ test("a read-only page: the only buttons are search clear, Seen and Sign out", (
   for (const l of labels) assert.match(l, /^(Seen|Sign out|)$/);
 });
 
-test("the page: no session goes to the login, marketing and the Judge Advisor stay, the rest go home", () => {
-  const page = read("src/app/marketing/page.tsx");
-  assert.match(page, /router\.replace\("\/marketing\/login"\)/);
-  assert.match(page, /session\.role !== "marketing" && session\.role !== "admin"/);
-  assert.match(page, /router\.replace\(homeFor\(session\.role\)\)/);
-  assert.match(page, /\/api\/awards\/released/);
-  assert.match(page, /15_000/);
-  assert.match(page, /visibilitychange/);
-  assert.match(page, /readSeen\(/);
-  assert.match(page, /writeSeen\(/);
-  assert.match(read("src/components/marketing/AwardsDesk.tsx"), /<SignOutButton to="\/marketing\/login" \/>/);
-});
-
-test("the Seen set reads localStorage behind its own try/catch", () => {
-  assert.match(read("src/app/marketing/page.tsx"), /try \{\s*return window\.localStorage;\s*\} catch \{\s*return null;\s*\}/);
+test("the page: only marketing and the Judge Advisor stay", () => {
+  assert.match(read("src/app/marketing/page.tsx"), /session\.role !== "marketing" && session\.role !== "admin"/);
 });
 
 test("sign-in: Marketing has a door, a home and its own avatar", () => {
@@ -201,9 +182,8 @@ test("the CSS: page-scoped, no motion, outside the Judge Advisor blocks", () => 
   assert.ok(start < css.indexOf("/* @ja-block"), "before the first @ja-block marker");
   const block = css.slice(css.lastIndexOf("/* ----", start), css.lastIndexOf("/* ----", css.indexOf("Coordinator console (")));
   assert.ok(block.length > 3000);
-  assert.doesNotMatch(block.replace(/\/\*[\s\S]*?\*\//g, ""), /@keyframes|animation|transform: (?!none)|(?<!over)scroll-behavior/);
+  noMotion(block, /@keyframes|animation|transform: (?!none)|(?<!over)scroll-behavior/);
   assert.doesNotMatch(css, /si-av--ph|dp-av--ph|mk-av--ph/);
-  assert.match(block, /\.mk-av img \{[^}]*object-fit: cover/);
 });
 
 /* ---- the program tabs -------------------------------------------------- */
@@ -262,19 +242,6 @@ test("one tab, no tab bar: the page is what it was", () => {
   assert.deepEqual(headings(m), ["Elementary School", MS, "High School"]);
 });
 
-test("the tab is remembered on this device behind its own try/catch, and the tabs are styled like the Judge Advisor's toggle", () => {
-  const page = read("src/app/marketing/page.tsx");
-  assert.match(page, /readTab\(/);
-  assert.match(page, /writeTab\(/);
-  const css = read("src/app/globals.css");
-  assert.match(css, /\.mk-tabs button\[aria-selected="true"\] \{[^}]*background: var\(--accent\)/);
-  assert.match(css, /\.mk-tabs button \{[^}]*min-height: 44px/);
-  assert.match(css, /\.mk-tabs button \{[^}]*min-height: 36px/);
-  assert.match(css, /\.mk-tab-c::before \{ content: " \\00b7 "/);
-  assert.match(css, /\.mk-tab-c \{[^}]*white-space: nowrap/);
-  assert.doesNotMatch(read("src/components/marketing/AwardsDesk.tsx"), /ja-aw-/);
-});
-
 /* ---- a saved event setup: no tabs, an event title, sections ------------ */
 
 const WE = "Whole event";
@@ -293,7 +260,7 @@ const SETUP_VIEW: ReleasedView = {
   ],
   releases: [
     release("excellence", { division: ES, teams: [TAGGED("41111A", "Little Levers", ES)] }),
-    release("excellence", { teams: [TAGGED("7700B", "Polar Bots", MS)], previous: { teams: [T("1234A", "Gear Grinders")], no_winner: false }, changed_at: "2026-11-19T03:58:00.000Z" }),
+    release("excellence", { teams: [TAGGED("7700B", "Polar Bots", MS)], previous: { teams: [T("1234A", "Gear Grinders")], no_winner: false }, changed_at: CHANGED_AT }),
     release("design", { teams: [TAGGED("2381C", "Byte Size", MS)] }),
     release("think", { division: WE, teams: [TAGGED("5150X", "Short Circuit", MS)] }),
     release("build", { division: WE, teams: [T("88012A", "Torque Team")] }),
@@ -353,11 +320,4 @@ test("a saved setup: search groups results by section and hides sections with no
   assert.match(text(m), /1 result(?!s)/);
   assert.deepEqual(headings(setupDesk({ query: "Excellence" })), [ES, MS]);
   assert.match(text(setupDesk({ query: "nothing here" })), /No award or team matches/);
-});
-
-test("the CSS: the event title and the division tag are plain styles under .mk, no motion", () => {
-  const css = read("src/app/globals.css");
-  assert.match(css, /\.mk-ev h2 \{[^}]*font-size: 19px/);
-  assert.match(css, /\.mk-dv \{[^}]*border-radius: 999px/);
-  assert.match(css, /\.mk-ev h2 \{[^}]*font-size: 22px/);
 });

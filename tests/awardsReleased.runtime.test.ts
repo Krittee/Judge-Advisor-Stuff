@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AsyncLocalStorage } from "node:async_hooks";
-import { createHmac } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SignJWT } from "jose";
 
 import type { Session } from "../src/lib/auth";
-import type { Panel, Team } from "../src/lib/types";
+import type { Team } from "../src/lib/types";
+import { ADMIN, COORDINATOR, ES, MARKETING, MS, QUEUER, REFEREE, hit, judgeOf, world as seedWorld } from "./routeHarness";
 
 /* The Awards Desk's /api/awards/released -- read, send one, send all ready, recall --
    driven through the REAL route handler against the real file store, with the same
@@ -16,79 +14,8 @@ process.env.DATA_FILE = join(tmpdir(), `judge-queue-awards-released-${process.pi
 process.env.SEED_DEMO = "false";
 process.env.SESSION_SECRET = "awards-released-test-secret-0123456789";
 delete process.env.DATABASE_URL;
-(globalThis as Record<string, unknown>).AsyncLocalStorage = AsyncLocalStorage;
 
-const ES = "Elementary School";
-const MS = "Middle School";
 const ONLY_JA = "Only the Judge Advisor can send awards to Marketing.";
-
-const ADMIN: Session = { role: "admin", name: "Alex" };
-const MARKETING: Session = { role: "marketing", name: "Pim" };
-const QUEUER: Session = { role: "queuer", name: "Desk" };
-const REFEREE: Session = { role: "referee", name: "Ref" };
-const COORDINATOR: Session = { role: "coordinator", name: "Coco" };
-const judgeOf = (panel: Panel, name = "Amy"): Session => ({
-  role: "judge",
-  name,
-  panelId: panel.id,
-  panelName: panel.name,
-});
-
-/* ---- the harness ------------------------------------------------------- */
-
-async function inRequestScope<T>(session: Session | null, fn: () => Promise<T>): Promise<T> {
-  const [{ workAsyncStorage }, { workUnitAsyncStorage }, { RequestCookies }, { RequestCookiesAdapter }] =
-    await Promise.all([
-      import("next/dist/server/app-render/work-async-storage.external"),
-      import("next/dist/server/app-render/work-unit-async-storage.external"),
-      import("next/dist/server/web/spec-extension/cookies"),
-      import("next/dist/server/web/spec-extension/adapters/request-cookies"),
-    ]);
-
-  const headers = new Headers();
-  if (session) {
-    const panel = session.role === "judge"
-      ? await (await import("../src/lib/db/file")).fileStore.findPanelById(session.panelId)
-      : null;
-    if (session.role === "judge") assert.ok(panel);
-    const judgeClaims = panel ? {
-        panelAuth: createHmac("sha256", process.env.SESSION_SECRET!)
-          .update(panel.id).update("\0").update(panel.code.toUpperCase()).digest("hex"),
-        judgeDay: new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
-      } : {};
-    const token = await new SignJWT({ ...session, ...judgeClaims })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuedAt()
-      .setExpirationTime("1h")
-      .sign(new TextEncoder().encode(process.env.SESSION_SECRET));
-    headers.set("cookie", `jq_session=${token}`);
-  }
-  const cookies = RequestCookiesAdapter.seal(new RequestCookies(headers));
-  return workAsyncStorage.run({ route: "/api/test" } as never, () =>
-    workUnitAsyncStorage.run({ type: "request", phase: "render", cookies } as never, fn),
-  );
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Reply = { status: number; body: any; headers: Headers };
-type Handlers = Record<string, (request: Request) => Promise<Response>>;
-
-async function hit(
-  load: () => Promise<unknown>,
-  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
-  session: Session | null,
-  path: string,
-  body?: unknown,
-): Promise<Reply> {
-  const handlers = (await load()) as Handlers;
-  const request = new Request(`http://localhost${path}`, {
-    method,
-    headers: { "content-type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const res = await inRequestScope(session, () => handlers[method](request));
-  return { status: res.status, body: await res.json(), headers: res.headers };
-}
 
 const releasedRoute = () => import("../src/app/api/awards/released/route");
 const stateRoute = () => import("../src/app/api/state/route");
@@ -100,8 +27,13 @@ const recall = (session: Session | null, awardId: string, division: string) => r
 /* ---- the fixture ------------------------------------------------------- */
 
 async function world() {
-  const db = (await import("../src/lib/db/file")).fileStore;
-  await db.resetAll();
+  const spec: [string, string, string][] = [
+    ["9882K", "Hawks", ES],
+    ["7700B", "Bolts", ES],
+    ["1234", "Comets", ES],
+    ["2088C", "Storm", MS],
+  ];
+  const { db, team } = await seedWorld(spec);
   const panel = await db.createPanel({
     name: "Panel 1",
     code: "AW1001",
@@ -113,15 +45,6 @@ async function world() {
     slot_minutes: 20,
     slot_count: 0,
   });
-  const spec: [string, string, string][] = [
-    ["9882K", "Hawks", ES],
-    ["7700B", "Bolts", ES],
-    ["1234", "Comets", ES],
-    ["2088C", "Storm", MS],
-  ];
-  await db.upsertTeams(spec.map(([number, name, division]) => ({ number, name, pit: null, division, category: "developing" })));
-  const teams = await db.listTeams();
-  const team = (n: string) => teams.find((t) => t.number === n) as Team;
   const [hawks, bolts, comets, storm] = ["9882K", "7700B", "1234", "2088C"].map(team);
   return { db, panel, hawks, bolts, comets, storm };
 }
