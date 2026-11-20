@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  buildAwardPanels, buildMatrix, clearAfterAsking, conductIn, decidedCount, decidedText, detailFor, giveAfterAsking, heldByTeam, nominationsIn, notReadyLines, readyToSend, winnersOf,
+  buildAwardPanels, buildMatrix, clearAfterAsking, conductIn, decidedCount, decidedText, detailFor, eventDecided, eventDecidedText, eventNotReadyLines, eventSentCount, giveAfterAsking, heldByTeam, nominationsIn, notReadyLines, readyToSend, winnersOf,
 } from "../src/components/admin/awardsLogic";
 import { WHOLE_EVENT } from "../src/lib/eventSetup";
-import { awards as awardList, gearGrinders, nom, nominations, panels, roboraptors, team, teams, win } from "./adminAwards.fixtures";
+import { awards as awardList, gearGrinders, nom, nominations, panels, release, roboraptors, team, teams, win } from "./adminAwards.fixtures";
 
 const ES = "Elementary School";
 const MS = "Middle School";
@@ -85,4 +85,40 @@ test("give and clear send the pick's division, else the team's", async () => {
   await clearAfterAsking(ask, call, { award: innovate, team: esTeam, division: WHOLE_EVENT });
   await giveAfterAsking(ask, call, { award: innovate, team: esTeam, current: null });
   assert.deepEqual(sent.map((s) => s.body.division), [WHOLE_EVENT, WHOLE_EVENT, ES]);
+});
+
+// The whole VEX IQ Blended event: Excellence and Design in ES and MS, and nine awards for the whole event, 13 in all.
+const twelve = [
+  win("excellence", esTeam), win("excellence", gearGrinders), win("design", esTeam), win("design", gearGrinders),
+  ...["innovate", "think", "amaze", "build", "inspire", "sportsmanship"].map((id) => win(id, gearGrinders, WHOLE_EVENT)),
+  win("judges", gearGrinders, WHOLE_EVENT), win("judges", roboraptors, WHOLE_EVENT),
+];
+const create = [{ award_id: "create", division: WHOLE_EVENT }];
+
+test("eventDecided and eventDecidedText count every key: 12 of 13 with Energy open", () => {
+  assert.deepEqual(eventDecided(twelve, awards, [ES, MS], create, "blended"), { decided: 12, total: 13 });
+  assert.equal(eventDecidedText(twelve, awards, [ES, MS], create, "blended"), "12/13");
+  assert.equal(eventDecidedText([], awards, [ES, MS], [], "blended"), "0/13");
+  // Standard: every award per division.
+  assert.equal(eventDecidedText([win("excellence", esTeam)], awards, [ES, MS], [], "standard"), "1/22");
+});
+
+test("eventSentCount counts the sent rows across ES, MS and Whole event, not a recalled one", () => {
+  const releases = [
+    release("excellence", esTeam, { division: ES }),
+    release("excellence", gearGrinders, { division: MS }),
+    release("innovate", gearGrinders, { division: WHOLE_EVENT }),
+    release("think", gearGrinders, { division: WHOLE_EVENT, status: "recalled" }),
+  ];
+  assert.equal(eventSentCount(releases, awards, [ES, MS], "blended"), 3);
+  assert.equal(eventSentCount([], awards, [ES, MS], "blended"), 0);
+});
+
+test("eventNotReadyLines names each key, so two halves of one award do not read alike", () => {
+  const lines = eventNotReadyLines(awards, [ES, MS], [win("excellence", esTeam)], [], [], "blended");
+  assert.equal(lines.length, 12);
+  assert.ok(lines.includes("Excellence · Middle School isn't ready: no winner yet."));
+  assert.ok(lines.includes("Innovate · Whole event isn't ready: no winner yet."));
+  assert.ok(!lines.some((l) => l.startsWith("Excellence · Elementary School")));
+  assert.equal(new Set(lines).size, lines.length);
 });

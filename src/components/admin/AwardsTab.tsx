@@ -8,7 +8,8 @@ import { Banner } from "@/components/ui";
 import { call, useScores } from "@/components/useAppState";
 import { rankTeams } from "@/lib/ranking";
 import type { Rubric } from "@/lib/rubrics";
-import type { AppState, AwardReleaseRow, AwardsAdminView, ReleasedView, SendAllReply, Team } from "@/lib/types";
+import { setupDivisions } from "@/lib/eventSetup";
+import type { AppState, AwardReleaseRow, AwardsAdminView, AwardView, ReleasedView, SendAllReply, Team } from "@/lib/types";
 import {
   ALL_PANELS,
   backing,
@@ -24,6 +25,7 @@ import {
   decidedCount,
   decidedText,
   detailFor,
+  eventNotReadyLines,
   distinctTeams,
   fullText,
   giveAfterAsking,
@@ -55,12 +57,15 @@ import {
   teamsByNumber,
   winnersOf,
   type AwardPanel,
+  type BlendedSel,
   type Detail,
   type Matrix,
+  type Nominee,
   type Sel,
   type SendState,
   type View,
 } from "./awardsLogic";
+import { BlendedBoard } from "./BlendedAwards";
 import { divisionTag } from "./floorLogic";
 import { withRanks, type RankedRow } from "./scoresLogic";
 
@@ -71,28 +76,29 @@ function Glyph({ size = 16, strokeWidth = 1.9, children }: { size?: number; stro
     </svg>
   );
 }
-const Tick = ({ size = 12, strokeWidth = 2.6 }: { size?: number; strokeWidth?: number }) => (
+export const Tick = ({ size = 12, strokeWidth = 2.6 }: { size?: number; strokeWidth?: number }) => (
   <Glyph size={size} strokeWidth={strokeWidth}>
     <path d="M5 12.5l4.5 4.5L19 7.5" />
   </Glyph>
 );
-const LockIcon = () => (
+export const LockIcon = () => (
   <Glyph>
     <path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3" />
   </Glyph>
 );
-const Arrow = ({ size }: { size: number }) => (
+export const Arrow = ({ size }: { size: number }) => (
   <Glyph size={size} strokeWidth={2.2}>
     <path d="M5 12h14M13 6l6 6-6 6" />
   </Glyph>
 );
-const CautionIcon = ({ size }: { size: number }) => (
+export const CautionIcon = ({ size }: { size: number }) => (
   <Glyph size={size} strokeWidth={2}>
     <path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.2v.01" />
   </Glyph>
 );
 
-type Slice = Pick<AppState, "teams" | "panels" | "divisions" | "flags" | "flagKinds">;
+/** `eventSetup` is the saved setup, if any: a blended one swaps the board for BlendedBoard. */
+export type Slice = Pick<AppState, "teams" | "panels" | "divisions" | "flags" | "flagKinds"> & { eventSetup?: AppState["eventSetup"] };
 
 /** The side panel is a column from 1024px, the Sections sheet's own breakpoint; below it, a bottom sheet. */
 const WIDE = "(min-width: 1024px)";
@@ -150,7 +156,9 @@ export function AwardsTab({
 }) {
   const [view, setView] = useState<View>(loadView);
   const [panelId, setPanelId] = useState(ALL_PANELS);
-  const [sel, setSel] = useState<Sel | null>(null);
+  const [sel, setSel] = useState<(Sel & { key?: string }) | null>(null);
+  // Blended: which division's nominees the rows show ("" is All).
+  const [from, setFrom] = useState("");
   const [busy, setBusy] = useState(false);
   const writing = useRef(false);
   const { ask, dialog } = useConfirm();
@@ -183,11 +191,45 @@ export function AwardsTab({
   };
 
   const releases = released?.releases ?? [];
+  // A blended event is decided under each of the program's divisions and under "Whole event"; any other keeps the console's divisions.
+  const setupKeys = state.eventSetup?.format === "blended" ? setupDivisions(state.eventSetup) : null;
+  const keys = setupKeys ?? state.divisions;
+  const format = setupKeys ? ("blended" as const) : undefined;
+
+  // The writes below take the key the award is decided under: the division on the standard board, a division or "Whole event" on the blended one.
+  // Sending is undone by Recall, so it does not ask; Recall does, since Marketing sees the award go.
+  const sendAward = (awardId: string, division: string) =>
+    write(async () => {
+      await call("/api/awards/released", { method: "PUT", body: { awardId, division } });
+      return true;
+    });
+  const recallAward = (awardId: string, division: string) => {
+    const award = data.awards.find((a) => a.id === awardId);
+    if (!award) return;
+    const { question, body } = recallQuestion(award.label, division);
+    void write(async () => {
+      if (!(await ask(question, { body, confirmLabel: "Recall", danger: true }))) return false;
+      await call("/api/awards/released", { method: "DELETE", body: { awardId, division } });
+      return true;
+    });
+  };
+  const markNoWinner = (awardId: string, division: string) => {
+    const award = data.awards.find((a) => a.id === awardId);
+    const held = new Set(data.winners.filter((w) => w.award_id === awardId && w.division === division).map((w) => w.team_id));
+    if (award) void write(() => markNoWinnerAfterAsking(ask, call, { award, division, holders: state.teams.filter((t) => held.has(t.id)) }));
+  };
+  const clearNoWinner = (awardId: string, division: string) => {
+    const award = data.awards.find((a) => a.id === awardId);
+    if (award) void write(() => clearNoWinnerAfterAsking(ask, call, { award, division }));
+  };
+
   const sendAll = () => {
-    const items = readyToSend(data.awards, state.divisions, data.winners, data.noWinners, releases);
+    const items = readyToSend(data.awards, keys, data.winners, data.noWinners, releases, format);
     if (!items.length) return;
     const lines = sendAllLines(items, data.winners, data.noWinners, state.teams, releases);
-    const notReady = notReadyLines(data.awards, division, data.winners, data.noWinners, releases);
+    const notReady = setupKeys
+      ? eventNotReadyLines(data.awards, keys, data.winners, data.noWinners, releases, format)
+      : notReadyLines(data.awards, division, data.winners, data.noWinners, releases);
     // The banner has to come after write() has cleared the last error and reloaded, or it would be wiped at once.
     const skipped: { text: string | null } = { text: null };
     void (async () => {
@@ -201,6 +243,44 @@ export function AwardsTab({
       if (skipped.text) onError(skipped.text);
     })();
   };
+
+  if (setupKeys && state.eventSetup) {
+    return (
+      <>
+        <BlendedBoard
+          data={data}
+          released={released}
+          state={state}
+          setup={state.eventSetup}
+          rows={rows}
+          rubricList={scoreData.rubrics}
+          from={from}
+          onFrom={setFrom}
+          panelId={panelId}
+          onPanel={setPanelId}
+          view={view}
+          onView={(next) => {
+            setView(next);
+            saveView(next);
+          }}
+          sel={sel?.key ? (sel as BlendedSel) : null}
+          onSelect={setSel}
+          wide={wide}
+          busy={busy}
+          onGive={(d, key) => write(() => giveAfterAsking(ask, call, { award: d.award, team: d.team, current: d.current, noWinner: d.noWinner, division: key }))}
+          onClear={(d, key) => write(() => clearAfterAsking(ask, call, { award: d.award, team: d.team, division: key }))}
+          onMarkNoWinner={(awardId, key) => markNoWinner(awardId, key)}
+          onClearNoWinner={(awardId, key) => clearNoWinner(awardId, key)}
+          onNominate={(awardId, teamId) => write(() => nominateAsAdmin(call, { awardId, teamId }))}
+          onRemove={(d, line) => write(() => removeAfterAsking(ask, call, { ...line, award: d.award, team: d.team }))}
+          onSend={(awardId, key) => sendAward(awardId, key)}
+          onRecall={(awardId, key) => recallAward(awardId, key)}
+          onSendAll={sendAll}
+        />
+        {dialog}
+      </>
+    );
+  }
 
   return (
     <>
@@ -230,34 +310,12 @@ export function AwardsTab({
         busy={busy}
         onGive={(d) => write(() => giveAfterAsking(ask, call, { award: d.award, team: d.team, current: d.current, noWinner: d.noWinner }))}
         onClear={(d) => write(() => clearAfterAsking(ask, call, { award: d.award, team: d.team }))}
-        onMarkNoWinner={(awardId) => {
-          const award = data.awards.find((a) => a.id === awardId);
-          const held = new Set(data.winners.filter((w) => w.award_id === awardId && w.division === division).map((w) => w.team_id));
-          if (award) void write(() => markNoWinnerAfterAsking(ask, call, { award, division, holders: state.teams.filter((t) => held.has(t.id)) }));
-        }}
-        onClearNoWinner={(awardId) => {
-          const award = data.awards.find((a) => a.id === awardId);
-          if (award) void write(() => clearNoWinnerAfterAsking(ask, call, { award, division }));
-        }}
+        onMarkNoWinner={(awardId) => markNoWinner(awardId, division)}
+        onClearNoWinner={(awardId) => clearNoWinner(awardId, division)}
         onNominate={(awardId, teamId) => write(() => nominateAsAdmin(call, { awardId, teamId }))}
         onRemove={(d, line) => write(() => removeAfterAsking(ask, call, { ...line, award: d.award, team: d.team }))}
-        // Sending is undone by Recall, so it does not ask; Recall does, since Marketing sees the award go.
-        onSend={(awardId) =>
-          write(async () => {
-            await call("/api/awards/released", { method: "PUT", body: { awardId, division } });
-            return true;
-          })
-        }
-        onRecall={(awardId) => {
-          const award = data.awards.find((a) => a.id === awardId);
-          if (!award) return;
-          const { question, body } = recallQuestion(award.label, division);
-          void write(async () => {
-            if (!(await ask(question, { body, confirmLabel: "Recall", danger: true }))) return false;
-            await call("/api/awards/released", { method: "DELETE", body: { awardId, division } });
-            return true;
-          });
-        }}
+        onSend={(awardId) => sendAward(awardId, division)}
+        onRecall={(awardId) => recallAward(awardId, division)}
         onSendAll={sendAll}
       />
       {dialog}
@@ -532,6 +590,11 @@ export function ViewToggle({ view, onView }: { view: View; onView: (view: View) 
  * conduct alone, a tick is the winner, nothing is not nominated. Only this box
  * scrolls sideways, with the team column held in place.
  */
+/** The matrix, or the blended one: whose columns can also say which key (division or "Whole event") an award is decided under, and a team a division. */
+export type MatrixLike = { columns: (Matrix["columns"][number] & { key?: string })[]; rows: Matrix["rows"]; hidden: Matrix["hidden"] };
+
+const columnId = (c: { award: { id: string }; key?: string }): string => (c.key ? `${c.award.id}|${c.key}` : c.award.id);
+
 export function MatrixView({
   matrix,
   sel,
@@ -539,16 +602,19 @@ export function MatrixView({
   none,
   sent,
   onSelect,
+  tags = false,
 }: {
-  matrix: Matrix;
-  sel: Sel | null;
+  matrix: MatrixLike;
+  sel: (Sel & { key?: string }) | null;
   /** The sentence about the columns that are hidden, if any are. */
   note: string;
   /** What the board says when nobody is nominated. */
   none: string;
-  /** The ids of the awards sent to Marketing, which wear a lock after their tick. */
+  /** The awards sent to Marketing, which wear a lock after their tick: their ids, or (a blended column) "id|key". */
   sent?: Set<string>;
-  onSelect: (sel: Sel | null) => void;
+  onSelect: (sel: (Sel & { key?: string }) | null) => void;
+  /** Blended: each team wears its division beside its panel. */
+  tags?: boolean;
 }) {
   if (!matrix.rows.length) return <p className="ja-empty">{none}</p>;
   return (
@@ -564,25 +630,30 @@ export function MatrixView({
               <th scope="col" className="ja-aw-pn">
                 Panel
               </th>
-              {matrix.columns.map(({ award, decided, noWinner }) => (
-                <th key={award.id} scope="col" className={sel?.awardId === award.id ? "ja-aw-on" : undefined}>
-                  <abbr className="ja-aw-hl" title={award.label}>
-                    {award.short}
-                  </abbr>
-                  <span className="ja-aw-hk">
-                    {noWinner ? (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="no winner">
-                        <path d="M6 12h12" />
-                      </svg>
-                    ) : decided ? (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="decided">
-                        <path d="M5 12.5l4.5 4.5L19 7.5" />
-                      </svg>
-                    ) : null}
-                    {sent?.has(award.id) ? <Locked /> : null}
-                  </span>
-                </th>
-              ))}
+              {matrix.columns.map((column) => {
+                const { award, decided, noWinner, key } = column;
+                const label = key ? `${award.label} ${divisionTag(key)}` : undefined;
+                return (
+                  <th key={columnId(column)} scope="col" className={sel?.awardId === award.id && (!key || sel.key === key) ? "ja-aw-on" : undefined} aria-label={label}>
+                    <abbr className="ja-aw-hl" title={key ? `${award.label} · ${key}` : award.label}>
+                      {award.short}
+                      {key ? <span className="ja-aw-hd">{divisionTag(key)}</span> : null}
+                    </abbr>
+                    <span className="ja-aw-hk">
+                      {noWinner ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="no winner">
+                          <path d="M6 12h12" />
+                        </svg>
+                      ) : decided ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="decided">
+                          <path d="M5 12.5l4.5 4.5L19 7.5" />
+                        </svg>
+                      ) : null}
+                      {sent?.has(columnId(column)) ? <Locked /> : null}
+                    </span>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -594,19 +665,25 @@ export function MatrixView({
                 </th>
                 <td className="ja-aw-pn">
                   <span className="ja-aw-ptag">{row.tag}</span>
+                  {tags ? (
+                    <span className="ja-aw-ptag ja-aw-dv" title={divisionTag(row.team.division) !== row.team.division ? row.team.division : undefined}>
+                      {divisionTag(row.team.division)}
+                    </span>
+                  ) : null}
                 </td>
-                {matrix.columns.map(({ award }, i) => {
+                {matrix.columns.map((column, i) => {
+                  const { award, key } = column;
                   const cell = row.cells[i];
-                  if (cell === "none") return <td key={award.id} />;
-                  const on = sel?.awardId === award.id && sel.teamId === row.team.id;
+                  if (cell === "none") return <td key={columnId(column)} />;
+                  const on = sel?.awardId === award.id && sel.teamId === row.team.id && (!key || sel.key === key);
                   return (
-                    <td key={award.id}>
+                    <td key={columnId(column)}>
                       <button
                         type="button"
                         className={cell === "winner" ? "ja-aw-cell ja-aw-won" : "ja-aw-cell"}
                         aria-pressed={on}
-                        aria-label={`${row.team.number}, ${award.label}: ${cell === "winner" ? "winner" : cell === "conduct" ? `nominated by referees (${conductText(row.conduct)})` : "nominated"}`}
-                        onClick={() => onSelect(on ? null : { awardId: award.id, teamId: row.team.id })}
+                        aria-label={`${row.team.number}, ${key ? `${award.label} · ${key}` : award.label}: ${cell === "winner" ? "winner" : cell === "conduct" ? `nominated by referees (${conductText(row.conduct)})` : "nominated"}`}
+                        onClick={() => onSelect(on ? null : key ? { awardId: award.id, teamId: row.team.id, key } : { awardId: award.id, teamId: row.team.id })}
                       >
                         {cell === "winner" ? <Tick size={16} strokeWidth={2.8} /> : <i className={cell === "conduct" ? "ja-aw-mk ja-aw-gd" : "ja-aw-mk"} aria-hidden="true" />}
                       </button>
@@ -646,14 +723,14 @@ export function MatrixView({
 /* ---- by award ------------------------------------------------------------------ */
 
 /** The lock of a sent award: labelled for a screen reader, since the icon alone says nothing. */
-const Locked = () => (
+export const Locked = () => (
   <span className="ja-aw-lk" role="img" aria-label="Locked: sent to Marketing">
     <LockIcon />
   </span>
 );
 
 /** Why a sent award's winner cannot be changed. */
-const RECALL_FIRST = "Recall it from Marketing first.";
+export const RECALL_FIRST = "Recall it from Marketing first.";
 
 /** "2 judges", "1 judge · JA" when the Judge Advisor nominated too, or "Good conduct ×3" in green for a team only referees put up, or both. */
 function Backing({ judges, ja = 0, conduct }: { judges: number; ja?: number; conduct: number }) {
@@ -702,7 +779,8 @@ export function AwardLists({
 }) {
   return (
     <div className="ja-aw-aps">
-      {lists.map(({ award, decided, status, nominees, ja, noWinner: marked }) => {
+      {lists.map((panel) => {
+        const { award, decided } = panel;
         const state = send?.states.get(award.id);
         const row = send ? releaseOf(send.releases, award.id, send.division) : null;
         const locked = state === "sent";
@@ -713,124 +791,225 @@ export function AwardLists({
                 {award.label}
                 {locked ? <Locked /> : null}
               </h2>
-              {state === "recalled" && row ? (
-                <span className="ja-aw-cst">Recalled</span>
-              ) : (
-                <span className={decided ? "ja-aw-cst ja-aw-ok" : "ja-aw-cst"}>{status}</span>
-              )}
-              {send && state ? (
-                <div className="ja-aw-hr">
-                  {state === "ready" || state === "recalled" ? (
-                    <button
-                      type="button"
-                      className="ja-aw-snd"
-                      disabled={send.busy || !decided}
-                      aria-label={state === "ready" ? `Send ${award.label} to Marketing` : `Send ${award.label} to Marketing again`}
-                      onClick={() => send.onSend(award.id)}
-                    >
-                      {state === "ready" ? "Send to Marketing" : "Send again"}
-                      <Arrow size={14} />
-                    </button>
-                  ) : state === "sent" && row ? (
-                    <>
-                      <span className="ja-aw-sent">
-                        <Tick size={13} />
-                        Sent {hhmm(row.sent_at)}
-                      </span>
-                      <button type="button" className="ja-aw-rcl" disabled={send.busy} aria-label={`Recall ${award.label} from Marketing`} onClick={() => send.onRecall(award.id)}>
-                        Recall
-                      </button>
-                    </>
-                  ) : (
-                    <span className="ja-aw-nsend">{pickText(award, send.held.get(award.id)?.length ?? 0)}</span>
-                  )}
-                </div>
-              ) : null}
+              {awardStatus(panel, state, row)}
+              {sendControls(award, award.label, state, row, decided, send?.held.get(award.id)?.length ?? 0, send)}
             </header>
-            {state === "recalled" && row ? (
-              <p className="ja-aw-cwarn">
-                <CautionIcon size={15} />
-                <span>
-                  Marketing had <b>{snapshotLine(row)}</b>
-                </span>
-              </p>
-            ) : null}
-            {nominees.length ? (
-              <ul>
-                {nominees.map((n) => {
-                  const on = sel?.awardId === award.id && sel.teamId === n.team.id;
-                  return (
-                    <li key={n.team.id}>
-                      <button
-                        type="button"
-                        className={n.winner ? "ja-aw-nr ja-aw-won" : "ja-aw-nr"}
-                        aria-pressed={on}
-                        aria-label={`${n.team.number} ${n.team.name}, ${award.label}, ${n.winner ? "winner" : backingText(n.judges, n.conduct, n.ja)}${n.has.length ? `, ${hasText(n.has)}` : ""}`}
-                        onClick={() => onSelect(on ? null : { awardId: award.id, teamId: n.team.id })}
-                      >
-                        <b>{n.team.number}</b>
-                        <span className="ja-aw-nm">{n.team.name}</span>
-                        {n.has.length ? (
-                          <span className="ja-aw-cau" title={hasText(n.has)}>
-                            <CautionIcon size={15} />
-                          </span>
-                        ) : null}
-                        <span className="ja-aw-ptag">{n.tag}</span>
-                        <span className="ja-aw-jc">
-                          <Backing judges={n.judges} ja={n.ja} conduct={n.conduct} />
-                        </span>
-                        {n.winner ? (
-                          <span className="ja-aw-win">
-                            <Tick />
-                            Winner
-                          </span>
-                        ) : null}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="ja-aw-cnone">No nominations yet</p>
-            )}
-            {add ? (
-              <div className="ja-aw-add">
-                <div className="ja-selw">
-                  <select
-                    className="ja-in ja-sel"
-                    aria-label={`Add team to ${award.label}`}
-                    value=""
-                    disabled={add.busy}
-                    onChange={(e) => e.target.value && add.onAdd(award.id, e.target.value)}
-                  >
-                    <option value="">Add team…</option>
-                    {add.teams.map((t) => (
-                      <option key={t.id} value={t.id} disabled={ja.has(t.id)}>
-                        {`${t.number} ${t.name}${ja.has(t.id) ? " · added" : ""}`}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown />
-                </div>
-              </div>
-            ) : null}
-            {noWinner ? (
-              <div className="ja-aw-nw">
-                {marked ? (
-                  <button type="button" className="ja-aw-lnk" disabled={noWinner.busy || locked} title={locked ? RECALL_FIRST : undefined} aria-label={`Clear No winner on ${award.label}`} onClick={() => noWinner.onClear(award.id)}>
-                    Clear
-                  </button>
-                ) : (
-                  <button type="button" className="ja-aw-lnk" disabled={noWinner.busy || locked} title={locked ? RECALL_FIRST : undefined} aria-label={`Mark no winner for ${award.label}`} onClick={() => noWinner.onMark(award.id)}>
-                    Mark no winner
-                  </button>
-                )}
-              </div>
-            ) : null}
+            {awardBody({ panel, state, row, name: award.label, sel, onSelect, add, noWinner, locked })}
           </section>
         );
       })}
     </div>
+  );
+}
+
+/*
+ * The pieces of one award's list, as plain functions (they hold no state and return markup, so a test can walk what they return). The standard board
+ * draws them under its own header; the blended board draws them under a division's half of the award, or under a whole-event award's.
+ */
+
+/** The write handlers behind an award's Send controls. */
+export type SendCtx = {
+  busy: boolean;
+  onSend: (awardId: string) => void;
+  onRecall: (awardId: string) => void;
+};
+
+/** Where the award stands with Marketing, on the right of its header: Send, or Sent and Recall, or what it still needs. Nothing until the sends are known. `name` is what a screen reader hears for the award: its label, or (blended) "Excellence · Middle School". `held` is how many winners it has. */
+export function sendControls(award: AwardView, name: string, state: SendState | undefined, row: AwardReleaseRow | null, decided: boolean, held: number, send: SendCtx | undefined) {
+  if (!send || !state) return null;
+  return (
+    <div className="ja-aw-hr">
+      {state === "ready" || state === "recalled" ? (
+        <button
+          type="button"
+          className="ja-aw-snd"
+          disabled={send.busy || !decided}
+          aria-label={state === "ready" ? `Send ${name} to Marketing` : `Send ${name} to Marketing again`}
+          onClick={() => send.onSend(award.id)}
+        >
+          {state === "ready" ? "Send to Marketing" : "Send again"}
+          <Arrow size={14} />
+        </button>
+      ) : state === "sent" && row ? (
+        <>
+          <span className="ja-aw-sent">
+            <Tick size={13} />
+            Sent {hhmm(row.sent_at)}
+          </span>
+          <button type="button" className="ja-aw-rcl" disabled={send.busy} aria-label={`Recall ${name} from Marketing`} onClick={() => send.onRecall(award.id)}>
+            Recall
+          </button>
+        </>
+      ) : (
+        <span className="ja-aw-nsend">{pickText(award, held)}</span>
+      )}
+    </div>
+  );
+}
+
+/** "Decided", "2 nominees", "Open"; "Recalled" once it was sent and taken back. */
+export function awardStatus({ decided, status }: AwardPanel, state: SendState | undefined, row: AwardReleaseRow | null) {
+  return state === "recalled" && row ? <span className="ja-aw-cst">Recalled</span> : <span className={decided ? "ja-aw-cst ja-aw-ok" : "ja-aw-cst"}>{status}</span>;
+}
+
+/**
+ * Blended: a row wears its team's division, and a team that holds another award says so in a line under the row, naming where it holds it.
+ * `has` writes that line: "Already has Excellence · Middle School".
+ */
+export type Scoped = { has: (teamId: string, has: AwardView[]) => string };
+
+/** The nominees of one award as rows, or the note that there are none. `empty` words that note when a filter, not the judges, is why. */
+export function nomineeRows(award: AwardView, nominees: Nominee[], sel: Sel | null, onSelect: (sel: Sel | null) => void, scoped?: Scoped, empty = "No nominations yet") {
+  if (!nominees.length) return <p className="ja-aw-cnone">{empty}</p>;
+  return (
+    <ul>
+      {nominees.map((n) => {
+        const on = sel?.awardId === award.id && sel.teamId === n.team.id;
+        if (scoped) {
+          const has = n.has.length ? scoped.has(n.team.id, n.has) : null;
+          const tag = divisionTag(n.team.division);
+          return (
+            <li key={n.team.id}>
+              <button
+                type="button"
+                className={n.winner ? "ja-aw-nr ja-aw-won" : "ja-aw-nr"}
+                aria-pressed={on}
+                aria-label={`${n.team.number} ${n.team.name}, ${tag}, ${award.label}, ${n.winner ? "winner" : backingText(n.judges, n.conduct, n.ja)}${has ? `, ${has}` : ""}`}
+                onClick={() => onSelect(on ? null : { awardId: award.id, teamId: n.team.id })}
+              >
+                <b>{n.team.number}</b>
+                <span className="ja-aw-nm">
+                  <span className="ja-aw-n1">{n.team.name}</span>
+                  <span className="ja-aw-n2">
+                    {n.tag} · <Backing judges={n.judges} ja={n.ja} conduct={n.conduct} />
+                  </span>
+                </span>
+                <span className="ja-aw-ptag ja-aw-dv" title={tag !== n.team.division ? n.team.division : undefined}>
+                  {tag}
+                </span>
+                {n.winner ? (
+                  <span className="ja-aw-win">
+                    <Tick />
+                    Winner
+                  </span>
+                ) : null}
+              </button>
+              {has ? (
+                <p className="ja-aw-rwarn">
+                  <CautionIcon size={15} />
+                  <span>{has}</span>
+                </p>
+              ) : null}
+            </li>
+          );
+        }
+        return (
+          <li key={n.team.id}>
+            <button
+              type="button"
+              className={n.winner ? "ja-aw-nr ja-aw-won" : "ja-aw-nr"}
+              aria-pressed={on}
+              aria-label={`${n.team.number} ${n.team.name}, ${award.label}, ${n.winner ? "winner" : backingText(n.judges, n.conduct, n.ja)}${n.has.length ? `, ${hasText(n.has)}` : ""}`}
+              onClick={() => onSelect(on ? null : { awardId: award.id, teamId: n.team.id })}
+            >
+              <b>{n.team.number}</b>
+              <span className="ja-aw-nm">{n.team.name}</span>
+              {n.has.length ? (
+                <span className="ja-aw-cau" title={hasText(n.has)}>
+                  <CautionIcon size={15} />
+                </span>
+              ) : null}
+              <span className="ja-aw-ptag">{n.tag}</span>
+              <span className="ja-aw-jc">
+                <Backing judges={n.judges} ja={n.ja} conduct={n.conduct} />
+              </span>
+              {n.winner ? (
+                <span className="ja-aw-win">
+                  <Tick />
+                  Winner
+                </span>
+              ) : null}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** What is under an award's header: what Marketing had (once recalled), the nominees, the Add team picker, and Mark no winner or Clear. */
+export function awardBody({
+  panel,
+  state,
+  row,
+  name,
+  sel,
+  onSelect,
+  add,
+  noWinner,
+  locked,
+  scoped,
+  empty,
+}: {
+  panel: AwardPanel;
+  state: SendState | undefined;
+  row: AwardReleaseRow | null;
+  name: string;
+  sel: Sel | null;
+  onSelect: (sel: Sel | null) => void;
+  add?: { teams: Team[]; busy: boolean; onAdd: (awardId: string, teamId: string) => void };
+  noWinner?: { busy: boolean; onMark: (awardId: string) => void; onClear: (awardId: string) => void };
+  locked: boolean;
+  scoped?: Scoped;
+  empty?: string;
+}) {
+  const { award, nominees, ja, noWinner: marked } = panel;
+  return (
+    <>
+      {state === "recalled" && row ? (
+        <p className="ja-aw-cwarn">
+          <CautionIcon size={15} />
+          <span>
+            Marketing had <b>{snapshotLine(row)}</b>
+          </span>
+        </p>
+      ) : null}
+      {nomineeRows(award, nominees, sel, onSelect, scoped, empty)}
+      {add ? (
+        <div className="ja-aw-add">
+          <div className="ja-selw">
+            <select
+              className="ja-in ja-sel"
+              aria-label={`Add team to ${name}`}
+              value=""
+              disabled={add.busy}
+              onChange={(e) => e.target.value && add.onAdd(award.id, e.target.value)}
+            >
+              <option value="">Add team…</option>
+              {add.teams.map((t) => (
+                <option key={t.id} value={t.id} disabled={ja.has(t.id)}>
+                  {`${t.number} ${t.name}${ja.has(t.id) ? " · added" : ""}`}
+                </option>
+              ))}
+            </select>
+            <ChevronDown />
+          </div>
+        </div>
+      ) : null}
+      {noWinner ? (
+        <div className="ja-aw-nw">
+          {marked ? (
+            <button type="button" className="ja-aw-lnk" disabled={noWinner.busy || locked} title={locked ? RECALL_FIRST : undefined} aria-label={`Clear No winner on ${name}`} onClick={() => noWinner.onClear(award.id)}>
+              Clear
+            </button>
+          ) : (
+            <button type="button" className="ja-aw-lnk" disabled={noWinner.busy || locked} title={locked ? RECALL_FIRST : undefined} aria-label={`Mark no winner for ${name}`} onClick={() => noWinner.onMark(award.id)}>
+              Mark no winner
+            </button>
+          )}
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -860,6 +1039,7 @@ export function NomineePanel({
   onClear,
   onNominate,
   onRemove,
+  scoped,
 }: {
   detail: Detail;
   row: RankedRow | undefined;
@@ -875,8 +1055,11 @@ export function NomineePanel({
   onClear: (detail: Detail) => void;
   onNominate: (awardId: string, teamId: string) => void;
   onRemove: (detail: Detail, line: { id: string; by: string }) => void;
+  /** Blended: the key the award is decided under, which the eyebrow names instead of the team's division, and how "Already has" names the scope. Other nominees wear their division. */
+  scoped?: Scoped & { key: string };
 }) {
   const { award, team } = detail;
+  const has = (teamId: string, list: AwardView[]) => (scoped ? scoped.has(teamId, list) : hasText(list));
   const score = scoreParts(row, rubricList);
   const referee = refereeLine(flags, flagKinds);
   const locked = sentAt !== null;
@@ -884,7 +1067,7 @@ export function NomineePanel({
   return (
     <>
       <p className="ja-aw-eyebrow">
-        {award.label} · {team.division}
+        {award.label} · {scoped ? scoped.key : team.division}
       </p>
       <h2 id={titleId}>
         {team.number}
@@ -908,7 +1091,7 @@ export function NomineePanel({
       {detail.has.length ? (
         <p className="ja-aw-warnl">
           <CautionIcon size={13} />
-          {hasText(detail.has)}
+          {has(team.id, detail.has)}
         </p>
       ) : null}
 
@@ -993,10 +1176,15 @@ export function NomineePanel({
                 {o.has.length ? (
                   <p className="ja-aw-warnl">
                     <CautionIcon size={13} />
-                    {hasText(o.has)}
+                    {has(o.team.id, o.has)}
                   </p>
                 ) : null}
               </div>
+              {scoped ? (
+                <span className="ja-aw-ptag ja-aw-dv" title={divisionTag(o.team.division) !== o.team.division ? o.team.division : undefined}>
+                  {divisionTag(o.team.division)}
+                </span>
+              ) : null}
               {o.winner ? (
                 <span className="ja-aw-win">
                   <Tick />
@@ -1046,7 +1234,7 @@ export function NomineePanel({
 }
 
 /** A native <dialog> opened with showModal(), as the Sections sheet is: the phone's side panel. */
-function PanelSheet({ open, titleId, onClose, children }: { open: boolean; titleId: string; onClose: () => void; children: React.ReactNode }) {
+export function PanelSheet({ open, titleId, onClose, children }: { open: boolean; titleId: string; onClose: () => void; children: React.ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const el = ref.current;

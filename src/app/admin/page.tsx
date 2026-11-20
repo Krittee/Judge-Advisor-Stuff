@@ -6,7 +6,7 @@ import { liveRequestFor } from "@/lib/data";
 import { ActivityTab } from "@/components/admin/ActivityTab";
 import { AdminFrame, railCounts, type AdminTab as Tab } from "@/components/admin/AdminFrame";
 import { AwardsTab } from "@/components/admin/AwardsTab";
-import { decidedText, pickDivision } from "@/components/admin/awardsLogic";
+import { decidedText, eventDecidedText, pickDivision } from "@/components/admin/awardsLogic";
 import { ConflictsTab } from "@/components/admin/ConflictsTab";
 import { EventTab } from "@/components/admin/EventTab";
 import { FloorTab } from "@/components/admin/FloorTab";
@@ -23,6 +23,7 @@ import { call, useAppState, useScores } from "@/components/useAppState";
 import { Banner } from "@/components/ui";
 import type { Session } from "@/lib/auth";
 import { rankTeams } from "@/lib/ranking";
+import { setupDivisions } from "@/lib/eventSetup";
 
 /** The Judge Advisor's console: every panel at once, and the tools to unstick it. */
 export default function AdminPage() {
@@ -82,9 +83,12 @@ export default function AdminPage() {
      waiting, Conflicts' only the judges' (older whole-panel entries are not
      counted); a total that is merely large is not a reason to look. */
   const division = pickDivision(awardDivision, state.divisions, awards.data?.nominations ?? [], state.teams);
+  const blendedDivisions = state.eventSetup?.format === "blended" ? setupDivisions(state.eventSetup) : null;
   const counts = {
     ...railCounts(state),
     ...(awards.data?.awards.length ? { awards: decidedText(awards.data.winners, awards.data.awards, division, awards.data.noWinners) } : {}),
+    // A blended event counts every key at once: each division's awards and the whole event's.
+    ...(awards.data?.awards.length && blendedDivisions ? { awards: eventDecidedText(awards.data.winners, awards.data.awards, blendedDivisions, awards.data.noWinners, "blended") } : {}),
   };
   const sheetTeam = state.teams.find((t) => t.id === sheetId) ?? null;
 

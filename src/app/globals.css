@@ -4424,6 +4424,47 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-aw-sheet .ja-aw-eyebrow { padding-right: 48px; }
 .ja-aw-sx { position: absolute; top: 12px; right: 8px; }
 
+/* A blended event, "Award order" (design/event-setup/reference-awards-*.dc.html): one column of blocks in the config's order. An award given in each division is one
+   block whose halves stack (side by side from 1280px); every other award is one full-width block with a neutral "Whole event" label. Nothing here takes a hue but the
+   cautions (amber, "Already has" and "Marketing had") and the sent state (green); the division tag and the label are the quiet neutral ones. On a phone Send all ready comes
+   first, then the view toggle and the Nominees from chips, then the meta line. */
+.ja-aw-bl .ja-aw-fbar { order: 1; }
+.ja-aw-bl .ja-aw-top { order: 2; }
+.ja-aw-bl .ja-aw-cols { order: 3; }
+.ja-aw-bl .ja-aw-fr { order: -1; }
+.ja-aw-bl .ja-aw-sall { order: -1; }
+.ja-aw-from { width: 100%; }
+.ja-aw-from .ja-aw-chip { min-width: 44px; flex: 1; justify-content: center; }
+.ja-aw-stack { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
+.ja-aw-bh { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; }
+.ja-aw-bh h2, .ja-aw-hn { margin: 0; font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; font-weight: 700; line-height: 1.2; }
+.ja-aw-bh h2 { font-size: 16px; }
+.ja-aw-bh .ja-aw-cst { font-weight: 400; }
+.ja-aw-halves { display: grid; grid-template-columns: minmax(0, 1fr); }
+.ja-aw-half { display: flex; min-width: 0; flex-direction: column; border-top: 1px solid var(--line); }
+.ja-aw-hn { display: flex; grid-column: 1; min-width: 0; align-items: center; gap: 7px; font-size: 14.5px; white-space: nowrap; }
+.ja-aw-scope {
+  display: inline-flex; height: 22px; flex: none; align-items: center; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--ink-subtle);
+  font-weight: 500; font-size: 12px; white-space: nowrap;
+}
+/* A nominee row: the team, then its panel and who backs it under the name, then its division tag */
+.ja-aw-bl .ja-aw-nm { display: flex; flex-direction: column; line-height: 1.3; }
+.ja-aw-n1, .ja-aw-n2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ja-aw-n2 { color: var(--ink-subtle); font-size: 12px; }
+.ja-aw-bl .ja-aw-nr b { min-width: 58px; }
+.ja-aw-dv { margin-left: 2px; }
+.ja-aw-rwarn {
+  display: flex; align-items: center; gap: 8px; margin: 0; padding: 6px 14px; border-top: 1px solid color-mix(in srgb, var(--caution) 40%, transparent);
+  background: color-mix(in srgb, var(--caution) 13%, transparent); color: var(--caution-quiet); font-size: 12.5px; line-height: 1.35;
+}
+.ja-aw-rwarn svg { flex: none; }
+/* The matrix: a column per division for Excellence and Design, headed "Exc" over "ES"; a team wears its panel and its division */
+.ja-aw-hd { display: block; font-size: 11px; letter-spacing: 0.04em; }
+.ja-aw-bl .ja-aw-mx table { min-width: calc(200px + var(--n) * 40px); }
+.ja-aw-bl .ja-aw-mx thead th.ja-aw-pn { width: 88px; }
+.ja-aw-bl .ja-aw-mx td.ja-aw-pn { white-space: nowrap; }
+.ja-aw-mx .ja-aw-pn .ja-aw-dv { margin-left: 4px; }
+
 @media (min-width: 1024px) {
   .ja-aw { gap: 14px; }
 
@@ -4458,6 +4499,22 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-aw-mx tbody th { padding: 6px 8px 6px 16px; }
   /* The divider that shows the team column is held is for a phone, where the box always scrolls */
   .ja-aw-mx .ja-aw-tm { box-shadow: none; }
+  .ja-aw-bl .ja-aw-top, .ja-aw-bl .ja-aw-fbar, .ja-aw-bl .ja-aw-cols, .ja-aw-bl .ja-aw-fr, .ja-aw-bl .ja-aw-sall { order: 0; }
+  .ja-aw-from { width: auto; }
+  .ja-aw-from .ja-aw-chip { flex: none; }
+  .ja-aw-bh { min-height: 46px; }
+  .ja-aw-rwarn { padding-left: 82px; }
+  .ja-aw-bl .ja-aw-mx table { min-width: calc(244px + var(--n) * 40px); }
+  .ja-aw-bl .ja-aw-mx thead th.ja-aw-pn { width: 100px; }
+}
+
+/* From 1280px an award given in each division has room for its halves side by side, hairline between; the half's header stacks the division over its Send controls */
+@media (min-width: 1280px) {
+  .ja-aw-halves { grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); }
+  .ja-aw-half + .ja-aw-half { border-left: 1px solid var(--line); }
+  .ja-aw-half .ja-aw-aph { display: flex; min-height: 0; flex-direction: column; align-items: stretch; gap: 6px; padding: 10px 8px 8px 14px; }
+  .ja-aw-half .ja-aw-hr { justify-content: flex-start; margin-left: -4px; }
+  .ja-aw-half .ja-aw-nsend { max-width: none; margin-right: 0; text-align: left; }
 }
 
 /* @ja-block activity */

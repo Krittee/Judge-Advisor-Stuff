@@ -3,7 +3,7 @@ import type { Ask } from "@/components/judge/logic";
 import { goodConductTeams, GOOD_CONDUCT, GOOD_CONDUCT_MIN, SPORTSMANSHIP } from "@/lib/awards";
 import { matchReference } from "@/lib/match";
 import { judgeKey } from "@/lib/roster";
-import { awardKey, awardPairs, awardsUnder, WHOLE_EVENT } from "@/lib/eventSetup";
+import { awardKey, awardPairs, awardsUnder, scopeKeys, WHOLE_EVENT } from "@/lib/eventSetup";
 import type { Rubric } from "@/lib/rubrics";
 import type { AwardReleaseRow, AwardView, EventFormat, FlagRow, NominationRow, NoWinnerRow, PublicPanel, ReleaseSnapshot, SendAllReply, Team, WinnerRow } from "@/lib/types";
 import { teamCount } from "./floorLogic";
@@ -53,6 +53,9 @@ export function saveView(view: View, store?: ViewStore): void {
 /** One nominee for one award: what the matrix cell and the By award row both open the side panel on. */
 export type Sel = { awardId: string; teamId: string };
 
+/** The same in a blended event, where an award is decided under a key (a division, or "Whole event"): Excellence has one column and one half per division. */
+export type BlendedSel = Sel & { key: string };
+
 /** "" is every panel, combined. */
 export const ALL_PANELS = "";
 
@@ -97,6 +100,21 @@ export function decidedCount(winners: WinnerRow[], awards: Pick<AwardView, "id" 
 /** "3/11": the rail's count and a division chip's. */
 export const decidedText = (winners: WinnerRow[], awards: Pick<AwardView, "id" | "places" | "blendedScope">[], division: string, noWinners: Marks = [], format?: EventFormat | null): string =>
   `${decidedCount(winners, awards, division, noWinners, format)}/${awardsUnder(awards, division, format).length}`;
+
+/** How many of the event's awards are decided, over every key (a blended event: each division's, then "Whole event"'s), and how many there are to decide. */
+export function eventDecided(winners: WinnerRow[], awards: Pick<AwardView, "id" | "places" | "blendedScope">[], divisions: string[], noWinners: Marks = [], format?: EventFormat | null): { decided: number; total: number } {
+  const keys = scopeKeys(divisions, format);
+  return {
+    decided: keys.reduce((n, key) => n + decidedCount(winners, awards, key, noWinners, format), 0),
+    total: keys.reduce((n, key) => n + awardsUnder(awards, key, format).length, 0),
+  };
+}
+
+/** "12/13": the rail's count in a blended event. */
+export function eventDecidedText(winners: WinnerRow[], awards: Pick<AwardView, "id" | "places" | "blendedScope">[], divisions: string[], noWinners: Marks = [], format?: EventFormat | null): string {
+  const { decided, total } = eventDecided(winners, awards, divisions, noWinners, format);
+  return `${decided}/${total}`;
+}
 
 /** Every award a team holds, under any key: a Blended team holds Excellence under its division and the rest under "Whole event". */
 export function heldByTeam(winners: WinnerRow[]): Map<string, WinnerRow[]> {
@@ -591,6 +609,10 @@ export function readyToSend(awards: AwardView[], divisions: string[], winners: W
 export const sentCountIn = (releases: AwardReleaseRow[], awards: Pick<AwardView, "id">[], division: string): number =>
   releases.filter((r) => r.status === "sent" && r.division === division && awards.some((a) => a.id === r.award_id)).length;
 
+/** How many awards the event has sent, over every key: "· N sent to Marketing". */
+export const eventSentCount = (releases: AwardReleaseRow[], awards: Pick<AwardView, "id" | "blendedScope">[], divisions: string[], format?: EventFormat | null): number =>
+  scopeKeys(divisions, format).reduce((n, key) => n + sentCountIn(releases, awardsUnder(awards, key, format), key), 0);
+
 /** "4455F Spark Plugs", "1234A Gear Grinders, 60601D Iron Owls" or "No winner". */
 export const snapshotLine = (s: ReleaseSnapshot): string => (s.no_winner || !s.teams.length ? "No winner" : s.teams.map((t) => `${t.number} ${t.name}`).join(", "));
 
@@ -630,6 +652,11 @@ export function notReadyLines(awards: AwardView[], division: string, winners: Wi
       const n = decided.get(a.id)?.length ?? 0;
       return `${a.label} isn't ready: ${n === 0 ? "no winner yet" : n === 1 ? "only one winner" : `only ${n} winners`}.`;
     });
+}
+
+/** notReadyLines over every key of a blended event, each line naming its key: "Excellence · Middle School isn't ready: no winner yet." */
+export function eventNotReadyLines(awards: AwardView[], divisions: string[], winners: WinnerRow[], noWinners: Marks, releases: AwardReleaseRow[], format?: EventFormat | null): string[] {
+  return scopeKeys(divisions, format).flatMap((key) => notReadyLines(awards, key, winners, noWinners, releases, format).map((line) => line.replace(" isn't ready", ` · ${key} isn't ready`)));
 }
 
 /** The banner after Send all: one line per award the server skipped that the dialog had listed (an award it was never asked to send is not news). Null when none. */
