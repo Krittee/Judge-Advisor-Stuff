@@ -3,12 +3,14 @@
 import type { AppState, FlagRow } from "@/lib/types";
 import { tone } from "@/lib/tone";
 import { fieldLabel, matchReference } from "@/lib/match";
+import { canonicalFlagKind } from "@/lib/presets";
 import { getRuleset, parseRuleList, ruleDisplayLabel } from "@/lib/rules";
 
 export type FlagKind = AppState["flagKinds"][number];
 
 export function kindOf(id: string, kinds: FlagKind[]): FlagKind | null {
-  return kinds.find((k) => k.id === id) ?? null;
+  const canonical = canonicalFlagKind(id);
+  return kinds.find((k) => k.id === canonical) ?? null;
 }
 
 /** The flags recorded on one calendar day, in the referee device's own
@@ -35,7 +37,7 @@ function FlagChip({
   kind: string;
   kinds: FlagKind[];
   size?: "xs" | "sm";
-  /** Shown as "Major x2" when a team has several of one kind. */
+  /** Shown as "DQ x2" when a team has several of one kind. */
   count?: number;
 }) {
   const found = kindOf(kind, kinds);
@@ -58,7 +60,10 @@ function FlagChip({
  *  flags do not use is left out, and so is a kind the config no longer has. */
 export function kindCounts(flags: FlagRow[], kinds: FlagKind[]): { kind: FlagKind; count: number }[] {
   const counts = new Map<string, number>();
-  for (const f of flags) counts.set(f.kind, (counts.get(f.kind) ?? 0) + 1);
+  for (const f of flags) {
+    const id = canonicalFlagKind(f.kind);
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
 
   return [...counts.entries()]
     .map(([id, count]) => ({ kind: kindOf(id, kinds), count }))

@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-11-20 | [Referee: Major removed, DQ stands alone](#referee-major-removed-dq-stands-alone-2026-11-20) | `TBD` | Not yet (375 preview) | Built on `claude/referee-dq-major-92956f`, not pushed |
 | 2026-11-20 | [Awards Desk UI (2.2.0)](#awards-desk-ui-220-2026-11-20) | `c02e7c3`..`2d83b19` | iPhone Simulator only | Built on `claude/awards-desk-ui-e125c3`, not pushed |
 | 2026-11-19 | [Awards Desk backend (2.2.0)](#awards-desk-backend-220-2026-11-19) | `d5b1807`..`f9cc675` | Not needed (no UI yet) | Built on `claude/awards-desk-backend-921f59`, UI built on `claude/awards-desk-ui-e125c3` |
 | 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
@@ -21,6 +22,44 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Referee: Major removed, DQ stands alone (2026-11-20)
+
+### Problem / request
+
+User: "on Referee page DQ and Major Violation is the same". In VEX a Major violation is a disqualification, so the user asked to remove Major and keep DQ, with Minor taking its place.
+
+### Root cause
+
+Two flag kinds for one ruling: `config/event.json` `refereeFlags` (and the `FLAG_FALLBACK` copy in `src/lib/presets.ts`) listed both "Major violation" and "Disqualified". On top of that the DQ chip was a faint grey ink tint (`bg-ink/12`), so it read as no worse than the red Major one.
+
+### What changed
+
+- `config/event.json`, `src/lib/presets.ts`: the `major` kind is gone. Kinds left: Good conduct, Warning, Minor violation, Disqualified (DQ keeps severity 4).
+- `src/lib/presets.ts`: new `LEGACY_FLAG_KINDS` (`major` and `major violation` read as `dq`) and `canonicalFlagKind(id)`. `resolveFlagKind` goes through it first, so a stale phone posting "major" records a DQ, never Good conduct.
+- `src/lib/db/file.ts`, `src/lib/db/postgres.ts`: `listFlags` reads stored `major` flags as `dq`. That one funnel feeds AppState `flags`, `/api/flags`, the PATCH and DELETE routes, and the awards route. Stored rows are not rewritten and `match_affecting` is kept.
+- `src/components/Flags.tsx`: `kindOf` and `kindCounts` resolve through the alias, so old "major" activity-log lines (`activityLogic.ts` uses `kindOf`) show the DQ pill instead of nothing.
+- `src/components/referee/SeverityButtons.tsx`, `src/app/globals.css`: Good conduct and Warning share the top row; Minor and DQ each take a full row (`rf-sv--wide` on kinds with `requiresRule`), still the 56px buttons. The Judge Advisor's compact row (`.ja-sv`) now sizes its four buttons evenly (`flex: 1 1 0`).
+- `src/app/referee/page.tsx`: the repeat-violation ring now goes on DQ, the most severe kind. It is only a ring and never selects it.
+- `src/lib/flagValidation.ts`: `MATCH_AFFECTING_KINDS` is `["minor"]`. The switch says "Minor only" on the referee page and in `RefereeTab.tsx`. Comments updated in `refereeLogic.ts`, `types.ts`, `referee/logic.ts`; `docs/onboarding/referee.md` updated.
+- `src/lib/tone.ts`: the DQ pill (`black`) is now solid, `bg-ink text-canvas ring-ink`. It is the one deliberate solid chip, because DQ is the gravest flag.
+
+### How it was tested
+
+- New `tests/flagDqStandsAlone.test.ts` (no Major kind, stale "major" resolves to DQ not Good, DQ tone differs from rose and is solid) and a store conformance case "a flag stored as the retired Major kind is read back as DQ" in `tests/storeConformance.runtime.ts` (runs on the file store, and on Postgres when configured). Both failed before the change.
+- Existing tests that used "major" were moved to "minor" or "dq"; the ones that assert legacy handling (old log lines, stale POSTs) now expect DQ.
+- `npm test` 1875 pass, 0 fail, 1 skipped (Postgres-only); `npx tsc --noEmit`, `npx eslint . --ignore-pattern '.claude/**'` clean; `npm run build` passes.
+- Browser at 375 wide, dark and light, on a copy of the data: the four buttons sit as asked, all 56px tall; a Major recorded before the change shows as DQ (team chip "DQ ×2"); the DQ chip is solid (white on dark, black on light). No console or server errors on a fresh server. Not checked on an iPhone.
+
+### Commit and branch
+
+- Branch `claude/referee-dq-major-92956f`, commit `TBD`.
+
+### Status
+
+Built on `claude/referee-dq-major-92956f`, not pushed. Not checked on an iPhone.
 
 ---
 

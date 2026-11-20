@@ -3263,7 +3263,7 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-rf-area:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--jg-ring); }
 .ja-sev5 { display: flex; gap: 6px; padding: 0 4px; }
 .ja-sv {
-  display: flex; min-width: 0; flex: 1 1 auto; height: 44px; align-items: center; justify-content: center; gap: 5px; padding: 0 4px;
+  display: flex; min-width: 0; flex: 1 1 0; height: 44px; align-items: center; justify-content: center; gap: 5px; padding: 0 4px;
   border: 1.5px solid var(--line); border-radius: 12px; font-weight: 600; font-size: 13px;
 }
 .ja-sv i { flex: none; width: 8px; height: 8px; border-radius: 50%; }

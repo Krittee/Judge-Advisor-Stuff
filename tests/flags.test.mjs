@@ -14,12 +14,12 @@ const kinds = event.refereeFlags;
 
 /* ---- the kinds themselves -------------------------------------------- */
 
-test("the config offers praise, three weights of violation and Disqualified", () => {
+test("the config offers praise, two weights of violation and Disqualified", () => {
   const ids = kinds.map((k) => k.id);
-  assert.deepEqual(ids, ["good", "warning", "minor", "major", "dq"]);
+  assert.deepEqual(ids, ["good", "warning", "minor", "dq"]);
 });
 
-test("Disqualified is the most severe kind and, like Minor and Major, needs a rule", () => {
+test("Disqualified is the most severe kind and, like Minor, needs a rule", () => {
   const dq = kinds.find((k) => k.id === "dq");
   assert.equal(dq.label, "Disqualified");
   assert.equal(dq.short, "DQ");
@@ -42,7 +42,7 @@ test("severity orders them, with praise at the bottom", () => {
   assert.equal(good.severity, 0, "praise must not outrank a violation");
   const violations = kinds.filter((k) => k.id !== "good");
   const ordered = [...violations].sort((a, b) => a.severity - b.severity).map((k) => k.id);
-  assert.deepEqual(ordered, ["warning", "minor", "major", "dq"]);
+  assert.deepEqual(ordered, ["warning", "minor", "dq"]);
 });
 
 test("every kind has its own colour and reads without one", () => {
@@ -69,8 +69,8 @@ function resolveFlagKind(input) {
 }
 
 test("an id, a label or a short name all resolve", () => {
-  assert.equal(resolveFlagKind("major"), "major");
-  assert.equal(resolveFlagKind("Major violation"), "major");
+  assert.equal(resolveFlagKind("Disqualified"), "dq");
+  assert.equal(resolveFlagKind("DQ"), "dq");
   assert.equal(resolveFlagKind("Minor"), "minor");
   assert.equal(resolveFlagKind("WARNING"), "warning");
 });
@@ -78,7 +78,7 @@ test("an id, a label or a short name all resolve", () => {
 test("an unknown kind falls back to the LEAST severe, never the worst", () => {
   /* The direction matters: falling back to the first entry would be fine
      today, but if the list were ever reordered a junk request could post
-     a major violation against a team that did nothing. */
+     a disqualification against a team that did nothing. */
   for (const junk of ["", null, undefined, "nonsense", "critical", "severe", "0"]) {
     assert.equal(resolveFlagKind(junk), "good", `"${junk}" should not become a violation`);
   }
@@ -245,7 +245,7 @@ test("PATCH validates with the same rules as POST, not a looser copy", () => {
   const src = readFileSync(new URL("../src/app/api/flags/route.ts", import.meta.url), "utf8");
   // Both handlers must route through the one shared validator, or a
   // correction could accept something a fresh flag would have refused.
-  // POST additionally opts into requiring a rule for Minor/Major (an
+  // POST additionally opts into requiring a rule for Minor/DQ (an
   // options argument on the same shared call, not a second validator),
   // so the match here is a prefix rather than the exact literal call.
   const postFn = src.slice(src.indexOf("export async function POST"), src.indexOf("export async function PATCH"));

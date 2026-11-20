@@ -750,6 +750,28 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
 
   /* ---- flags and the event boundary ----------------------------------- */
 
+  it("a flag stored as the retired Major kind is read back as DQ", async (store) => {
+    await store.upsertTeams([teamInput("1002")]);
+    const team = await store.findTeamByNumber("1002");
+    assert.ok(team);
+    await store.createFlag({
+      teamId: team.id,
+      kind: "major",
+      body: "",
+      author: "Referee",
+      matchType: "Q",
+      matchNumber: "1",
+      field: "1",
+      rule: "G1",
+      ruleset: "viqrc",
+      manualVersion: null,
+      matchAffecting: true,
+    });
+    const [read] = await store.listFlags(team.id);
+    assert.equal(read.kind, "dq");
+    assert.equal(read.match_affecting, true, "the stored boolean is not stripped");
+  });
+
   it("a flag keeps its ruleset, rules, manual version and match-affecting through create and correct", async (store) => {
     await store.upsertTeams([teamInput("1001")]);
     const team = await store.findTeamByNumber("1001");
@@ -757,7 +779,7 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
 
     const created = await store.createFlag({
       teamId: team.id,
-      kind: "major",
+      kind: "minor",
       body: "Held a robot for a count of five.",
       author: "Referee",
       matchType: "QF",

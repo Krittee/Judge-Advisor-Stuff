@@ -28,7 +28,7 @@ import {
 import { toneSolid } from "@/lib/tone";
 import { filterTeamNumberInput, normalizeTeamNumber } from "@/lib/teamNumber";
 import { fieldLabel, matchReference } from "@/lib/match";
-import { DISQUALIFIED_KIND, MAX_FIELD_COUNT, type FlagReport } from "@/lib/flagValidation";
+import { MAX_FIELD_COUNT, type FlagReport } from "@/lib/flagValidation";
 import { refereeHistory } from "@/lib/refereeHistory";
 import {
   commonFieldRules,
@@ -168,12 +168,11 @@ function Referee() {
       .sort((a, b) => b.flags[0].created_at.localeCompare(a.flags[0].created_at));
   }, [todayFlags, state.teams]);
 
-  // The most serious kind short of Disqualified gets the escalation
-  // highlight -- derived from severity rather than a hardcoded "major" id,
-  // the same way the button order above is. Disqualified is left out on
-  // purpose: a repeated Minor may prompt a review, but nothing on this page
-  // ever steers a referee toward a DQ.
-  const maxSeverity = Math.max(0, ...kinds.filter((k) => k.id !== DISQUALIFIED_KIND).map((k) => k.severity));
+  // The most serious kind (Disqualified) gets the escalation ring --
+  // derived from severity rather than a hardcoded id, the same way the
+  // button order above is. It is only a ring: a repeated Minor may prompt a
+  // review, but nothing on this page ever selects a DQ for the referee.
+  const maxSeverity = Math.max(0, ...kinds.map((k) => k.severity));
 
   /* Repeated-violation detection is a pure calculation over the current
      event store. It excludes Good Conduct and never selects or changes a
@@ -415,13 +414,13 @@ function Referee() {
           />
         </details>
 
-        {/* Counts only for Minor and Major (the server stores false for
+        {/* Counts only for Minor (the server stores false for
             anything else). Shown once a rule is picked because every kind that
             can use it requires one. */}
         {rules.length ? (
           <label className="rf-row">
             <span>
-              Match affecting<small>Minor and Major only</small>
+              Match affecting<small>Minor only</small>
             </span>
             <input
               type="checkbox"
@@ -435,7 +434,7 @@ function Referee() {
 
         {/* Repeated-violation warning. Display only -- never selects
             or creates anything. The Head Referee reads this and
-            still chooses Minor or Major themselves. One line per
+            still chooses the severity themselves. One line per
             cited rule that this team already has a record for, in
             this ruleset. */}
         {team && repeatedRules.length ? (

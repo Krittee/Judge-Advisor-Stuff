@@ -164,7 +164,7 @@ export type FlagRow = {
   /** The manual edition the ruleset was at when this was recorded (set by
    *  the server from the ruleset, never by the client). Null for IQ. */
   manual_version: string | null;
-  /** The referee marked this Minor/Major as having affected the match. */
+  /** The referee marked this Minor as having affected the match. */
   match_affecting: boolean;
   created_at: string;
 };

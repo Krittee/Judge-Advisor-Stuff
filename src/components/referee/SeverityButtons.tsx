@@ -2,17 +2,16 @@
 
 import { useId } from "react";
 import type { FlagKind } from "@/components/Flags";
-import { DISQUALIFIED_KIND } from "@/lib/flagValidation";
 import { toneRail, toneSolid } from "@/lib/tone";
 
 /**
  * "How serious?": one big button per kind, filled in its severity colour.
  * Tapping only selects it -- the Record button below the form is what saves --
  * so a slip costs nothing. The colour is the severity and the label says it
- * too, so nobody taps "Major" meaning "Good".
+ * too, so nobody taps "DQ" meaning "Good".
  *
  * `compact` is the Judge Advisor's Correct flag sheet: the same select-then-
- * confirm buttons in one row of five, a dot in the kind's colour until it is
+ * confirm buttons in one row, a dot in the kind's colour until it is
  * chosen and the whole button filled once it is. Styles: .ja-sev5 / .ja-sv.
  */
 export function SeverityButtons({
@@ -75,7 +74,7 @@ export function SeverityButtons({
               type="button"
               aria-pressed={on}
               onClick={() => onChange(k.id)}
-              className={`rf-sv ${toneSolid(k.color)} ${k.id === DISQUALIFIED_KIND ? "rf-sv--wide" : ""} ${
+              className={`rf-sv ${toneSolid(k.color)} ${k.requiresRule ? "rf-sv--wide" : ""} ${
                 escalateId === k.id ? "ring-2 ring-offset-2 ring-offset-canvas ring-caution" : ""
               }`}
             >

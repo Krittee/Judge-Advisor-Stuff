@@ -174,7 +174,7 @@ test("the clear-scores confirm counts the scores, singular for one", () => {
 const kinds = [
   { id: "good", severity: 0 },
   { id: "warning", severity: 1 },
-  { id: "major", severity: 3 },
+  { id: "dq", severity: 4 },
 ];
 const flag = (over) => ({
   id: "f", team_id: "t", kind: "warning", body: "", author: "Jordan Lee",
@@ -192,9 +192,9 @@ test("one line of a flag: the rules and the match, never the field or the author
 test("the flag on a card is the most serious, then the newest", () => {
   const warnOld = flag({ id: "w1", created_at: "2026-10-17T09:00:00Z" });
   const warnNew = flag({ id: "w2", created_at: "2026-10-17T10:00:00Z" });
-  const major = flag({ id: "m", kind: "major", created_at: "2026-10-17T08:00:00Z" });
+  const dq = flag({ id: "m", kind: "dq", created_at: "2026-10-17T08:00:00Z" });
   assert.equal(leadFlag([warnOld, warnNew], kinds).id, "w2");
-  assert.equal(leadFlag([warnNew, major, warnOld], kinds).id, "m");
+  assert.equal(leadFlag([warnNew, dq, warnOld], kinds).id, "m");
   assert.equal(leadFlag([flag({ kind: "mystery" }), warnOld], kinds).id, "w1", "an unknown kind ranks last");
   assert.equal(leadFlag([], kinds), null);
 });
@@ -203,9 +203,9 @@ test("flags list worst first, never reorder the input, and the lead is the first
   const good = flag({ id: "g", kind: "good", created_at: "2026-10-17T07:00:00Z" });
   const warnOld = flag({ id: "w1", created_at: "2026-10-17T09:00:00Z" });
   const warnNew = flag({ id: "w2", created_at: "2026-10-17T10:00:00Z" });
-  const major = flag({ id: "m", kind: "major", created_at: "2026-10-17T08:00:00Z" });
+  const dq = flag({ id: "m", kind: "dq", created_at: "2026-10-17T08:00:00Z" });
   const mystery = flag({ id: "x", kind: "mystery", created_at: "2026-10-17T11:00:00Z" });
-  const input = [good, warnOld, major, warnNew];
+  const input = [good, warnOld, dq, warnNew];
   const ids = (list) => list.map((f) => f.id);
   assert.deepEqual(ids(flagsWorstFirst(input, kinds)), ["m", "w2", "w1", "g"]);
   assert.deepEqual(ids(input), ["g", "w1", "m", "w2"], "the input is left alone");

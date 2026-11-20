@@ -224,7 +224,7 @@ test("Disqualified needs a rule, and match affecting is dropped for it", async (
   });
   assert.equal(ok.status, 200, ok.body.error);
   assert.equal(ok.body.flag?.kind, "dq");
-  assert.equal(ok.body.flag?.match_affecting, false, "only Minor and Major can be match affecting");
+  assert.equal(ok.body.flag?.match_affecting, false, "only Minor can be match affecting");
 });
 
 test("a correction changes rules, ruleset and match affecting, and the Activity log says so", async () => {

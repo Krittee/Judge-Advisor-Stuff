@@ -30,7 +30,7 @@ test("the real validator applies the exact rule requirement for every severity",
   const warning = parseFlagFields({ ...validReport, body: "" });
   assert.equal(warning.ok, true, "Warning must work without a rule");
 
-  for (const kind of ["minor", "major", "dq"]) {
+  for (const kind of ["minor", "dq"]) {
     const missing = parseFlagFields({ ...validReport, kind, body: "" });
     assert.equal(missing.ok, false, `${kind} must be blocked without a rule`);
 
@@ -72,10 +72,13 @@ test("a legacy rule-less violation can be corrected but cannot bypass a severity
   assert.equal(sameKind.ok, true, "legacy text/match corrections must remain possible");
 
   const changedKind = parseFlagFields(
-    { ...validReport, kind: "major" },
+    { ...validReport, kind: "dq" },
     { allowLegacyRulelessKind: "minor" },
   );
-  assert.equal(changedKind.ok, false, "PATCH must not change a rule-less Minor into Major");
+  assert.equal(changedKind.ok, false, "PATCH must not change a rule-less Minor into DQ");
+
+  const stale = parseFlagFields({ ...validReport, kind: "major" });
+  assert.equal(stale.ok, false, "a stale Major is a DQ, so it needs a rule too");
 });
 
 test("leading zeroes are canonicalized so Q023 and Q23 identify the same match", () => {
@@ -135,7 +138,7 @@ test("an unknown ruleset is refused rather than guessed", () => {
 test("several rules are normalised, de-duplicated and stored comma-joined", () => {
   const result = parseFlagFields({
     ...validReport,
-    kind: "major",
+    kind: "minor",
     ruleset: "v5rc",
     rules: ["gg17", "SG9", " GG17 "],
   });
@@ -171,15 +174,14 @@ test("a correction that names no ruleset keeps the flag's own, so V5RC is not si
   assert.equal(legacy.ok && legacy.ruleset, "viqrc");
 });
 
-test("match affecting is stored only for Minor and Major", () => {
+test("match affecting is stored only for Minor", () => {
   const stored = (kind: string, matchAffecting: unknown) => {
     const r = parseFlagFields({ ...validReport, kind, rule: "SG6", matchAffecting });
     assert.equal(r.ok, true, kind);
     return r.ok && r.matchAffecting;
   };
   assert.equal(stored("minor", true), true);
-  assert.equal(stored("major", true), true);
-  for (const kind of ["good", "warning", "dq"]) {
+  for (const kind of ["good", "warning", "dq", "major"]) {
     assert.equal(stored(kind, true), false, `${kind} must not keep a match-affecting tick`);
   }
   assert.equal(stored("minor", false), false);

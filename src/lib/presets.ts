@@ -180,7 +180,6 @@ const FLAG_FALLBACK: FlagKind[] = [
   { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },
   { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
   { id: "minor", label: "Minor violation", short: "Minor", color: "orange", severity: 2, requiresRule: true },
-  { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3, requiresRule: true },
   { id: "dq", label: "Disqualified", short: "DQ", color: "black", severity: 4, requiresRule: true },
 ];
 
@@ -208,14 +207,25 @@ export function refereeFlags(): FlagKind[] {
   return parsed.length ? parsed : FLAG_FALLBACK;
 }
 
+/** Kinds the config no longer offers (by id or label), and the one each now reads as. A Major
+ *  violation is a disqualification, so old flags, old log lines and a stale
+ *  phone that still says "major" all mean DQ. Stored data is not rewritten. */
+export const LEGACY_FLAG_KINDS: Record<string, string> = { major: "dq", "major violation": "dq" };
+
+/** The kind a stored id stands for today: itself, unless it was retired. */
+export function canonicalFlagKind(id: string): string {
+  return LEGACY_FLAG_KINDS[id.trim().toLowerCase()] ?? id;
+}
+
 /**
  * Snap a typed-in kind to one that exists.
  *
  * Falls back to the *least* severe kind rather than the first, so a
- * malformed request can never invent a major violation against a team.
+ * malformed request can never invent a disqualification against a team.
+ * A retired kind ("major") reads as what it became first.
  */
 export function resolveFlagKind(input: unknown): string {
-  const wanted = String(input ?? "").trim().toLowerCase();
+  const wanted = canonicalFlagKind(String(input ?? "")).trim().toLowerCase();
   const kinds = refereeFlags();
   const match = kinds.find(
     (f) =>

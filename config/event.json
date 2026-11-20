@@ -72,14 +72,6 @@
       "requiresRule": true
     },
     {
-      "id": "major",
-      "label": "Major violation",
-      "short": "Major",
-      "color": "rose",
-      "severity": 3,
-      "requiresRule": true
-    },
-    {
       "id": "dq",
       "label": "Disqualified",
       "short": "DQ",

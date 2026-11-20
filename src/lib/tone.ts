@@ -17,7 +17,9 @@
  *
  * Only the first kind competes for attention, which is why a referee flag
  * in orange never reads as "this team is waiting", even though waiting is
- * also orange. One is a filled tile, the other a hairline pill.
+ * also orange. One is a filled tile, the other a hairline pill. The one
+ * deliberate exception is the Disqualified flag's pill (`black`), solid
+ * because DQ is the gravest flag.
  */
 
 /** Tinted pill: an attribute, not a state. */
@@ -32,8 +34,9 @@ const TONES: Record<string, string> = {
   teal: "bg-done/18 text-done-quiet ring-done/40",
   // The ink colour itself -- near-black on the light theme, near-white on
   // the dark one -- so it is the one tone no queue status or red can be
-  // mistaken for. Used by the Disqualified flag.
-  black: "bg-ink/12 text-ink ring-ink/50",
+  // mistaken for. Used by the Disqualified flag. Deliberately SOLID, the one
+  // exception to the tinted rule above: DQ is the gravest flag.
+  black: "bg-ink text-canvas ring-ink",
   zinc: "bg-off text-off-ink ring-line",
 };
 

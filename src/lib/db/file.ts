@@ -28,7 +28,7 @@ import type { Status } from "../status";
 import { readActivity, type StoredActivity } from "../activity";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
-import { divisionsCompatible } from "../presets";
+import { canonicalFlagKind, divisionsCompatible } from "../presets";
 import { hasNearbyBooking } from "../data";
 import { judgeKey, panelBlocks, planAssignments } from "../roster";
 import {
@@ -1121,7 +1121,10 @@ function removeJudge(id: string): boolean {
 function listFlags(teamId?: string): FlagRow[] {
   const rows = teamId ? state().flags.filter((f) => f.team_id === teamId) : state().flags;
   // Newest first: on a busy field the last thing seen matters most.
-  return [...rows].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  // A retired kind ("major") reads as what it became; the stored row is untouched.
+  return rows
+    .map((f) => ({ ...f, kind: canonicalFlagKind(f.kind) }))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 function createFlag(input: NewFlag): FlagRow {
