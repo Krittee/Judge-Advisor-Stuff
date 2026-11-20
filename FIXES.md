@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-11-20 | [Event setup and blended awards (backend)](#event-setup-and-blended-awards-backend-2026-11-20) | `f22f50e`..`84d586a` | Not needed (no UI yet) | Built on `claude/blended-backend-c6182b`, not pushed |
 | 2026-11-20 | [Awards Desk UI (2.2.0)](#awards-desk-ui-220-2026-11-20) | `c02e7c3`..`2d83b19` | iPhone Simulator only | Built on `claude/awards-desk-ui-e125c3`, not pushed |
 | 2026-11-19 | [Awards Desk backend (2.2.0)](#awards-desk-backend-220-2026-11-19) | `d5b1807`..`f9cc675` | Not needed (no UI yet) | Built on `claude/awards-desk-backend-921f59`, UI built on `claude/awards-desk-ui-e125c3` |
 | 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
@@ -23,6 +24,47 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
 
 ---
+
+## Event setup and blended awards (backend) (2026-11-20)
+
+### Problem / request
+
+A blended event (e.g. IQ Blended: Elementary and Middle School together) gives Excellence and Design once per division and every other award once for the whole event. Every award decision was keyed by (award, division), so a blended event could only have one Excellence. The user's idea: the Judge Advisor sets the event up first (program, format), with the divisions inside it. This entry is the server side only; the screens come in a UI session.
+
+### Root cause
+
+Not a bug: "Blended" was just another division name, and nothing knew which awards span the whole event.
+
+### What changed
+
+Spec `docs/superpowers/specs/2026-11-20-event-setup-blended-awards-design.md`, plan `docs/superpowers/plans/2026-11-20-event-setup-blended-backend.md`.
+
+- Event setup: one `event_setup` row (program from `config/event.json` `programs`, format standard/blended) in both stores, RLS on, cleared by Wipe everything, kept by Reset the day. `PUT /api/event-setup`, JA only, refused with "Clear the awards first." while any award is decided or sent, and with a list while a team or panel sits outside the program's divisions. Saving drops recalled releases. Read through `/api/state` (`eventSetup`).
+- Award scope: `"blendedScope": "division"` on Excellence and Design in `config/event.json`; every other award is decided under the key "Whole event" in a blended event. One helper (`src/lib/eventSetup.ts`) decides the keys for the winners and No winner routes, Send all ready, the Awards Desk reply (`setup`, `sections`) and the Awards tab logic counts.
+- A whole-event winner may be any team in the event; the Judges Award keeps two places for the whole event. Send / Recall / Changed / lock unchanged; a team holding only whole-event sent awards may change division.
+- A saved setup's divisions are the event's divisions: `/api/state`, panel creation, team edits and CSV import (a new team with no division gets the program's first). In a blended event any panel may judge any team, and a new panel defaults to "Whole event".
+- No setup saved: everything behaves and replies exactly as 2.2.0 (judges' award list and the desk reply keep their old keys).
+
+### How it was tested
+
+- `npm test`: 1923 tests, 1922 pass, 0 fail, 1 skipped (real-Postgres suite). `tsc` and eslint (`--ignore-pattern '.claude/**'`) clean. No existing test edited.
+- New tests: `tests/eventSetup.lib.test.mjs`, `tests/eventSetupStore.runtime.test.ts`, `tests/eventSetupRoute.runtime.test.ts`, `tests/blendedAwards.runtime.test.ts`, `tests/blendedAwardsLogic.test.mjs`; additions to `tests/postgres-sql.test.mjs` and `tests/storeConformance.runtime.ts`.
+- On a scratch copy of `.data/state.json` (original checksum unchanged), through the real route handlers: VEX IQ refused by one High School panel, V5RC by 16 teams and 2 panels; after moving the panel, VEX IQ · Blended saved, divisions became ES + MS, the desk showed ES 2 · MS 2 · Whole event 9, a judge saw all 24 teams, Send all ready walked 13 awards.
+
+### Branch / commits
+
+`claude/blended-backend-c6182b`: `73b2b82` (plan), `f22f50e` (helper, config), `f201c81` (stores), `ccca2af` (route, state, divisions, lock), `5561d79` + `3635b6f` (award routes), `8e68694` (Awards tab logic), `84d586a` (store conformance cases), plus this entry.
+
+### Status
+
+Built and committed locally. Not pushed. Waiting on the UI session.
+
+### Follow-ups
+
+- Real Postgres run on Neon (new table; needs the hotspot) before release.
+- UI: Setup screen, Awards tab "Whole event" section, desk title and sections; pass the format to the client `divisionsCompatible` callers (`conflictsLogic.ts`, `teamsLogic.ts`, `floorLogic.ts`).
+- The setup save is check-then-write (a `ponytail:` note in the route), like the award lock.
+- No way to clear a setup back to "none" except Wipe everything.
 
 ## Awards Desk UI (2.2.0) (2026-11-20)
 
