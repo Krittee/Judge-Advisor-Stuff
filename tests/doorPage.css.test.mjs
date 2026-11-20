@@ -166,17 +166,40 @@ test("touch targets: doors 64px or more, the board link 56px, the back link 44px
   assert.match(css, /\.lp-back \{[^}]*min-height: 44px/);
 });
 
-test("layout: tiles go 3 + 2 on a phone and one row of five from 1024px; doors one column then 4 + 3 centred", () => {
+test("layout: tiles go 3 + 2 on a phone and one row of five from 1024px", () => {
   assert.match(bare, /\.dp-sg \{[^}]*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/);
   assert.match(bare, /\.dp-tl:nth-child\(n\+4\) \{ grid-column: span 3; \}/);
   const wide = bare.slice(bare.indexOf("@media (min-width: 1024px)"));
   assert.match(wide, /\.dp-sg \{[^}]*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
-  // Eight half-columns: each door spans two, and the fifth starts at column 2 so doors 5-7 sit centred under 1-4.
-  assert.match(wide, /\.dp-doors \{ display: grid; grid-template-columns: repeat\(8, minmax\(0, 1fr\)\); gap: 36px 16px;/);
-  assert.match(wide, /\.dp-cell \{[^}]*grid-column: span 2;/);
-  assert.match(wide, /\.dp-cell:nth-child\(5\) \{ grid-column: 2 \/ span 2; \}/);
   assert.match(wide, /\.dp-card \{[^}]*min-height: 224px/);
+});
+
+test("layout: Team then Staff; the staff list is two columns on a phone, and from 1024px Team | divider | Staff with the Team card one staff card wide", () => {
+  // Phone: the Team row as before, the staff doors two across, the groups 20px apart.
   assert.match(bare, /\.dp-doors \{ display: flex; flex-direction: column;/);
+  assert.match(bare, /\.dp-doors--staff \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(bare, /\.dp-split \{ display: grid; gap: 20px; \}/);
+  const narrow = bare.slice(bare.indexOf("@media (max-width: 1023.98px)"), bare.indexOf("@media (min-width: 1024px)"));
+  assert.match(narrow, /\.dp-doors--staff \.dp-card \{[^}]*flex-direction: column/);
+  // The hint is clipped, not display:none, so screen readers still read it; the chevron goes with it.
+  assert.match(narrow, /\.dp-doors--staff \.dp-s, \.dp-doors--staff \.dp-card > svg \{[^}]*position: absolute; width: 1px; height: 1px;[^}]*clip: rect\(0 0 0 0\)/);
+  assert.doesNotMatch(narrow, /display: none/);
+  // Wide: one team column (a quarter of the card columns), the divider on the staff group, three staff columns.
+  const wide = bare.slice(bare.indexOf("@media (min-width: 1024px)"));
+  assert.match(wide, /\.dp-split \{ grid-template-columns: calc\(\(100% - 81px\) \/ 4\) minmax\(0, 1fr\); gap: 0 24px; \}/);
+  assert.match(wide, /\.dp-grp--staff \{ padding-left: 24px; border-left: 1px solid var\(--line\); \}/);
+  assert.match(wide, /\.dp-doors--staff \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); gap: 16px; \}/);
+  // 81px = a 24px gap + the staff group's 24px padding + its 1px divider + two 16px card gaps (32px): w + 24 + (3w + 32 + 1 + 24) = 4w + 81.
+  assert.doesNotMatch(bare, /repeat\(8, minmax|\.dp-cell:nth-child\(5\)/, "the old 4 + 3 rules are gone");
+  assert.doesNotMatch(wide, /\.dp-doors--staff \.dp-s\b/, "the hint is not hidden on a wide card");
+});
+
+test("the group labels are small quiet text, not accent-coloured", () => {
+  const label = bare.match(/\.dp-gt \{[^}]*\}/)?.[0] ?? "";
+  assert.match(label, /font-size: 12px; font-weight: 600;/);
+  assert.match(label, /text-transform: uppercase/);
+  assert.match(label, /color: var\(--ink-subtle\)/);
+  assert.doesNotMatch(label, /accent/);
 });
 
 test("Marketing's door ring is the desk teal, like the Coordinator's, and no placeholder style is left", () => {

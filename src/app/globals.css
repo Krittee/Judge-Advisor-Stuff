@@ -1177,8 +1177,11 @@ body:has(.landing) > .theme-toggle { top: 0; }
 .dp-title { margin: 0; font-weight: 700; font-size: 28px; line-height: 1.1; letter-spacing: -0.02em; }
 .dp-intro { margin: 6px 0 0; color: var(--ink-subtle); font-size: 15px; line-height: 1.4; }
 
-/* ---- the six doors ---- */
+/* ---- the doors: Team, then Staff ---- */
+.dp-split { display: grid; gap: 20px; }
+.dp-gt { margin: 0 0 8px; color: var(--ink-subtle); font-size: 12px; font-weight: 600; line-height: 1.3; letter-spacing: 0.08em; text-transform: uppercase; }
 .dp-doors { display: flex; flex-direction: column; gap: 8px; }
+.dp-doors--staff { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .dp-cell { position: relative; }
 .dp-card {
   display: flex; align-items: center; gap: 14px; min-height: 72px; padding: 8px 14px;
@@ -1239,16 +1242,33 @@ body:has(.landing) > .theme-toggle { top: 0; }
 .dp-s-in { --c: var(--active); --ci: var(--active-ink); }
 .dp-s-dn { border-color: var(--dp-done-line); background: var(--dp-done-tint); color: var(--ink); }
 
+/* Phone: a staff card is avatar over name; the hint stays for screen readers, the chevron is decoration. */
+@media (max-width: 1023.98px) {
+  .dp-doors--staff .dp-card { height: 100%; flex-direction: column; justify-content: center; gap: 6px; padding: 10px 8px; text-align: center; }
+  .dp-doors--staff .dp-rt { flex: none; }
+  .dp-doors--staff .dp-s, .dp-doors--staff .dp-card > svg {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+}
+
 @media (min-width: 1024px) {
   .dp-grid { max-width: 1184px; margin: auto; padding: 8px 32px 40px; }
   .dp-head { margin: 0 0 28px; text-align: center; }
   .dp-title { font-size: 40px; }
   .dp-intro { margin-top: 8px; font-size: 17px; }
-  /* 4 + 3: eight half-columns, each door spans two, and the fifth starts at column 2 so the second row sits centred.
-     The row gap leaves room for the Team door's caption under its card. */
-  .dp-doors { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 36px 16px; }
-  .dp-cell { min-width: 0; grid-column: span 2; }
-  .dp-cell:nth-child(5) { grid-column: 2 / span 2; }
+  /* Team | divider | Staff: four equal card columns, Team one, Staff three (3w + two 16px gaps).
+     Two 24px column gaps and the 1px divider make the other 81px, so the Team card is as wide as a staff card. */
+  .dp-split { grid-template-columns: calc((100% - 81px) / 4) minmax(0, 1fr); gap: 0 24px; }
+  .dp-gt { font-size: 13px; }
+  .dp-grp--team { display: flex; flex-direction: column; }
+  .dp-grp--staff { padding-left: 24px; border-left: 1px solid var(--line); }
+  .dp-doors--team { flex: 1; }
+  .dp-doors--team .dp-cell { display: flex; flex: 1; }
+  .dp-doors--team .dp-card { height: auto; flex: 1; justify-content: center; }
+  .dp-doors--team .dp-rt { flex: none; }
+  .dp-doors--staff { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .dp-cell { min-width: 0; }
   .dp-card { height: 100%; min-height: 224px; flex-direction: column; align-items: center; gap: 0; padding: 22px 16px 16px; text-align: center; }
   .dp-av { --s: 72px; }
   .dp-rt { flex: 1 0 auto; margin-top: 16px; }
