@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { changesOf, countText, deskRows, highlight, matchRow, pickTab, readSeen, readTab, resultsText, rowState, seenKey, sentCount, tabKey, tabLabel, writeSeen, writeTab } from "../src/components/marketing/marketingLogic";
+import { changesOf, countText, deskRows, highlight, matchRow, pickTab, readSeen, readTab, resultsText, rowState, seenKey, sentCount, tabKey, tabCount, tabLabel, writeSeen, writeTab } from "../src/components/marketing/marketingLogic";
 import { programTabs } from "../src/lib/presets";
 import type { AwardReleaseRow, ReleasedView, ReleaseTeam } from "../src/lib/types";
 
@@ -192,6 +192,8 @@ test("tabLabel counts sent rows over awards x divisions; Middle School counts in
   // Middle School has 4 sent (excellence, design, create, judges); High School 1; the "ghost" award is not counted.
   assert.equal(tabLabel(v, IQ), "VEX IQ · 4 of 22 sent");
   assert.equal(tabLabel(v, V5), "V5RC · 5 of 22 sent");
+  assert.equal(tabCount(v, IQ), "4 of 22 sent");
+  assert.equal(tabCount(v, V5), "5 of 22 sent");
 });
 
 test("the remembered tab survives a throwing storage", () => {

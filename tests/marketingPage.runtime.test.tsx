@@ -208,15 +208,18 @@ test("the CSS: page-scoped, no motion, outside the Judge Advisor blocks", () => 
 
 /* ---- the program tabs -------------------------------------------------- */
 
-const tabsOf = (m: string) => [...m.matchAll(/<button[^>]*role="tab"[^>]*>([\s\S]*?)<\/button>/g)].map((b) => text(b[1]).trim());
+const tabsOf = (m: string) => [...m.matchAll(/<button[^>]*role="tab"[^>]*aria-label="([^"]*)"/g)].map((b) => b[1]);
 const headings = (m: string) => [...m.matchAll(/<h2 id="mk-h-\d+">([^<]*)<\/h2>/g)].map((h) => h[1]);
 
 test("the tab bar: one tab per program with its sent count, the first selected, a quiet tablist", () => {
   const m = desk();
   assert.match(m, /role="tablist"/);
-  assert.deepEqual(tabsOf(m), ["VEX IQ · 4 of 22 sent", "V5RC · 4 of 22 sent", "Blended · 0 of 11 sent"]);
+  assert.deepEqual(tabsOf(m), ["VEX IQ, 4 of 22 sent", "V5RC, 4 of 22 sent", "Blended, 0 of 11 sent"]);
+  // Name and count are separate spans so a phone breaks between them, never mid-phrase.
+  assert.match(m, /<b class="mk-tab-n">VEX IQ<\/b><span class="mk-tab-c">4 of 22 sent<\/span>/);
+  assert.match(m, /<b class="mk-tab-n">Blended<\/b><span class="mk-tab-c">0 of 11 sent<\/span>/);
   assert.equal([...m.matchAll(/aria-selected="true"/g)].length, 1);
-  assert.match(m, /aria-selected="true"[^>]*>VEX IQ/);
+  assert.match(m, /aria-selected="true"[^>]*><b class="mk-tab-n">VEX IQ/);
   // The status line comes first, the tabs under it, the changed box above them.
   assert.ok(m.indexOf("Checks every") < m.indexOf('role="tablist"'));
   assert.ok(m.indexOf("Changed since sent") < m.indexOf('role="tablist"'));
@@ -226,7 +229,7 @@ test("only the selected tab's divisions show, in its order; the saved tab is the
   assert.deepEqual(headings(desk()), ["Elementary School", MS]);
   const v5 = desk({ tab: "v5rc" });
   assert.deepEqual(headings(v5), [MS, "High School"]);
-  assert.match(v5, /aria-selected="true"[^>]*>V5RC/);
+  assert.match(v5, /aria-selected="true"[^>]*><b class="mk-tab-n">V5RC/);
   assert.deepEqual(headings(desk({ tab: "blended" })), ["Blended"]);
   // A saved tab that no longer exists falls back to the first.
   assert.deepEqual(headings(desk({ tab: "gone" })), ["Elementary School", MS]);
@@ -250,7 +253,7 @@ test("search spans every tab: no tab bar, each division once, each row counted o
   assert.deepEqual(headings(ms), [MS]);
   assert.match(text(ms), /1 result(?!s)/);
   // Back on the same tab once the query is gone.
-  assert.match(desk({ tab: "v5rc", query: "" }), /aria-selected="true"[^>]*>V5RC/);
+  assert.match(desk({ tab: "v5rc", query: "" }), /aria-selected="true"[^>]*><b class="mk-tab-n">V5RC/);
 });
 
 test("one tab, no tab bar: the page is what it was", () => {
@@ -267,5 +270,7 @@ test("the tab is remembered on this device behind its own try/catch, and the tab
   assert.match(css, /\.mk-tabs button\[aria-selected="true"\] \{[^}]*background: var\(--accent\)/);
   assert.match(css, /\.mk-tabs button \{[^}]*min-height: 44px/);
   assert.match(css, /\.mk-tabs button \{[^}]*min-height: 36px/);
+  assert.match(css, /\.mk-tab-c::before \{ content: " \\00b7 "/);
+  assert.match(css, /\.mk-tab-c \{[^}]*white-space: nowrap/);
   assert.doesNotMatch(read("src/components/marketing/AwardsDesk.tsx"), /ja-aw-/);
 });

@@ -103,11 +103,14 @@ export function pickTab(tabs: ReleasedProgram[], saved: string | null): string {
   return saved && keys.includes(saved) ? saved : (keys[0] ?? "");
 }
 
-/** "VEX IQ · 7 of 22 sent": sent rows over awards × divisions; a division in two tabs counts in each. */
-export function tabLabel(view: ReleasedView, tab: ReleasedProgram): string {
+/** "7 of 22 sent": sent rows over awards × divisions; a division in two tabs counts in each. */
+export function tabCount(view: ReleasedView, tab: ReleasedProgram): string {
   const n = tab.divisions.reduce((sum, d) => sum + sentCount(view, d), 0);
-  return `${tab.label} · ${countText(n, view.awards.length * tab.divisions.length)}`;
+  return countText(n, view.awards.length * tab.divisions.length);
 }
+
+/** "VEX IQ · 7 of 22 sent": the tab's whole label, for one line. */
+export const tabLabel = (view: ReleasedView, tab: ReleasedProgram) => `${tab.label} · ${tabCount(view, tab)}`;
 
 export const countText = (n: number, m: number) => `${n} of ${m} sent`;
 

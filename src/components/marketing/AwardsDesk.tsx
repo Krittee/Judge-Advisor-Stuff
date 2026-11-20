@@ -1,7 +1,7 @@
 "use client";
 
 import { SignOutButton } from "@/components/judging";
-import { countText, deskRows, changesOf, highlight, hhmm, matchRow, pickTab, resultsText, sentCount, tabKey, tabLabel, tabsOf, type Change, type DeskRow } from "./marketingLogic";
+import { countText, deskRows, changesOf, highlight, hhmm, matchRow, pickTab, resultsText, sentCount, tabCount, tabKey, tabsOf, type Change, type DeskRow } from "./marketingLogic";
 import type { ReleasedView } from "@/lib/types";
 
 /**
@@ -95,7 +95,8 @@ function ChangedBox({ changes, onSeen }: { changes: Change[]; onSeen: (key: stri
 /**
  * One tab per program, drawn like the Judge Advisor's Matrix | By award toggle
  * but with tab semantics: the selected tab is the accent (it is a control),
- * and each label carries its own sent count in words. Arrow keys move between
+ * and each label carries its own sent count in words: the name over the
+ * count on a phone, one line with a " · " drawn by CSS from 1024px. Arrow keys move between
  * tabs, Home and End jump to the ends.
  */
 function TabBar({ view, active, onTab }: { view: ReleasedView; active: string; onTab: (key: string) => void }) {
@@ -115,8 +116,9 @@ function TabBar({ view, active, onTab }: { view: ReleasedView; active: string; o
         const key = tabKey(t.label);
         const on = key === active;
         return (
-          <button key={key} type="button" role="tab" id={`mk-tab-${key}`} aria-selected={on} aria-controls="mk-tp" tabIndex={on ? 0 : -1} onClick={() => onTab(key)}>
-            {tabLabel(view, t)}
+          <button key={key} type="button" role="tab" id={`mk-tab-${key}`} aria-selected={on} aria-controls="mk-tp" aria-label={`${t.label}, ${tabCount(view, t)}`} tabIndex={on ? 0 : -1} onClick={() => onTab(key)}>
+            <b className="mk-tab-n">{t.label}</b>
+            <span className="mk-tab-c">{tabCount(view, t)}</span>
           </button>
         );
       })}
