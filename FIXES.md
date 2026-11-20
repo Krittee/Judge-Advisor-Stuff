@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-11-21 | [Awards send time shows NaN:NaN, and audit cleanup](#awards-send-time-shows-nannan-and-audit-cleanup-2026-11-21) | `bb0ef0f`..`fcd4930` | Not needed (no layout change) | Built on `claude/audit-cuts-22-13220b`, not pushed |
 | 2026-11-20 | [Event setup and blended awards (UI)](#event-setup-and-blended-awards-ui-2026-11-20) | `e2e1ad6`..`89b0d7c` | Not yet (375 preview only) | Built on `claude/blended-ui-d3aac8`, not pushed |
 | 2026-11-20 | [Event setup and blended awards (backend)](#event-setup-and-blended-awards-backend-2026-11-20) | `f22f50e`..`84d586a` | Not needed (no UI yet) | Built on `claude/blended-backend-c6182b`, not pushed |
 | 2026-11-20 | [Door page: Team \| Staff groups](#door-page-team--staff-groups-2026-11-20) | `7f0d2de` | Not yet (375px preview only) | Built on `claude/door-team-staff-258f85`, not pushed |
@@ -25,6 +26,35 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Awards send time shows NaN:NaN, and audit cleanup (2026-11-21)
+
+### Problem / request
+
+A ponytail audit of 2.2.x found one bug and 17 over-engineering cuts; the user approved all of them. The bug: a send time that does not parse showed "NaN:NaN" on the Awards Desk row and on the JA Awards tab ("Sent NaN:NaN", and in the recall dialog).
+
+### Root cause
+
+`hhmm` in `marketingLogic.ts` formatted any `Date` without checking it was valid. The Event page had its own copy with the check, so only that page was safe.
+
+### Fix
+
+- `hhmm` returns a blank for a time that does not parse; the Event page now uses the same `hhmm`.
+- Cleanup, no other behaviour change: one shared route test harness and marketing fixtures; source-text and copied-CSS tests dropped; one `storeGet`/`storeSet` pair for Seen and the remembered tab; one `sentUnder` counter for the four "N sent" counts; `sendAllLines` uses `sameDecision`/`snapshotLine`; `Change.wasNumbers`, `tabLabel`, `pickText`, `ReleasedAward.order`, `ReleasedProgram` and `ReleaseStatus` removed; one parse for the send/recall route; `event_setup` in the one reset truncate.
+- A send now always records each team's division on the snapshot (it used to only with a saved event setup). Nothing on screen changes: the desk shows the tag only on Whole event rows with a setup.
+- Net 188 lines fewer (src 50, tests 138).
+
+### Testing
+
+- New test: `hhmm("not a time")` is blank (failed with "NaN:NaN" before the fix).
+- `npm test`: 2000 tests before, 1994 after (1993 pass, 1 skipped). Seven source-text/CSS-value tests removed, one added; no behaviour test lost. `tsc` and eslint clean; `npm run build` passes.
+- Browser, built app on a copy of the data: JA Awards tab shows "Sent HH:MM", "Pick a winner to send", "1 sent to Marketing"; `/marketing` shows the counts in config order, no division tag without a setup, and the chosen tab survives a reload.
+
+### Commit / status
+
+`bb0ef0f`, `66dc5d3`, `fcd4930` on `claude/audit-cuts-22-13220b`. Not merged, not pushed.
 
 ---
 
