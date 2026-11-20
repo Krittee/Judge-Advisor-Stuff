@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-11-20 | [Event setup and blended awards (UI)](#event-setup-and-blended-awards-ui-2026-11-20) | `e2e1ad6`..`89b0d7c` | Not yet (375 preview only) | Built on `claude/blended-ui-d3aac8`, not pushed |
 | 2026-11-20 | [Event setup and blended awards (backend)](#event-setup-and-blended-awards-backend-2026-11-20) | `f22f50e`..`84d586a` | Not needed (no UI yet) | Built on `claude/blended-backend-c6182b`, not pushed |
 | 2026-11-20 | [Door page: Team \| Staff groups](#door-page-team--staff-groups-2026-11-20) | `7f0d2de` | Not yet (375px preview only) | Built on `claude/door-team-staff-258f85`, not pushed |
 | 2026-11-20 | [Referee: Major removed, DQ stands alone](#referee-major-removed-dq-stands-alone-2026-11-20) | `329fcc8` | Not yet (375 preview) | Built on `claude/referee-dq-major-92956f`, not pushed |
@@ -24,6 +25,78 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Event setup and blended awards (UI) (2026-11-20)
+
+### Problem / request
+
+The screens for the event setup the backend added: the Judge Advisor's Event page, the JA Awards tab in a blended event, and the Awards Desk with a saved setup. The user picked Event page C "Four tiles + preview", Awards tab C "Award order", and the desk as mocked (`design/event-setup/PROMPT.md`).
+
+### Root cause
+
+Not a bug: new screens on top of the backend (`claude/blended-backend-c6182b`, merged into this branch).
+
+### What changed
+
+Plan `docs/superpowers/plans/2026-11-20-event-setup-blended-ui.md`. Everything is gated on a saved setup; with none, every screen is as before (the only visible change is the new Event rail item).
+
+- **Event page** (`EventTab.tsx`, `eventLogic.ts`, `AdminFrame.tsx`):
+  - "Event" comes first in the Setup rail group.
+  - Four tiles (VEX IQ / V5RC × Standard / Blended) form a radio group with arrow keys.
+  - The preview shows how awards group per division / "Whole event".
+  - The "Before you can save" checklist covers Awards, Teams and Panels, with "Open …" links.
+  - A refused save shows the server message, with its `outside` lists.
+  - The top bar shows "Judge Queue · VEX IQ · Blended" once a setup is saved.
+- **Awards tab, blended** (`BlendedAwards.tsx`, `AwardsTab.tsx`, `awardsLogic.ts`):
+  - Blocks follow the award order. Excellence and Design are split into a half per division, each with its own Send / Recall / lock / No winner.
+  - Every other award is one "Whole event" block.
+  - "Nominees from" (All / ES / MS) filters nominee rows only.
+  - The Matrix has a column per key.
+  - The side panel reads "<Award> · <scope>".
+  - Send all ready lines read "<Award> · <scope> · …".
+  - The rail and meta count event-wide ("3/13").
+- **Awards Desk** (`AwardsDesk.tsx`, `marketingLogic.ts`): with a setup there are no tabs. The page shows the event title and line, then sections (divisions, then "Whole event") with "N of M sent". Whole-event rows tag each team ES / MS, and the Changed box reads "<scope> · <Award>".
+- **Snapshot:** `ReleaseTeam.division?`, written only when a setup is saved (`decisionFor(..., withDivision)`). With no setup the stored snapshot is exactly as in 2.2.0.
+- **Pickers:** the Floor, Teams and Conflicts checks pass the event format (blended: any panel takes any team). The Panels pickers offer "Whole event" in a blended event, and a new panel defaults to it.
+- **Existing test edits** (all source-text or count pins of what the spec changes):
+  - `adminPage.runtime` rail goes from 9 to 10 sections (approved by the user).
+  - Four pinned call strings in `adminTeams.runtime` (now passing `format`).
+  - One count line in `adminEvent.logic` (this branch's own test).
+
+### How it was tested
+
+- `npm test`: 2000 tests, 1999 pass, 0 fail, 1 skipped (real-Postgres suite). `npx tsc --noEmit`, `npx eslint src tests --ignore-pattern '.claude/**'` and `npm run build` are clean.
+- Browser preview on scratch copies of `.data/state.json` (never `.data/`), at 1280 and 375, dark and light:
+  - Event page: not set, VEX IQ Standard saved, VEX IQ Blended saved, refused by a High School panel, refused by awards, and a server 409.
+  - Awards tab: Standard, and Blended (halves, Whole event blocks, filter, Matrix, side panel, Send all, Recalled, locks).
+  - Awards Desk: unset (tabs), Standard, and Blended (tags, Changed, search).
+  - Panels pickers in Blended.
+- Each task was reviewed by an Opus reviewer, followed by a whole-branch review. Its one Important finding ("15 of 13" with no setup) is fixed in `89b0d7c`.
+
+### Branch / commits
+
+`claude/blended-ui-d3aac8`:
+- `837ef42`: merge of the backend.
+- `031dba9`: design.
+- `64631b3`: plan.
+- `e2e1ad6` + `b3b71d9`: Event page.
+- `7ec7008` + `6e41b00`: Awards tab.
+- `1c23044`: desk.
+- `bbd4e8d`: pickers.
+- `89b0d7c`: final review fixes.
+- Plus this entry.
+
+### Status
+
+Built and committed locally. Not pushed, not merged into main.
+
+### Follow-ups
+
+- Real Postgres run on Neon (new `event_setup` table, `division` inside the `teams` jsonb).
+- Optional tidying: split the shared award pieces out of `AwardsTab.tsx` (`AwardsTab` ↔ `BlendedAwards` import each other; this is safe at runtime).
+- Check on an iPhone.
 
 ---
 
