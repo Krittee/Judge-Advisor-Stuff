@@ -2,7 +2,7 @@ import type { Ask } from "@/components/judge/logic";
 import type { call } from "@/components/useAppState";
 import { divisionsCompatible } from "@/lib/presets";
 import { isPanelBlocked, panelBlocks, type PanelBlock } from "@/lib/roster";
-import type { ConflictRow, JudgeRow, PublicPanel, Team } from "@/lib/types";
+import type { ConflictRow, EventFormat, JudgeRow, PublicPanel, Team } from "@/lib/types";
 import { divisionTag } from "./floorLogic";
 
 /* The Judge Advisor Conflicts tab's decisions, kept out of the markup so they
@@ -62,10 +62,10 @@ export function conflictGroups(
  * their division is blocked from them. Auto-assign skips them, so without
  * this nobody finds out until the team turns up.
  */
-export function strandedTeams(teams: Team[], panels: PublicPanel[], blocks: PanelBlock[]): Team[] {
+export function strandedTeams(teams: Team[], panels: PublicPanel[], blocks: PanelBlock[], format?: EventFormat | null): Team[] {
   return teams.filter((team) => {
     if (team.panel_id) return false;
-    const inDivision = panels.filter((p) => divisionsCompatible(team.division, p.division));
+    const inDivision = panels.filter((p) => divisionsCompatible(team.division, p.division, format));
     return inDivision.length > 0 && inDivision.every((p) => isPanelBlocked(blocks, p.id, team.id));
   });
 }

@@ -750,6 +750,28 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
 
   /* ---- flags and the event boundary ----------------------------------- */
 
+  it("a flag stored as the retired Major kind is read back as DQ", async (store) => {
+    await store.upsertTeams([teamInput("1002")]);
+    const team = await store.findTeamByNumber("1002");
+    assert.ok(team);
+    await store.createFlag({
+      teamId: team.id,
+      kind: "major",
+      body: "",
+      author: "Referee",
+      matchType: "Q",
+      matchNumber: "1",
+      field: "1",
+      rule: "G1",
+      ruleset: "viqrc",
+      manualVersion: null,
+      matchAffecting: true,
+    });
+    const [read] = await store.listFlags(team.id);
+    assert.equal(read.kind, "dq");
+    assert.equal(read.match_affecting, true, "the stored boolean is not stripped");
+  });
+
   it("a flag keeps its ruleset, rules, manual version and match-affecting through create and correct", async (store) => {
     await store.upsertTeams([teamInput("1001")]);
     const team = await store.findTeamByNumber("1001");
@@ -757,7 +779,7 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
 
     const created = await store.createFlag({
       teamId: team.id,
-      kind: "major",
+      kind: "minor",
       body: "Held a robot for a count of five.",
       author: "Referee",
       matchType: "QF",
@@ -918,6 +940,57 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     assert.deepEqual(await store.getRefereeSetup(), second, "a day reset keeps it");
     await store.resetAll();
     assert.equal(await store.getRefereeSetup(), null, "a full wipe clears it");
+  });
+
+  it("the event setup is one record per event: absent, saved, replaced; a day reset keeps it, a full wipe clears it", async (store) => {
+    assert.equal(await store.getEventSetup(), null, "nothing is set up on a fresh event");
+
+    const first = await store.saveEventSetup({ program: "V5RC", format: "standard", setBy: "Dana" });
+    assert.deepEqual([first.program, first.format, first.set_by], ["V5RC", "standard", "Dana"]);
+    assert.ok(!Number.isNaN(Date.parse(first.updated_at)), "updated_at is a timestamp");
+    assert.deepEqual(await store.getEventSetup(), first, "and it reads back as saved");
+
+    const second = await store.saveEventSetup({ program: "VEX IQ", format: "blended", setBy: "Judge Advisor" });
+    assert.deepEqual([second.program, second.format, second.set_by], ["VEX IQ", "blended", "Judge Advisor"], "a second save replaces the first");
+    assert.deepEqual(await store.getEventSetup(), second);
+
+    await store.resetDay();
+    assert.deepEqual(await store.getEventSetup(), second, "a day reset keeps it");
+    await store.resetAll();
+    assert.equal(await store.getEventSetup(), null, "a full wipe clears it");
+  });
+
+  it("saving the event setup deletes recalled award releases and keeps sent ones", async (store) => {
+    for (const division of [ES, MS]) {
+      await store.sendRelease({ awardId: "design", division, snapshot: { teams: [], no_winner: true }, previous: null, changedAt: null, sentBy: "Alex" });
+    }
+    await store.recallRelease("design", MS);
+
+    await store.saveEventSetup({ program: "VEX IQ", format: "standard", setBy: "Dana" });
+    assert.deepEqual((await store.listReleases()).map((r) => [r.division, r.status]), [[ES, "sent"]]);
+  });
+
+  it("a new team with no division lands in the saved program's first division", async (store) => {
+    await store.saveEventSetup({ program: "V5RC", format: "standard", setBy: "Dana" });
+    await store.upsertTeams([{ number: "1001", name: "New", pit: null }]);
+    assert.equal((await store.findTeamByNumber("1001"))?.division, MS);
+  });
+
+  it("in a blended event, a team that changes division keeps its panel, and so does a panel that changes division", async (store) => {
+    await store.saveEventSetup({ program: "VEX IQ", format: "blended", setBy: "Dana" });
+    const whole = await store.createPanel(panelInput({ division: "Whole event" }));
+    const es = await store.createPanel(panelInput({ name: "Panel B", code: "CONF02", division: ES }));
+    await store.upsertTeams([teamInput("1001", { division: ES }), teamInput("1002", { division: ES })]);
+    const [a, b] = [await store.findTeamByNumber("1001"), await store.findTeamByNumber("1002")];
+    assert.ok(a && b);
+    await store.updateTeam(a.id, { panel_id: whole.id });
+    await store.updateTeam(b.id, { panel_id: es.id });
+
+    await store.upsertTeams([teamInput("1001", { division: MS })]);
+    assert.equal((await store.findTeamByNumber("1001"))?.panel_id, whole.id, "no wall: the Whole event panel still judges it");
+
+    await store.updatePanel(es.id, { division: MS });
+    assert.equal((await store.findTeamByNumber("1002"))?.panel_id, es.id, "no wall: the ES team stays on the moved panel");
   });
 
   it("a conflict is declared once, however many times it is asked for", async (store) => {
@@ -1505,6 +1578,38 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     await store.setNoWinner({ awardId: "design", division: ES, decidedBy: "Alex" });
     await store.resetAll();
     assert.deepEqual(await store.listNoWinners(), []);
+  });
+
+  it("an award release round-trips, one row per (award, division); recall keeps the teams; resets clear releases", async (store) => {
+    const a = { id: "11111111-1111-4111-8111-111111111111", number: "1001", name: "Team 1001" };
+    const prev = { teams: [{ id: "22222222-2222-4222-8222-222222222222", number: "1002", name: "Team 1002" }], no_winner: false };
+    const sent = await store.sendRelease({
+      awardId: "design", division: ES, snapshot: { teams: [a], no_winner: false },
+      previous: prev, changedAt: "2026-11-19T09:30:00.000Z", sentBy: "Alex",
+    });
+    assert.equal(sent.status, "sent");
+    const [got] = await store.listReleases();
+    assert.deepEqual([got.award_id, got.division, got.teams, got.no_winner, got.status, got.sent_by], ["design", ES, [a], false, "sent", "Alex"]);
+    assert.deepEqual(got.previous, prev);
+    assert.equal(new Date(got.changed_at!).toISOString(), "2026-11-19T09:30:00.000Z");
+    assert.ok(got.sent_at);
+
+    await store.sendRelease({ awardId: "design", division: ES, snapshot: { teams: [], no_winner: true }, previous: null, changedAt: null, sentBy: "Sam" });
+    const all = await store.listReleases();
+    assert.equal(all.length, 1, "sending again on the same key is one row");
+    assert.deepEqual([all[0].teams, all[0].no_winner, all[0].previous, all[0].changed_at, all[0].sent_by], [[], true, null, null, "Sam"]);
+
+    await store.sendRelease({ awardId: "design", division: MS, snapshot: { teams: [a], no_winner: false }, previous: null, changedAt: null, sentBy: "Alex" });
+    const recalled = await store.recallRelease("design", MS);
+    assert.deepEqual([recalled?.status, recalled?.teams], ["recalled", [a]]);
+    assert.equal((await store.listReleases()).find((r) => r.division === MS)?.status, "recalled");
+    assert.equal(await store.recallRelease("create", ES), null, "no such release");
+
+    await store.resetDay();
+    assert.deepEqual(await store.listReleases(), []);
+    await store.sendRelease({ awardId: "design", division: ES, snapshot: { teams: [a], no_winner: false }, previous: null, changedAt: null, sentBy: "Alex" });
+    await store.resetAll();
+    assert.deepEqual(await store.listReleases(), []);
   });
 
   it("deleting a team takes its nominations and wins with it, and no other team's", async (store) => {

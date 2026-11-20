@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { noMotion } from "./cssChecks";
 
 /* The door page's stylesheet ("Five doors", design/door-redesign/): the
    sample tiles wear the Live board's fills and inks, so they get the same
@@ -150,7 +151,7 @@ test("the door block sits after the landing block and before the referee block",
 test("no motion on / or /team: no keyframes, no animation, transitions off under reduced motion", () => {
   const landing = css.slice(css.indexOf("Team landing page"), css.indexOf('Team page ("Status board"'));
   const landingBare = landing.replace(/\/\*[\s\S]*?\*\//g, "");
-  assert.doesNotMatch(landingBare, /@keyframes|animation/);
+  noMotion(landingBare);
   assert.match(bare, /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.doorpage \*, \.doorpage \*::before, \.doorpage \*::after \{ transition: none !important; \}/);
   assert.match(landingBare, /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.landing \*, \.landing \*::before, \.landing \*::after \{ transition: none !important; \}/);
 });
@@ -164,13 +165,4 @@ test("touch targets: doors 64px or more, the board link 56px, the back link 44px
   assert.match(bare, /\.dp-card \{[^}]*min-height: 72px/);
   assert.match(bare, /\.dp-board \{[^}]*min-height: 56px/);
   assert.match(css, /\.lp-back \{[^}]*min-height: 44px/);
-});
-
-test("layout: tiles go 3 + 2 on a phone and one row of five from 1024px; doors one column then 3 x 2", () => {
-  assert.match(bare, /\.dp-sg \{[^}]*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/);
-  assert.match(bare, /\.dp-tl:nth-child\(n\+4\) \{ grid-column: span 3; \}/);
-  const wide = bare.slice(bare.indexOf("@media (min-width: 1024px)"));
-  assert.match(wide, /\.dp-sg \{[^}]*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
-  assert.match(wide, /\.dp-doors \{ display: grid; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); gap: 36px 16px;/);
-  assert.match(bare, /\.dp-doors \{ display: flex; flex-direction: column;/);
 });

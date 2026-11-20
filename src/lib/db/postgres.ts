@@ -6,19 +6,23 @@ import type {
   NominationRow,
   Note,
   Panel,
+  EventFormat,
+  EventSetup,
   RefereeSetup,
   RequestRow,
   ScoreRow,
   Team,
   WinnerRow,
   NoWinnerRow,
+  AwardReleaseRow,
 } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { randomPanelCode } from "../panelCode";
 import { readActivity, type StoredActivity } from "../activity";
-import { blendedDivisions, defaultCategory, divisionsCompatible, presetDivisions, presetPanels } from "../presets";
+import { blendedDivisions, canonicalFlagKind, defaultCategory, divisionsCompatible, presetDivisions, presetPanels } from "../presets";
 import { hasNearbyBooking } from "../data";
 import { judgeKey, panelBlocks, planAssignments } from "../roster";
+import { setupDivisions, WHOLE_EVENT } from "../eventSetup";
 import {
   StoreError,
   STALE_STATUS_MESSAGE,
@@ -35,6 +39,7 @@ import {
   type NewRequest,
   type NewWinner,
   type NewNoWinner,
+  type SendRelease,
   type NominationKey,
   type SaveScore,
   type Store,
@@ -318,6 +323,16 @@ async function migrate(): Promise<void> {
       updated_at  timestamptz not null default now()
     );
 
+    -- The event's program and format, set by the Judge Advisor. One row, ever,
+    -- like referee_setup.
+    create table if not exists event_setup (
+      id         int primary key default 1 check (id = 1),
+      program    text not null,
+      format     text not null check (format in ('standard', 'blended')),
+      set_by     text not null,
+      updated_at timestamptz not null default now()
+    );
+
     create table if not exists scores (
       id         uuid primary key default gen_random_uuid(),
       team_id    uuid not null references teams(id) on delete cascade,
@@ -396,6 +411,21 @@ async function migrate(): Promise<void> {
       division   text not null,
       decided_by text not null,
       decided_at timestamptz not null default now(),
+      primary key (award_id, division)
+    );
+
+    -- What the Awards Desk has sent: one row per award per division. The
+    -- snapshot is jsonb, so there is no team to cascade from.
+    create table if not exists award_releases (
+      award_id   text not null,
+      division   text not null,
+      teams      jsonb not null default '[]'::jsonb,
+      no_winner  boolean not null default false,
+      previous   jsonb,
+      status     text not null check (status in ('sent', 'recalled')),
+      sent_at    timestamptz not null default now(),
+      sent_by    text not null,
+      changed_at timestamptz,
       primary key (award_id, division)
     );
 
@@ -483,8 +513,10 @@ async function migrate(): Promise<void> {
     alter table nominations enable row level security;
     alter table award_winners enable row level security;
     alter table award_no_winner enable row level security;
+    alter table award_releases enable row level security;
     alter table activity  enable row level security;
     alter table referee_setup enable row level security;
+    alter table event_setup enable row level security;
   `);
 
     // Schema changes that an already-deployed event may not have yet.
@@ -997,6 +1029,7 @@ export const postgresStore: Store = {
 
   async upsertTeams(list: ImportedTeam[]) {
     if (!list.length) return 0;
+    const setup = await this.getEventSetup();
     // A blank cell leaves what is stored (see ImportedTeam), so nulls come in as nulls. The proposed row is
     // checked against not null before the conflict is looked at, so it has to carry a name, division and type:
     // the stored one for a team that exists, else the default. Pit has no default and coalesces on update.
@@ -1019,7 +1052,7 @@ export const postgresStore: Store = {
          languages = excluded.languages,
          -- A team that changes division loses its panel only when that
          -- panel can't judge the new one: divisionsCompatible, with $8 the
-         -- blended divisions.
+         -- blended divisions, or every division in a Blended event.
          panel_id = case
            when teams.division is not distinct from excluded.division then teams.panel_id
            when exists (
@@ -1037,9 +1070,9 @@ export const postgresStore: Store = {
         list.map((t) => t.pit),
         list.map((t) => t.division ?? null),
         list.map((t) => t.category ?? null),
-        presetDivisions()[0],
+        (setupDivisions(setup) ?? presetDivisions())[0],
         defaultCategory(),
-        blendedDivisions(),
+        setup?.format === "blended" ? [...blendedDivisions(), ...(setupDivisions(setup) ?? []), WHOLE_EVENT] : blendedDivisions(),
         list.map((t) => (t.languages ? t.languages.join(",") : null)),
       ],
     );
@@ -1085,8 +1118,9 @@ export const postgresStore: Store = {
    * mid-event top-up stays balanced.
    */
   async autoAssignTeams(perPanel, includeAssigned = false, division?: string) {
+    const format = (await this.getEventSetup())?.format;
     const panels = (await this.listPanels()).filter(
-      (p) => !division || divisionsCompatible(p.division, division),
+      (p) => !division || divisionsCompatible(p.division, division, format),
     );
     if (!panels.length) {
       throw new StoreError(
@@ -1101,7 +1135,7 @@ export const postgresStore: Store = {
     const pending = teams.filter(
       (t) =>
         (includeAssigned || !t.panel_id) &&
-        (!division || divisionsCompatible(t.division, division)),
+        (!division || divisionsCompatible(t.division, division, format)),
     );
     if (!pending.length) return 0;
 
@@ -1115,7 +1149,7 @@ export const postgresStore: Store = {
     // A panel that must stay away from a team is not a candidate for it.
     const blocks = panelBlocks(await this.listConflicts(), await this.listJudges());
 
-    const assignments = planAssignments(pending, panels, load, perPanel, blocks);
+    const assignments = planAssignments(pending, panels, load, perPanel, blocks, format);
 
     if (assignments.length) {
       await query(
@@ -1184,7 +1218,8 @@ export const postgresStore: Store = {
           const held = await run<{ id: string; division: string }>(
             "select id, division from teams where panel_id = $1 for update", [id],
           );
-          release = held.filter((t) => !divisionsCompatible(t.division, moved)).map((t) => t.id);
+          const format = one(await run<{ format: EventFormat }>("select format from event_setup"))?.format;
+          release = held.filter((t) => !divisionsCompatible(t.division, moved, format)).map((t) => t.id);
           if (release.length && (await run(
             `select 1 from requests where team_id = any($1::uuid[])
              and status in ('requested', 'acknowledged', 'interviewing', 'scheduled') limit 1`,
@@ -1359,12 +1394,14 @@ export const postgresStore: Store = {
   /** Declaring the same pair twice returns the one already recorded. */
   async listFlags(teamId?: string) {
     // Newest first: on a busy field the last thing seen matters most.
-    return teamId
+    const rows = teamId
       ? await query<FlagRow>(
           "select * from flags where team_id = $1 order by created_at desc",
           [teamId],
         )
       : await query<FlagRow>("select * from flags order by created_at desc");
+    // A retired kind ("major") reads as what it became; the stored row is untouched.
+    return rows.map((f) => ({ ...f, kind: canonicalFlagKind(f.kind) }));
   },
 
   async createFlag(input: NewFlag) {
@@ -1445,6 +1482,30 @@ export const postgresStore: Store = {
         [input.ruleset, input.fieldCount, input.setBy, input.setOn],
       ),
     )!;
+  },
+
+  async getEventSetup() {
+    // Named columns, not *: the row's id is an implementation detail.
+    return one(await query<EventSetup>("select program, format, set_by, updated_at from event_setup"));
+  },
+
+  async saveEventSetup(input) {
+    // One transaction: a recall made under the old setup must not outlive it.
+    return withClient(async (run) => {
+      const [saved] = await run<EventSetup>(
+        `insert into event_setup (id, program, format, set_by)
+         values (1, $1, $2, $3)
+         on conflict (id) do update set
+           program = excluded.program,
+           format = excluded.format,
+           set_by = excluded.set_by,
+           updated_at = now()
+         returning program, format, set_by, updated_at`,
+        [input.program, input.format, input.setBy],
+      );
+      await run("delete from award_releases where status = 'recalled'");
+      return isoise(saved);
+    });
   },
 
   async addConflict(input: NewConflict) {
@@ -1718,6 +1779,46 @@ export const postgresStore: Store = {
     return gone.length > 0;
   },
 
+  async listReleases() {
+    return rows(await query<AwardReleaseRow>("select * from award_releases order by sent_at, award_id, division"));
+  },
+
+  async sendRelease(input: SendRelease) {
+    return one(
+      await query<AwardReleaseRow>(
+        `insert into award_releases (award_id, division, teams, no_winner, previous, status, sent_by, changed_at)
+         values ($1, $2, $3::jsonb, $4, $5::jsonb, 'sent', $6, $7)
+         on conflict (award_id, division) do update set
+           teams = excluded.teams,
+           no_winner = excluded.no_winner,
+           previous = excluded.previous,
+           status = 'sent',
+           sent_at = now(),
+           sent_by = excluded.sent_by,
+           changed_at = excluded.changed_at
+         returning *`,
+        [
+          input.awardId,
+          input.division,
+          JSON.stringify(input.snapshot.teams),
+          input.snapshot.no_winner,
+          input.previous ? JSON.stringify(input.previous) : null,
+          input.sentBy,
+          input.changedAt,
+        ],
+      ),
+    )!;
+  },
+
+  async recallRelease(awardId, division) {
+    return one(
+      await query<AwardReleaseRow>(
+        "update award_releases set status = 'recalled' where award_id = $1 and division = $2 returning *",
+        [awardId, division],
+      ),
+    );
+  },
+
   async logActivity(entry: NewActivity) {
     // The log is a convenience, not a record of account. Never let a
     // failed audit write break the thing the user actually asked for.
@@ -1742,18 +1843,18 @@ export const postgresStore: Store = {
 
   async resetDay() {
     // Referee flags intentionally survive a day reset: repeat history is
-    // event-wide, including at multi-day events. So does the referee setup.
-    await query("truncate activity, notes, scores, nominations, award_winners, award_no_winner, requests");
+    // event-wide, including at multi-day events. So do the referee and event setups.
+    await query("truncate activity, notes, scores, nominations, award_winners, award_no_winner, award_releases, requests");
   },
 
   async resetAll() {
     // Teams cascade to referee flags. This is the application's event
     // boundary and must be used before importing the next event's roster.
-    // The referee setup is the event's too, so it goes with them.
+    // The referee and event setups are the event's too, so they go with them.
     // cascade also takes nominations and award_winners: both reference teams.
-    // award_no_winner has no team, so it is named.
+    // award_no_winner and award_releases have no team, so they are named.
     await query(
-      "truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup, award_no_winner cascade",
+      "truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup, event_setup, award_no_winner, award_releases cascade",
     );
   },
 };

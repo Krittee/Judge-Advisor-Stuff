@@ -1,5 +1,5 @@
 import { awards as configAwards } from "../src/lib/presets";
-import type { AppState, AwardView, NominationRow, Team, WinnerRow } from "../src/lib/types";
+import type { AppState, AwardReleaseRow, AwardView, NominationRow, Team, WinnerRow } from "../src/lib/types";
 
 /* The event in design/awards-redesign/reference-awards-board.dc.html, as data:
    Middle School, Panel 2 (Sam Rivera, Priya Nair) and Panel 3 (Lena Ortiz,
@@ -76,3 +76,17 @@ export const winners: WinnerRow[] = [win("amaze", gearGrinders), win("design", l
 export const MS = "Middle School";
 export const HS = "High School";
 export const divisions = ["Elementary School", MS, HS, "Blended"];
+
+/* ---- what the Judge Advisor has sent to Marketing ------------------------------------------ */
+
+/** A local clock time, so "10:58" reads the same in any time zone. */
+export const at = (h: number, m: number): string => new Date(2026, 9, 20, h, m).toISOString();
+
+/** One send of an award in a division: `team` is the snapshot's winner(s), or null for "No winner". */
+export const release = (awardId: string, team: Team | Team[] | null, over: Partial<AwardReleaseRow> = {}): AwardReleaseRow => {
+  const list = team === null ? [] : Array.isArray(team) ? team : [team];
+  return {
+    award_id: awardId, division: "Middle School", teams: list.map((t) => ({ id: t.id, number: t.number, name: t.name })), no_winner: team === null,
+    previous: null, status: "sent", sent_at: at(10, 58), sent_by: "Alex Morgan", changed_at: null, ...over,
+  };
+};

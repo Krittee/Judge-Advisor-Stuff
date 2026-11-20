@@ -60,7 +60,6 @@ const kinds = [
   { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },
   { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
   { id: "minor", label: "Minor violation", short: "Minor", color: "orange", severity: 2, requiresRule: true },
-  { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3, requiresRule: true },
   { id: "dq", label: "Disqualified", short: "DQ", color: "black", severity: 4, requiresRule: true },
 ];
 let n = 0;
@@ -294,7 +293,7 @@ test("the worst conduct is the Referee tab's order: the highest severity, with h
   assert.deepEqual(worstConduct(some, kinds).kind.id, "warning");
   assert.equal(worstConduct(some, kinds).count, 2);
   // A disqualification outranks everything, however many of the others there are.
-  const dq = [...some, flag(t, "major"), flag(t, "major"), flag(t, "dq")];
+  const dq = [...some, flag(t, "minor"), flag(t, "minor"), flag(t, "dq")];
   assert.equal(worstConduct(dq, kinds).kind.id, "dq");
   assert.equal(worstConduct(dq, kinds).count, 1);
   // Good conduct alone is still what was said about them.

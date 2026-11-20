@@ -4,9 +4,12 @@ import Link from "next/link";
 import { STATUS_META, type Status } from "@/lib/status";
 
 /**
- * The front door: one card per role, then the Live board with the colour
- * key drawn as sample tiles inside it. Styles live under `.doorpage` in
- * globals.css ("Five doors" + the Coordinator, design/door-redesign/).
+ * The front door: two labelled groups, Team (the one public door) and Staff
+ * (the six role doors), then the Live board with the colour key drawn as
+ * sample tiles inside it. Phone: Team row, then Staff two across. Wide: Team
+ * and Staff side by side, the Team card as wide as one staff card. Styles live
+ * under `.doorpage` in globals.css ("Five doors" + the Coordinator,
+ * design/door-redesign/).
  */
 
 type Door = { name: string; line: string; href: string; ring: string | null; avatar?: string };
@@ -22,7 +25,10 @@ const DOORS: Door[] = [
   { name: "Queue desk", line: "Check teams in and book times", href: "/queue/login", ring: "desk", avatar: "queue-desk" },
   { name: "Coordinator", line: "Walk the pits: languages and bookings", href: "/coordinator/login", ring: "co", avatar: "coordinator" },
   { name: "Judge Advisor", line: "Runs judging for the event", href: "/admin/login", ring: "ja", avatar: "judge-advisor" },
+  { name: "Marketing", line: "Awards as the Judge Advisor sends them", href: "/marketing/login", ring: "mk", avatar: "marketing" },
 ];
+const TEAM = DOORS.slice(0, 1);
+const STAFF = DOORS.slice(1);
 
 /** One sample team in each colour a tile can wear on the board, in the order a visit happens. */
 const SAMPLES: { status: Status; cls: string; time?: string }[] = [
@@ -56,25 +62,30 @@ export function DoorPage() {
             <p className="dp-intro">Choose your door</p>
           </div>
 
-          <ul className="dp-doors" aria-labelledby="dp-title">
-            {DOORS.map((d) => (
-              <li key={d.href} className="dp-cell">
-                <Link href={d.href} className="dp-card" aria-describedby={d.ring ? undefined : "dp-cap"}>
-                  {d.avatar ? (
-                    <span className={d.ring ? `dp-av dp-r-${d.ring}` : "dp-av dp-av--team"}>
-                      <img src={`/avatars/${d.avatar}.jpg`} alt="" width={48} height={48} />
-                    </span>
-                  ) : null}
-                  <span className="dp-rt">
-                    <span className="dp-dt">{d.name}</span>
-                    <span className="dp-s">{d.line}</span>
-                  </span>
-                  <Chevron />
-                </Link>
-                {d.ring ? null : <p className="dp-cap" id="dp-cap">Opens the team ticket</p>}
-              </li>
+          <div className="dp-split">
+            {([["team", "Team", TEAM], ["staff", "Staff", STAFF]] as const).map(([id, label, doors]) => (
+              <section key={id} className={`dp-grp dp-grp--${id}`}>
+                <h2 className="dp-gt" id={`dp-g-${id}`}>{label}</h2>
+                <ul className={`dp-doors dp-doors--${id}`} aria-labelledby={`dp-g-${id}`}>
+                  {doors.map((d) => (
+                    <li key={d.href} className="dp-cell">
+                      <Link href={d.href} className="dp-card" aria-describedby={d.ring ? undefined : "dp-cap"}>
+                        <span className={d.ring ? `dp-av dp-r-${d.ring}` : "dp-av dp-av--team"}>
+                          <img src={`/avatars/${d.avatar}.jpg`} alt="" width={48} height={48} />
+                        </span>
+                        <span className="dp-rt">
+                          <span className="dp-dt">{d.name}</span>
+                          <span className="dp-s">{d.line}</span>
+                        </span>
+                        <Chevron />
+                      </Link>
+                      {d.ring ? null : <p className="dp-cap" id="dp-cap">Opens the team ticket</p>}
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
 
           <div className="dp-below">
             <div className="dp-bcard">

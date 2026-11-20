@@ -176,15 +176,15 @@ const frame = (over: Partial<Parameters<typeof AdminFrame>[0]> = {}) =>
 const rail = (markup: string) => markup.match(/<nav class="ja-rail"[\s\S]*?<\/nav>/)?.[0] ?? "";
 const sheet = (markup: string) => markup.match(/<dialog class="ja-sheet"[\s\S]*?<\/dialog>/)?.[0] ?? "";
 
-test("the rail is a labelled nav with LIVE, SETUP and RESULTS in order, and the nine sections under them", () => {
+test("the rail is a labelled nav with LIVE, SETUP and RESULTS in order, and the ten sections under them", () => {
   const r = rail(frame());
   assert.match(r, /^<nav class="ja-rail" aria-label="Judge Advisor sections">/);
   assert.deepEqual([...r.matchAll(/<h2 class="ja-rl">(.*?)<\/h2>/g)].map((m) => m[1]), ["Live", "Setup", "Results", "Other consoles"]);
   const groups = r.split('<h2 class="ja-rl">').slice(1, 4).map((g) => [...g.matchAll(/<span>(\w+)<\/span>/g)].map((m) => m[1]));
-  assert.deepEqual(groups, [["Floor", "Referee"], ["Teams", "Panels", "Conflicts", "Import"], ["Scores", "Awards", "Activity"]]);
-  assert.deepEqual(SECTION_GROUPS.flatMap((g) => g.items.map((i) => i.id)), ["floor", "flags", "teams", "panels", "conflicts", "import", "scores", "awards", "log"]);
+  assert.deepEqual(groups, [["Floor", "Referee"], ["Event", "Teams", "Panels", "Conflicts", "Import"], ["Scores", "Awards", "Activity"]]);
+  assert.deepEqual(SECTION_GROUPS.flatMap((g) => g.items.map((i) => i.id)), ["floor", "flags", "event", "teams", "panels", "conflicts", "import", "scores", "awards", "log"]);
   // Real buttons, not links: the section is page state.
-  assert.equal(r.match(/<button type="button" class="ja-ri"/g)?.length, 9);
+  assert.equal(r.match(/<button type="button" class="ja-ri"/g)?.length, 10);
   // The only links are the other consoles, in a group of their own after the sections.
   const sections = r.split('<h2 class="ja-rl">Other consoles</h2>')[0];
   assert.doesNotMatch(sections, /<a /);
@@ -254,7 +254,7 @@ test("the Sections sheet is a native dialog with a grab handle, title, Close, th
   assert.match(s, /<h2 id="[^"]+">Sections<\/h2><button type="button" class="ja-x" aria-label="Close">/);
   assert.match(s, /<nav class="ja-sh-list" aria-label="Judge Advisor sections">/);
   assert.deepEqual([...s.matchAll(/<h3 class="ja-rl">(.*?)<\/h3>/g)].map((m) => m[1]), ["Live", "Setup", "Results", "Other consoles"]);
-  assert.equal(s.match(/<button type="button" class="ja-ri"/g)?.length, 9);
+  assert.equal(s.match(/<button type="button" class="ja-ri"/g)?.length, 10);
   assert.match(s, /<button type="button" class="ja-ri" aria-current="page">[\s\S]*<span>Floor<\/span><b class="ja-rb">3<\/b>/, "current is marked as in the rail");
   assert.match(s, /<div class="ja-sh-foot"><p>Alex Morgan · Judge Advisor<\/p><button[^>]*>Sign out<\/button><\/div>/);
   // Closed until the menu button opens it: showModal() is what makes it open.

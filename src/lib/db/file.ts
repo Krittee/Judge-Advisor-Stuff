@@ -16,18 +16,22 @@ import type {
   NominationRow,
   Note,
   Panel,
+  EventFormat,
+  EventSetup,
   RefereeSetup,
   RequestRow,
   ScoreRow,
   Team,
   WinnerRow,
   NoWinnerRow,
+  AwardReleaseRow,
 } from "../types";
 import type { Status } from "../status";
 import { readActivity, type StoredActivity } from "../activity";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { normalizePanelCode, randomPanelCode } from "../panelCode";
-import { divisionsCompatible } from "../presets";
+import { canonicalFlagKind, divisionsCompatible } from "../presets";
+import { setupDivisions } from "../eventSetup";
 import { hasNearbyBooking } from "../data";
 import { judgeKey, panelBlocks, planAssignments } from "../roster";
 import {
@@ -53,6 +57,7 @@ import {
   type NewNomination,
   type NewWinner,
   type NewNoWinner,
+  type SendRelease,
   type NominationKey,
   type FlagEdit,
   type NewRefereeSetup,
@@ -95,12 +100,16 @@ type Data = {
   winners: WinnerRow[];
   /** Awards the Judge Advisor marked "No winner", per division. */
   noWinners: NoWinnerRow[];
+  /** What the Awards Desk has sent, per (award, division). */
+  awardReleases: AwardReleaseRow[];
   conflicts: ConflictRow[];
   /** The judge roster, in the order judges were added. */
   judges: JudgeRow[];
   flags: FlagRow[];
   /** The event's program and field count; null until one is saved. */
   refereeSetup: RefereeSetup | null;
+  /** The event's program and format; null until one is saved. */
+  eventSetup: EventSetup | null;
   activity: StoredActivity[];
 };
 
@@ -174,10 +183,12 @@ function empty(): Data {
     nominations: [],
     winners: [],
     noWinners: [],
+    awardReleases: [],
     conflicts: [],
     judges: [],
     flags: [],
     refereeSetup: null,
+    eventSetup: null,
     activity: [],
   };
 }
@@ -261,10 +272,12 @@ function migrate(data: Data): Data {
   for (const n of data.nominations) n.role ??= "judge";
   data.winners ??= [];
   data.noWinners ??= [];
+  data.awardReleases ??= [];
   data.conflicts ??= [];
   data.judges ??= [];
   data.flags ??= [];
   data.refereeSetup ??= null;
+  data.eventSetup ??= null;
   // Activity entries gained a kind and the actor's role; an older one has
   // neither and is read as what it implies (see readActivity).
   for (const a of data.activity) {
@@ -686,6 +699,8 @@ function reassignRequest(
 
 function upsertTeams(rows: ImportedTeam[]): number {
   const now = new Date().toISOString();
+  const setup = state().eventSetup;
+  const defaultDivision = (setupDivisions(setup) ?? presetDivisions())[0];
   for (const row of rows) {
     const existing = state().teams.find((t) => t.number === row.number);
     if (existing) {
@@ -699,7 +714,7 @@ function upsertTeams(rows: ImportedTeam[]): number {
       if (row.division && row.division !== existing.division) {
         existing.division = row.division;
         const held = state().panels.find((p) => p.id === existing.panel_id);
-        if (!held || !divisionsCompatible(row.division, held.division)) existing.panel_id = null;
+        if (!held || !divisionsCompatible(row.division, held.division, setup?.format)) existing.panel_id = null;
       }
     } else {
       state().teams.push({
@@ -707,7 +722,7 @@ function upsertTeams(rows: ImportedTeam[]): number {
         number: row.number,
         name: row.name || `Team ${row.number}`,
         panel_id: null,
-        division: row.division || presetDivisions()[0],
+        division: row.division || defaultDivision,
         category: row.category || defaultCategory(),
         pit: row.pit,
         languages: row.languages ?? [],
@@ -766,8 +781,9 @@ function deleteTeam(id: string): void {
  * mid-event top-up stays balanced.
  */
 function autoAssignTeams(perPanel: number, includeAssigned = false, division?: string): number {
+  const format = state().eventSetup?.format;
   const panels = listPanels().filter(
-    (p) => !division || divisionsCompatible(p.division, division),
+    (p) => !division || divisionsCompatible(p.division, division, format),
   );
   if (!panels.length) {
     throw new StoreError(
@@ -781,7 +797,7 @@ function autoAssignTeams(perPanel: number, includeAssigned = false, division?: s
   const pending = listTeams().filter(
     (t) =>
       (includeAssigned || !t.panel_id) &&
-      (!division || divisionsCompatible(t.division, division)),
+      (!division || divisionsCompatible(t.division, division, format)),
   );
   if (!pending.length) return 0;
 
@@ -797,7 +813,7 @@ function autoAssignTeams(perPanel: number, includeAssigned = false, division?: s
 
   // The walls (division, conflicts, perPanel) and the language preference
   // live in planAssignments, shared with the Postgres store.
-  const plan = planAssignments(pending, panels, load, perPanel, blocks);
+  const plan = planAssignments(pending, panels, load, perPanel, blocks, format);
   for (const { teamId, panelId } of plan) {
     state().teams.find((t) => t.id === teamId)!.panel_id = panelId;
   }
@@ -880,7 +896,7 @@ function updatePanel(id: string, patch: Partial<Panel>): Panel {
   // refused.
   if (patch.division && patch.division !== panel.division) {
     const moved = patch.division;
-    const release = state().teams.filter((t) => t.panel_id === id && !divisionsCompatible(t.division, moved));
+    const release = state().teams.filter((t) => t.panel_id === id && !divisionsCompatible(t.division, moved, state().eventSetup?.format));
     const ids = new Set(release.map((t) => t.id));
     if (state().requests.some((r) => ids.has(r.team_id) && LIVE.includes(r.status))) {
       throw new StoreError("Reassign or cancel this panel's active requests before changing its division.", 409);
@@ -1115,7 +1131,10 @@ function removeJudge(id: string): boolean {
 function listFlags(teamId?: string): FlagRow[] {
   const rows = teamId ? state().flags.filter((f) => f.team_id === teamId) : state().flags;
   // Newest first: on a busy field the last thing seen matters most.
-  return [...rows].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  // A retired kind ("major") reads as what it became; the stored row is untouched.
+  return rows
+    .map((f) => ({ ...f, kind: canonicalFlagKind(f.kind) }))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 function createFlag(input: NewFlag): FlagRow {
@@ -1178,6 +1197,19 @@ function saveRefereeSetup(input: NewRefereeSetup): RefereeSetup {
     updated_at: new Date().toISOString(),
   };
   state().refereeSetup = setup;
+  save();
+  return setup;
+}
+
+function getEventSetup(): EventSetup | null {
+  return state().eventSetup;
+}
+
+/** Replaces the record, and drops every recalled release (a recall only matters under the setup it was made in). */
+function saveEventSetup(input: { program: string; format: EventFormat; setBy: string }): EventSetup {
+  const setup: EventSetup = { program: input.program, format: input.format, set_by: input.setBy, updated_at: new Date().toISOString() };
+  state().eventSetup = setup;
+  state().awardReleases = state().awardReleases.filter((r) => r.status !== "recalled");
   save();
   return setup;
 }
@@ -1417,6 +1449,38 @@ function clearNoWinner(awardId: string, division: string): boolean {
   return removed;
 }
 
+function listReleases(): AwardReleaseRow[] {
+  return state().awardReleases.map((r) => ({ ...r }));
+}
+
+/** One row per (award, division); sending again overwrites it. */
+function sendRelease(input: SendRelease): AwardReleaseRow {
+  const row: AwardReleaseRow = {
+    award_id: input.awardId,
+    division: input.division,
+    teams: input.snapshot.teams.map((t) => ({ ...t })),
+    no_winner: input.snapshot.no_winner,
+    previous: input.previous && { teams: input.previous.teams.map((t) => ({ ...t })), no_winner: input.previous.no_winner },
+    status: "sent",
+    sent_at: new Date().toISOString(),
+    sent_by: input.sentBy,
+    changed_at: input.changedAt,
+  };
+  const at = state().awardReleases.findIndex((r) => r.award_id === row.award_id && r.division === row.division);
+  if (at >= 0) state().awardReleases[at] = row;
+  else state().awardReleases.push(row);
+  save();
+  return { ...row };
+}
+
+function recallRelease(awardId: string, division: string): AwardReleaseRow | null {
+  const row = state().awardReleases.find((r) => r.award_id === awardId && r.division === division);
+  if (!row) return null;
+  row.status = "recalled";
+  save();
+  return { ...row };
+}
+
 function logActivity(entry: NewActivity): void {
   state().activity.push({
     id: randomUUID(),
@@ -1448,6 +1512,7 @@ function resetDay(): void {
   state().nominations = [];
   state().winners = [];
   state().noWinners = [];
+  state().awardReleases = [];
   state().activity = [];
   save();
 }
@@ -1622,10 +1687,12 @@ function demoData(): Data {
     nominations: [],
     winners: [],
     noWinners: [],
+    awardReleases: [],
     conflicts: [],
     judges,
     flags: [],
     refereeSetup: null,
+    eventSetup: null,
     activity: [],
   };
 }
@@ -1683,6 +1750,8 @@ export const fileStore: Store = {
   updateFlag: async (id, edit) => updateFlag(id, edit),
   removeFlag: async (id) => removeFlag(id),
 
+  getEventSetup: async () => getEventSetup(),
+  saveEventSetup: async (input) => saveEventSetup(input),
   getRefereeSetup: async () => getRefereeSetup(),
   saveRefereeSetup: async (input) => saveRefereeSetup(input),
 
@@ -1711,6 +1780,9 @@ export const fileStore: Store = {
   listNoWinners: async () => listNoWinners(),
   setNoWinner: async (input) => setNoWinner(input),
   clearNoWinner: async (awardId, division) => clearNoWinner(awardId, division),
+  listReleases: async () => listReleases(),
+  sendRelease: async (input) => sendRelease(input),
+  recallRelease: async (awardId, division) => recallRelease(awardId, division),
 
   resetDay: async () => resetDay(),
   resetAll: async () => resetAll(),

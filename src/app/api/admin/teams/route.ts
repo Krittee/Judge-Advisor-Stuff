@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { actorParts } from "@/lib/activity";
 import { canAdminister, getSession } from "@/lib/auth";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
-import { divisionsCompatible, parseLanguageList, presetDivisions, resolveCategory } from "@/lib/presets";
+import { divisionChoices } from "@/lib/eventSetup";
+import { divisionsCompatible, parseLanguageList, resolveCategory } from "@/lib/presets";
 import { normalizePit } from "@/lib/pit";
 import { store, StoreError } from "@/lib/db";
 import { isPanelBlocked, loadBlocks } from "@/lib/conflicts";
-import type { Team } from "@/lib/types";
+import type { EventSetup, Team } from "@/lib/types";
+import { teamLockMessage } from "../../awards/shared";
 
 export const dynamic = "force-dynamic";
 
@@ -54,9 +56,11 @@ export async function POST(request: Request) {
   const autoAssign = Boolean(body.autoAssign);
   const perPanel = clampPerPanel(body.perPanel);
 
+  const eventSetup = await store().getEventSetup();
   const { teams, skipped, skippedLines } = parseTeams(
     text,
-    named(body.division, resolveDivision),
+    eventSetup,
+    named(body.division, (d) => resolveDivision(d, eventSetup)),
     named(body.category, resolveCategory),
   );
   if (!teams.length) {
@@ -76,7 +80,14 @@ export async function POST(request: Request) {
   try {
     // Counted against what is stored now, before the write. `teams` holds
     // one row per number, so a number pasted twice is one team, not two.
-    const known = new Set((await store().listTeams()).map((t) => t.number));
+    const stored = await store().listTeams();
+    const known = new Set(stored.map((t) => t.number));
+    // A line naming another division for a team in a sent award would move it; a blank one leaves it alone.
+    for (const line of teams) {
+      const old = stored.find((t) => t.number === line.number);
+      const locked = old && line.division && line.division !== old.division ? await teamLockMessage(old.id, true) : null;
+      if (locked) return NextResponse.json({ error: locked }, { status: 409 });
+    }
     await store().upsertTeams(teams);
     const assigned = autoAssign ? await store().autoAssignTeams(perPanel) : 0;
     const updated = teams.filter((t) => known.has(t.number)).length;
@@ -109,13 +120,14 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}));
+  const eventSetup = await store().getEventSetup();
 
   try {
     if (body.action === "autoAssign") {
       const assigned = await store().autoAssignTeams(
         clampPerPanel(body.perPanel),
         Boolean(body.includeAssigned),
-        body.division ? resolveDivision(body.division) : undefined,
+        body.division ? resolveDivision(body.division, eventSetup) : undefined,
       );
       return NextResponse.json({ assigned });
     }
@@ -163,13 +175,13 @@ export async function PATCH(request: Request) {
 
       const team = teams.find((t) => t.id === teamId);
       const nextDivision =
-        "division" in body ? resolveDivision(body.division) : team?.division;
+        "division" in body ? resolveDivision(body.division, eventSetup) : team?.division;
 
       // A blended team clears this wall against any panel, which is the
       // whole point of the category: it used to be refused here unless a
       // panel happened to exist in the blended division, so the only way
       // to get one judged was to mis-file it as a single age group.
-      if (team && nextDivision && !divisionsCompatible(nextDivision, panel.division)) {
+      if (team && nextDivision && !divisionsCompatible(nextDivision, panel.division, eventSetup?.format)) {
         return NextResponse.json(
           {
             error:
@@ -192,8 +204,11 @@ export async function PATCH(request: Request) {
     if ("panelId" in body) patch.panel_id = body.panelId ? String(body.panelId) : null;
     if ("category" in body) patch.category = resolveCategory(body.category);
     if ("division" in body) {
-      const moved = resolveDivision(body.division);
+      const moved = resolveDivision(body.division, eventSetup);
       patch.division = moved;
+      const current = (await store().listTeams()).find((t) => t.id === teamId);
+      const locked = current && current.division !== moved ? await teamLockMessage(teamId, true) : null;
+      if (locked) return NextResponse.json({ error: locked }, { status: 409 });
       // Changing division normally puts the team on the far side of the
       // wall from whichever panel held it, so the assignment goes. Not if
       // the panel may still judge them: moving a team to Blended must not
@@ -204,7 +219,7 @@ export async function PATCH(request: Request) {
         const team = teams.find((t) => t.id === teamId);
         const panels = await store().listPanels();
         const held = panels.find((p) => p.id === team?.panel_id);
-        if (!held || !divisionsCompatible(moved, held.division)) patch.panel_id = null;
+        if (!held || !divisionsCompatible(moved, held.division, eventSetup?.format)) patch.panel_id = null;
       }
     }
     if ("pit" in body) patch.pit = normalizePit(body.pit);
@@ -254,6 +269,9 @@ export async function DELETE(request: Request) {
   const teamId = new URL(request.url).searchParams.get("teamId");
   if (!teamId) return NextResponse.json({ error: "teamId required." }, { status: 400 });
 
+  const locked = await teamLockMessage(teamId);
+  if (locked) return NextResponse.json({ error: locked }, { status: 409 });
+
   const team = (await store().listTeams()).find((t) => t.id === teamId);
   await store().deleteTeam(teamId);
   if (team) await logSetup(session, "removed a team", `Team ${team.number} · ${team.name}`);
@@ -273,13 +291,14 @@ function named(input: unknown, resolve: (input: unknown) => string): string | nu
   return String(input ?? "").trim() ? resolve(input) : null;
 }
 
-function resolveDivision(input: unknown): string {
+function resolveDivision(input: unknown, setup: EventSetup | null): string {
   const wanted = String(input ?? "").trim();
-  const divisions = presetDivisions();
-  return divisions.includes(wanted) ? wanted : divisions[0];
+  const { options, fallback } = divisionChoices(setup, false);
+  return options.includes(wanted) ? wanted : fallback;
 }
 
 /**
+ * @param setup the saved event setup, which decides what a division cell may say.
  * @param fallbackDivision used for any row that does not name one in a
  *        fourth column, so a whole paste can go into one division. Null
  *        when the request names none.
@@ -287,6 +306,7 @@ function resolveDivision(input: unknown): string {
  */
 function parseTeams(
   text: string,
+  setup: EventSetup | null,
   fallbackDivision: string | null,
   fallbackCategory: string | null,
 ): { teams: ParsedTeam[]; skipped: number; skippedLines: SkippedLine[] } {
@@ -322,7 +342,7 @@ function parseTeams(
       number,
       name: cells[1] || null,
       pit: normalizePit(cells[2]),
-      division: cells[3] ? resolveDivision(cells[3]) : fallbackDivision,
+      division: cells[3] ? resolveDivision(cells[3], setup) : fallbackDivision,
       category: cells[4] ? resolveCategory(cells[4]) : fallbackCategory,
       // Nothing recognised counts as blank, so a stray word never wipes what is stored.
       languages: languages.length ? languages : null,

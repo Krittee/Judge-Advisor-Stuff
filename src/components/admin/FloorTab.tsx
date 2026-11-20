@@ -10,7 +10,7 @@ import { Banner, formatMinutes, slotLabel } from "@/components/ui";
 import { call } from "@/components/useAppState";
 import { minutesSince } from "@/lib/judgeQueue";
 import { STATUS_META, type Status } from "@/lib/status";
-import type { AppState, ConflictRow, FlagRow, JudgeRow, PublicPanel, RequestRow, Team } from "@/lib/types";
+import type { AppState, ConflictRow, EventFormat, FlagRow, JudgeRow, PublicPanel, RequestRow, Team } from "@/lib/types";
 import {
   allowedPanels,
   buildColumns,
@@ -55,6 +55,8 @@ type Shared = {
   panels: PublicPanel[];
   conflicts: ConflictRow[];
   judges: JudgeRow[];
+  /** The saved event format: a blended event lets any panel judge any team. */
+  format?: EventFormat | null;
   now: number;
   /** The request id with a write in the air. */
   busy: string | null;
@@ -171,6 +173,7 @@ export function FloorTab({
         panels={state.panels}
         conflicts={state.conflicts}
         judges={state.judges}
+        format={state.eventSetup?.format}
         now={now}
         busy={busy}
         menu={menu}
@@ -341,6 +344,7 @@ function Card({
   panels,
   conflicts,
   judges,
+  format,
   now,
   busy,
   menu,
@@ -365,7 +369,7 @@ function Card({
 
   // Where this interview may go: the current panel is where it already is.
   const targets = view
-    ? allowedPanels(team, request.panel_id, panels, conflicts, judges).filter((p) => p.id !== request.panel_id)
+    ? allowedPanels(team, request.panel_id, panels, conflicts, judges, format).filter((p) => p.id !== request.panel_id)
     : [];
 
   return (

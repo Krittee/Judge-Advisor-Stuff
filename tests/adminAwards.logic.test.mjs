@@ -49,11 +49,15 @@ import {
   VIEW_KEY,
   winnersOf,
 } from "../src/components/admin/awardsLogic";
+import {
+  isReady, notReadyLines, readyToSend, recallQuestion, releaseOf, sendAllLines, sendState, skippedText, snapshotLine,
+} from "../src/components/admin/awardsLogic";
 import { withRanks } from "../src/components/admin/scoresLogic";
 import { rankTeams } from "../src/lib/ranking";
+import { sentUnder } from "../src/lib/releases";
 import { rubrics } from "../src/lib/rubrics";
 import {
-  adminNom, awards, byteMe, divisions, gearGrinders, hexAppeal, HS, labRats, MS, momentum, monitors, nom, nominations, panels, quiet, roboraptors, teams, torque, win, winners,
+  adminNom, at, awards, breakers, byteMe, divisions, gearGrinders, hexAppeal, HS, labRats, MS, momentum, monitors, nom, nominations, panels, quiet, roboraptors, teams, torque, release, win, winners,
 } from "./adminAwards.fixtures";
 
 /* The Judge Advisor Awards board's decisions, run for real against
@@ -418,12 +422,12 @@ test("referee flags: Good conduct and the worst of the rest, or none", () => {
   const kinds = [
     { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },
     { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
-    { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3, requiresRule: true },
+    { id: "dq", label: "Disqualified", short: "DQ", color: "black", severity: 4, requiresRule: true },
   ];
   const flag = (kind) => ({ team_id: byteMe.id, kind });
   assert.deepEqual(refereeLine([], kinds), { good: null, caution: null });
   assert.deepEqual(refereeLine([flag("good"), flag("good"), flag("good")], kinds), { good: "Good conduct ×3", caution: null });
-  assert.deepEqual(refereeLine([flag("good"), flag("warning"), flag("warning"), flag("major")], kinds), { good: "Good conduct ×1", caution: "Major violation ×1" });
+  assert.deepEqual(refereeLine([flag("good"), flag("warning"), flag("warning"), flag("dq")], kinds), { good: "Good conduct ×1", caution: "Disqualified ×1" });
   assert.deepEqual(refereeLine([flag("warning")], kinds), { good: null, caution: "Warning ×1" }, "a flag of a kind the config dropped says nothing");
 });
 
@@ -822,4 +826,129 @@ test("the other Sportsmanship nominees include the Good conduct teams, with the 
   // For another award the rivals carry no Good conduct.
   const build = detailFor({ awardId: "build", teamId: torque.id }, { ...everything, flags });
   assert.ok(build.others.every((o) => o.conduct === 0));
+});
+
+/* ---- sending to Marketing ------------------------------------------------------------------- */
+
+const award = (id) => awards.find((a) => a.id === id);
+const judgesAward = award("judges");
+const noMarks = [];
+
+test("isReady: all of an award's winners picked, or No winner; one of the Judges Award's two is not", () => {
+  assert.equal(isReady(award("amaze"), MS, winners, noMarks), true, "one winner on a one-place award");
+  assert.equal(isReady(judgesAward, MS, [win("judges", hexAppeal)], noMarks), false, "Judges with 1 of 2");
+  assert.equal(isReady(judgesAward, MS, [win("judges", hexAppeal), win("judges", gearGrinders)], noMarks), true, "Judges with 2 of 2");
+  assert.equal(isReady(award("energy"), MS, winners, [{ award_id: "energy", division: MS }]), true, "No winner");
+  assert.equal(isReady(award("energy"), MS, winners, [{ award_id: "energy", division: HS }]), false, "No winner in another division");
+  assert.equal(isReady(award("energy"), MS, winners, noMarks), false, "nothing");
+  assert.equal(isReady(award("amaze"), HS, winners, noMarks), false, "another division's winner does not count");
+});
+
+test("releaseOf finds the row for one award in one division", () => {
+  const r = release("amaze", gearGrinders);
+  assert.equal(releaseOf([r], "amaze", MS), r);
+  assert.equal(releaseOf([r], "amaze", HS), null);
+  assert.equal(releaseOf([r], "design", MS), null);
+});
+
+test("sendState: sent wins over ready; a recalled row is recalled; ready; or not ready", () => {
+  const sent = release("amaze", gearGrinders);
+  assert.equal(sendState(award("amaze"), MS, winners, noMarks, [sent]), "sent", "sent even though it is ready");
+  assert.equal(sendState(award("amaze"), MS, winners, noMarks, [release("amaze", gearGrinders, { status: "recalled" })]), "recalled");
+  assert.equal(sendState(award("amaze"), MS, winners, noMarks, []), "ready");
+  assert.equal(sendState(award("energy"), MS, winners, noMarks, []), "not-ready");
+  assert.equal(sendState(award("amaze"), HS, winners, noMarks, [sent]), "not-ready", "a send in Middle School says nothing about High School");
+});
+
+test("readyToSend: every ready award in every division that is not sent; a recalled one is included", () => {
+  const w = [...winners, win("excellence", monitors), win("think", monitors)];
+  const rels = [release("amaze", gearGrinders), release("design", labRats, { status: "recalled" })];
+  const out = readyToSend(awards, [MS, HS], w, noMarks, rels).map((x) => `${x.award.id}|${x.division}`);
+  assert.deepEqual(out, ["design|Middle School", "think|Middle School", "excellence|High School", "think|High School"], "amaze is sent; the recalled design is back in");
+  assert.deepEqual(readyToSend(awards, [MS], winners, noMarks, [release("amaze", gearGrinders), release("design", labRats), release("think", breakers)]), [], "nothing is left once all are sent");
+});
+
+test("readyToSend only considers the config's awards and the divisions asked", () => {
+  const w = [...winners, win("gone", gearGrinders)];
+  assert.deepEqual(readyToSend(awards, [MS], w, noMarks, []).map((x) => x.award.id), ["design", "think", "amaze"], "in the config's order, and not an award the config no longer has");
+  assert.deepEqual(readyToSend(awards, [], w, noMarks, []), []);
+});
+
+test("sentUnder counts the sent (not recalled) rows of one division", () => {
+  const rels = [release("amaze", gearGrinders), release("design", labRats, { status: "recalled" }), release("think", breakers, { division: HS }), release("gone", gearGrinders)];
+  const ids = awards.map((a) => a.id);
+  assert.equal(sentUnder(rels, MS, ids), 1);
+  assert.equal(sentUnder(rels, HS, ids), 1);
+  assert.equal(sentUnder([], MS, ids), 0);
+});
+
+test("snapshotLine: number and name, both teams, or No winner", () => {
+  assert.equal(snapshotLine({ teams: [{ id: "a", number: "4455F", name: "Spark Plugs" }], no_winner: false }), "4455F Spark Plugs");
+  assert.equal(snapshotLine({ teams: [{ id: "a", number: "1234A", name: "Gear Grinders" }, { id: "b", number: "60601D", name: "Iron Owls" }], no_winner: false }), "1234A Gear Grinders, 60601D Iron Owls");
+  assert.equal(snapshotLine({ teams: [], no_winner: true }), "No winner");
+});
+
+test("sendAllLines: award, division and the team(s) or No winner; was is set only when a release differs from the decision now", () => {
+  const sparkPlugs = { ...momentum, id: "t-4455F", number: "4455F", name: "Spark Plugs" };
+  const w = [win("excellence", byteMe), win("judges", hexAppeal), win("judges", gearGrinders), win("think", breakers)];
+  const items = readyToSend(awards, [MS], w, [{ award_id: "energy", division: MS }], [release("excellence", sparkPlugs, { status: "recalled" }), release("think", breakers, { status: "recalled" })]);
+  const lines = sendAllLines(items, w, [{ award_id: "energy", division: MS }], teams, [release("excellence", sparkPlugs, { status: "recalled" }), release("think", breakers, { status: "recalled" })]);
+  const by = Object.fromEntries(lines.map((l) => [l.key, l]));
+  assert.equal(by["excellence|Middle School"].text, "Excellence · Middle School · 7700B Byte Me");
+  assert.equal(by["excellence|Middle School"].was, "4455F Spark Plugs", "a recalled Excellence was 4455F and is now 7700B");
+  assert.equal(by["think|Middle School"].was, null, "the same decision is no change");
+  assert.equal(by["judges|Middle School"].text, "Judges · Middle School · 3311X Hex Appeal, 5150Z Gear Grinders", "Judges names both");
+  assert.equal(by["judges|Middle School"].was, null, "never sent");
+  assert.equal(by["energy|Middle School"].text, "Energy · Middle School · No winner");
+  assert.equal(by["energy|Middle School"].was, null);
+});
+
+test("sendAllLines: a recalled No winner now decided for a team, and the other way, is a change", () => {
+  const rels = [release("energy", null, { status: "recalled" }), release("think", breakers, { status: "recalled" })];
+  const marks = [{ award_id: "think", division: MS }];
+  const w = [win("energy", gearGrinders)];
+  const lines = sendAllLines(
+    [{ award: award("energy"), division: MS }, { award: award("think"), division: MS }],
+    w, marks, teams, rels,
+  );
+  assert.equal(lines[0].was, "No winner");
+  assert.equal(lines[1].was, "1234A Circuit Breakers");
+  assert.equal(lines[1].text, "Think · Middle School · No winner");
+});
+
+test("notReadyLines: what is missing, one line per award of the division that is not ready", () => {
+  const w = [win("judges", hexAppeal), win("amaze", gearGrinders)];
+  const lines = notReadyLines(awards, MS, w, [], [release("amaze", gearGrinders)]);
+  assert.ok(lines.includes("Energy isn't ready: no winner yet."));
+  assert.ok(lines.includes("Judges isn't ready: only one winner."));
+  assert.ok(!lines.some((l) => l.startsWith("Amaze")), "a sent award is not missing anything");
+  assert.equal(lines.length, awards.length - 1, "every other award is waiting for a winner");
+  // A recalled award that is not decided again is left out of Send all too, so it is listed; a sent one is not.
+  const recalled = notReadyLines(awards, MS, [], [], [release("energy", null, { status: "recalled" }), release("think", breakers)]);
+  assert.ok(recalled.includes("Energy isn't ready: no winner yet."), "recalled and undecided");
+  assert.ok(!recalled.some((l) => l.startsWith("Think")), "sent");
+  assert.deepEqual(notReadyLines(awards, MS, [], awards.map((a) => ({ award_id: a.id, division: MS })), []), [], "all marked No winner");
+});
+
+test("skippedText: one line per skipped award the dialog listed, else null", () => {
+  const asked = new Set(["think|Middle School", "amaze|Middle School"]);
+  const skipped = [
+    { awardId: "think", division: MS, reason: "not ready" },
+    { awardId: "design", division: MS, reason: "not ready" },
+    { awardId: "amaze", division: MS, reason: "already sent" },
+  ];
+  assert.equal(
+    skippedText(skipped, asked, awards),
+    "Think · Middle School was not sent: it changed while you were sending. Check it and send again.\nAmaze · Middle School was not sent: it changed while you were sending. Check it and send again.",
+  );
+  assert.equal(skippedText([skipped[1]], asked, awards), null, "design was not in the dialog");
+  assert.equal(skippedText([], asked, awards), null);
+});
+
+test("recallQuestion: the question and the body, in the award's words", () => {
+  assert.deepEqual(recallQuestion("Design", MS), {
+    question: "Recall Design from Marketing?",
+    body: "Marketing will see Design · Middle School as \"Being updated\" until you send it again. You can then change the winner.",
+  });
+  assert.equal(typeof at(10, 58), "string");
 });

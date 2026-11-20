@@ -30,7 +30,7 @@ export function isValidFieldPick(field: string, fieldCount: number = MAX_FIELD_C
 export const DISQUALIFIED_KIND = "dq";
 
 /** Only these kinds can be marked as having affected the match. */
-export const MATCH_AFFECTING_KINDS: readonly string[] = ["minor", "major"];
+export const MATCH_AFFECTING_KINDS: readonly string[] = ["minor"];
 
 /**
  * What the browser sends to POST and PATCH /api/flags. `rules` is the list
@@ -70,7 +70,7 @@ export type FlagFieldParseResult =
 
 type ParseOptions = {
   /**
-   * A legacy rule-less Minor/Major may still have its text or match corrected
+   * A legacy rule-less Minor or DQ may still have its text or match corrected
    * without inventing historical data. It may not change into another
    * rule-requiring kind without supplying a real rule.
    */

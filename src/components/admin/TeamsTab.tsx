@@ -7,6 +7,7 @@ import { ChevronDown, ChevronRight, CloseIcon, StatusPill, WarnIcon } from "@/co
 import { call } from "@/components/useAppState";
 import { formatClock, slotLabel } from "@/components/ui";
 import { liveRequestFor } from "@/lib/data";
+import { divisionChoices } from "@/lib/eventSetup";
 import { STATUS_META, type Status } from "@/lib/status";
 import { reachedSteps } from "@/lib/stepTimes";
 import type { AppState, RequestRow, Team } from "@/lib/types";
@@ -91,7 +92,7 @@ const isWide = () => window.matchMedia(WIDE).matches;
 /** From 1024px the editor is a drawer beside a table; below it, a sheet over a list. */
 const useWide = (): boolean => useSyncExternalStore(watchWide, isWide, () => false);
 
-type Slice = Pick<AppState, "teams" | "panels" | "requests" | "categories" | "divisions" | "conflicts" | "judges" | "flags" | "flagKinds" | "languages">;
+type Slice = Pick<AppState, "teams" | "panels" | "requests" | "categories" | "divisions" | "conflicts" | "judges" | "eventSetup" | "flags" | "flagKinds" | "languages">;
 
 /**
  * The Teams section: the roster and who judges whom. Select a team to edit it
@@ -167,7 +168,7 @@ export function TeamsTab({
     setSaving(true);
     setError(null);
     try {
-      if (await saveTeamAfterAsking(ask, call, team, draft, state.panels)) {
+      if (await saveTeamAfterAsking(ask, call, team, draft, state.panels, state.eventSetup?.format)) {
         await refresh();
         setEdit(null);
         // A sheet has done its job; a drawer stays, showing the saved team.
@@ -370,7 +371,11 @@ export function TeamsBoard({
   const { teams, panels, requests, categories, divisions, conflicts, judges, flags, flagKinds } = state;
   const shown = useMemo(() => filterTeams(teams, filters), [teams, filters]);
   const unassigned = shown.filter((t) => !t.panel_id).length;
-  const stranded = useMemo(() => strandedIds(teams, panels, conflicts, judges), [teams, panels, conflicts, judges]);
+  const format = state.eventSetup?.format;
+  const stranded = useMemo(
+    () => strandedIds(teams, panels, conflicts, judges, format),
+    [teams, panels, conflicts, judges, format],
+  );
   const team = pickedId ? (teams.find((t) => t.id === pickedId) ?? null) : null;
   const active = activeFilters(filters);
   const categoryLabel = (id: string) => categories.find((c) => c.id === id)?.label ?? id;
@@ -987,7 +992,7 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, bu
   const bookingPanel = booking ? (state.panels.find((p) => p.id === booking.panel_id) ?? panel) : null;
   const timed = timesRequestOf(team.id, state.requests, Date.now());
   const pills = flagPills(team.id, state.flags, state.flagKinds);
-  const options = panelOptions(team, state.panels, state.conflicts, state.judges, draft.division);
+  const options = panelOptions(team, state.panels, state.conflicts, state.judges, draft.division, state.eventSetup?.format);
   // A panel the new division cannot use is no longer in the list: the select reads "— none —", which is what Save will do (after asking).
   const panelShown = options.some((o) => o.id === draft.panelId) ? draft.panelId : "";
   const chosen = state.panels.find((p) => p.id === panelShown);
@@ -997,7 +1002,9 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, bu
     ...state.languages.map((l) => ({ key: l.id, label: l.label, ids: [l.id] })),
     { key: "both", label: "Both", ids: state.languages.map((l) => l.id) },
   ];
-  const divisions = state.divisions.includes(draft.division) ? state.divisions : [...state.divisions, draft.division];
+  // A saved setup lists its own divisions; with none saved the list is the event's, as before.
+  const choices = state.eventSetup ? divisionChoices(state.eventSetup, false).options : state.divisions;
+  const divisions = choices.includes(draft.division) ? choices : [...choices, draft.division];
 
   return (
     <>

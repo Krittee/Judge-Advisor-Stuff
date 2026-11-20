@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Awards Desk · A · One list · Phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Fira+Sans:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+button,input{font:inherit;color:inherit}
+.jq{--canvas:oklch(0.968 0.005 265);--surface:oklch(0.995 0.002 265);--surface-2:oklch(0.935 0.008 265);--ink:oklch(0.225 0.016 265);--muted:oklch(0.520 0.014 265);--line:oklch(0.885 0.010 265);--accent:oklch(0.510 0.160 258);--accent-hover:oklch(0.455 0.160 258);--on-accent:oklch(0.995 0.002 265);--danger:oklch(0.560 0.200 18);--tint:oklch(0.510 0.160 258 / 0.09);--ring:oklch(0.510 0.160 258 / 0.25);--field:oklch(0.995 0.002 265);--field-line:oklch(0.640 0.012 265);--done:oklch(0.735 0.135 158);--done-ink:oklch(0.420 0.110 158);--tile:oklch(0.225 0.016 265 / 0.07);--rail:oklch(0.740 0.012 265);--caution-bg:oklch(0.790 0.150 82 / 0.18);--caution-line:oklch(0.620 0.130 78 / 0.5);--caution-ink:oklch(0.420 0.090 70);--warn:oklch(0.600 0.140 75);position:relative;box-sizing:border-box;width:790px;height:1136px;overflow:hidden;background:var(--canvas);color:var(--ink);font-family:'Fira Sans',system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+.jq[data-theme="dark"]{--canvas:oklch(0.165 0.012 265);--surface:oklch(0.205 0.014 265);--surface-2:oklch(0.250 0.016 265);--ink:oklch(0.955 0.005 265);--muted:oklch(0.670 0.013 265);--line:oklch(0.320 0.016 265);--accent:oklch(0.680 0.140 258);--accent-hover:oklch(0.730 0.125 258);--on-accent:oklch(0.165 0.012 265);--danger:oklch(0.555 0.200 18);--tint:oklch(0.680 0.140 258 / 0.14);--ring:oklch(0.680 0.140 258 / 0.35);--field:oklch(0.180 0.013 265);--field-line:oklch(0.520 0.014 265);--done:oklch(0.745 0.140 158);--done-ink:oklch(0.800 0.120 158);--tile:oklch(0.955 0.005 265 / 0.10);--rail:oklch(0.420 0.016 265);--caution-bg:oklch(0.790 0.150 82 / 0.12);--caution-line:oklch(0.790 0.150 82 / 0.35);--caution-ink:oklch(0.840 0.100 82);--warn:oklch(0.790 0.150 82)}
+.jq *,.jq *::before,.jq *::after{box-sizing:border-box}
+:where(.jq) :is(h1,h2,p,ul){margin:0;padding:0}
+:where(.jq) ul{list-style:none}
+.jq :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.top{flex:none;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap}
+.mark{flex:none;width:26px;height:26px;border-radius:8px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center}
+.brand-n{font-family:Archivo,sans-serif;font-weight:700;font-size:16px;letter-spacing:-0.01em}
+.brand-s{font-size:14px;color:var(--muted)}
+.icon-btn{flex:none;width:44px;height:44px;border-radius:12px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;transition:background .15s,color .15s}
+.icon-btn:hover{background:var(--tint);color:var(--ink)}
+.id{display:flex;align-items:center;gap:14px}
+.av{flex:none;display:block;width:48px;height:48px;border-radius:25%}
+.av--ph{border:1.5px dashed var(--rail)}
+.id-t{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+.id-t h1{font-family:Archivo,sans-serif;font-weight:700;font-size:28px;letter-spacing:-0.01em}
+.id-t span{margin-top:3px;font-size:14px;color:var(--muted)}
+.signout{margin-left:auto;flex:none;height:36px;padding:0 14px;border:1.5px solid var(--field-line);border-radius:10px;background:transparent;color:var(--ink);font-size:14px;font-weight:500;cursor:pointer}
+.srch{position:relative}
+.srch>svg{position:absolute;left:14px;top:15px;pointer-events:none;color:var(--muted)}
+.input{display:block;width:100%;height:48px;margin:0;padding:0 14px 0 40px;border:1.5px solid var(--field-line);border-radius:12px;background:var(--field);color:var(--ink);font-size:16px;-webkit-appearance:none;appearance:none}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.input::placeholder{color:var(--muted);opacity:1}
+.clr{position:absolute;right:2px;top:2px;width:44px;height:44px;border:0;border-radius:10px;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.poll{font-size:12.5px;color:var(--muted)}
+.chg{border:1.5px solid var(--caution-line);border-radius:14px;background:var(--caution-bg)}
+.chg-h{display:flex;align-items:center;gap:8px;color:var(--caution-ink)}
+.chg-h h2{font-family:Archivo,sans-serif;font-weight:700;font-size:17px}
+.chg-h .n{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;border:1px solid var(--caution-line);font-size:12.5px;font-weight:500;font-variant-numeric:tabular-nums}
+.chg-h .hint{margin-left:auto;font-size:12.5px;color:var(--muted)}
+.chg-i{display:flex;align-items:center;gap:12px}
+.chg-w{min-width:0;display:flex;flex-direction:column;gap:2px;line-height:1.35}
+.chg-w b{font-weight:500}
+.chg-w .d{color:var(--caution-ink);font-size:14px}
+.chg-w .d b{font-family:Archivo,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+.seen{flex:none;margin-left:auto;display:inline-flex;align-items:center;justify-content:center;padding:0 14px;border:1.5px solid var(--accent);border-radius:10px;background:transparent;color:var(--accent);font-family:Archivo,sans-serif;font-weight:600;font-size:14px;cursor:pointer;transition:background .15s}
+.seen:hover{background:var(--tint)}
+.dh{display:flex;align-items:center;gap:12px}
+.dh h2{font-family:Archivo,sans-serif;font-weight:700;font-size:22px;line-height:1.2}
+.dh .cnt{margin-left:auto;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pg{flex:none;width:96px;height:4px;border-radius:2px;background:var(--line)}
+.pg i{display:block;height:100%;border-radius:2px;background:var(--done)}
+.rows{border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.r{display:grid;align-items:start;border-top:1px solid var(--line)}
+.r:first-child{border-top:0}
+.al{font-size:15px;color:var(--ink)}
+.tm{min-width:0}
+.tl{display:flex;align-items:baseline;gap:12px;min-width:0}
+.tl b{flex:none;font-family:Archivo,sans-serif;font-weight:700;font-size:17px;font-variant-numeric:tabular-nums}
+.tl .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
+.mu{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:14px}
+.tt{font-size:13px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.r.ns .al,.r.ns .mu{color:var(--muted)}
+.r.ns .al,.r.ns .tm{opacity:.62}
+.r.ch{background:var(--caution-bg)}
+.fl{display:flex;align-items:center;gap:10px}
+.tag{display:inline-flex;align-items:center;height:24px;padding:0 10px;border:1px solid var(--caution-line);border-radius:999px;background:var(--caution-bg);color:var(--caution-ink);font-size:12.5px;font-weight:500;white-space:nowrap}
+.hl{color:inherit;border-radius:3px;background:var(--tile);box-shadow:0 0 0 2px var(--tile)}
+.sec{display:flex;flex-direction:column}
+
+.jq{display:block}
+.row2{display:flex;gap:40px;align-items:flex-start;padding:16px 0 20px}
+.col{flex:none;width:375px;display:flex;flex-direction:column;gap:6px}
+.cap{height:22px;font-size:12px;line-height:22px;color:var(--muted)}
+.scr{position:relative;width:375px;overflow:hidden;background:var(--canvas);border:1px solid var(--line);border-radius:24px}
+.jq .top{height:56px;padding:0 6px 0 14px}
+.id{padding:2px 8px 8px 14px;gap:12px}
+.av{width:44px;height:44px}
+.id-t h1{font-size:22px}
+.id-t span{font-size:13px;margin-top:2px}
+.signout{height:44px;padding:0 14px}
+.pad{padding:0 16px 24px;display:flex;flex-direction:column}
+.srch{margin-top:6px}
+.poll{margin-top:6px}
+.chg{margin-top:12px;padding:12px}
+.chg-i{margin-top:8px;align-items:center;gap:10px}
+.chg-w .d{font-size:13.5px}
+.seen{height:44px;min-width:76px}
+.chg .ft{margin-top:8px;font-size:12.5px;color:var(--muted)}
+.sec{margin-top:14px}
+.dh{position:sticky;top:0;z-index:2;margin:0 -16px;padding:0 16px;height:48px;background:var(--canvas);border-bottom:1px solid var(--line);gap:10px}
+.dh h2{font-size:19px}
+.dh .cnt{font-size:13px}
+.pg{width:56px}
+.rows{margin-top:10px}
+.r{grid-template-columns:104px minmax(0,1fr);column-gap:8px;padding:0 12px;min-height:40px}
+.al,.tl,.mu{line-height:40px;font-size:14px}
+.al{color:var(--muted)}
+.tl{gap:8px}
+.tl b{font-size:18px;min-width:76px}
+.tl .nm{font-size:14px}
+.mu{height:40px}
+.r.ch .fl{grid-column:1 / -1;margin:-2px 0 8px;gap:8px}
+.r.ch{padding-bottom:0}
+.tag{height:28px;font-size:12px}
+.res{margin-top:18px;font-family:Archivo,sans-serif;font-weight:700;font-size:17px}
+.res-n{margin-top:2px;font-size:13px;color:var(--muted)}
+.hint2{margin-top:2px;font-size:12.5px;color:var(--muted)}
+</style>
+</helmet>
+<div class="jq" data-theme="{{theme}}"><div class="row2"><section class="col" aria-label="Top of the page"><p class="cap">Awards Desk · top of the page, division heading pins</p><div class="scr" style="height:1072px"><header class="top"><div class="brand"><span class="mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M5 12h10M5 17h6"></path></svg></span><span class="brand-n">Judge Queue</span><span class="brand-s">VEX IQ · V5RC</span></div><button type="button" class="icon-btn" onClick="{{onTheme}}" aria-label="{{themeLabel}}"><sc-if value="{{light}}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path></svg></sc-if><sc-if value="{{dark}}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"></path></svg></sc-if></button></header><div class="id"><span class="av av--ph" aria-hidden="true"></span><div class="id-t"><h1>Awards Desk</h1><span>Marketing · signed in as Ploy</span></div><button type="button" class="signout">Sign out</button></div><div class="pad"><div class="srch"><label class="sr" for="l-q">Search team number, name or award</label><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg><input id="l-q" class="input" type="text" placeholder="Search team number, name or award" autocomplete="off"></div><p class="poll">Checks every 15 s · last 10:59</p><section class="chg" aria-labelledby="l-c"><div class="chg-h"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17h.01"></path></svg><h2 id="l-c">Changed since sent</h2><span class="n">1</span></div><div class="chg-i"><p class="chg-w"><b>Middle School · Excellence</b><span class="d">now <b>7700B</b> Polar Bots · was <b>1234A</b></span></p><button type="button" class="seen" aria-label="Mark Middle School Excellence as seen">Seen</button></div><p class="ft">Seen is kept on this device</p></section><section class="sec" aria-labelledby="h-es"><div class="dh"><h2 id="h-es">Elementary School</h2><span class="cnt">2 of 11 sent</span><span class="pg" aria-hidden="true"><i style="width:18.2%"></i></span></div><ul class="rows" aria-label="Elementary School awards"><li class="r"><span class="al">Excellence</span><span class="tm"><span class="tl"><b>41111A</b><span class="nm">Little Levers</span></span></span></li><li class="r ns"><span class="al">Design</span><span class="tm"><span class="mu">Not sent yet</span></span></li><li class="r ns"><span class="al">Innovate</span><span class="tm"><span class="mu">Not sent yet</span></span></li><li class="r ns"><span class="al">Think</span><span class="tm"><span class="mu">Not sent yet</span></span></li><li class="r ns"><span class="al">Amaze</span><span class="tm"><span class="mu">Not sent yet</span></span></li><li class="r ns"><span class="al">Build</span><span class="tm"><span class="mu">Not sent yet</span></span></li><li class="r ns"><span class="al">Create</span><span class="tm"><span class="mu">Not sent yet</span></span></li><li class="r ns"><span class="al">Judges</span><span class="tm"><span class="mu">Not sent yet</span></span></li><li class="r ns"><span class="al">Inspire</span><span class="tm"><span class="mu">Not sent yet</span></span></li><li class="r ns"><span class="al">Sportsmanship</span><span class="tm"><span class="mu">Not sent yet</span></span></li><li class="r"><span class="al">Energy</span><span class="tm"><span class="tl"><b>12021B</b><span class="nm">Blue Bolts</span></span></span></li></ul></section><section class="sec" aria-labelledby="h-ms"><div class="dh"><h2 id="h-ms">Middle School</h2><span class="cnt">7 of 11 sent</span><span class="pg" aria-hidden="true"><i style="width:63.6%"></i></span></div><ul class="rows" aria-label="Middle School awards"><li class="r ch"><span class="al">Excellence</span><span class="tm"><span class="tl"><b>7700B</b><span class="nm">Polar Bots</span></span></span><span class="fl"><span class="tag">Changed — was 1234A</span><button type="button" class="seen" aria-label="Mark Excellence as seen">Seen</button></span></li><li class="r"><span class="al">Design</span><span class="tm"><span class="tl"><b>2381C</b><span class="nm">Byte Size</span></span></span></li><li class="r"><span class="al">Innovate</span><span class="tm"><span class="mu"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path><path d="M13.5 6.5l4 4"></path></svg>Being updated</span></span></li><li class="r"><span class="al">Think</span><span class="tm"><span class="tl"><b>5150X</b><span class="nm">Short Circuit</span></span></span></li></ul></section></div></div></section><section class="col" aria-label="Search results"><p class="cap">Awards Desk · searching for 1234</p><div class="scr" style="height:580px"><header class="top"><div class="brand"><span class="mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M5 12h10M5 17h6"></path></svg></span><span class="brand-n">Judge Queue</span><span class="brand-s">VEX IQ · V5RC</span></div><button type="button" class="icon-btn" onClick="{{onTheme}}" aria-label="{{themeLabel}}"><sc-if value="{{light}}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path></svg></sc-if><sc-if value="{{dark}}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"></path></svg></sc-if></button></header><div class="id"><span class="av av--ph" aria-hidden="true"></span><div class="id-t"><h1>Awards Desk</h1><span>Marketing · signed in as Ploy</span></div><button type="button" class="signout">Sign out</button></div><div class="pad"><div class="srch"><label class="sr" for="r-q">Search team number, name or award</label><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg><input id="r-q" class="input" type="text" placeholder="Search team number, name or award" autocomplete="off" value="1234"><button type="button" class="clr" aria-label="Clear search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div><p class="poll">Checks every 15 s · last 10:59</p><section class="chg" aria-labelledby="r-c"><div class="chg-h"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17h.01"></path></svg><h2 id="r-c">Changed since sent</h2><span class="n">1</span></div><div class="chg-i"><p class="chg-w"><b>Middle School · Excellence</b><span class="d">now <b>7700B</b> Polar Bots · was <b>1234A</b></span></p><button type="button" class="seen" aria-label="Mark Middle School Excellence as seen">Seen</button></div><p class="ft">Seen is kept on this device</p></section><p class="res" role="status">1 result</p><p class="res-n">Search looks at what Marketing has now</p><section class="sec" aria-labelledby="h-ms2"><div class="dh"><h2 id="h-ms2">Middle School</h2><span class="cnt">7 of 11 sent</span><span class="pg" aria-hidden="true"><i style="width:63.6%"></i></span></div><ul class="rows" aria-label="Middle School awards"><li class="r"><span class="al">Judges</span><span class="tm"><span class="tl"><b><mark class="hl">1234</mark>A</b><span class="nm">Gear Grinders</span></span><span class="tl"><b>60601D</b><span class="nm">Iron Owls</span></span></span></li></ul></section></div></div></section></div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"dark"},"$preview":{"width":790,"height":1136}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const theme = s.theme ?? this.props.theme ?? 'dark';
+    return {
+      theme,
+      light: theme !== 'dark',
+      dark: theme === 'dark',
+      themeLabel: theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
+      onTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' })
+    };
+  }
+}
+</script>
+</body>
+</html>

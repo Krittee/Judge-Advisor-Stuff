@@ -6,10 +6,12 @@ import { useEffect, useId, useRef, useState } from "react";
 import { SignOutButton } from "@/components/judging";
 import { CloseIcon } from "@/components/judge/parts";
 import { judgeConflictCount } from "./conflictsLogic";
-import type { AppState } from "@/lib/types";
+import { setupLabel } from "@/lib/eventSetup";
+import type { AppState, EventSetup } from "@/lib/types";
 
 export type AdminTab =
   | "floor"
+  | "event"
   | "conflicts"
   | "flags"
   | "teams"
@@ -41,6 +43,7 @@ export const SECTION_GROUPS: { label: string; items: Section[] }[] = [
   {
     label: "Setup",
     items: [
+      { id: "event", label: "Event", icon: <path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4" /> },
       {
         id: "teams",
         label: "Teams",
@@ -200,6 +203,7 @@ export function AdminFrame({
   onTab,
   counts,
   scoredNote,
+  setup,
   children,
 }: {
   name?: string;
@@ -210,6 +214,8 @@ export function AdminFrame({
   counts: RailCounts;
   /** "9 of 48 scored": the phone bar's note on Scores, which the rail does not count. */
   scoredNote?: string;
+  /** The saved event setup, if any: titles the wide top bar, and the phone bar on the Event page. Nothing without one. */
+  setup?: Pick<EventSetup, "program" | "format"> | null;
   children: React.ReactNode;
 }) {
   const [sheet, setSheet] = useState(false);
@@ -270,6 +276,17 @@ export function AdminFrame({
             {name ? <span>{name}</span> : null}
           </span>
         </div>
+        {setup ? (
+          <div className="ja-bd">
+            <span className="ja-mk" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 7h14M5 12h10M5 17h6" />
+              </svg>
+            </span>
+            <span className="ja-bd-n">Judge Queue</span>
+            <span className="ja-bd-s">{setupLabel(setup)}</span>
+          </div>
+        ) : null}
         {/* Room for the theme toggle, which docks into the top-right corner here. */}
         <div className="ja-top-r">
           <span className="jg-live" data-online={online}>
@@ -309,6 +326,8 @@ export function AdminFrame({
           )
         ) : tab === "scores" && scoredNote ? (
           <span className="ja-rc">{scoredNote}</span>
+        ) : tab === "event" && setup ? (
+          <span className="ja-rc">{setupLabel(setup)}</span>
         ) : null}
       </div>
 

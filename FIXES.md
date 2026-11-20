@@ -4,10 +4,17 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Local only |
-| 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ef84422` | Not yet | Local only |
-| 2026-11-16 | [Judges Award can have two winners](#judges-award-can-have-two-winners-2026-11-16) | `c04c9b3` | Not needed | Local only |
-| 2026-11-16 | [Awards: mark an award "No winner"](#awards-mark-an-award-no-winner-2026-11-16) | `1d9aa15`..`c68fecd` | Not yet (phone-width preview only) | Local only |
+| 2026-11-21 | [Awards send time shows NaN:NaN, and audit cleanup](#awards-send-time-shows-nannan-and-audit-cleanup-2026-11-21) | `bb0ef0f`..`fcd4930` | Not needed (no layout change) | Built on `claude/audit-cuts-22-13220b`, not pushed |
+| 2026-11-20 | [Event setup and blended awards (UI)](#event-setup-and-blended-awards-ui-2026-11-20) | `e2e1ad6`..`89b0d7c` | Not yet (375 preview only) | Built on `claude/blended-ui-d3aac8`, not pushed |
+| 2026-11-20 | [Event setup and blended awards (backend)](#event-setup-and-blended-awards-backend-2026-11-20) | `f22f50e`..`84d586a` | Not needed (no UI yet) | Built on `claude/blended-backend-c6182b`, not pushed |
+| 2026-11-20 | [Door page: Team \| Staff groups](#door-page-team--staff-groups-2026-11-20) | `7f0d2de` | Not yet (375px preview only) | Built on `claude/door-team-staff-258f85`, not pushed |
+| 2026-11-20 | [Referee: Major removed, DQ stands alone](#referee-major-removed-dq-stands-alone-2026-11-20) | `329fcc8` | Not yet (375 preview) | Built on `claude/referee-dq-major-92956f`, not pushed |
+| 2026-11-20 | [Awards Desk UI (2.2.0)](#awards-desk-ui-220-2026-11-20) | `c02e7c3`..`2d83b19` | iPhone Simulator only | Built on `claude/awards-desk-ui-e125c3`, not pushed |
+| 2026-11-19 | [Awards Desk backend (2.2.0)](#awards-desk-backend-220-2026-11-19) | `d5b1807`..`f9cc675` | Not needed (no UI yet) | Built on `claude/awards-desk-backend-921f59`, UI built on `claude/awards-desk-ui-e125c3` |
+| 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
+| 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ef84422` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
+| 2026-11-16 | [Judges Award can have two winners](#judges-award-can-have-two-winners-2026-11-16) | `c04c9b3` | Not needed | Live in 2.1.4 (PR #18, 2026-11-16) |
+| 2026-11-16 | [Awards: mark an award "No winner"](#awards-mark-an-award-no-winner-2026-11-16) | `1d9aa15`..`c68fecd` | Not yet (phone-width preview only) | Live in 2.1.4 (PR #18, 2026-11-16) |
 | 2026-11-13 | [Coordinator page scrolls past its tab bar](#coordinator-page-scrolls-past-its-tab-bar-2026-11-13) | `259cabb` | Simulator only | Live in 2.1.2 |
 | 2026-11-13 | [Coordinator sign-in: COORDINATOR word clipped](#coordinator-sign-in-coordinator-word-clipped-2026-11-13) | `f4793fb` | Not needed | Live in 2.1.2 |
 | 2026-11-08 | [New teams start Ungraded](#new-teams-start-ungraded-2026-11-08) | `3b9d670` | Not needed | Live in 2.1.1 |
@@ -19,6 +26,312 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Awards send time shows NaN:NaN, and audit cleanup (2026-11-21)
+
+### Problem / request
+
+A ponytail audit of 2.2.x found one bug and 17 over-engineering cuts; the user approved all of them. The bug: a send time that does not parse showed "NaN:NaN" on the Awards Desk row and on the JA Awards tab ("Sent NaN:NaN", and in the recall dialog).
+
+### Root cause
+
+`hhmm` in `marketingLogic.ts` formatted any `Date` without checking it was valid. The Event page had its own copy with the check, so only that page was safe.
+
+### Fix
+
+- `hhmm` returns a blank for a time that does not parse; the Event page now uses the same `hhmm`.
+- Cleanup, no other behaviour change: one shared route test harness and marketing fixtures; source-text and copied-CSS tests dropped; one `storeGet`/`storeSet` pair for Seen and the remembered tab; one `sentUnder` counter for the four "N sent" counts; `sendAllLines` uses `sameDecision`/`snapshotLine`; `Change.wasNumbers`, `tabLabel`, `pickText`, `ReleasedAward.order`, `ReleasedProgram` and `ReleaseStatus` removed; one parse for the send/recall route; `event_setup` in the one reset truncate.
+- A send now always records each team's division on the snapshot (it used to only with a saved event setup). Nothing on screen changes: the desk shows the tag only on Whole event rows with a setup.
+- Net 188 lines fewer (src 50, tests 138).
+
+### Testing
+
+- New test: `hhmm("not a time")` is blank (failed with "NaN:NaN" before the fix).
+- `npm test`: 2000 tests before, 1994 after (1993 pass, 1 skipped). Seven source-text/CSS-value tests removed, one added; no behaviour test lost. `tsc` and eslint clean; `npm run build` passes.
+- Browser, built app on a copy of the data: JA Awards tab shows "Sent HH:MM", "Pick a winner to send", "1 sent to Marketing"; `/marketing` shows the counts in config order, no division tag without a setup, and the chosen tab survives a reload.
+
+### Commit / status
+
+`bb0ef0f`, `66dc5d3`, `fcd4930` on `claude/audit-cuts-22-13220b`. Not merged, not pushed.
+
+---
+
+## Event setup and blended awards (UI) (2026-11-20)
+
+### Problem / request
+
+The screens for the event setup the backend added: the Judge Advisor's Event page, the JA Awards tab in a blended event, and the Awards Desk with a saved setup. The user picked Event page C "Four tiles + preview", Awards tab C "Award order", and the desk as mocked (`design/event-setup/PROMPT.md`).
+
+### Root cause
+
+Not a bug: new screens on top of the backend (`claude/blended-backend-c6182b`, merged into this branch).
+
+### What changed
+
+Plan `docs/superpowers/plans/2026-11-20-event-setup-blended-ui.md`. Everything is gated on a saved setup; with none, every screen is as before (the only visible change is the new Event rail item).
+
+- **Event page** (`EventTab.tsx`, `eventLogic.ts`, `AdminFrame.tsx`):
+  - "Event" comes first in the Setup rail group.
+  - Four tiles (VEX IQ / V5RC × Standard / Blended) form a radio group with arrow keys.
+  - The preview shows how awards group per division / "Whole event".
+  - The "Before you can save" checklist covers Awards, Teams and Panels, with "Open …" links.
+  - A refused save shows the server message, with its `outside` lists.
+  - The top bar shows "Judge Queue · VEX IQ · Blended" once a setup is saved.
+- **Awards tab, blended** (`BlendedAwards.tsx`, `AwardsTab.tsx`, `awardsLogic.ts`):
+  - Blocks follow the award order. Excellence and Design are split into a half per division, each with its own Send / Recall / lock / No winner.
+  - Every other award is one "Whole event" block.
+  - "Nominees from" (All / ES / MS) filters nominee rows only.
+  - The Matrix has a column per key.
+  - The side panel reads "<Award> · <scope>".
+  - Send all ready lines read "<Award> · <scope> · …".
+  - The rail and meta count event-wide ("3/13").
+- **Awards Desk** (`AwardsDesk.tsx`, `marketingLogic.ts`): with a setup there are no tabs. The page shows the event title and line, then sections (divisions, then "Whole event") with "N of M sent". Whole-event rows tag each team ES / MS, and the Changed box reads "<scope> · <Award>".
+- **Snapshot:** `ReleaseTeam.division?`, written only when a setup is saved (`decisionFor(..., withDivision)`). With no setup the stored snapshot is exactly as in 2.2.0.
+- **Pickers:** the Floor, Teams and Conflicts checks pass the event format (blended: any panel takes any team). The Panels pickers offer "Whole event" in a blended event, and a new panel defaults to it.
+- **Existing test edits** (all source-text or count pins of what the spec changes):
+  - `adminPage.runtime` rail goes from 9 to 10 sections (approved by the user).
+  - Four pinned call strings in `adminTeams.runtime` (now passing `format`).
+  - One count line in `adminEvent.logic` (this branch's own test).
+
+### How it was tested
+
+- `npm test`: 2000 tests, 1999 pass, 0 fail, 1 skipped (real-Postgres suite). `npx tsc --noEmit`, `npx eslint src tests --ignore-pattern '.claude/**'` and `npm run build` are clean.
+- Browser preview on scratch copies of `.data/state.json` (never `.data/`), at 1280 and 375, dark and light:
+  - Event page: not set, VEX IQ Standard saved, VEX IQ Blended saved, refused by a High School panel, refused by awards, and a server 409.
+  - Awards tab: Standard, and Blended (halves, Whole event blocks, filter, Matrix, side panel, Send all, Recalled, locks).
+  - Awards Desk: unset (tabs), Standard, and Blended (tags, Changed, search).
+  - Panels pickers in Blended.
+- Each task was reviewed by an Opus reviewer, followed by a whole-branch review. Its one Important finding ("15 of 13" with no setup) is fixed in `89b0d7c`.
+
+### Branch / commits
+
+`claude/blended-ui-d3aac8`:
+- `837ef42`: merge of the backend.
+- `031dba9`: design.
+- `64631b3`: plan.
+- `e2e1ad6` + `b3b71d9`: Event page.
+- `7ec7008` + `6e41b00`: Awards tab.
+- `1c23044`: desk.
+- `bbd4e8d`: pickers.
+- `89b0d7c`: final review fixes.
+- Plus this entry.
+
+### Status
+
+Built and committed locally. Not pushed, not merged into main.
+
+### Follow-ups
+
+- Real Postgres run on Neon (new `event_setup` table, `division` inside the `teams` jsonb).
+- Optional tidying: split the shared award pieces out of `AwardsTab.tsx` (`AwardsTab` ↔ `BlendedAwards` import each other; this is safe at runtime).
+- Check on an iPhone.
+
+---
+
+## Event setup and blended awards (backend) (2026-11-20)
+
+### Problem / request
+
+A blended event (e.g. IQ Blended: Elementary and Middle School together) gives Excellence and Design once per division and every other award once for the whole event. Every award decision was keyed by (award, division), so a blended event could only have one Excellence. The user's idea: the Judge Advisor sets the event up first (program, format), with the divisions inside it. This entry is the server side only; the screens come in a UI session.
+
+### Root cause
+
+Not a bug: "Blended" was just another division name, and nothing knew which awards span the whole event.
+
+### What changed
+
+Spec `docs/superpowers/specs/2026-11-20-event-setup-blended-awards-design.md`, plan `docs/superpowers/plans/2026-11-20-event-setup-blended-backend.md`.
+
+- Event setup: one `event_setup` row (program from `config/event.json` `programs`, format standard/blended) in both stores, RLS on, cleared by Wipe everything, kept by Reset the day. `PUT /api/event-setup`, JA only, refused with "Clear the awards first." while any award is decided or sent, and with a list while a team or panel sits outside the program's divisions. Saving drops recalled releases. Read through `/api/state` (`eventSetup`).
+- Award scope: `"blendedScope": "division"` on Excellence and Design in `config/event.json`; every other award is decided under the key "Whole event" in a blended event. One helper (`src/lib/eventSetup.ts`) decides the keys for the winners and No winner routes, Send all ready, the Awards Desk reply (`setup`, `sections`) and the Awards tab logic counts.
+- A whole-event winner may be any team in the event; the Judges Award keeps two places for the whole event. Send / Recall / Changed / lock unchanged; a team holding only whole-event sent awards may change division.
+- A saved setup's divisions are the event's divisions: `/api/state`, panel creation, team edits and CSV import (a new team with no division gets the program's first). In a blended event any panel may judge any team, and a new panel defaults to "Whole event".
+- No setup saved: everything behaves and replies exactly as 2.2.0 (judges' award list and the desk reply keep their old keys).
+
+### How it was tested
+
+- `npm test`: 1923 tests, 1922 pass, 0 fail, 1 skipped (real-Postgres suite). `tsc` and eslint (`--ignore-pattern '.claude/**'`) clean. No existing test edited.
+- New tests: `tests/eventSetup.lib.test.mjs`, `tests/eventSetupStore.runtime.test.ts`, `tests/eventSetupRoute.runtime.test.ts`, `tests/blendedAwards.runtime.test.ts`, `tests/blendedAwardsLogic.test.mjs`; additions to `tests/postgres-sql.test.mjs` and `tests/storeConformance.runtime.ts`.
+- On a scratch copy of `.data/state.json` (original checksum unchanged), through the real route handlers: VEX IQ refused by one High School panel, V5RC by 16 teams and 2 panels; after moving the panel, VEX IQ · Blended saved, divisions became ES + MS, the desk showed ES 2 · MS 2 · Whole event 9, a judge saw all 24 teams, Send all ready walked 13 awards.
+
+### Branch / commits
+
+`claude/blended-backend-c6182b`: `73b2b82` (plan), `f22f50e` (helper, config), `f201c81` (stores), `ccca2af` (route, state, divisions, lock), `5561d79` + `3635b6f` (award routes), `8e68694` (Awards tab logic), `84d586a` (store conformance cases), plus this entry.
+
+### Status
+
+Built and committed locally. Not pushed. Waiting on the UI session.
+
+### Follow-ups
+
+- Real Postgres run on Neon (new table; needs the hotspot) before release.
+- UI: Setup screen, Awards tab "Whole event" section, desk title and sections; pass the format to the client `divisionsCompatible` callers (`conflictsLogic.ts`, `teamsLogic.ts`, `floorLogic.ts`).
+- The setup save is check-then-write (a `ponytail:` note in the route), like the award lock.
+- No way to clear a setup back to "none" except Wipe everything.
+
+---
+
+## Door page: Team | Staff groups (2026-11-20)
+
+### Problem / request
+
+The user: "since we have 7 pages including team page and staffs page can it be separate like -> Team | Staffs to make it more symmetrical". The door page "/" showed seven doors in one list (Team, then six staff roles), laid out 4 + 3 on wide screens, which looked lopsided.
+
+### Root cause
+
+Not a bug: the 2.2.0 Marketing door made it seven, and the 8-half-column 4 + 3 grid was the old layout for an odd count.
+
+### Decision
+
+The user picked "Side by side" for wide screens and "Two wide" for phones from two sketches each.
+
+### What changed
+
+- `src/components/door/DoorPage.tsx`: the doors are split into two `<section>`s, each with an `<h2>` label (Team, Staff) and its own list labelled by it. Card markup, the Team caption, the Live board and the colour key are unchanged, and so is the link order.
+- `src/app/globals.css` (door block):
+  - New `.dp-split`, `.dp-gt` (quiet uppercase label in `--ink-subtle`, not accent), `.dp-grp--*` and `.dp-doors--*`.
+  - Phone (< 1024px): the Team row as before, then the staff doors two across as avatar over name. The hint and chevron are clipped visually but kept for screen readers.
+  - Wide (≥ 1024px): Team | 1px divider | Staff 3 × 2. The Team card fills both rows and is exactly one staff card wide (`calc((100% - 81px) / 4)`). The old 4 + 3 rules are gone.
+- `tests/doorPage.runtime.test.tsx`: new test for the two labelled groups and which doors each holds.
+- `tests/doorPage.css.test.mjs`: the 4 + 3 layout test is replaced by tests for the split, the two-wide phone grid, the clipped hint and the label colour.
+
+### How it was tested
+
+- `npm test`: 1875 tests, 1874 pass, 0 fail, 1 skipped (the same skip as before). `npx tsc --noEmit`: clean. `npx eslint src tests --ignore-pattern '.claude/**'`: clean. `npm run build`: clean.
+- Browser preview on a copy of `.data/state.json` in the session scratchpad (never `.data/`):
+  - 1280px, dark and light: all seven cards measure 259.8px wide, the staff cards are 224px tall, and the Team card is 464px (both rows).
+  - 375px, light and dark: the Team card is 343 × 72, and the staff cards are 168 × 98. No name is clipped, there is no horizontal scroll, and the hints are still in the accessibility tree.
+  - No console errors.
+
+### Commit
+
+`7f0d2de` on `claude/door-team-staff-258f85`. Not pushed.
+
+---
+
+## Referee: Major removed, DQ stands alone (2026-11-20)
+
+### Problem / request
+
+User: "on Referee page DQ and Major Violation is the same". In VEX a Major violation is a disqualification, so the user asked to remove Major and keep DQ, with Minor taking its place.
+
+### Root cause
+
+Two flag kinds for one ruling: `config/event.json` `refereeFlags` (and the `FLAG_FALLBACK` copy in `src/lib/presets.ts`) listed both "Major violation" and "Disqualified". On top of that the DQ chip was a faint grey ink tint (`bg-ink/12`), so it read as no worse than the red Major one.
+
+### What changed
+
+- `config/event.json`, `src/lib/presets.ts`: the `major` kind is gone. Kinds left: Good conduct, Warning, Minor violation, Disqualified (DQ keeps severity 4).
+- `src/lib/presets.ts`: new `LEGACY_FLAG_KINDS` (`major` and `major violation` read as `dq`) and `canonicalFlagKind(id)`. `resolveFlagKind` goes through it first, so a stale phone posting "major" records a DQ, never Good conduct.
+- `src/lib/db/file.ts`, `src/lib/db/postgres.ts`: `listFlags` reads stored `major` flags as `dq`. That one funnel feeds AppState `flags`, `/api/flags`, the PATCH and DELETE routes, and the awards route. Stored rows are not rewritten and `match_affecting` is kept.
+- `src/components/Flags.tsx`: `kindOf` and `kindCounts` resolve through the alias, so old "major" activity-log lines (`activityLogic.ts` uses `kindOf`) show the DQ pill instead of nothing.
+- `src/components/referee/SeverityButtons.tsx`, `src/app/globals.css`: Good conduct and Warning share the top row; Minor and DQ each take a full row (`rf-sv--wide` on kinds with `requiresRule`), still the 56px buttons. The Judge Advisor's compact row (`.ja-sv`) now sizes its four buttons evenly (`flex: 1 1 0`).
+- `src/app/referee/page.tsx`: the repeat-violation ring now goes on DQ, the most severe kind. It is only a ring and never selects it.
+- `src/lib/flagValidation.ts`: `MATCH_AFFECTING_KINDS` is `["minor"]`. The switch says "Minor only" on the referee page and in `RefereeTab.tsx`. Comments updated in `refereeLogic.ts`, `types.ts`, `referee/logic.ts`; `docs/onboarding/referee.md` updated.
+- `src/lib/tone.ts`: the DQ pill (`black`) is now solid, `bg-ink text-canvas ring-ink`. It is the one deliberate solid chip, because DQ is the gravest flag.
+
+### How it was tested
+
+- New `tests/flagDqStandsAlone.test.ts` (no Major kind, stale "major" resolves to DQ not Good, DQ tone differs from rose and is solid) and a store conformance case "a flag stored as the retired Major kind is read back as DQ" in `tests/storeConformance.runtime.ts` (runs on the file store, and on Postgres when configured). Both failed before the change.
+- Existing tests that used "major" were moved to "minor" or "dq"; the ones that assert legacy handling (old log lines, stale POSTs) now expect DQ.
+- `npm test` 1875 pass, 0 fail, 1 skipped (Postgres-only); `npx tsc --noEmit`, `npx eslint . --ignore-pattern '.claude/**'` clean; `npm run build` passes.
+- Browser at 375 wide, dark and light, on a copy of the data: the four buttons sit as asked, all 56px tall; a Major recorded before the change shows as DQ (team chip "DQ ×2"); the DQ chip is solid (white on dark, black on light). No console or server errors on a fresh server. Not checked on an iPhone.
+
+### Commit and branch
+
+- Branch `claude/referee-dq-major-92956f`, commit `329fcc8`.
+
+### Status
+
+Built on `claude/referee-dq-major-92956f`, not pushed. Not checked on an iPhone.
+
+---
+
+## Awards Desk UI (2.2.0) (2026-11-20)
+
+### Problem / request
+
+The pages for the Awards Desk backend above: Marketing's read-only Awards Desk, the Judge Advisor's controls to send and recall awards, and a door for Marketing on "/".
+
+### Root cause
+
+Not a bug: new feature (Version 2.2.0).
+
+### What changed
+
+Build spec `design/awards-desk/PROMPT.md` (boards `design/awards-desk/reference-*.dc.html`), plan `docs/superpowers/plans/2026-11-19-awards-desk-ui.md`.
+
+- `/marketing/login` and `/marketing`. Marketing lands on its own desk. The desk shows one section per division ("N of M sent") with one line per award: the team(s), "No winner", "Being updated" (recalled, never a team) or "Not sent yet". It checks every 15 s while the tab is visible and keeps the last good answer when a check fails. A "Changed since sent" box sits above the divisions and each changed row is tagged "Changed — was …"; Seen hides it and is kept only in that browser. Search covers team number, name and award, and never the old team. Logic is in `src/components/marketing/marketingLogic.ts`.
+- JA Awards tab, By award: each award's header shows Send to Marketing (when decided), Sent HH:MM · Recall with a lock, Recalled · Send again with "Marketing had …", or "Pick a winner to send". A sent award's Mark no winner / Clear and the side panel's Clear winner / Give are disabled ("Recall it from Marketing first."). The matrix shows the lock on sent columns. Recall and Send all ready (N, event-wide) ask first through `useConfirm`. Send all refusals show in the danger banner. `ConfirmOptions` gained `body?: ReactNode`, and `Banner` keeps line breaks.
+- Recalled shows no time: the server records only the send time, and the recall is in Activity.
+- Door page: seventh door "Marketing" after Judge Advisor. The wide layout is 4 + 3, centred.
+- Marketing avatar: the user's art, cropped inside its frame to 320 × 320 (`public/avatars/marketing.jpg`), on the sign-in pass, the door (desk teal ring, like the Coordinator) and the desk's top bar.
+- Program tabs (user request, 2026-11-20): the desk has VEX IQ (Elementary + Middle School), V5RC (Middle + High School) and Blended tabs at every size; Middle School shows in both programs. Set in `config/event.json` `programs`; Blended is the event's blended divisions, and a division in neither lands in an Other tab. GET `/api/awards/released` gained `programs` (additive). Each tab shows "N of M sent"; the tab is remembered on the device (`mk-tab`). Changed since sent stays above the tabs for every division; a search looks across all tabs and lists each division once. Commits `319b1c7`, `2d83b19`.
+
+### How it was tested
+
+- `npm test`: 1860 tests, 1859 pass, 1 skipped (the real-Postgres suite). `tsc`, eslint (`--ignore-pattern '.claude/**'`) and `npm run build` clean.
+- New and changed tests: `tests/marketingLogic.test.ts`, `tests/marketingPage.runtime.test.tsx`, plus additions to `tests/adminAwards.logic.test.mjs`, `tests/adminAwards.runtime.test.tsx`, `tests/confirmDialog.test.tsx`, `tests/doorPage.runtime.test.tsx`, `tests/doorPage.css.test.mjs` and `tests/mobile.test.mjs`.
+- Browser (file store, a scratch copy of `.data/state.json`), at 1280 dark and 375 light:
+  - Marketing signed in with `MKTG01`. The desk showed sent, recalled, No winner, two-team Judges, not-sent and changed rows. Search hid the recalled and old teams. Seen survived a reload. The division heading stuck on the phone.
+  - JA: Send, Recall (dialog then DELETE), Send all ready (dialog then POST, count to 0 and disabled), and the lock on Mark no winner / Clear and in the side panel / phone sheet. Buttons are 44px on the phone.
+  - Door at both widths.
+
+### Branch / commits
+
+`claude/awards-desk-ui-e125c3` (on top of the backend branch): `34edfd7` (spec), `fe4f21a` (plan), `c02e7c3` (desk), `4a574e6` + `f32e3bf` (JA tab), `8a123da` + `6925842` (door), the Marketing avatar (this commit), plus this entry.
+
+### Status
+
+Built and committed locally. Not pushed. Not checked on a real iPhone.
+
+### Follow-ups
+
+- If the JA wants the recall time, the backend needs a `recalled_at` field.
+
+---
+
+## Awards Desk backend (2.2.0) (2026-11-19)
+
+### Problem / request
+
+At the last event marketing waited for the Judge Advisor to finish every award and send one late list, which delayed the ceremony backdrop. 2.2.0 adds a read-only Marketing role whose Awards Desk shows only the awards the JA has sent. This entry covers the server side only; the pages come in a separate UI session.
+
+### Root cause
+
+Not a bug: there was no way to hand a finished award to marketing without also exposing every undecided pick.
+
+### What changed
+
+Spec `docs/superpowers/specs/2026-11-19-awards-desk-design.md`, plan `docs/superpowers/plans/2026-11-19-awards-desk-backend.md`.
+
+- Role: `marketing`, signed in with `MARKETING_CODE` (dev default `MKTG01`, refused in production like every published code; listed in `scripts/doctor.mjs` and `.env.example`). Name optional. Every `can*` helper and every existing route refuses it. `/api/state` now nulls staff names for marketing, as it does for the public.
+- Storage (both stores): `award_releases`, one row per award per division, with a snapshot of the teams sent (id, number, name), `no_winner`, `previous`, `status` sent/recalled, `sent_at`, `sent_by`, `changed_at`. Postgres: `create table if not exists`, RLS on; both resets name it. Old state files load with `awardReleases` = `[]`.
+- API: `/api/awards/released` — GET for marketing and the JA (`no-store`; a recalled row is emptied for marketing), PUT sends one award (409 unless every place is filled or No winner), POST sends every ready award not already sent, DELETE recalls. Sends and recalls go to Activity (`award`). Send rules in `src/lib/releases.ts`.
+- Lock: while sent, winners and No winner PUT/DELETE answer 409 "Recall it from Marketing first."; deleting a team in a sent award, or moving it to another division (edit or paste), answers 409 "Recall <award> from Marketing first."
+- Reset the day and Wipe everything both clear the sends.
+- One placeholder outside the server: `src/components/SignInForm.tsx` has a `marketing` entry (coordinator avatar) so the role map compiles; the UI session must route marketing to the Awards Desk and give it its own avatar.
+
+### How it was tested
+
+- `npm test` with `DATA_FILE` on a scratch copy of `.data/state.json`: 1801 tests, 1800 pass, 1 skipped (real-Postgres suite, run separately below). `tsc` and eslint (`--ignore-pattern '.claude/**'`) clean.
+- Real Postgres on the Neon test project: `tests/storePostgres.runtime.test.ts` 66/66 pass, release conformance included.
+- New tests: `tests/marketing.runtime.test.ts`, `tests/releases.test.ts`, `tests/releasesMigration.runtime.test.ts`, `tests/awardsReleased.runtime.test.ts`; additions to `tests/storeConformance.runtime.ts` and `tests/postgres-sql.test.mjs`.
+
+### Branch / commits
+
+`claude/awards-desk-backend-921f59`: `d5b1807` (role), `305852a` (store), `ac72726` (routes), `f9cc675` (lock), plus this entry.
+
+### Status
+
+Built and committed locally. Not pushed. Waiting on the UI session.
+
+### Follow-ups
+
+- UI: `/marketing` and `/marketing/login`, the JA's Send / Recall / Send all ready controls, and the sign-in routing for marketing.
+- The lock is check-then-write (a `ponytail:` note in `src/app/api/awards/shared.ts`); a send landing in between could slip one change through.
 
 ---
 
@@ -58,7 +371,7 @@ The user chose "each its own colour". Every flag box wears its kind's colour, fr
 
 ### Status
 
-Local only. Not merged, pushed or deployed.
+Live in 2.1.4 (PR #18, merged `ff04220`, 2026-11-16). Not checked on an iPhone.
 
 ### Follow-ups
 
@@ -118,7 +431,7 @@ Not a bug: notes were append-only by design. `/api/notes` had only GET and POST,
 
 ### Status
 
-Local only: not pushed, not merged, not deployed. The Postgres columns are added on the first start against a database (additive).
+Live in 2.1.4 (PR #18, merged `ff04220`, 2026-11-16). The Postgres columns were added on the first request after deploy (additive). Not checked on an iPhone.
 
 ### Follow-ups
 
@@ -163,7 +476,7 @@ Decisions agreed with the user: the count is fixed in config, it applies per div
 
 ### Status
 
-Local only. It merges with the "No winner" change (`no-winner-award`), which touches the same files. Before deploying, run the conformance suite against the Neon test database, since the live Supabase migration changes the primary key.
+Live in 2.1.4 (PR #18, merged `ff04220`, 2026-11-16). Combined with the "No winner" change in merge `130a8d3`. The real-Postgres suite passed on Neon first (1835/1835), then the live Supabase key change applied on deploy.
 
 ### Follow-ups
 
@@ -200,7 +513,7 @@ The user chose: any award can be marked (even one with nominees), the wording is
 
 ### Status
 
-Local only. Not pushed, merged or deployed.
+Live in 2.1.4 (PR #18, merged `ff04220`, 2026-11-16). Combined with the two-winner change in merge `130a8d3`. Not checked on an iPhone.
 
 ### Follow-ups
 

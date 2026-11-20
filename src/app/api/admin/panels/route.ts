@@ -6,7 +6,9 @@ import { takeOffPanel, teamsToTakeOff } from "@/lib/conflicts";
 import { judgeKey } from "@/lib/roster";
 import type { Panel } from "@/lib/types";
 import { parseSlotDays, slotSummaryFields } from "@/lib/data";
-import { parseLanguageList, presetDivisions } from "@/lib/presets";
+import { divisionChoices } from "@/lib/eventSetup";
+import { parseLanguageList } from "@/lib/presets";
+import type { EventSetup } from "@/lib/types";
 import { normalizePanelCode } from "@/lib/panelCode";
 
 export const dynamic = "force-dynamic";
@@ -35,11 +37,12 @@ export async function POST(request: Request) {
   const days = "slotDays" in body ? parseSlotDays(body.slotDays, slotMinutes) : null;
   if (days && "error" in days) return NextResponse.json({ error: days.error }, { status: 400 });
 
+  const eventSetup = await store().getEventSetup();
   try {
     let panel = await store().createPanel({
       name,
       code: normalizePanelCode(body.code) || (await store().generatePanelCode()),
-      division: resolveDivision(body.division),
+      division: resolveDivision(body.division, eventSetup),
       judges: parseJudges(body.judges),
       languages: parseLanguageList(body.languages),
       sort_order: Number(body.sortOrder) || 0,
@@ -73,9 +76,10 @@ export async function PATCH(request: Request) {
   if (!id) return NextResponse.json({ error: "id required." }, { status: 400 });
 
   const patch: Partial<Panel> = {};
+  const eventSetup = await store().getEventSetup();
   if ("name" in body) patch.name = String(body.name).trim().slice(0, 80);
   if ("code" in body) patch.code = normalizePanelCode(body.code);
-  if ("division" in body) patch.division = resolveDivision(body.division);
+  if ("division" in body) patch.division = resolveDivision(body.division, eventSetup);
   if ("judges" in body) patch.judges = parseJudges(body.judges);
   if ("languages" in body) patch.languages = parseLanguageList(body.languages);
   if ("sortOrder" in body) patch.sort_order = Number(body.sortOrder) || 0;
@@ -226,13 +230,14 @@ export async function DELETE(request: Request) {
 }
 
 /**
- * Fall back to the first configured division rather than accepting a
- * free-text one: a typo would strand the panel where no team can reach it.
+ * Fall back to the first division the event runs (Whole event when blended)
+ * rather than accepting a free-text one: a typo would strand the panel where
+ * no team can reach it.
  */
-function resolveDivision(input: unknown): string {
+function resolveDivision(input: unknown, setup: EventSetup | null): string {
   const wanted = String(input ?? "").trim();
-  const divisions = presetDivisions();
-  return divisions.includes(wanted) ? wanted : divisions[0];
+  const { options, fallback } = divisionChoices(setup, true);
+  return options.includes(wanted) ? wanted : fallback;
 }
 
 function parseJudges(input: unknown): string[] {

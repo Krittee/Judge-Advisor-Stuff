@@ -1177,8 +1177,11 @@ body:has(.landing) > .theme-toggle { top: 0; }
 .dp-title { margin: 0; font-weight: 700; font-size: 28px; line-height: 1.1; letter-spacing: -0.02em; }
 .dp-intro { margin: 6px 0 0; color: var(--ink-subtle); font-size: 15px; line-height: 1.4; }
 
-/* ---- the six doors ---- */
+/* ---- the doors: Team, then Staff ---- */
+.dp-split { display: grid; gap: 20px; }
+.dp-gt { margin: 0 0 8px; color: var(--ink-subtle); font-size: 12px; font-weight: 600; line-height: 1.3; letter-spacing: 0.08em; text-transform: uppercase; }
 .dp-doors { display: flex; flex-direction: column; gap: 8px; }
+.dp-doors--staff { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .dp-cell { position: relative; }
 .dp-card {
   display: flex; align-items: center; gap: 14px; min-height: 72px; padding: 8px 14px;
@@ -1200,6 +1203,8 @@ body:has(.landing) > .theme-toggle { top: 0; }
 .dp-r-desk { --rc: var(--si-desk); }
 /* The Coordinator wears the queue desk's teal (its sign-in pass does too) until it has a colour of its own. */
 .dp-r-co { --rc: var(--si-desk); }
+/* Marketing's sign-in pass is the desk teal too. */
+.dp-r-mk { --rc: var(--si-desk); }
 .dp-r-ja { --rc: var(--si-ja); }
 .dp-r-ref { --rc: repeating-linear-gradient(135deg, oklch(0.985 0.003 265) 0 4px, oklch(0.180 0.012 265) 4px 8px); }
 
@@ -1237,15 +1242,34 @@ body:has(.landing) > .theme-toggle { top: 0; }
 .dp-s-in { --c: var(--active); --ci: var(--active-ink); }
 .dp-s-dn { border-color: var(--dp-done-line); background: var(--dp-done-tint); color: var(--ink); }
 
+/* Phone: a staff card is avatar over name; the hint stays for screen readers, the chevron is decoration. */
+@media (max-width: 1023.98px) {
+  .dp-doors--staff .dp-card { height: 100%; flex-direction: column; justify-content: center; gap: 6px; padding: 10px 8px; text-align: center; }
+  .dp-doors--staff .dp-rt { flex: none; }
+  .dp-doors--staff .dp-s, .dp-doors--staff .dp-card > svg {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+}
+
 @media (min-width: 1024px) {
   .dp-grid { max-width: 1184px; margin: auto; padding: 8px 32px 40px; }
   .dp-head { margin: 0 0 28px; text-align: center; }
   .dp-title { font-size: 40px; }
   .dp-intro { margin-top: 8px; font-size: 17px; }
-  /* 3 x 2; the row gap leaves room for the Team door's caption under its card. */
-  .dp-doors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px 16px; }
+  /* Team | divider | Staff: four equal card columns, Team one, Staff three (3w + two 16px gaps).
+     Two 24px column gaps and the 1px divider make the other 81px, so the Team card is as wide as a staff card. */
+  .dp-split { grid-template-columns: calc((100% - 81px) / 4) minmax(0, 1fr); gap: 0 24px; }
+  .dp-gt { font-size: 13px; }
+  .dp-grp--team { display: flex; flex-direction: column; }
+  .dp-grp--staff { padding-left: 24px; border-left: 1px solid var(--line); }
+  .dp-doors--team { flex: 1; }
+  .dp-doors--team .dp-cell { display: flex; flex: 1; }
+  .dp-doors--team .dp-card { height: auto; flex: 1; justify-content: center; }
+  .dp-doors--team .dp-rt { flex: none; }
+  .dp-doors--staff { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   .dp-cell { min-width: 0; }
-  .dp-card { height: 100%; min-height: 220px; flex-direction: column; align-items: center; gap: 0; padding: 22px 16px 16px; text-align: center; }
+  .dp-card { height: 100%; min-height: 224px; flex-direction: column; align-items: center; gap: 0; padding: 22px 16px 16px; text-align: center; }
   .dp-av { --s: 72px; }
   .dp-rt { flex: 1 0 auto; margin-top: 16px; }
   .dp-dt { font-size: 19px; }
@@ -2139,6 +2163,229 @@ body:has(.judge) > .theme-toggle:hover {
 }
 
 /* ------------------------------------------------------------------ *
+ * Awards Desk ("One list", design/awards-desk/, direction A)
+ *
+ * Marketing's read-only page: one list of every award in every division,
+ * with what the Judge Advisor has sent. A phone page first (the division
+ * heading pins while its rows scroll under it); from 1024px up it is one
+ * centred column with the sent time shown. Colour is signal: green is the
+ * sent count, caution is "Changed — was …", muted grey is not sent / being
+ * updated, and the accent is only the Seen button, the focus ring and the
+ * search field. The search highlight is a neutral tile, never the accent.
+ * Hover and focus change colour only, nothing moves.
+ * ------------------------------------------------------------------ */
+
+.mk {
+  --mk-field: oklch(0.180 0.013 265);
+  --mk-field-line: oklch(0.520 0.014 265);
+  --mk-cbg: color-mix(in srgb, var(--caution) 15%, transparent);
+  --mk-cline: color-mix(in srgb, var(--caution) 45%, transparent);
+  --mk-tint: color-mix(in srgb, var(--accent) 12%, transparent);
+  --mk-ring: color-mix(in srgb, var(--accent) 30%, transparent);
+  --mk-tile: color-mix(in srgb, var(--ink) 12%, transparent);
+
+  display: flex; min-height: 100dvh; flex-direction: column;
+  background: var(--canvas); color: var(--ink);
+}
+:root[data-theme="light"] .mk {
+  --mk-field: oklch(0.995 0.002 265);
+  --mk-field-line: oklch(0.640 0.012 265);
+}
+.mk :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mk-brand-n, .mk-id-t h1, .mk-ev h2, .mk-chg-h h2, .mk-cw .d b, .mk-seen, .mk-dh h2, .mk-tl b, .mk-res {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* The app's one theme toggle, docked into the top bar's corner as on the other consoles. This page scrolls
+   and its top bar goes with it, so the toggle scrolls too instead of floating over the pinned division heading. */
+body:has(.mk) > .theme-toggle {
+  position: absolute; top: 6px; right: 6px; bottom: auto; width: 44px; height: 44px;
+  border: 0; border-radius: 12px; background: transparent; box-shadow: none; color: var(--ink-subtle);
+}
+body:has(.mk) > .theme-toggle:hover {
+  transform: none; color: var(--ink); background: var(--mk-tint);
+}
+
+/* Chrome */
+.mk-top { display: flex; flex: none; height: 56px; align-items: center; padding: 0 60px 0 14px; }
+.mk-brand { display: flex; min-width: 0; align-items: center; gap: 8px; white-space: nowrap; }
+.mk-mark { display: grid; flex: none; width: 26px; height: 26px; place-items: center; border-radius: 8px; background: var(--accent); color: var(--accent-ink); }
+.mk-brand-n { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
+.mk-brand-s { color: var(--ink-subtle); font-size: 14px; }
+
+.mk-page { display: flex; flex: 1; width: 100%; max-width: 880px; flex-direction: column; margin: 0 auto; padding: 0 16px 24px; }
+.mk-id { display: flex; align-items: center; gap: 12px; padding: 2px 0 8px; }
+.mk-av { display: block; flex: none; width: 44px; height: 44px; border-radius: 25%; }
+.mk-av img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 22%; }
+.mk-id-t { display: flex; min-width: 0; flex-direction: column; line-height: 1.2; }
+.mk-id-t h1 { margin: 0; font-weight: 700; font-size: 22px; letter-spacing: -0.01em; }
+.mk-id-t span { margin-top: 2px; color: var(--ink-subtle); font-size: 13px; }
+.mk-id > button {
+  flex: none; margin-left: auto; min-height: 44px; padding: 0 14px;
+  border: 1.5px solid var(--mk-field-line); border-radius: 10px; color: var(--ink); font-weight: 500; font-size: 14px;
+  transition: background-color 150ms ease;
+}
+.mk-id > button:hover { background: var(--mk-tint); color: var(--ink); }
+
+/* Search and status */
+.mk-srch { position: relative; margin-top: 6px; }
+.mk-srch > svg { position: absolute; top: 15px; left: 14px; color: var(--ink-subtle); pointer-events: none; }
+.mk-input {
+  display: block; width: 100%; height: 48px; margin: 0; padding: 0 14px 0 40px;
+  border: 1.5px solid var(--mk-field-line); border-radius: 12px; background: var(--mk-field); color: var(--ink); font-size: 16px;
+  -webkit-appearance: none; appearance: none;
+}
+.mk-input:not(:placeholder-shown) { padding-right: 48px; }
+.mk-input::-webkit-search-cancel-button { display: none; -webkit-appearance: none; }
+.mk-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--mk-ring); }
+.mk-input::placeholder { color: var(--ink-subtle); opacity: 1; }
+.mk-clr {
+  position: absolute; top: 2px; right: 2px; display: grid; width: 44px; height: 44px; place-items: center;
+  border-radius: 10px; color: var(--ink-subtle); transition: color 150ms ease, background-color 150ms ease;
+}
+.mk-clr:hover { color: var(--ink); background: var(--mk-tint); }
+.mk-poll { margin: 6px 0 0; color: var(--ink-subtle); font-size: 12.5px; }
+.mk-err { margin: 6px 0 0; color: var(--danger-quiet); font-size: 13px; }
+
+/* Changed since sent */
+.mk-chg { position: relative; margin-top: 12px; padding: 12px; border: 1.5px solid var(--mk-cline); border-radius: 14px; background: var(--mk-cbg); }
+.mk-chg-h { display: flex; align-items: center; gap: 8px; color: var(--caution-quiet); }
+.mk-chg-h svg { flex: none; }
+.mk-chg-h h2 { margin: 0; font-weight: 700; font-size: 17px; }
+.mk-n {
+  display: inline-grid; min-width: 22px; height: 22px; place-items: center; padding: 0 6px;
+  border: 1px solid var(--mk-cline); border-radius: 999px; font-weight: 500; font-size: 12.5px; font-variant-numeric: tabular-nums;
+}
+.mk-chg-l { margin: 0; padding: 0; list-style: none; }
+.mk-chg-i { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.mk-cw { display: flex; min-width: 0; flex-direction: column; gap: 2px; margin: 0; line-height: 1.35; }
+.mk-cw b { font-weight: 500; }
+.mk-cw .d { color: var(--caution-quiet); font-size: 13.5px; }
+.mk-cw .d b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.mk-seen {
+  display: inline-flex; flex: none; min-width: 76px; height: 44px; align-items: center; justify-content: center; margin-left: auto; padding: 0 14px;
+  border: 1.5px solid var(--accent); border-radius: 10px; background: transparent; color: var(--accent); font-weight: 600; font-size: 14px;
+  transition: background-color 150ms ease;
+}
+.mk-seen:hover { background: var(--mk-tint); }
+.mk-chg-ft { margin: 8px 0 0; color: var(--ink-subtle); font-size: 12.5px; }
+
+/* Search results */
+.mk-res { margin: 18px 0 0; font-weight: 700; font-size: 17px; }
+.mk-res-n { margin: 2px 0 0; color: var(--ink-subtle); font-size: 13px; }
+.mk-empty { margin: 18px 0 0; padding: 24px 16px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-subtle); text-align: center; font-size: 14px; }
+.mk-hl { border-radius: 3px; background: var(--mk-tile); box-shadow: 0 0 0 2px var(--mk-tile); color: inherit; }
+
+/* The program tabs: the Judge Advisor's Matrix | By award look (.ja-aw-seg), with the sent count in each label.
+   A phone fits three by letting a label wrap onto a second line; the selected tab is the accent, a control's colour. */
+.mk-tabs { display: flex; gap: 2px; margin-top: 14px; padding: 3px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--jg-field); }
+.mk-tabs button {
+  flex: 1 1 0; min-width: 0; min-height: 44px; padding: 4px 8px; border-radius: 9px; background: transparent; color: var(--ink-subtle);
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 14px; line-height: 1.25; font-variant-numeric: tabular-nums;
+}
+.mk-tabs button { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.mk-tab-n { font-weight: 600; white-space: nowrap; }
+.mk-tab-c { color: var(--ink-subtle); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
+.mk-tabs button[aria-selected="true"] .mk-tab-c { color: var(--accent-ink); }
+.mk-tabs button:hover:not([aria-selected="true"]) { background: var(--surface-2); color: var(--ink); }
+.mk-tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+
+/* A saved event setup: the event title under the poll line, and the neutral division tag on Whole event rows */
+.mk-ev { margin-top: 14px; }
+.mk-ev h2 { margin: 0; font-weight: 700; font-size: 19px; line-height: 1.25; letter-spacing: -0.01em; }
+.mk-ev p { margin: 2px 0 0; color: var(--ink-subtle); font-size: 13px; }
+.mk-dv {
+  display: inline-flex; flex: none; align-self: center; align-items: center; height: 20px; margin-left: 6px; padding: 0 6px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--ink-subtle);
+  font-weight: 500; font-size: 11.5px; line-height: 1; white-space: nowrap;
+}
+/* On a phone a setup's rows give the award column a little less so the number, name and tag share one line */
+@media (max-width: 1023.98px) {
+  .mk-set .mk-r { grid-template-columns: 96px minmax(0, 1fr); }
+  .mk-set .mk-tl { gap: 6px; }
+  .mk-set .mk-tl b { min-width: 70px; }
+}
+
+/* One division: its heading pins on a phone, hairline under it */
+.mk-sec { margin-top: 14px; }
+.mk-dh {
+  position: sticky; top: 0; z-index: 2; display: flex; height: 48px; align-items: center; gap: 10px;
+  margin: 0 -16px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--canvas);
+}
+.mk-dh h2 { margin: 0; font-weight: 700; font-size: 19px; line-height: 1.2; }
+.mk-cnt { margin-left: auto; color: var(--ink-subtle); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mk-pg { flex: none; width: 56px; height: 4px; border-radius: 2px; background: var(--line); }
+.mk-pg i { display: block; height: 100%; border-radius: 2px; background: var(--done); }
+
+.mk-rows { margin: 10px 0 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); list-style: none; }
+.mk-r { display: grid; min-height: 40px; grid-template-columns: 104px minmax(0, 1fr); align-items: start; column-gap: 8px; padding: 0 12px; border-top: 1px solid var(--line); }
+.mk-r:first-child { border-top: 0; }
+.mk-al { color: var(--ink-subtle); font-size: 14px; line-height: 40px; }
+.mk-tm { min-width: 0; }
+.mk-tl { display: flex; min-width: 0; align-items: baseline; gap: 8px; line-height: 40px; }
+.mk-tl b { flex: none; min-width: 76px; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
+.mk-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.mk-mu { display: flex; height: 40px; align-items: center; gap: 6px; color: var(--ink-subtle); font-size: 14px; }
+.mk-tt { display: none; }
+/* Not sent: the row is greyed by its ground and its words, never by lowering the text's contrast. */
+.mk-r.is-ns { background: color-mix(in srgb, var(--sunken) 45%, var(--surface)); }
+.mk-r.is-ch { padding-bottom: 0; background: var(--mk-cbg); }
+/* On a phone the tag and Seen take a second line of their own. */
+.mk-fl { display: flex; grid-column: 1 / -1; align-items: center; gap: 8px; margin: -2px 0 8px; }
+.mk-tag {
+  display: inline-flex; height: 28px; align-items: center; padding: 0 10px; border: 1px solid var(--mk-cline); border-radius: 999px;
+  background: var(--mk-cbg); color: var(--caution-quiet); font-weight: 500; font-size: 12px; white-space: nowrap;
+}
+
+@media (min-width: 1024px) {
+  body:has(.mk) > .theme-toggle { top: 12px; right: 28px; }
+  .mk-top { height: 56px; padding: 12px 28px 0; }
+  .mk-page { padding: 4px 24px 40px; }
+  .mk-id { gap: 14px; margin-top: 12px; padding: 0; }
+  .mk-av { width: 48px; height: 48px; }
+  .mk-id-t h1 { font-size: 28px; }
+  .mk-id-t span { margin-top: 3px; font-size: 14px; }
+  .mk-id > button { min-height: 36px; height: 36px; }
+  .mk-srch { margin-top: 24px; }
+  .mk-poll { margin-top: 8px; }
+
+  .mk-chg { margin-top: 20px; padding: 14px 16px 16px; }
+  .mk-chg-i { min-height: 32px; margin-top: 10px; }
+  .mk-cw { flex-flow: row wrap; align-items: baseline; gap: 0 10px; font-size: 15px; }
+  .mk-cw .d { font-size: 15px; }
+  .mk-seen { min-width: 0; height: 32px; }
+  /* The note moves up beside the count. */
+  .mk-chg-ft { position: absolute; top: 16px; right: 16px; margin: 0; }
+
+  .mk-tabs { align-self: flex-start; margin-top: 20px; }
+  .mk-tabs button { flex: none; flex-direction: row; min-height: 36px; padding: 0 16px; white-space: nowrap; }
+  .mk-tab-c { color: inherit; font-weight: inherit; font-size: inherit; }
+  .mk-tab-c::before { content: " \00b7 "; white-space: pre; }
+
+  .mk-ev { margin-top: 20px; }
+  .mk-ev h2 { font-size: 22px; }
+  .mk-ev p { font-size: 14px; }
+  .mk-dv { margin-left: 10px; padding: 0 8px; font-size: 12px; }
+  .mk-sec { margin-top: 32px; }
+  .mk-dh { position: static; height: auto; min-height: 32px; margin: 0 0 10px; padding: 0; border-bottom: 0; background: none; gap: 12px; }
+  .mk-dh h2 { font-size: 22px; }
+  .mk-cnt { font-size: 14px; }
+  .mk-pg { width: 96px; }
+  .mk-rows { margin-top: 0; }
+  .mk-r { min-height: 34px; grid-template-columns: 168px minmax(0, 1fr) auto 52px; column-gap: 12px; padding: 0 16px; }
+  .mk-al, .mk-tl, .mk-tt { line-height: 34px; }
+  .mk-al { color: var(--ink); font-size: 15px; }
+  .mk-tl { gap: 0; }
+  .mk-tl b { width: 92px; min-width: 0; font-size: 17px; }
+  .mk-nm { font-size: 15px; }
+  .mk-mu { height: 34px; }
+  .mk-tt { display: block; grid-column: 4; grid-row: 1; color: var(--ink-subtle); text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .mk-fl { grid-column: 3; grid-row: 1; min-height: 34px; margin: 0; }
+  .mk-tag { height: 24px; font-size: 12.5px; }
+  .mk-r .mk-seen { margin-left: 0; }
+}
+
+/* ------------------------------------------------------------------ *
  * Coordinator console ("Teams + Slots", design/coordinator-redesign/, direction B)
  *
  * A phone app shell like the referee's: the page never scrolls, so the top
@@ -2541,7 +2788,7 @@ body:has(.desk, .co) > .theme-toggle:hover {
  * One stylesheet serves every tab, so a class one tab styles is a class the
  * others' markup can pick up. Each feature's CSS opens with an @ja-block
  * marker comment, and a class is styled bare by one block only: another tab
- * takes its own prefix (.ja-cf-, .ja-tm-, .ja-pn-, .ja-rf-, .ja-im-, .ja-sc-, .ja-aw-, .ja-ac-) or anchors a rule on
+ * takes its own prefix (.ja-cf-, .ja-tm-, .ja-pn-, .ja-rf-, .ja-im-, .ja-sc-, .ja-aw-, .ja-ac-, .ja-es-) or anchors a rule on
  * a class of its own. tests/adminCssScope.test.mjs fails on a second definition.
  * ------------------------------------------------------------------ */
 
@@ -2562,7 +2809,7 @@ body:has(.desk, .co) > .theme-toggle:hover {
   --ja-col: var(--surface-2);
 }
 
-.ja-rb, .ja-sbar b, .ja-sh-top h2 {
+.ja-rb, .ja-sbar b, .ja-sh-top h2, .ja-bd-n {
   font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -2585,6 +2832,12 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-top-r { display: flex; flex: none; align-items: center; gap: 2px; margin-right: 44px; }
 .ja-top-r > button { min-height: 44px; padding: 0 10px; border-radius: 10px; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
 .ja-top-r > button:hover { color: var(--ink); }
+
+/* The saved event's title in the wide top bar: after the identity and a hairline, the brand mark, "Judge Queue" and the setup. Wide only; the phone's section bar carries the setup on the Event page. */
+.ja-bd { display: none; }
+.ja-bd-n { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
+.ja-bd-s { color: var(--ink-subtle); font-size: 14px; }
+.ja-mk { display: grid; flex: none; width: 26px; height: 26px; place-items: center; border-radius: 8px; background: var(--accent); color: var(--accent-ink); }
 
 /* The current section, on a phone */
 .ja-sbar {
@@ -2657,6 +2910,7 @@ body:has(.admin) > .theme-toggle:hover {
 
   .ja-top { height: 56px; padding: 0 12px 0 20px; }
   .ja-menu, .ja-sbar { display: none; }
+  .ja-bd { display: flex; align-items: center; gap: 10px; height: 28px; margin: 0 auto 0 16px; padding-left: 16px; border-left: 1px solid var(--line); white-space: nowrap; }
   .ja-top-r > button { min-height: 36px; }
   .ja-rail { display: flex; }
   .ja-pad { padding: 12px 20px 16px; }
@@ -3056,7 +3310,7 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-rf-area:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--jg-ring); }
 .ja-sev5 { display: flex; gap: 6px; padding: 0 4px; }
 .ja-sv {
-  display: flex; min-width: 0; flex: 1 1 auto; height: 44px; align-items: center; justify-content: center; gap: 5px; padding: 0 4px;
+  display: flex; min-width: 0; flex: 1 1 0; height: 44px; align-items: center; justify-content: center; gap: 5px; padding: 0 4px;
   border: 1.5px solid var(--line); border-radius: 12px; font-weight: 600; font-size: 13px;
 }
 .ja-sv i { flex: none; width: 8px; height: 8px; border-radius: 50%; }
@@ -3558,6 +3812,131 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-sl-foot .ja-prim { padding: 0 32px; }
 }
 
+/* @ja-block event */
+/* Event (design/event-setup/reference-setup-*.dc.html): the Judge Advisor picks the program and format the whole event runs. Four tiles
+   (one radio group), a preview of what that gives the Awards tab and the Desk, and the three things that would refuse the save.
+   Colour is signal: green is saved / fine, amber is a blocker, muted is not set; accent is chrome (the picked tile, links, the Save button).
+   A refused write is the page's danger Banner, not drawn here. Tints are color-mix in srgb. No motion at all, as the other blocks. */
+.ja-es-h, .ja-es-tn b, .ja-es-ph, .ja-es-ch, .ja-es-ms b, .ja-es-tl b, .ja-es-pgh b, .ja-es-prim {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+.ja-es { display: grid; min-width: 0; max-width: 720px; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.ja-es > * { min-width: 0; }
+.ja-es-h { margin: 0; font-weight: 700; font-size: 24px; line-height: 1.15; letter-spacing: -0.01em; }
+.ja-es-intro { margin: 4px 0 0; color: var(--ink-subtle); font-size: 14.5px; line-height: 1.45; }
+.ja-es-notice {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--jg-field); color: var(--ink-subtle); font-size: 14px; line-height: 1.45;
+}
+.ja-es-notice svg, .ja-es-note svg { flex: none; margin-top: 2px; }
+
+/* The four tiles: a radio group, one column on a phone, 2 x 2 from 1024px */
+.ja-es-tiles { display: flex; flex-direction: column; gap: 10px; }
+.ja-es-tile {
+  position: relative; display: flex; min-height: 88px; align-items: flex-start; gap: 12px; padding: 14px 12px 14px 14px; border: 2px solid var(--line);
+  border-radius: 14px; background: var(--surface); color: var(--ink); text-align: left;
+}
+.ja-es-tile:hover { border-color: var(--jg-field-line); }
+.ja-es-tile[aria-checked="true"] { border-color: var(--accent); background: var(--ja-accent-t); }
+.ja-es-tt { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
+.ja-es-tn { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.ja-es-tn b { font-weight: 700; font-size: 18px; line-height: 1.2; }
+.ja-es-dv { font-size: 14px; line-height: 1.35; }
+.ja-es-ds { color: var(--ink-subtle); font-size: 13px; line-height: 1.35; }
+.ja-es-ck { display: grid; flex: none; width: 26px; height: 26px; place-items: center; border: 2px solid var(--jg-field-line); border-radius: 50%; color: transparent; }
+.ja-es-tile[aria-checked="true"] .ja-es-ck { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.ja-es-sv {
+  display: inline-flex; height: 22px; align-items: center; gap: 4px; padding: 0 8px 0 6px; border: 1px solid color-mix(in srgb, var(--done) 55%, transparent);
+  border-radius: 999px; background: color-mix(in srgb, var(--done) 15%, transparent); color: var(--done-quiet); font-weight: 500; font-size: 12px; white-space: nowrap;
+}
+
+/* The preview: a compact block on a phone (one text line per group), a card with chips from 1024px */
+.ja-es-pv { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.ja-es-eb { display: none; }
+.ja-es-ph { margin: 0; font-weight: 700; font-size: 14px; line-height: 1.3; }
+.ja-es-mu, .ja-es-note { margin: 0; color: var(--ink-subtle); font-size: 13.5px; line-height: 1.4; }
+.ja-es-note { display: flex; align-items: flex-start; gap: 8px; }
+.ja-es-pg { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; font-size: 13.5px; line-height: 1.4; }
+.ja-es-pgh { display: contents; }
+.ja-es-pgh b { font-weight: 500; }
+.ja-es-pgh b::after { content: ":"; }
+.ja-es-pgh span { display: none; }
+.ja-es-pgc { display: contents; }
+.ja-es-aw:not(:last-child)::after { content: ","; }
+
+/* Before you can save */
+.ja-es-ckb { display: flex; flex-direction: column; gap: 8px; }
+.ja-es-ch { margin: 0; font-weight: 700; font-size: 16px; line-height: 1.2; }
+.ja-es-cl { margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); list-style: none; }
+.ja-es-cr { display: flex; flex-wrap: wrap; min-height: 52px; align-items: flex-start; gap: 0 12px; padding: 10px 14px; border-top: 1px solid var(--line); }
+.ja-es-cr:first-child { border-top: 0; }
+.ja-es-warn { background: color-mix(in srgb, var(--caution) 13%, transparent); border-top-color: color-mix(in srgb, var(--caution) 40%, transparent); }
+.ja-es-si { display: grid; flex: none; width: 24px; height: 24px; margin-top: 1px; place-items: center; border-radius: 50%; }
+.ja-es-ok { background: var(--done); color: var(--done-ink); }
+.ja-es-no { color: var(--caution-quiet); }
+.ja-es-wait { color: var(--ink-subtle); }
+.ja-es-cb { display: flex; min-width: 0; flex: 1 1 0; flex-direction: column; gap: 6px; }
+.ja-es-ms { margin: 0; font-size: 14px; line-height: 1.4; }
+.ja-es-ms b { display: block; margin: 0 0 1px; font-weight: 700; font-size: 15px; }
+.ja-es-ms em { font-style: normal; font-weight: 500; }
+.ja-es-warn .ja-es-ms { color: var(--caution-quiet); }
+.ja-es-warn .ja-es-ms b { color: var(--ink); }
+.ja-es-tl { display: flex; margin: 0; padding: 0; flex-direction: column; overflow: hidden; border: 1px solid color-mix(in srgb, var(--caution) 40%, transparent); border-radius: 10px; background: var(--surface); list-style: none; }
+.ja-es-tl li { display: flex; min-height: 44px; align-items: center; gap: 10px; padding: 4px 10px 4px 12px; border-top: 1px solid var(--line); }
+.ja-es-tl li:first-child { border-top: 0; }
+.ja-es-tl b { flex: none; min-width: 58px; font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
+.ja-es-n { min-width: 0; flex: 1; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.ja-es-ptag {
+  display: inline-flex; height: 24px; flex: none; align-items: center; padding: 0 7px; border: 1px solid var(--line); border-radius: 6px;
+  color: var(--ink-subtle); font-weight: 500; font-size: 12px; letter-spacing: 0.04em; white-space: nowrap;
+}
+.ja-es-go {
+  display: inline-flex; min-height: 44px; flex: 0 0 100%; align-items: center; padding: 0 4px 0 36px; border-radius: 8px; background: transparent;
+  color: var(--accent); font-weight: 500; font-size: 14px; text-decoration: underline; white-space: nowrap;
+}
+
+/* Save */
+.ja-es-save { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.ja-es-prim {
+  display: inline-flex; width: 100%; height: 52px; align-items: center; justify-content: center; padding: 0 22px; border: 1.5px solid var(--accent);
+  border-radius: 12px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 17px; white-space: nowrap;
+}
+.ja-es-prim:disabled { border-color: var(--line); background: var(--surface-2); color: var(--ink-subtle); cursor: not-allowed; }
+.ja-es-hint { color: var(--ink-subtle); font-size: 13.5px; text-align: center; }
+.ja-es-by { margin: 0; color: var(--ink-subtle); font-size: 13px; text-align: center; }
+
+@media (min-width: 1024px) {
+  .ja-es { max-width: none; padding-top: 8px; gap: 18px; }
+  .ja-es-h { font-size: 26px; }
+  .ja-es-intro { font-size: 15px; }
+  .ja-es-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .ja-es-tile { min-height: 112px; padding: 14px; }
+  .ja-es-cr { flex-wrap: nowrap; }
+  .ja-es-go { min-height: 32px; flex: none; padding: 0 8px; }
+  .ja-es-cr { align-items: center; }
+  .ja-es-ms b { display: inline-block; min-width: 68px; margin: 0 6px 0 0; }
+  .ja-es-save { flex-direction: row; align-items: center; gap: 14px; }
+  .ja-es-prim { width: auto; height: 44px; font-size: 16px; }
+  .ja-es-hint, .ja-es-by { text-align: left; }
+  .ja-es-pv { gap: 14px; padding: 16px 18px 18px; border-radius: 14px; box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 50%, transparent), 0 18px 40px -24px var(--shadow); }
+  .ja-es-eb { display: block; color: var(--ink-subtle); font-weight: 500; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .ja-es-ph { margin-top: -10px; font-size: 18px; line-height: 1.2; }
+  .ja-es-pg { display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px; }
+  .ja-es-pgh { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .ja-es-pgh b { font-weight: 600; font-size: 15px; }
+  .ja-es-pgh b::after { content: none; }
+  .ja-es-pgh span { display: inline; color: var(--ink-subtle); font-size: 12.5px; }
+  .ja-es-pgc { display: flex; margin: 0; padding: 0; flex-wrap: wrap; gap: 6px; list-style: none; }
+  .ja-es-aw { display: inline-flex; height: 28px; align-items: center; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--jg-field); font-size: 13.5px; white-space: nowrap; }
+  .ja-es-aw:not(:last-child)::after { content: none; }
+  .ja-es-note { padding-top: 14px; border-top: 1px solid var(--line); }
+}
+@media (min-width: 1280px) {
+  .ja-es { grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto auto auto auto auto 1fr; column-gap: 20px; }
+  .ja-es > * { grid-column: 1; align-self: start; }
+  .ja-es-pv { grid-column: 2; grid-row: 1 / -1; align-self: start; }
+}
+
 /* @ja-block import */
 /* Import (design/admin-redesign/reference-import-*.dc.html): one box that takes a file, a drop or a paste, and the two answers under it.
    Colour is signal: done-green is "Imported", caution is "lines skipped"; accent is chrome (Choose a file, the dashed border while dragging, Import). */
@@ -3868,7 +4247,7 @@ body:has(.admin) > .theme-toggle:hover {
    Colour is signal: green is a winner or a decided award, amber is a team that already holds another award or has a referee caution, accent is chrome (buttons,
    the chosen chip and toggle, the selected cell); a nomination is an ink dot with no hue, except the green one referees' Good conduct alone makes for
    Sportsmanship. Tints are color-mix in srgb. No motion at all. */
-.ja-aw-h, .ja-aw-chip, .ja-aw-seg button, .ja-aw-tm b, .ja-aw-aph h2, .ja-aw-nr b, .ja-aw-dr h2, .ja-aw-oth p b, .ja-aw-prim {
+.ja-aw-h, .ja-aw-chip, .ja-aw-seg button, .ja-aw-tm b, .ja-aw-aph h2, .ja-aw-nr b, .ja-aw-dr h2, .ja-aw-oth p b, .ja-aw-prim, .ja-aw-sall, .ja-aw-snd {
   font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
 .ja-aw { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
@@ -3901,6 +4280,16 @@ body:has(.admin) > .theme-toggle:hover {
 /* The board and, beside it from 1024px, the side panel */
 .ja-aw-cols { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
 .ja-aw-view { min-width: 0; }
+
+/* Marketing: Send all ready sits with the view toggle (full width, under it, on a phone) */
+.ja-aw-fr { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
+.ja-aw-fr .ja-aw-seg { margin-left: 0; }
+.ja-aw-sall {
+  display: inline-flex; width: 100%; height: 52px; flex: none; align-items: center; justify-content: center; gap: 7px; padding: 0 14px; border-radius: 12px;
+  background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 17px; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.ja-aw-sall:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, var(--ink)); }
+.ja-aw-sall:disabled { opacity: 0.5; }
 
 /* The matrix: the box scrolls, the page does not. The team column stays; borders sit on the cells so they travel with it. */
 .ja-aw-mxw { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
@@ -3946,9 +4335,10 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-aw-aps { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 12px; }
 .ja-aw-ap { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .ja-aw-ap.ja-aw-dec { border-color: color-mix(in srgb, var(--done) 55%, transparent); }
-.ja-aw-aph { display: flex; min-height: 48px; align-items: center; gap: 10px; padding: 8px 14px; }
-.ja-aw-aph h2 { flex: 1; min-width: 0; font-weight: 700; font-size: 16px; line-height: 1.2; }
-.ja-aw-cst { flex: none; color: var(--ink-subtle); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
+/* The title, its state under it, and (once the sends are known) the Send controls on the right across both rows */
+.ja-aw-aph { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; row-gap: 1px; min-height: 64px; align-content: center; align-items: center; padding: 8px 8px 8px 14px; }
+.ja-aw-aph h2 { display: flex; grid-column: 1; min-width: 0; align-items: center; gap: 7px; font-weight: 700; font-size: 16px; line-height: 1.2; white-space: nowrap; }
+.ja-aw-cst { grid-column: 1; color: var(--ink-subtle); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
 .ja-aw-cst.ja-aw-ok { color: var(--done-quiet); }
 .ja-aw-cnone { margin: 0; padding: 12px 14px; border-top: 1px solid var(--line); color: var(--ink-subtle); font-size: 13.5px; }
 .ja-aw-ap li { border-top: 1px solid var(--line); }
@@ -3971,6 +4361,40 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-aw-add .ja-in, .ja-aw-dr .ja-selw .ja-in { height: 44px; }
 .ja-aw-nw { display: flex; justify-content: flex-end; padding: 0 4px; border-top: 1px solid var(--line); }
 .ja-aw-nw .ja-aw-lnk { white-space: nowrap; }
+
+/* A sent award's lock, by its title (and over its matrix column), and where the award stands with Marketing on the right of its header.
+   Green is sent, caution is "Marketing had …", accent is the button; not ready is plain grey words. */
+.ja-aw-lk { display: inline-flex; color: var(--ink-subtle); }
+.ja-aw-lk svg { width: 14px; height: 14px; }
+.ja-aw-hr { display: flex; grid-column: 2; grid-row: 1 / span 2; align-items: center; gap: 2px; }
+.ja-aw-snd {
+  display: inline-flex; height: 44px; flex: none; align-items: center; justify-content: center; gap: 6px; padding: 0 14px; border: 1.5px solid var(--accent); border-radius: 10px;
+  background: transparent; color: var(--accent); font-weight: 600; font-size: 14px; white-space: nowrap;
+}
+.ja-aw-snd:hover:not(:disabled) { background: var(--ja-accent-t); }
+.ja-aw-snd:disabled { opacity: 0.5; }
+.ja-aw-sent {
+  display: inline-flex; height: 32px; flex: none; align-items: center; gap: 5px; padding: 0 10px 0 8px; border: 1px solid color-mix(in srgb, var(--done) 55%, transparent); border-radius: 999px;
+  background: color-mix(in srgb, var(--done) 14%, transparent); color: var(--done-quiet); font-weight: 500; font-size: 13.5px; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.ja-aw-rcl { min-width: 60px; min-height: 44px; flex: none; padding: 0 6px; background: transparent; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
+.ja-aw-rcl:hover:not(:disabled) { color: var(--ink); }
+.ja-aw-rcl:disabled { opacity: 0.5; }
+.ja-aw-nsend { max-width: 130px; margin-right: 6px; color: var(--ink-subtle); font-size: 12.5px; line-height: 1.3; text-align: right; }
+.ja-aw-cwarn {
+  display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 14px; border-top: 1px solid color-mix(in srgb, var(--caution) 40%, transparent);
+  background: color-mix(in srgb, var(--caution) 13%, transparent); color: var(--caution-quiet); font-size: 13px; line-height: 1.35;
+}
+.ja-aw-cwarn svg { flex: none; }
+.ja-aw-cwarn b { font-weight: 500; }
+
+/* The Send all ready dialog's body (the confirm dialog's own box holds it): a list, a caution under what changes, and what is left out */
+.ja-aw-sl { margin: 12px 0 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--jg-field); list-style: none; }
+.ja-aw-sl li { display: flex; flex-direction: column; gap: 3px; padding: 10px 14px; font-size: 14.5px; line-height: 1.35; }
+.ja-aw-sl li + li { border-top: 1px solid var(--line); }
+.ja-aw-cw { display: flex; align-items: flex-start; gap: 6px; color: var(--caution-quiet); font-size: 12.5px; }
+.ja-aw-cw svg { flex: none; margin-top: 2px; }
+.ja-aw-dnote { margin: 12px 0 0; padding: 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.4; list-style: none; }
 
 /* The side panel: the same in both views */
 .ja-aw-dr { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
@@ -4010,10 +4434,56 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-aw-lnk:hover:not(:disabled) { color: var(--ink); }
 .ja-aw-lnk:disabled { opacity: 0.5; }
 
+/* Why a sent award's winner cannot change, under the disabled controls */
+.ja-aw-lockn { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--jg-field); color: var(--ink-subtle); font-size: 13.5px; line-height: 1.4; }
+.ja-aw-lockn svg { flex: none; margin-top: 2px; }
+.ja-aw-lockn b { display: block; color: var(--ink); font-weight: 500; }
+
 /* On a phone the panel is the bottom sheet's body, under a grab handle and a Close at its corner */
 .ja-aw-sheet .ja-aw-dr { flex: auto; min-height: 0; padding: 16px 20px max(20px, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; border: 0; border-radius: 0; background: transparent; }
 .ja-aw-sheet .ja-aw-eyebrow { padding-right: 48px; }
 .ja-aw-sx { position: absolute; top: 12px; right: 8px; }
+
+/* A blended event, "Award order" (design/event-setup/reference-awards-*.dc.html): one column of blocks in the config's order. An award given in each division is one
+   block whose halves stack (side by side from 1280px); every other award is one full-width block with a neutral "Whole event" label. Nothing here takes a hue but the
+   cautions (amber, "Already has" and "Marketing had") and the sent state (green); the division tag and the label are the quiet neutral ones. On a phone Send all ready comes
+   first, then the view toggle and the Nominees from chips, then the meta line. */
+.ja-aw-bl .ja-aw-fbar { order: 1; }
+.ja-aw-bl .ja-aw-top { order: 2; }
+.ja-aw-bl .ja-aw-cols { order: 3; }
+.ja-aw-bl .ja-aw-fr { order: -1; }
+.ja-aw-bl .ja-aw-sall { order: -1; }
+.ja-aw-from { width: 100%; }
+.ja-aw-from .ja-aw-chip { min-width: 44px; flex: 1; justify-content: center; }
+.ja-aw-stack { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
+.ja-aw-bh { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; }
+.ja-aw-bh h2, .ja-aw-hn { margin: 0; font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif; font-weight: 700; line-height: 1.2; }
+.ja-aw-bh h2 { font-size: 16px; }
+.ja-aw-bh .ja-aw-cst { font-weight: 400; }
+.ja-aw-halves { display: grid; grid-template-columns: minmax(0, 1fr); }
+.ja-aw-half { display: flex; min-width: 0; flex-direction: column; border-top: 1px solid var(--line); }
+.ja-aw-hn { display: flex; grid-column: 1; min-width: 0; align-items: center; gap: 7px; font-size: 14.5px; white-space: nowrap; }
+.ja-aw-scope {
+  display: inline-flex; height: 22px; flex: none; align-items: center; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--ink-subtle);
+  font-weight: 500; font-size: 12px; white-space: nowrap;
+}
+/* A nominee row: the team, then its panel and who backs it under the name, then its division tag */
+.ja-aw-bl .ja-aw-nm { display: flex; flex-direction: column; line-height: 1.3; }
+.ja-aw-n1, .ja-aw-n2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ja-aw-n2 { color: var(--ink-subtle); font-size: 12px; }
+.ja-aw-bl .ja-aw-nr b { min-width: 58px; }
+.ja-aw-dv { margin-left: 2px; }
+.ja-aw-rwarn {
+  display: flex; align-items: center; gap: 8px; margin: 0; padding: 6px 14px; border-top: 1px solid color-mix(in srgb, var(--caution) 40%, transparent);
+  background: color-mix(in srgb, var(--caution) 13%, transparent); color: var(--caution-quiet); font-size: 12.5px; line-height: 1.35;
+}
+.ja-aw-rwarn svg { flex: none; }
+/* The matrix: a column per division for Excellence and Design, headed "Exc" over "ES"; a team wears its panel and its division */
+.ja-aw-hd { display: block; font-size: 11px; letter-spacing: 0.04em; }
+.ja-aw-bl .ja-aw-mx table { min-width: calc(200px + var(--n) * 40px); }
+.ja-aw-bl .ja-aw-mx thead th.ja-aw-pn { width: 88px; }
+.ja-aw-bl .ja-aw-mx td.ja-aw-pn { white-space: nowrap; }
+.ja-aw-mx .ja-aw-pn .ja-aw-dv { margin-left: 4px; }
 
 @media (min-width: 1024px) {
   .ja-aw { gap: 14px; }
@@ -4026,12 +4496,17 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-aw-fbar { flex-flow: row wrap; align-items: center; gap: 10px 28px; }
   .ja-aw-fg { flex-direction: row; align-items: center; gap: 10px; }
   .ja-aw-chip { height: 40px; }
-  .ja-aw-seg { margin-left: auto; }
+  .ja-aw-fr { flex-direction: row; align-items: center; margin-left: auto; }
+  .ja-aw-sall { width: auto; height: 40px; border-radius: 10px; font-size: 14px; }
   .ja-aw-seg button { flex: none; height: 38px; }
 
   .ja-aw-cols { flex-direction: row; align-items: flex-start; gap: 20px; }
   .ja-aw-view { flex: 1; }
   .ja-aw-aps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ja-aw-aph { min-height: 58px; }
+  .ja-aw-snd { height: 34px; padding: 0 12px; font-size: 13.5px; }
+  .ja-aw-sent { height: 28px; font-size: 13px; }
+  .ja-aw-rcl { min-width: 48px; min-height: 34px; font-size: 13.5px; }
   .ja-aw-dr { position: sticky; top: 12px; flex: none; width: 340px; max-height: calc(100dvh - 80px); overflow-y: auto; }
 
   /* A mouse has no swipe: from here the box keeps a thin scrollbar for the narrow windows where it scrolls at all */
@@ -4044,6 +4519,22 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-aw-mx tbody th { padding: 6px 8px 6px 16px; }
   /* The divider that shows the team column is held is for a phone, where the box always scrolls */
   .ja-aw-mx .ja-aw-tm { box-shadow: none; }
+  .ja-aw-bl .ja-aw-top, .ja-aw-bl .ja-aw-fbar, .ja-aw-bl .ja-aw-cols, .ja-aw-bl .ja-aw-fr, .ja-aw-bl .ja-aw-sall { order: 0; }
+  .ja-aw-from { width: auto; }
+  .ja-aw-from .ja-aw-chip { flex: none; }
+  .ja-aw-bh { min-height: 46px; }
+  .ja-aw-rwarn { padding-left: 82px; }
+  .ja-aw-bl .ja-aw-mx table { min-width: calc(244px + var(--n) * 40px); }
+  .ja-aw-bl .ja-aw-mx thead th.ja-aw-pn { width: 100px; }
+}
+
+/* From 1280px an award given in each division has room for its halves side by side, hairline between; the half's header stacks the division over its Send controls */
+@media (min-width: 1280px) {
+  .ja-aw-halves { grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); }
+  .ja-aw-half + .ja-aw-half { border-left: 1px solid var(--line); }
+  .ja-aw-half .ja-aw-aph { display: flex; min-height: 0; flex-direction: column; align-items: stretch; gap: 6px; padding: 10px 8px 8px 14px; }
+  .ja-aw-half .ja-aw-hr { justify-content: flex-start; margin-left: -4px; }
+  .ja-aw-half .ja-aw-nsend { max-width: none; margin-right: 0; text-align: left; }
 }
 
 /* @ja-block activity */

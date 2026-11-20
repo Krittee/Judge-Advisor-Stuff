@@ -246,6 +246,21 @@ test("Add panel is name and division only: the judges come from the roster", () 
   assert.doesNotMatch(board(), /Judges \(comma separated\)|Judge names, comma separated/);
 });
 
+test("a blended setup offers Whole event in the add form and pre-selects it; the card's picker offers it too", () => {
+  const eventSetup = { program: "VEX IQ", format: "blended", set_by: "Alex", updated_at: "2026-11-20T08:12:00" };
+  const m = board({ state: { divisions: ["Elementary School", "Middle School"], eventSetup } as never });
+  const form = m.match(/<form class="ja-pn-add"[\s\S]*?<\/form>/)?.[0] ?? "";
+  assert.deepEqual([...form.matchAll(/<option value="([^"]*)"/g)].map((x) => x[1]), ["Elementary School", "Middle School", "Whole event"]);
+  assert.equal(selectedOf(form), "Whole event");
+  assert.match(cardOf(m, "Panel 3"), /<option value="Whole event">/);
+  // Standard (or nothing saved): today's options, first one chosen.
+  const std = board({ state: { divisions: ["Elementary School", "Middle School"], eventSetup: { ...eventSetup, format: "standard" } } as never });
+  const sform = std.match(/<form class="ja-pn-add"[\s\S]*?<\/form>/)?.[0] ?? "";
+  assert.doesNotMatch(sform, /Whole event/);
+  assert.equal(selectedOf(sform), "Elementary School");
+  assert.doesNotMatch(board(), /Whole event/);
+});
+
 test("Add preset panels keeps its caption", () => {
   const m = board();
   assert.match(m, /<button type="button" class="ja-pn-gh">Add preset panels<\/button>/);

@@ -10,6 +10,8 @@ export type ConfirmOptions = {
   cancelLabel?: string;
   /** Styles the confirming button as the destructive act it is. */
   danger?: boolean;
+  /** More under the question (a list, a note), in a wider dialog. */
+  body?: React.ReactNode;
 };
 
 export type Pending = ConfirmOptions & { question: string };
@@ -85,7 +87,7 @@ export function ConfirmDialog({
       ref={ref}
       aria-modal="true"
       aria-labelledby={titleId}
-      className="m-auto w-[calc(100%_-_2rem)] max-w-sm rounded-2xl bg-surface p-0 text-ink ring-1 ring-line backdrop:bg-black/60"
+      className={`m-auto w-[calc(100%_-_2rem)] ${pending?.body ? "max-w-md" : "max-w-sm"} rounded-2xl bg-surface p-0 text-ink ring-1 ring-line backdrop:bg-black/60`}
       // Escape closes the dialog by itself; that is a "no". A close we asked
       // for (nothing pending any more) is not news.
       onClose={() => {
@@ -101,6 +103,7 @@ export function ConfirmDialog({
           <p id={titleId} className="whitespace-pre-line text-base text-ink">
             {pending.question}
           </p>
+          {pending.body ? <div className="mt-2 text-[15px] leading-normal text-ink">{pending.body}</div> : null}
           <div className="mt-5 flex gap-3">
             {/* Cancel comes first so showModal() puts focus on it: the safe answer. */}
             <Button variant="ghost" className="min-h-11 flex-1" onClick={() => onSettle(false)}>

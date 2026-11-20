@@ -25,7 +25,6 @@ const kinds: FlagKind[] = [
   { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },
   { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
   { id: "minor", label: "Minor violation", short: "Minor", color: "orange", severity: 2, requiresRule: true },
-  { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3, requiresRule: true },
   { id: "dq", label: "Disqualified", short: "DQ", color: "black", severity: 4, requiresRule: true },
 ];
 
@@ -155,7 +154,7 @@ test("a V5RC flag lists every rule with its official title, the ruleset and the 
     <FlagList
       flags={[
         report({
-          kind: "major",
+          kind: "minor",
           rule: "GG17,SG9",
           ruleset: "v5rc",
           manual_version: "2.1",
@@ -191,8 +190,8 @@ test("Disqualified renders as its own DQ chip, in a tone no other kind shares", 
   const markup = renderToStaticMarkup(
     <FlagSummary flags={[report({ kind: "dq" }), report({ id: "2", kind: "major" })]} kinds={kinds} />,
   );
-  assert.match(markup, /DQ/);
-  assert.match(markup, /Major/);
+  assert.match(markup, /DQ ×2/, "a flag stored as the retired Major kind counts as a DQ");
+  assert.doesNotMatch(markup, /Major/);
   assert.notEqual(tone("black"), tone("rose"));
   assert.notEqual(tone("black"), tone(undefined), "black must not fall through to the neutral zinc tone");
   assert.notEqual(toneSolid("black"), toneSolid(undefined));

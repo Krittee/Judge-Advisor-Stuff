@@ -24,7 +24,7 @@ test("a team counts from its second Good conduct flag, and the count is every on
 test("each team is counted on its own flags, and the other kinds of flag count for nothing", () => {
   const flags = [
     flag("a", "good"), flag("b", "good"), flag("a", "good"), flag("c", "good"),
-    flag("b", "warning"), flag("b", "minor"), flag("c", "major"), flag("c", "warning"), flag("d", "warning"), flag("d", "warning"),
+    flag("b", "warning"), flag("b", "minor"), flag("c", "minor"), flag("c", "warning"), flag("d", "warning"), flag("d", "warning"),
   ];
   assert.deepEqual([...goodConductTeams(flags)], [["a", 2]], "b and c have one Good conduct each; d has none, however many Warnings");
 });

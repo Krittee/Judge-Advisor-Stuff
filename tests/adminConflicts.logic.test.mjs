@@ -299,3 +299,12 @@ test("Withdraw asks first: declining sends nothing, confirming sends once, and t
   assert.equal(await declined, false);
   assert.deepEqual(sent, ["delete"], "declining sends nothing");
 });
+
+test("strandedTeams counts a blended team against every panel, not only its division's", () => {
+  const blocks = (conflicts, judges = roster) => panelBlocks(conflicts, judges);
+  const es = team("3000E", null, "Elementary School"); // Panel 4 is the only Elementary School panel
+  const cs = [byPanel("c1", "p4", es)];
+  assert.deepEqual(strandedTeams([es], panels, blocks(cs)).map((t) => t.number), ["3000E"]);
+  assert.deepEqual(strandedTeams([es], panels, blocks(cs), "standard").map((t) => t.number), ["3000E"]);
+  assert.deepEqual(strandedTeams([es], panels, blocks(cs), "blended"), [], "Panels 1 to 3 can judge it");
+});

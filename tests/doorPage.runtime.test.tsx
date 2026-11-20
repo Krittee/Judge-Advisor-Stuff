@@ -23,23 +23,37 @@ const text = (markup: string) => markup.replace(/<[^>]+>/g, "");
 const door = renderToStaticMarkup(<DoorPage />);
 const hrefs = [...door.matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
 
-test("/: six doors in order, each a link to its sign-in", () => {
-  assert.deepEqual(hrefs.slice(0, 6), ["/team", "/judge/login", "/referee/login", "/queue/login", "/coordinator/login", "/admin/login"]);
+test("/: seven doors in order, each a link to its sign-in", () => {
+  assert.deepEqual(hrefs.slice(0, 7), ["/team", "/judge/login", "/referee/login", "/queue/login", "/coordinator/login", "/admin/login", "/marketing/login"]);
   const names = [...door.matchAll(/<span class="dp-dt">([^<]+)<\/span>/g)].map((m) => m[1]);
-  assert.deepEqual(names, ["Team", "Judge", "Referee", "Queue desk", "Coordinator", "Judge Advisor"]);
+  assert.deepEqual(names, ["Team", "Judge", "Referee", "Queue desk", "Coordinator", "Judge Advisor", "Marketing"]);
   const lines = [...door.matchAll(/<span class="dp-s">([^<]+)<\/span>/g)].map((m) => m[1]);
-  assert.deepEqual(lines.slice(0, 6), [
+  assert.deepEqual(lines.slice(0, 7), [
     "Check your judging status",
     "Panel code from your Judge Advisor",
     "Referees and the head referee",
     "Check teams in and book times",
     "Walk the pits: languages and bookings",
     "Runs judging for the event",
+    "Awards as the Judge Advisor sends them",
   ]);
 });
 
+test("/: two labelled groups, Team with the one /team door and Staff with the six role doors in order", () => {
+  const groups = [...door.matchAll(/<section class="dp-grp dp-grp--(\w+)"><h2 class="dp-gt" id="(dp-g-\w+)">([^<]+)<\/h2><ul class="dp-doors dp-doors--\w+" aria-labelledby="(dp-g-\w+)">([\s\S]*?)<\/ul><\/section>/g)];
+  assert.deepEqual(groups.map((g) => [g[1], g[2], g[3], g[4]]), [
+    ["team", "dp-g-team", "Team", "dp-g-team"],
+    ["staff", "dp-g-staff", "Staff", "dp-g-staff"],
+  ]);
+  const links = (g: RegExpMatchArray) => [...g[5].matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(links(groups[0]), ["/team"]);
+  assert.deepEqual(links(groups[1]), ["/judge/login", "/referee/login", "/queue/login", "/coordinator/login", "/admin/login", "/marketing/login"]);
+  assert.ok(door.indexOf('class="dp-split"') > door.indexOf("dp-title") && door.indexOf('class="dp-split"') < door.indexOf('class="dp-below"'));
+  assert.ok(!door.includes('<ul class="dp-doors" '), "no single list of seven doors is left");
+});
+
 test("/: the Live board is the one other link, and /login is not linked", () => {
-  assert.deepEqual(hrefs.slice(6), ["/board"]);
+  assert.deepEqual(hrefs.slice(7), ["/board"]);
   assert.ok(!hrefs.includes("/login"));
   assert.match(door, /<a class="dp-board" href="\/board">/);
   assert.match(door, /Live board<span class="dp-pill">LIVE<\/span>/);
@@ -54,7 +68,7 @@ test("/: titled 'Who are you?', with no team-number input and no staff rows", ()
 
 test("/: the Team door has the team picture with no ring and a caption; the others, the Coordinator included, ring theirs", () => {
   const cards = [...door.matchAll(/<a class="dp-card"[^>]*>[\s\S]*?<\/a>/g)].map((m) => m[0]);
-  assert.equal(cards.length, 6);
+  assert.equal(cards.length, 7);
   assert.match(cards[0], /<span class="dp-av dp-av--team"><img src="\/avatars\/team\.jpg" alt=""/);
   assert.ok(!/dp-r-/.test(cards[0]), "the Team door has no ring");
   assert.match(cards[0], /aria-describedby="dp-cap"/);
@@ -68,6 +82,16 @@ test("/: the Team door has the team picture with no ring and a caption; the othe
   // The Coordinator's card has no ticket caption, like the others with a ring.
   assert.ok(!/aria-describedby/.test(cards[4]));
   assert.equal([...door.matchAll(/class="dp-cap"/g)].length, 1);
+});
+
+test("/: Marketing is the seventh door, with its own picture in the desk teal ring and no ticket caption", () => {
+  const cards = [...door.matchAll(/<a class="dp-card"[^>]*>[\s\S]*?<\/a>/g)].map((m) => m[0]);
+  assert.match(cards[6], /^<a class="dp-card" href="\/marketing\/login">/);
+  assert.match(cards[6], /dp-r-mk"><img src="\/avatars\/marketing\.jpg" alt=""/);
+  assert.doesNotMatch(door, /dp-av--ph/, "no placeholder is left on the door");
+  assert.ok(!/aria-describedby/.test(cards[6]));
+  assert.match(cards[4], /<img src="\/avatars\/coordinator\.jpg"/);
+  assert.equal([...door.matchAll(/Opens the team ticket/g)].length, 1);
 });
 
 test("/: the Live board card holds five sample tiles for 1234A, as one key group", () => {

@@ -247,7 +247,7 @@ export function Banner({
     <div
       className={`flex items-start justify-between gap-3 rounded-xl px-4 py-3 text-sm ring-1 ring-inset ${styles[kind]}`}
     >
-      <div>{children}</div>
+      <div className="whitespace-pre-line">{children}</div>
       {onDismiss ? (
         <button onClick={onDismiss} className="shrink-0 opacity-60 hover:opacity-100">
           ✕

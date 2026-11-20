@@ -1,7 +1,7 @@
 import presetFile from "../../config/event.json";
 import { normalizePanelCode } from "./panelCode";
 import { getRuleset, type MatchType } from "./rules";
-import type { AwardView, Panel, Team } from "./types";
+import type { AwardView, EventFormat, Panel, Team } from "./types";
 
 /**
  * Preset panels, read from config/event.json.
@@ -45,6 +45,7 @@ export type Language = { id: string; label: string; short: string };
 type RawPreset = {
   divisions?: unknown;
   blendedDivisions?: unknown;
+  programs?: unknown;
   pitFloor?: unknown;
   languages?: unknown;
   refereeFlags?: unknown;
@@ -91,6 +92,42 @@ export function blendedDivisions(): string[] {
   return listed ?? presetDivisions().filter((d) => BLEND_PATTERN.test(d));
 }
 
+export type Program = { label: string; divisions: string[] };
+
+/**
+ * The Awards Desk's program tabs as configured: a label and the divisions it
+ * shows, both trimmed and de-duplicated. A malformed or empty entry is
+ * skipped; `[]` when the key is missing, which means one list with no tabs.
+ */
+export function presetPrograms(): Program[] {
+  if (!Array.isArray(raw.programs)) return [];
+  const seen = new Set<string>();
+  const out: Program[] = [];
+  for (const p of raw.programs as { label?: unknown; divisions?: unknown }[]) {
+    const label = String(p?.label ?? "").trim();
+    const divisions = Array.isArray(p?.divisions) ? unique(p.divisions.map((d) => String(d).trim()).filter(Boolean)) : [];
+    if (!label || !divisions.length || seen.has(label)) continue;
+    seen.add(label);
+    out.push({ label, divisions });
+  }
+  return out;
+}
+
+/**
+ * The tabs Marketing sees: each configured program (only the divisions this
+ * event has, in the event's order), then Blended, then Other so a division
+ * the Judge Advisor adds is never lost. A tab with no divisions is dropped.
+ * With no programs configured it is one tab, "All", and the desk draws no bar.
+ */
+export function programTabs(divisions: string[], programs: Program[], blended: string[]): Program[] {
+  if (!programs.length) return [{ label: "All", divisions }];
+  const within = (list: string[]) => divisions.filter((d) => list.includes(d));
+  const tabs = [...programs.map((p) => ({ label: p.label, divisions: within(p.divisions) })), { label: "Blended", divisions: within(blended) }];
+  const placed = new Set(tabs.flatMap((t) => t.divisions));
+  tabs.push({ label: "Other", divisions: divisions.filter((d) => !placed.has(d)) });
+  return tabs.filter((t) => t.divisions.length > 0);
+}
+
 /**
  * The division wall: whether a panel judging `panelDivision` may take a
  * team competing in `teamDivision`.
@@ -99,10 +136,11 @@ export function blendedDivisions(): string[] {
  * auto-assign, and what a judge can see — so the rule cannot drift
  * between them. Exact match is the normal answer; a blended division on
  * either side is the exception that makes Blend a usable category
- * instead of one that has to be lied about at the keyboard.
+ * instead of one that has to be lied about at the keyboard. A Blended event
+ * (`format`) has no wall at all: every panel judges every team.
  */
-export function divisionsCompatible(teamDivision: string, panelDivision: string): boolean {
-  if (teamDivision === panelDivision) return true;
+export function divisionsCompatible(teamDivision: string, panelDivision: string, format?: EventFormat | null): boolean {
+  if (format === "blended" || teamDivision === panelDivision) return true;
   const blended = blendedDivisions();
   return blended.includes(teamDivision) || blended.includes(panelDivision);
 }
@@ -143,7 +181,6 @@ const FLAG_FALLBACK: FlagKind[] = [
   { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },
   { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
   { id: "minor", label: "Minor violation", short: "Minor", color: "orange", severity: 2, requiresRule: true },
-  { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3, requiresRule: true },
   { id: "dq", label: "Disqualified", short: "DQ", color: "black", severity: 4, requiresRule: true },
 ];
 
@@ -171,14 +208,25 @@ export function refereeFlags(): FlagKind[] {
   return parsed.length ? parsed : FLAG_FALLBACK;
 }
 
+/** Kinds the config no longer offers (by id or label), and the one each now reads as. A Major
+ *  violation is a disqualification, so old flags, old log lines and a stale
+ *  phone that still says "major" all mean DQ. Stored data is not rewritten. */
+export const LEGACY_FLAG_KINDS: Record<string, string> = { major: "dq", "major violation": "dq" };
+
+/** The kind a stored id stands for today: itself, unless it was retired. */
+export function canonicalFlagKind(id: string): string {
+  return LEGACY_FLAG_KINDS[id.trim().toLowerCase()] ?? id;
+}
+
 /**
  * Snap a typed-in kind to one that exists.
  *
  * Falls back to the *least* severe kind rather than the first, so a
- * malformed request can never invent a major violation against a team.
+ * malformed request can never invent a disqualification against a team.
+ * A retired kind ("major") reads as what it became first.
  */
 export function resolveFlagKind(input: unknown): string {
-  const wanted = String(input ?? "").trim().toLowerCase();
+  const wanted = canonicalFlagKind(String(input ?? "")).trim().toLowerCase();
   const kinds = refereeFlags();
   const match = kinds.find(
     (f) =>
@@ -433,6 +481,7 @@ export function parseAwards(list: unknown): AwardView[] {
       short: String(o.short ?? "").trim() || label,
       blurb: String(o.blurb ?? "").trim(),
       places: clamp(o.winners, 1, 10, 1),
+      ...(o.blendedScope === "division" ? { blendedScope: "division" as const } : {}),
     });
   }
 

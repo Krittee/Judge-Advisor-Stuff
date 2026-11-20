@@ -198,3 +198,29 @@ test("the match sheet no longer carries the program line or its Change link", ()
   const css = read("src/app/globals.css");
   assert.ok(!css.includes(".rf-prog") && !css.includes(".rf-lnk"));
 });
+
+/* ---- a body under the question -------------------------------------------- */
+
+test("a body renders under the question, in a wider dialog; a question without one is as before", () => {
+  const withBody = renderToStaticMarkup(
+    <ConfirmDialog pending={{ question: "Send 2 awards to Marketing?", confirmLabel: "Send 2", body: <ul><li>Design · 2381C</li></ul> }} onSettle={noop} />,
+  );
+  const labelledby = withBody.match(/aria-labelledby="([^"]+)"/)![1];
+  assert.match(withBody, new RegExp(`<p id="${labelledby}"[^>]*>Send 2 awards to Marketing\\?</p><div[^>]*><ul><li>Design · 2381C</li></ul></div>`), "the body is a div after the question, not inside it");
+  assert.ok(withBody.indexOf("Design · 2381C") < withBody.indexOf(">Cancel<"), "above the buttons");
+  assert.match(withBody, /max-w-md/);
+
+  const plain = renderToStaticMarkup(<ConfirmDialog pending={{ question: "Remove it?" }} onSettle={noop} />);
+  assert.match(plain, /max-w-sm/);
+  assert.doesNotMatch(plain, /max-w-md|<div class="mt-2/, "nothing is added for a caller that gives no body");
+  assert.match(plain, /<p id="[^"]+"[^>]*>Remove it\?<\/p><div class="mt-5 flex gap-3">/);
+});
+
+test("ask passes the body through to the dialog", async () => {
+  const shown: (Pending | null)[] = [];
+  const { ask, settle } = createConfirmer((p) => shown.push(p));
+  const answer = ask("Recall?", { body: "Marketing will see it as being updated.", confirmLabel: "Recall", danger: true });
+  assert.deepEqual(shown, [{ question: "Recall?", body: "Marketing will see it as being updated.", confirmLabel: "Recall", danger: true }]);
+  settle(true);
+  assert.equal(await answer, true);
+});

@@ -1,4 +1,5 @@
 import type { Status } from "./status";
+import type { Program } from "./presets";
 import type { MatchType } from "./rules";
 
 /** One day of a panel's booking window. Both breaks are set or both null. */
@@ -164,7 +165,7 @@ export type FlagRow = {
   /** The manual edition the ruleset was at when this was recorded (set by
    *  the server from the ruleset, never by the client). Null for IQ. */
   manual_version: string | null;
-  /** The referee marked this Minor/Major as having affected the match. */
+  /** The referee marked this Minor as having affected the match. */
   match_affecting: boolean;
   created_at: string;
 };
@@ -199,6 +200,11 @@ export type ScoreRow = {
   updated_at: string;
 };
 
+/** How the event runs: "blended" decides most awards once for the whole event. */
+export type EventFormat = "standard" | "blended";
+/** The Judge Advisor's saved event setup: a program label from config/event.json and its format. */
+export type EventSetup = { program: string; format: EventFormat; set_by: string; updated_at: string };
+
 /** One of config/event.json's awards, as the browser receives it (judges and the Judge Advisor only). */
 export type AwardView = {
   id: string;
@@ -207,6 +213,8 @@ export type AwardView = {
   blurb: string;
   /** How many teams can win it per division: 1 unless config/event.json says more (the Judges Award has 2). */
   places: number;
+  /** "division": still given in each division in a Blended event; absent means once for the whole event. */
+  blendedScope?: "division";
 };
 
 /** Whose nomination a row is: a judge's, or the Judge Advisor's own. */
@@ -249,6 +257,41 @@ export type NoWinnerRow = {
   division: string;
   decided_by: string;
   decided_at: string;
+};
+
+/** `division` is the team's division at send time, always recorded; older stored snapshots lack it. The desk tags only Whole event rows with a saved setup. */
+export type ReleaseTeam = { id: string; number: string; name: string; division?: string };
+/** What was announced for one award in one division: the winning teams, or "no winner". */
+export type ReleaseSnapshot = { teams: ReleaseTeam[]; no_winner: boolean };
+/** The Awards Desk's send of one award in one division. `previous` is the decision it replaced, when it was recalled and changed. */
+export type AwardReleaseRow = ReleaseSnapshot & {
+  award_id: string;
+  division: string;
+  previous: ReleaseSnapshot | null;
+  status: "sent" | "recalled";
+  sent_at: string;
+  sent_by: string;
+  changed_at: string | null;
+};
+
+export type ReleasedAward = { id: string; label: string; places: number };
+/** One section of the desk: a key (a division, or "Whole event") and the ids of the awards decided under it. */
+export type ReleasedSection = { key: string; awardIds: string[] };
+/** GET /api/awards/released: the award list, the divisions, the tabs and the sends, never a nomination or a winner. */
+export type ReleasedView = {
+  awards: ReleasedAward[];
+  divisions: string[];
+  programs: Program[];
+  releases: AwardReleaseRow[];
+  /** Only when an event setup is saved; absent, the desk is exactly as before. */
+  setup?: Pick<EventSetup, "program" | "format">;
+  /** The desk's sections in order; present with `setup`. */
+  sections?: ReleasedSection[];
+};
+export type ReleaseReply = { release: AwardReleaseRow };
+export type SendAllReply = {
+  sent: AwardReleaseRow[];
+  skipped: { awardId: string; division: string; reason: "not ready" | "already sent" }[];
 };
 
 /**
@@ -311,6 +354,8 @@ export type AppState = {
   matchTypes: MatchType[];
   /** Null until a referee or the Judge Advisor sets the event up. */
   refereeSetup: RefereeSetup | null;
+  /** The program and format the Judge Advisor set for this event: null until set, and for an anonymous caller; `set_by` is blank for marketing. */
+  eventSetup: EventSetup | null;
   /** The kinds of flag a referee can record, with their colours. */
   flagKinds: {
     id: string;
@@ -328,7 +373,7 @@ export type AppState = {
 };
 
 export type ViewerCapabilities = {
-  role: "team" | "queuer" | "judge" | "referee" | "admin" | "coordinator";
+  role: "team" | "queuer" | "judge" | "referee" | "admin" | "coordinator" | "marketing";
   name: string | null;
   /** Set for a judge: the only panel they may act on. */
   panelId: string | null;

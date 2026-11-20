@@ -14,6 +14,7 @@ export function homeFor(role: Role): string {
   if (role === "judge") return "/judge";
   if (role === "referee") return "/referee";
   if (role === "coordinator") return "/coordinator";
+  if (role === "marketing") return "/marketing";
   return "/queue";
 }
 
@@ -24,13 +25,15 @@ const ROLES: Record<Role, { label: string; avatar: string; tone: string }> = {
   admin: { label: "Judge Advisor", avatar: "/avatars/judge-advisor.jpg", tone: "r-ja" },
   referee: { label: "Referee", avatar: "/avatars/referee.jpg", tone: "r-ref" },
   coordinator: { label: "Coordinator", avatar: "/avatars/coordinator.jpg", tone: "r-desk" },
+  marketing: { label: "Marketing", avatar: "/avatars/marketing.jpg", tone: "r-desk" },
 };
 const CREW: Role[] = ["judge", "queuer", "admin", "coordinator"];
 
 /** A role's picture. */
 function Avatar({ role, size }: { role: Role; size: number }) {
+  const src = ROLES[role].avatar;
   /* eslint-disable-next-line @next/next/no-img-element -- 20 KB static JPEGs; next/image buys nothing here. */
-  return <img className="si-av" src={ROLES[role].avatar} alt="" width={size} height={size} />;
+  return <img className="si-av" src={src} alt="" width={size} height={size} />;
 }
 
 /** What the pass calls someone: the head referee is a referee with a flag, and the same avatar. */

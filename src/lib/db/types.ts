@@ -13,6 +13,10 @@ import type {
   Team,
   WinnerRow,
   NoWinnerRow,
+  AwardReleaseRow,
+  EventFormat,
+  EventSetup,
+  ReleaseSnapshot,
 } from "../types";
 
 /** Thrown for rule violations we want to show the user verbatim. */
@@ -166,6 +170,15 @@ export type NewNoWinner = {
   decidedBy: string;
 };
 
+export type SendRelease = {
+  awardId: string;
+  division: string;
+  snapshot: ReleaseSnapshot;
+  previous: ReleaseSnapshot | null;
+  changedAt: string | null;
+  sentBy: string;
+};
+
 export type NewActivity = {
   requestId?: string | null;
   teamId?: string | null;
@@ -272,6 +285,11 @@ export type Store = {
   /** Replaces the one record. resetDay keeps it, resetAll clears it. */
   saveRefereeSetup(input: NewRefereeSetup): Promise<RefereeSetup>;
 
+  /** The event's program and format; null until one is saved. */
+  getEventSetup(): Promise<EventSetup | null>;
+  /** Replaces the one record and deletes every `recalled` award_releases row, in one write. resetDay keeps it, resetAll clears it. */
+  saveEventSetup(input: { program: string; format: EventFormat; setBy: string }): Promise<EventSetup>;
+
   /**
    * The judge roster, in the order judges were added. A panel's `judges`
    * list is derived from this; createPanel / updatePanel / seedPresetPanels
@@ -330,6 +348,12 @@ export type Store = {
   setNoWinner(input: NewNoWinner): Promise<NoWinnerRow>;
   /** Returns whether there was one. */
   clearNoWinner(awardId: string, division: string): Promise<boolean>;
+  /** Awards the Awards Desk has sent, oldest send first. */
+  listReleases(): Promise<AwardReleaseRow[]>;
+  /** One row per (awardId, division): sending again overwrites it as `sent`, stamped now. */
+  sendRelease(input: SendRelease): Promise<AwardReleaseRow>;
+  /** Sets status `recalled`, keeping the snapshot. Null if that award was never sent. */
+  recallRelease(awardId: string, division: string): Promise<AwardReleaseRow | null>;
 
   resetDay(): Promise<void>;
   resetAll(): Promise<void>;

@@ -625,3 +625,36 @@ test("setting a language is one PATCH to /api/team-language with the team and th
   ]);
   await assert.rejects(setTeamLanguages(caller("Only a coordinator can.").call, { id: "t-1" }, ["en"]), /Only a coordinator can\./);
 });
+
+/* ---- a blended event: any team, any panel ------------------------------------------------ */
+
+test("with format blended a team moved across divisions keeps its panel; without, behaviour is unchanged", async () => {
+  // titans hold Panel 2 (Middle School); Elementary School is a different division.
+  assert.equal(panelLeft(titans, "Elementary School", panels)?.id, "p2");
+  assert.equal(panelLeft(titans, "Elementary School", panels, "standard")?.id, "p2");
+  assert.equal(panelLeft(titans, "Elementary School", panels, null)?.id, "p2");
+  assert.equal(panelLeft(titans, "Elementary School", panels, "blended"), null);
+
+  const ids = (format) => panelOptions(titans, panels, [], [], "Elementary School", format).map((o) => o.id);
+  assert.deepEqual(ids(undefined), ["p4"]);
+  assert.deepEqual(ids("blended"), ["p1", "p2", "p3", "p4"], "every panel, the held one kept");
+
+  const yes = asker(true);
+  const { calls, call } = caller();
+  assert.equal(await saveTeamAfterAsking(yes.ask, call, titans, { ...startDraft(titans), division: "Elementary School" }, panels, "blended"), true);
+  assert.equal(yes.asked.length, 0, "nothing to ask: it keeps Panel 2");
+  assert.deepEqual(calls[0].body, { teamId: titans.id, division: "Elementary School" });
+  // A panel picked from another division is kept when blended.
+  const picked = { ...startDraft(titans), division: "Elementary School", panelId: "p1" };
+  await saveTeamAfterAsking(yes.ask, call, titans, picked, panels, "blended");
+  assert.equal(calls[1].body.panelId, "p1");
+});
+
+test("strandedIds follows the format: a blended team is stranded only when every panel is blocked", () => {
+  const es = team("2468E", "Rivets", { division: "Elementary School" });
+  const only = [panel(1, "Middle School")];
+  const conflicts = [conflict("c1", "j1", es)];
+  const judges = [judge("j1", "p1")];
+  assert.equal(strandedIds([es], only, conflicts, judges).size, 0, "no panel in its division at all: not stranded (today)");
+  assert.equal(strandedIds([es], only, conflicts, judges, "blended").size, 1, "Panel 1 can judge it now, and is blocked");
+});

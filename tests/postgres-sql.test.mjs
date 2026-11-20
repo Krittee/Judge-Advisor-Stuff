@@ -1104,6 +1104,56 @@ test("a day reset and a full wipe both name award_no_winner (it has no team to c
   assert.match(sent(/^truncate/)[0].sql, /\baward_no_winner\b/);
 });
 
+test("migrate() creates award_releases, one row per (award, division), additive and locked down", () => {
+  assert.match(
+    migrateBody,
+    /create table if not exists award_releases \(\s*award_id\s+text not null,\s*division\s+text not null,\s*teams\s+jsonb not null default '\[\]'::jsonb,\s*no_winner\s+boolean not null default false,\s*previous\s+jsonb,\s*status\s+text not null check \(status in \('sent', 'recalled'\)\),\s*sent_at\s+timestamptz not null default now\(\),\s*sent_by\s+text not null,\s*changed_at\s+timestamptz,\s*primary key \(award_id, division\)\s*\);/,
+  );
+  assert.ok(migrateBody.includes("alter table award_releases enable row level security;"));
+});
+
+test("sendRelease is one upsert on (award, division) with the snapshot as jsonb; previous stays SQL null; recallRelease flips the status", async () => {
+  const team = { id: "t1", number: "1001", name: "Team 1001" };
+  calls.length = 0;
+  answer = () => [{ award_id: "design", division: "Middle School", teams: [team], no_winner: false, previous: null, status: "sent", sent_at: new Date("2026-11-19T09:00:00.000Z"), sent_by: "Alex", changed_at: null }];
+  const made = await postgresStore.sendRelease({ awardId: "design", division: "Middle School", snapshot: { teams: [team], no_winner: false }, previous: null, changedAt: null, sentBy: "Alex" });
+  const upserts = sent(/^insert into award_releases/);
+  assert.equal(upserts.length, 1);
+  assert.match(upserts[0].sql, /on conflict \(award_id, division\) do update/);
+  assert.match(upserts[0].sql, /\$3::jsonb/);
+  assert.deepEqual(upserts[0].params.slice(0, 3), ["design", "Middle School", JSON.stringify([team])]);
+  assert.ok(upserts[0].params.includes(null), "previous is SQL null, not the JSON text null");
+  assert.ok(!upserts[0].params.includes("null"));
+  assert.equal(made.sent_at, "2026-11-19T09:00:00.000Z");
+
+  calls.length = 0;
+  const prev = { teams: [], no_winner: true };
+  await postgresStore.sendRelease({ awardId: "design", division: "Middle School", snapshot: { teams: [team], no_winner: false }, previous: prev, changedAt: "2026-11-19T09:30:00.000Z", sentBy: "Alex" });
+  assert.ok(sent(/^insert into award_releases/)[0].params.includes(JSON.stringify(prev)));
+
+  calls.length = 0;
+  await postgresStore.listReleases();
+  assert.equal(sent(/from award_releases/)[0].sql, "select * from award_releases order by sent_at, award_id, division");
+
+  calls.length = 0;
+  await postgresStore.recallRelease("design", "Middle School");
+  const [upd] = sent(/^update award_releases/);
+  assert.equal(upd.sql, "update award_releases set status = 'recalled' where award_id = $1 and division = $2 returning *");
+  assert.deepEqual(upd.params, ["design", "Middle School"]);
+  answer = () => [];
+  assert.equal(await postgresStore.recallRelease("design", "Middle School"), null);
+});
+
+test("a day reset and a full wipe both name award_releases (the snapshot is jsonb, so no team to cascade from)", async () => {
+  answer = () => [];
+  calls.length = 0;
+  await postgresStore.resetDay();
+  assert.match(sent(/^truncate/)[0].sql, /\baward_releases\b/);
+  calls.length = 0;
+  await postgresStore.resetAll();
+  assert.match(sent(/^truncate/)[0].sql, /\baward_releases\b/);
+});
+
 const NOMINATION = { id: "n1", award_id: "excellence", team_id: "t1", panel_id: "p1", judge: "Amy", reason: null, created_at: new Date("2026-10-24T08:00:00.000Z"), updated_at: new Date("2026-10-24T08:00:00.000Z") };
 
 test("nominate is one upsert on the full non-null key, the judge as lower(btrim(name)): no reason keeps the stored one, a reason (or null) sets it", async () => {
@@ -1280,4 +1330,67 @@ test("a day reset names the nominations and winners (and still spares flags and 
   assert.match(wipe.sql, /\bteams\b/);
   assert.ok(wipe.sql.endsWith("cascade"));
   assert.match(migrateBody, /nominations \(\s*id\s+uuid primary key default gen_random_uuid\(\),\s*award_id\s+text not null,\s*team_id\s+uuid not null references teams\(id\)/);
+});
+
+/* ---- the event setup (no database here either) ---- */
+
+test("migrate() creates the single-row event_setup table, and locks it down", () => {
+  assert.match(
+    migrateBody,
+    /create table if not exists event_setup \(\s*id\s+int primary key default 1 check \(id = 1\),\s*program\s+text not null,\s*format\s+text not null check \(format in \('standard', 'blended'\)\),\s*set_by\s+text not null,\s*updated_at\s+timestamptz not null default now\(\)\s*\);/,
+  );
+  assert.ok(migrateBody.includes("alter table event_setup enable row level security;"), "RLS must cover the new table");
+});
+
+test("saving the event setup upserts the one row and deletes the recalled releases in the same transaction", async () => {
+  const row = { program: "VEX IQ", format: "blended", set_by: "Alex", updated_at: new Date("2026-11-20T01:02:03.456Z") };
+  calls.length = 0;
+  answer = (sql) => (sql.startsWith("insert into event_setup") ? [row] : []);
+  const saved = await postgresStore.saveEventSetup({ program: "VEX IQ", format: "blended", setBy: "Alex" });
+  const [upsert] = sent(/^insert into event_setup/);
+  assert.match(
+    upsert.sql,
+    /^insert into event_setup \(id, program, format, set_by\) values \(1, \$1, \$2, \$3\) on conflict \(id\) do update set program = excluded\.program, format = excluded\.format, set_by = excluded\.set_by, updated_at = now\(\) returning program, format, set_by, updated_at$/,
+  );
+  assert.deepEqual(upsert.params, ["VEX IQ", "blended", "Alex"]);
+  assert.deepEqual(saved, { ...row, updated_at: "2026-11-20T01:02:03.456Z" });
+  assert.equal(sent(/^delete from award_releases where status = 'recalled'$/).length, 1);
+  const sqls = calls.map((c) => c.sql);
+  assert.ok(sqls.indexOf("begin") < sqls.findIndex((s) => s.startsWith("insert into event_setup")) && sqls.indexOf("commit") > sqls.findIndex((s) => s.startsWith("delete from award_releases")), "both writes sit inside one begin/commit");
+
+  calls.length = 0;
+  answer = (sql) => (sql.startsWith("select program") ? [row] : []);
+  assert.deepEqual(await postgresStore.getEventSetup(), saved);
+  assert.equal(sent(/from event_setup/)[0].sql, "select program, format, set_by, updated_at from event_setup");
+  answer = () => [];
+  assert.equal(await postgresStore.getEventSetup(), null);
+});
+
+test("a full wipe truncates the event setup; a day reset keeps it", async () => {
+  answer = () => [];
+  calls.length = 0;
+  await postgresStore.resetAll();
+  assert.ok(sent(/^truncate/).some((c) => /\bevent_setup\b/.test(c.sql)));
+  calls.length = 0;
+  await postgresStore.resetDay();
+  assert.ok(!sent(/^truncate/).some((c) => /event_setup/.test(c.sql)));
+});
+
+test("a team import defaults to the setup's first division, and a Blended event widens $8 to every division", async () => {
+  const { blendedDivisions } = await import("../src/lib/presets");
+  const { WHOLE_EVENT } = await import("../src/lib/eventSetup");
+  const setup = (format) => (sql) => (sql.startsWith("select program") ? [{ program: "V5RC", format, set_by: "Alex", updated_at: new Date() }] : []);
+  for (const format of ["blended", "standard"]) {
+    calls.length = 0;
+    answer = setup(format);
+    await postgresStore.upsertTeams([{ number: "1001", pit: null }]);
+    const [upsert] = sent(/insert into teams/);
+    assert.equal(upsert.params[5], "Middle School", "V5RC's first division, not the config's");
+    assert.equal(upsert.params.length, 9);
+    assert.deepEqual(upsert.params[7], format === "blended" ? [...blendedDivisions(), "Middle School", "High School", WHOLE_EVENT] : blendedDivisions());
+  }
+  calls.length = 0;
+  answer = () => [];
+  await postgresStore.upsertTeams([{ number: "1001", pit: null }]);
+  assert.deepEqual(sent(/insert into teams/)[0].params[7], blendedDivisions(), "no setup behaves as standard");
 });

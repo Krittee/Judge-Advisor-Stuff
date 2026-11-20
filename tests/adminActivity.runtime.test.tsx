@@ -26,7 +26,6 @@ const flagKinds: AppState["flagKinds"] = [
   { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },
   { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
   { id: "minor", label: "Minor violation", short: "Minor", color: "orange", severity: 2, requiresRule: true },
-  { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3, requiresRule: true },
   { id: "dq", label: "Disqualified", short: "DQ", color: "black", severity: 4, requiresRule: true },
 ];
 const team = (number: string, name: string): Team => ({
@@ -142,7 +141,7 @@ test("the footer says how much is shown, and the key explains the dots", () => {
   for (const word of ["Request", "Referee flag, by severity", "Conflict", "Setup", "Award"]) assert.ok(key.includes(word), word);
   assert.match(key, /<i class="ja-ac-dd ja-ac-d-award" aria-hidden="true"><\/i>Award/);
   // The referee entry in the key is one dot per severity the config has, in its own colours.
-  assert.deepEqual([...key.matchAll(/ja-ac-d-referee (bg-[\w-]+)/g)].map((x) => x[1]), ["bg-done", "bg-caution", "bg-waiting", "bg-danger", "bg-ink"]);
+  assert.deepEqual([...key.matchAll(/ja-ac-d-referee (bg-[\w-]+)/g)].map((x) => x[1]), ["bg-done", "bg-caution", "bg-waiting", "bg-ink"]);
 
   const long = Array.from({ length: 150 }, (_, i) => entry("setup", at(9, 0), { id: `x${i}` }));
   assert.match(board({ poll: { rows: long } }), /<p>Showing the latest 150 events<\/p>/);
@@ -173,8 +172,8 @@ test("severity words are severity pills: flagged, corrected from and to, removed
   const pills = (e: string) => [...e.matchAll(/<span class="ja-sp ([^"]*)" title="([^"]*)">(.*?)<\/span>/g)].map((x) => [x[3], x[1].includes("bg-") ? x[1].match(/bg-[\w-]+/)![0] : "", x[2]]);
   assert.deepEqual(pills(ev(m, "11:38")), [["Minor", "bg-waiting", "Minor violation"]]);
   assert.match(ev(m, "11:38"), /<span class="ja-ac-ac">flagged <span class="ja-sp /);
-  assert.deepEqual(pills(ev(m, "11:12")), [["Warning", "bg-caution", "Warning"], ["Major", "bg-danger", "Major violation"]]);
-  assert.match(ev(m, "11:12"), /corrected a flag: <span class="ja-sp [^"]*" title="Warning">Warning<\/span> → <span class="ja-sp [^"]*" title="Major violation">Major<\/span>/);
+  assert.deepEqual(pills(ev(m, "11:12")), [["Warning", "bg-caution", "Warning"], ["DQ", "bg-ink", "Disqualified"]]);
+  assert.match(ev(m, "11:12"), /corrected a flag: <span class="ja-sp [^"]*" title="Warning">Warning<\/span> → <span class="ja-sp [^"]*" title="Disqualified">DQ<\/span>/);
   const removed = board({ poll: { rows: [entry("referee", at(9, 0), { action: "removed a flag: dq", ...forTeam("2011A") })] } });
   assert.deepEqual(pills(ev(removed, "09:00")).map((p) => p[0]), ["DQ"]);
   // Other entries are plain words: no pill.
@@ -188,7 +187,7 @@ test("the dot: request neutral, conflict caution, setup an outline, referee the 
   const m = board();
   assert.equal(dot(ev(m, "11:42")), "ja-ac-d-request");
   assert.equal(dot(ev(m, "11:38")), "ja-ac-d-referee bg-waiting", "flagged Minor");
-  assert.equal(dot(ev(m, "11:12")), "ja-ac-d-referee bg-danger", "corrected to Major: the new severity");
+  assert.equal(dot(ev(m, "11:12")), "ja-ac-d-referee bg-ink", "an old line corrected to Major reads as DQ");
   assert.equal(dot(ev(m, "10:42")), "ja-ac-d-conflict");
   assert.equal(dot(ev(m, "10:15")), "ja-ac-d-setup");
   const awardEntry = entry("award", at(11, 50), { action: "gave Design to 2088C", detail: "Middle School", ...forTeam("2011A") });

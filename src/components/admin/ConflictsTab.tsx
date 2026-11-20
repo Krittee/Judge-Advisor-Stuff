@@ -136,7 +136,10 @@ export function ConflictsTab({
     () => conflictGroups(state.conflicts, state.judges, state.panels, state.teams, blocks),
     [state.conflicts, state.judges, state.panels, state.teams, blocks],
   );
-  const stranded = useMemo(() => strandedTeams(state.teams, state.panels, blocks), [state.teams, state.panels, blocks]);
+  const stranded = useMemo(
+    () => strandedTeams(state.teams, state.panels, blocks, state.eventSetup?.format),
+    [state.teams, state.panels, blocks, state.eventSetup?.format],
+  );
 
   // Arriving from Panels: bring that judge's group into view and put the keyboard on it. The frame scrolls a new section to its top in
   // an effect of its own that runs after this one, so the scroll waits a frame.

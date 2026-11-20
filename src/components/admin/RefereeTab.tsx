@@ -616,11 +616,11 @@ function CorrectBody({
               </button>
             </div>
 
-            {/* Counts only for Minor and Major (the server stores false for anything else); shown once a rule is picked, as on the referee's page. */}
+            {/* Counts only for Minor (the server stores false for anything else); shown once a rule is picked, as on the referee's page. */}
             {draft.rules.length || canAffectMatch(draft.kind) ? (
               <label className="ja-rf-row">
                 <span>
-                  Match affecting<small>Minor and Major only</small>
+                  Match affecting<small>Minor only</small>
                 </span>
                 <input
                   type="checkbox"

@@ -52,12 +52,12 @@ The match stays set for every flag you file until you change it. Change it when 
 
 1. Type the **Team to flag**. Or use the **All teams** tab and pick the team.
 2. Under **What happened**, tap the rules that were broken. **All rules** shows the full list.
-3. Under **How serious?**, tap one: Good conduct, Warning, Minor violation, Major violation or Disqualified.
+3. Under **How serious?**, tap one: Good conduct, Warning, Minor violation or Disqualified.
 4. Add a short **note** if you want to.
-5. After you pick rules, you can switch on **Match affecting**. It is for Minor and Major only.
+5. After you pick rules, you can switch on **Match affecting**. It is for Minor only.
 6. Press the **Record** button at the bottom. It shows the severity and team, for example Record Minor.
 
-Minor, Major and Disqualified need at least one rule. The line above the button tells you what is missing.
+Minor and Disqualified need at least one rule. The line above the button tells you what is missing.
 If the team already has a flag for the same rule, the app shows a **Repeated** warning. It does not choose the severity for you. You decide.
 
 **Check what is already on a team**

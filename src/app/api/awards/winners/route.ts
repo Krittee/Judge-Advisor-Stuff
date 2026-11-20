@@ -3,8 +3,9 @@ import { actorParts } from "@/lib/activity";
 import { canAdminister, getSession } from "@/lib/auth";
 import { goodConductTeams, SPORTSMANSHIP } from "@/lib/awards";
 import { store, StoreError } from "@/lib/db";
+import { keyError, WHOLE_EVENT } from "@/lib/eventSetup";
 import { awards } from "@/lib/presets";
-import { awardLabel, fields } from "../shared";
+import { awardLabel, fields, refuseIfSent } from "../shared";
 
 export const dynamic = "force-dynamic";
 
@@ -37,14 +38,20 @@ export async function PUT(request: Request) {
   if (!award) {
     return NextResponse.json({ error: "That award does not exist." }, { status: 400 });
   }
-
   const db = store();
+  const setup = await db.getEventSetup();
+  const wrongKey = keyError(award, division, setup);
+  if (wrongKey) return NextResponse.json({ error: wrongKey }, { status: 400 });
+  const locked = await refuseIfSent(awardId, division);
+  if (locked) return locked;
+
   const teams = await db.listTeams();
   const team = teams.find((t) => t.id === teamId);
   if (!team) {
     return NextResponse.json({ error: "That team no longer exists." }, { status: 404 });
   }
-  if (team.division !== division) {
+  // A blended whole-event award takes any team in the event.
+  if (team.division !== division && !(division === WHOLE_EVENT && setup?.format === "blended")) {
     return NextResponse.json(
       { error: `Team ${team.number} is in ${team.division}, not ${division}. Awards are decided division by division.` },
       { status: 400 },
@@ -108,6 +115,8 @@ export async function DELETE(request: Request) {
   if (!awardId || !division) {
     return NextResponse.json({ error: "An award and a division are required." }, { status: 400 });
   }
+  const locked = await refuseIfSent(awardId, division);
+  if (locked) return locked;
 
   const db = store();
   const teamId = String(body.teamId ?? "");

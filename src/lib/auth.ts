@@ -4,7 +4,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { store } from "./db";
 import { bangkokDay } from "./stepTimes";
 
-export const ROLES = ["admin", "judge", "queuer", "referee", "coordinator"] as const;
+export const ROLES = ["admin", "judge", "queuer", "referee", "coordinator", "marketing"] as const;
 export type Role = (typeof ROLES)[number];
 
 /** No cookie at all — a team on the public pages. */
@@ -13,7 +13,8 @@ export type Session =
   | { role: "judge"; name: string; panelId: string; panelName: string }
   | { role: "queuer"; name: string }
   | { role: "referee"; name: string; head?: true }
-  | { role: "coordinator"; name: string };
+  | { role: "coordinator"; name: string }
+  | { role: "marketing"; name: string };
 
 const COOKIE = "jq_session";
 const MAX_AGE = 60 * 60 * 16; // upper bound; judges also stop at the next Bangkok day
@@ -118,7 +119,7 @@ export async function getSession(): Promise<Session | null> {
   try {
     const { payload } = await jwtVerify(token, secret());
     const role = payload.role;
-    if (role === "admin" || role === "queuer" || role === "coordinator") {
+    if (role === "admin" || role === "queuer" || role === "coordinator" || role === "marketing") {
       return { role, name: String(payload.name ?? role) };
     }
     if (role === "referee") {
@@ -167,7 +168,7 @@ const warnedAboutCode = new Set<string>();
  * so in production they are not access codes at all — setting one
  * explicitly is refused just as firmly as leaving it unset.
  */
-const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "REF001", "HREF01", "COORD1", "ALPHA1", "BRAVO2", "CHARLIE3"]);
+const PUBLISHED_CODES = new Set(["JA2026", "DESK01", "REF001", "HREF01", "COORD1", "MKTG01", "ALPHA1", "BRAVO2", "CHARLIE3"]);
 
 /** Read and validate a code that may be left unset. */
 function configuredRoleCode(envVar: string): string {
@@ -230,7 +231,7 @@ function adminCodeSlots(): { code: string; defaultName: string }[] {
 /**
  * Turn a typed-in code into a session.
  *
- * Admin, queuer and coordinator codes come from env vars. Up to four separate admin
+ * Admin, queuer, coordinator and marketing codes come from env vars. Up to four separate admin
  * codes are accepted. Judge codes live on the
  * panels table so you can add a panel on event day without redeploying.
  */
@@ -241,6 +242,7 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
   const adminSlot = adminCodeSlots().find((slot) => sameCode(code, slot.code));
   const queuerCode = roleCode("QUEUER_CODE", "DESK01");
   const coordinatorCode = roleCode("COORDINATOR_CODE", "COORD1");
+  const marketingCode = roleCode("MARKETING_CODE", "MKTG01");
   const refereeCode = roleCode("REFEREE_CODE", "REF001");
   const headRefereeCode = roleCode("HEAD_REFEREE_CODE", "HREF01");
   const cleanName = name.trim().slice(0, 60);
@@ -253,6 +255,9 @@ export async function resolveCode(rawCode: string, name: string): Promise<Sessio
   }
   if (coordinatorCode && sameCode(code, coordinatorCode)) {
     return { role: "coordinator", name: cleanName || "Coordinator" };
+  }
+  if (marketingCode && sameCode(code, marketingCode)) {
+    return { role: "marketing", name: cleanName || "Marketing" };
   }
   if (refereeCode && sameCode(code, refereeCode)) {
     return { role: "referee", name: cleanName || "Referee" };
@@ -416,8 +421,10 @@ export function clientKeyFor(request: Request): string {
  *   judge             no        own panel  no             own panel   no
  *   admin             any       any        any            any         yes
  *   coordinator       any       no         no             no          no
+ *   marketing         no        no         no             no          no
  *
  * A coordinator also sets a team's interview language (canSetTeamLanguage).
+ * Marketing is read-only (the Awards Desk read comes in a later task); every helper below denies it.
  *
  * "own panel" is the load-bearing part: a judge may only advance,
  * read or write against teams assigned to the panel whose code they
@@ -525,5 +532,6 @@ export function actorLabel(s: Session | null): string {
   if (s.role === "queuer") return `queuer:${s.name}`;
   if (s.role === "referee") return `referee:${s.name}`;
   if (s.role === "coordinator") return `coordinator:${s.name}`;
+  if (s.role === "marketing") return `marketing:${s.name}`;
   return `admin:${s.name}`;
 }

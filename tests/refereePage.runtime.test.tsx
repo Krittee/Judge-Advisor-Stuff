@@ -18,7 +18,6 @@ const kinds: FlagKind[] = [
   { id: "good", label: "Good conduct", short: "Good", color: "emerald", severity: 0, requiresRule: false },
   { id: "warning", label: "Warning", short: "Warning", color: "amber", severity: 1, requiresRule: false },
   { id: "minor", label: "Minor violation", short: "Minor", color: "orange", severity: 2, requiresRule: true },
-  { id: "major", label: "Major violation", short: "Major", color: "rose", severity: 3, requiresRule: true },
   { id: "dq", label: "Disqualified", short: "DQ", color: "black", severity: 4, requiresRule: true },
 ];
 
@@ -149,22 +148,22 @@ test("the severity group has a button per kind, in order, and only the chosen on
       ["Good conduct", "false"],
       ["Warning", "false"],
       ["Minor violation", "true"],
-      ["Major violation", "false"],
       ["Disqualified", "false"],
     ],
   );
   assert.equal(markup.match(/<svg/g)?.length, 1, "the check is on the chosen one only");
+  assert.match(markup, /rf-sv--wide[^>]*>(?:<svg.*?<\/svg>)?Minor violation/, "Minor spans both columns");
   assert.match(markup, /class="[^"]*rf-sv--wide[^"]*">Disqualified/, "Disqualified spans both columns");
-  assert.equal(markup.match(/rf-sv--wide/g)?.length, 1);
+  assert.equal(markup.match(/rf-sv--wide/g)?.length, 2, "only Minor and DQ are wide; Good conduct and Warning share the top row");
 });
 
 test("severity buttons are filled in their tone, and the escalation ring marks a kind without selecting it", () => {
-  const markup = renderToStaticMarkup(<SeverityButtons kinds={kinds} value={null} onChange={noop} escalateId="major" />);
-  assert.match(markup, /class="[^"]*bg-danger[^"]*">Major violation/);
+  const markup = renderToStaticMarkup(<SeverityButtons kinds={kinds} value={null} onChange={noop} escalateId="dq" />);
+  assert.match(markup, /class="[^"]*bg-waiting[^"]*">Minor violation/);
   assert.match(markup, /class="[^"]*bg-ink [^"]*">Disqualified/);
   const ringed = markup.match(/ring-caution/g) ?? [];
   assert.equal(ringed.length, 1, "exactly one kind is ringed");
-  assert.match(markup, /class="[^"]*ring-caution[^"]*">Major violation/);
+  assert.match(markup, /class="[^"]*ring-caution[^"]*">Disqualified/);
   assert.doesNotMatch(markup, /aria-pressed="true"/, "nothing is selected on the user's behalf");
 });
 

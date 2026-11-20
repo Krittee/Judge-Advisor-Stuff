@@ -15,12 +15,12 @@ const matchFieldsSrc = readFileSync(new URL("../src/components/MatchFields.tsx",
 const fileStoreSrc = readFileSync(new URL("../src/lib/db/file.ts", import.meta.url), "utf8");
 const postgresSrc = readFileSync(new URL("../src/lib/db/postgres.ts", import.meta.url), "utf8");
 
-test("only Minor, Major and Disqualified are configured to require a rule", () => {
+test("only Minor and Disqualified are configured to require a rule", () => {
   const byId = Object.fromEntries(event.refereeFlags.map((kind) => [kind.id, kind]));
   assert.equal(byId.good.requiresRule, undefined);
   assert.equal(byId.warning.requiresRule, undefined);
   assert.equal(byId.minor.requiresRule, true);
-  assert.equal(byId.major.requiresRule, true);
+  assert.equal(byId.major, undefined, "Major is retired; DQ stands alone");
   assert.equal(byId.dq.requiresRule, true);
 });
 
@@ -145,7 +145,7 @@ test("a field is a number from the event's setup; the division prefix is gone", 
   assert.ok(!pageSrc.includes("matchTypes={"), "FlagList's deprecated matchTypes prop is no longer passed");
 });
 
-test("repeated history comes from the tested helper and cannot select an automatic Major or DQ", () => {
+test("repeated history comes from the tested helper and cannot select an automatic DQ", () => {
   assert.ok(pageSrc.includes("refereeHistory(state.flags"));
   assert.ok(pageSrc.includes("rules, matchType, matchNumber, rulesetId"), "history must be scoped to the event's ruleset");
   assert.ok(!/kind\s*=\s*["']major["']/.test(pageSrc));
@@ -161,8 +161,8 @@ test("repeated history comes from the tested helper and cannot select an automat
   assert.ok(pageSrc.includes("Head Referee"));
 });
 
-test("the escalation highlight can never point at Disqualified", () => {
-  assert.match(pageSrc, /kinds\.filter\(\(k\) => k\.id !== DISQUALIFIED_KIND\)\.map\(\(k\) => k\.severity\)/);
+test("the escalation highlight rings the most severe kind (DQ) but nothing selects it", () => {
+  assert.match(pageSrc, /Math\.max\(0, \.\.\.kinds\.map\(\(k\) => k\.severity\)\)/);
 });
 
 test("Flagged Today renders each complete report and legacy null rules remain guarded", () => {
@@ -177,7 +177,7 @@ test("the app's existing full wipe remains the active-event boundary", () => {
   assert.ok(fileStoreSrc.includes("loaded = empty()"));
   assert.match(
     postgresSrc,
-    /truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup, award_no_winner cascade/,
+    /truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup, event_setup, award_no_winner, award_releases cascade/,
     "a full wipe must clear the referee setup, and the judge roster, with the rest of the event",
   );
   assert.ok(!/resetDay\(\)[\s\S]*truncate[^\n]*flags/.test(postgresSrc));

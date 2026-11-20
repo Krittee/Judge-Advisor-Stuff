@@ -1,4 +1,5 @@
 import { store } from "./db";
+import { setupDivisions } from "./eventSetup";
 import { stripCode } from "./data";
 import { blockedTeams, conflictsFor, panelBlocks } from "./roster";
 import {
@@ -18,7 +19,15 @@ import {
   canReadNotes,
   type Session,
 } from "./auth";
-import type { AppState, ViewerCapabilities } from "./types";
+import type { AppState, EventSetup, Panel, Team, ViewerCapabilities } from "./types";
+
+/** Every division the event runs: the saved program's, else the configured ones plus any a panel or team has. */
+export function eventDivisions(panels: Panel[], teams: Team[], setup?: Pick<EventSetup, "program" | "format"> | null): string[] {
+  return (
+    setupDivisions(setup) ??
+    [...new Set([...presetDivisions(), ...panels.map((p) => p.division), ...teams.map((t) => t.division)])].filter(Boolean)
+  );
+}
 
 /**
  * Server-only. Imports the store, which reaches for node:fs — keep this
@@ -37,6 +46,9 @@ import type { AppState, ViewerCapabilities } from "./types";
  *   referee everything the board shows, minus those notes — a referee
  *           files flags; nothing about their job involves what a team
  *           wrote to its judges
+ *   marketing
+ *           exactly what a team gets: signed in, but not staff, so no
+ *           staff names either.
  *   team    the same, and without the staff names on each request
  *           (who created, acknowledged or interviewed it, and the
  *           outcome) — the big board never shows them
@@ -49,7 +61,7 @@ import type { AppState, ViewerCapabilities } from "./types";
  */
 export async function loadState(session: Session | null): Promise<AppState> {
   const db = store();
-  const [panels, teams, rows, allConflicts, judges, allFlags, refereeSetup] = await Promise.all([
+  const [panels, teams, rows, allConflicts, judges, allFlags, refereeSetup, eventSetup] = await Promise.all([
     db.listPanels(),
     db.listTeams(),
     db.listRequests(),
@@ -57,6 +69,7 @@ export async function loadState(session: Session | null): Promise<AppState> {
     db.listJudges(),
     db.listFlags(),
     db.getRefereeSetup(),
+    db.getEventSetup(),
   ]);
 
   const isJudge = session?.role === "judge";
@@ -86,7 +99,7 @@ export async function loadState(session: Session | null): Promise<AppState> {
   const visibleTeams = !judgeSessionValid
     ? []
     : (division
-        ? teams.filter((t) => divisionsCompatible(t.division, division))
+        ? teams.filter((t) => divisionsCompatible(t.division, division, eventSetup?.format))
         : teams
       ).filter((t) => !barred.has(t.id));
 
@@ -102,7 +115,7 @@ export async function loadState(session: Session | null): Promise<AppState> {
   const visiblePanels = !judgeSessionValid
     ? []
     : division
-      ? panels.filter((p) => divisionsCompatible(p.division, division) || heldPanelIds.has(p.id))
+      ? panels.filter((p) => divisionsCompatible(p.division, division, eventSetup?.format) || heldPanelIds.has(p.id))
       : panels;
   const visiblePanelIds = new Set(visiblePanels.map((p) => p.id));
   const visibleTeamIds = new Set(visibleTeams.map((t) => t.id));
@@ -135,15 +148,9 @@ export async function loadState(session: Session | null): Promise<AppState> {
   // out, is staff metadata. The board and team pages show none of it, so
   // an anonymous caller (anyone on the venue wifi) gets it nulled rather
   // than a roster of who was working which desk.
-  const includeStaffFields = session !== null;
+  const includeStaffFields = session !== null && session.role !== "marketing";
 
-  const divisions = [
-    ...new Set([
-      ...presetDivisions(),
-      ...panels.map((p) => p.division),
-      ...teams.map((t) => t.division),
-    ]),
-  ].filter(Boolean);
+  const divisions = eventDivisions(panels, teams, eventSetup);
 
   return {
     panels: visiblePanels.map(stripCode),
@@ -179,6 +186,9 @@ export async function loadState(session: Session | null): Promise<AppState> {
     matchTypes: matchTypes(refereeSetup?.ruleset),
     refereeSetup:
       refereeSetup && !includeStaffFields ? { ...refereeSetup, set_by: "" } : refereeSetup,
+    /* Marketing needs the program and format to read the Awards Desk; who set
+       them is staff. An anonymous caller gets none. */
+    eventSetup: !session ? null : eventSetup && !includeStaffFields ? { ...eventSetup, set_by: "" } : eventSetup,
     flagKinds: refereeFlags(),
     /* A referee's flag is about a team's conduct, not the queue, so it
        goes only to those who act on it: referees writing them, judges

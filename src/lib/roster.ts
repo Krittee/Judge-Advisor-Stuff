@@ -1,5 +1,5 @@
 import { divisionsCompatible, languageFit } from "./presets";
-import type { ConflictRow, JudgeRow, Panel, Team } from "./types";
+import type { ConflictRow, EventFormat, JudgeRow, Panel, Team } from "./types";
 
 /**
  * The one rule for "may this panel meet this team?", and the judge roster
@@ -85,10 +85,11 @@ export function planAssignments(
   load: Map<string, number>,
   perPanel: number,
   blocks: PanelBlock[],
+  format?: EventFormat | null,
 ): { teamId: string; panelId: string }[] {
   const left = new Map(load);
   const eligibleFor = (t: (typeof teams)[number]) =>
-    panels.filter((p) => divisionsCompatible(t.division, p.division) && !isPanelBlocked(blocks, p.id, t.id));
+    panels.filter((p) => divisionsCompatible(t.division, p.division, format) && !isPanelBlocked(blocks, p.id, t.id));
   // Array.prototype.sort is stable, so equal keys keep their given order.
   const scarcity = (t: (typeof teams)[number]) => {
     const matching = eligibleFor(t).filter((p) => languageFit(t, p) === "match").length;
