@@ -33,12 +33,18 @@ const releases = [
   release("create", { teams: [], no_winner: true }),
   release("judges", { teams: [T("1234A", "Gear Grinders"), T("60601D", "Iron Owls")] }),
 ];
-const VIEW: ReleasedView = { awards, divisions: ["Elementary School", MS, "High School"], releases };
+const IQ = { label: "VEX IQ", divisions: ["Elementary School", MS] };
+const V5 = { label: "V5RC", divisions: [MS, "High School"] };
+const BL = { label: "Blended", divisions: ["Blended"] };
+const DIVISIONS = ["Elementary School", MS, "High School", "Blended"];
+const VIEW: ReleasedView = { awards, divisions: DIVISIONS, programs: [IQ, V5, BL], releases };
+/** What the desk is given with no programs config: one tab, so no tab bar. */
+const ONE: ReleasedView = { ...VIEW, divisions: ["Elementary School", MS, "High School"], programs: [{ label: "All", divisions: ["Elementary School", MS, "High School"] }] };
 
 function desk(over: Partial<React.ComponentProps<typeof AwardsDesk>> = {}) {
   return renderToStaticMarkup(
     <AppRouterContext.Provider value={router}>
-      <AwardsDesk name="Ploy" view={VIEW} lastGood="10:59" failed={false} query="" onQuery={noop} isSeen={() => false} onSeen={noop} {...over} />
+      <AwardsDesk name="Ploy" view={VIEW} lastGood="10:59" failed={false} query="" onQuery={noop} tab={null} onTab={noop} isSeen={() => false} onSeen={noop} {...over} />
     </AppRouterContext.Provider>,
   );
 }
@@ -198,4 +204,68 @@ test("the CSS: page-scoped, no motion, outside the Judge Advisor blocks", () => 
   assert.doesNotMatch(block.replace(/\/\*[\s\S]*?\*\//g, ""), /@keyframes|animation|transform: (?!none)|(?<!over)scroll-behavior/);
   assert.doesNotMatch(css, /si-av--ph|dp-av--ph|mk-av--ph/);
   assert.match(block, /\.mk-av img \{[^}]*object-fit: cover/);
+});
+
+/* ---- the program tabs -------------------------------------------------- */
+
+const tabsOf = (m: string) => [...m.matchAll(/<button[^>]*role="tab"[^>]*>([\s\S]*?)<\/button>/g)].map((b) => text(b[1]).trim());
+const headings = (m: string) => [...m.matchAll(/<h2 id="mk-h-\d+">([^<]*)<\/h2>/g)].map((h) => h[1]);
+
+test("the tab bar: one tab per program with its sent count, the first selected, a quiet tablist", () => {
+  const m = desk();
+  assert.match(m, /role="tablist"/);
+  assert.deepEqual(tabsOf(m), ["VEX IQ · 4 of 22 sent", "V5RC · 4 of 22 sent", "Blended · 0 of 11 sent"]);
+  assert.equal([...m.matchAll(/aria-selected="true"/g)].length, 1);
+  assert.match(m, /aria-selected="true"[^>]*>VEX IQ/);
+  // The status line comes first, the tabs under it, the changed box above them.
+  assert.ok(m.indexOf("Checks every") < m.indexOf('role="tablist"'));
+  assert.ok(m.indexOf("Changed since sent") < m.indexOf('role="tablist"'));
+});
+
+test("only the selected tab's divisions show, in its order; the saved tab is the one drawn", () => {
+  assert.deepEqual(headings(desk()), ["Elementary School", MS]);
+  const v5 = desk({ tab: "v5rc" });
+  assert.deepEqual(headings(v5), [MS, "High School"]);
+  assert.match(v5, /aria-selected="true"[^>]*>V5RC/);
+  assert.deepEqual(headings(desk({ tab: "blended" })), ["Blended"]);
+  // A saved tab that no longer exists falls back to the first.
+  assert.deepEqual(headings(desk({ tab: "gone" })), ["Elementary School", MS]);
+});
+
+test("the changed box lists every division whatever tab is showing", () => {
+  const view: ReleasedView = { ...VIEW, releases: [...releases, release("design", { division: "High School", teams: [T("2210R", "Red Shift")], previous: { teams: [T("1111Z", "Old")], no_winner: false }, changed_at: "2026-11-19T04:00:00.000Z" })] };
+  const m = desk({ view, tab: "vex-iq" });
+  assert.match(text(m), /High School · Design/);
+  assert.deepEqual(headings(m), ["Elementary School", MS]);
+});
+
+test("search spans every tab: no tab bar, each division once, each row counted once; clearing brings the tabs back", () => {
+  const view: ReleasedView = { ...VIEW, releases: [...releases, release("design", { division: "High School" })] };
+  const m = desk({ view, tab: "vex-iq", query: "2381C" });
+  assert.doesNotMatch(m, /role="tablist"|role="tab"/);
+  assert.deepEqual(headings(m), [MS, "High School"], "Middle School once, and High School from the other tab");
+  assert.match(text(m), /2 results/);
+  const ms = desk({ query: "7700B" });
+  assert.doesNotMatch(ms, /role="tab"/);
+  assert.deepEqual(headings(ms), [MS]);
+  assert.match(text(ms), /1 result(?!s)/);
+  // Back on the same tab once the query is gone.
+  assert.match(desk({ tab: "v5rc", query: "" }), /aria-selected="true"[^>]*>V5RC/);
+});
+
+test("one tab, no tab bar: the page is what it was", () => {
+  const m = desk({ view: ONE });
+  assert.doesNotMatch(m, /role="tablist"|role="tab"/);
+  assert.deepEqual(headings(m), ["Elementary School", MS, "High School"]);
+});
+
+test("the tab is remembered on this device behind its own try/catch, and the tabs are styled like the Judge Advisor's toggle", () => {
+  const page = read("src/app/marketing/page.tsx");
+  assert.match(page, /readTab\(/);
+  assert.match(page, /writeTab\(/);
+  const css = read("src/app/globals.css");
+  assert.match(css, /\.mk-tabs button\[aria-selected="true"\] \{[^}]*background: var\(--accent\)/);
+  assert.match(css, /\.mk-tabs button \{[^}]*min-height: 44px/);
+  assert.match(css, /\.mk-tabs button \{[^}]*min-height: 36px/);
+  assert.doesNotMatch(read("src/components/marketing/AwardsDesk.tsx"), /ja-aw-/);
 });

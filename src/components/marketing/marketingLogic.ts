@@ -1,4 +1,4 @@
-import type { AwardReleaseRow, ReleasedView, ReleaseSnapshot, ReleaseTeam } from "@/lib/types";
+import type { AwardReleaseRow, ReleasedProgram, ReleasedView, ReleaseSnapshot, ReleaseTeam } from "@/lib/types";
 
 /**
  * The Awards Desk's decisions, as plain functions: what each award row says,
@@ -89,6 +89,26 @@ export function sentCount(view: ReleasedView, division: string): number {
   return view.releases.filter((r) => r.division === division && r.status === "sent" && ids.has(r.award_id)).length;
 }
 
+/** The tabs to draw: the server's, or one "All" tab over every division (an older answer, or no programs configured). */
+export function tabsOf(view: ReleasedView): ReleasedProgram[] {
+  return view.programs?.length ? view.programs : [{ label: "All", divisions: view.divisions }];
+}
+
+/** A tab's lower-case slug: what `mk-tab` remembers, so a rename of the label's case or spacing does not lose it. */
+export const tabKey = (label: string) => label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/** The key of the tab to show: the saved one while it still exists, else the first. */
+export function pickTab(tabs: ReleasedProgram[], saved: string | null): string {
+  const keys = tabs.map((t) => tabKey(t.label));
+  return saved && keys.includes(saved) ? saved : (keys[0] ?? "");
+}
+
+/** "VEX IQ · 7 of 22 sent": sent rows over awards × divisions; a division in two tabs counts in each. */
+export function tabLabel(view: ReleasedView, tab: ReleasedProgram): string {
+  const n = tab.divisions.reduce((sum, d) => sum + sentCount(view, d), 0);
+  return `${tab.label} · ${countText(n, view.awards.length * tab.divisions.length)}`;
+}
+
 export const countText = (n: number, m: number) => `${n} of ${m} sent`;
 
 /** Trimmed, case-insensitive: the award's label or a team Marketing has now. `previous` is never searched. */
@@ -134,5 +154,24 @@ export function writeSeen(store: Pick<Storage, "setItem"> | null, key: string): 
     store?.setItem(key, "1");
   } catch {
     /* nothing to do: the flag will show again next load */
+  }
+}
+
+/* The tab is remembered on this device, guarded like Seen: with storage blocked the first tab shows. */
+export const TAB_KEY = "mk-tab";
+
+export function readTab(store: Pick<Storage, "getItem"> | null): string | null {
+  try {
+    return store?.getItem(TAB_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeTab(store: Pick<Storage, "setItem"> | null, key: string): void {
+  try {
+    store?.setItem(TAB_KEY, key);
+  } catch {
+    /* nothing to do: the first tab shows next load */
   }
 }

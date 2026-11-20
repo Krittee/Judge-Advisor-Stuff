@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { changesOf, countText, deskRows, highlight, matchRow, readSeen, resultsText, rowState, seenKey, sentCount, writeSeen } from "../src/components/marketing/marketingLogic";
+import { changesOf, countText, deskRows, highlight, matchRow, pickTab, readSeen, readTab, resultsText, rowState, seenKey, sentCount, tabKey, tabLabel, writeSeen, writeTab } from "../src/components/marketing/marketingLogic";
+import { programTabs } from "../src/lib/presets";
 import type { AwardReleaseRow, ReleasedView, ReleaseTeam } from "../src/lib/types";
 
 /* The Awards Desk's decisions as plain functions: what a row says, the "N of M
@@ -28,7 +29,7 @@ const releases: AwardReleaseRow[] = [
   release("ghost"), // an award that is no longer in the config
   release("excellence", { division: "High School", teams: [T("2210R", "Red Shift")] }),
 ];
-const view: ReleasedView = { awards, divisions: ["Elementary School", MS, "High School"], releases };
+const view: ReleasedView = { awards, divisions: ["Elementary School", MS, "High School"], programs: [], releases };
 const unseen = () => false;
 
 test("rowState: sent, no winner, recalled, never sent", () => {
@@ -157,4 +158,50 @@ test("seen store reads back what it wrote", () => {
   writeSeen(store, "k");
   assert.equal(readSeen(store, "k"), true);
   assert.equal(m.get("k"), "1");
+});
+
+/* ---- the program tabs -------------------------------------------------- */
+
+const IQ = { label: "VEX IQ", divisions: ["Elementary School", MS] };
+const V5 = { label: "V5RC", divisions: [MS, "High School"] };
+const EVENT = ["Elementary School", MS, "High School", "Blended"];
+
+test("programTabs: configured programs in event order, then Blended, then Other; empty tabs drop", () => {
+  assert.deepEqual(programTabs(EVENT, [IQ, V5], ["Blended"]), [IQ, V5, { label: "Blended", divisions: ["Blended"] }]);
+  assert.deepEqual(programTabs([...EVENT, "Open"], [IQ, V5], ["Blended"]).at(-1), { label: "Other", divisions: ["Open"] });
+  // A program keeps only the divisions this event has, in the event's order.
+  assert.deepEqual(programTabs([MS, "Elementary School"], [IQ], []), [{ label: "VEX IQ", divisions: [MS, "Elementary School"] }]);
+  assert.deepEqual(programTabs(["High School"], [IQ, V5], ["Blended"]), [{ label: "V5RC", divisions: ["High School"] }]);
+});
+
+test("programTabs: without a programs config there is one tab, All", () => {
+  assert.deepEqual(programTabs(EVENT, [], ["Blended"]), [{ label: "All", divisions: EVENT }]);
+});
+
+test("tabKey is a lower-case slug; pickTab keeps the saved tab only while it exists", () => {
+  assert.equal(tabKey("VEX IQ"), "vex-iq");
+  assert.equal(tabKey("V5RC"), "v5rc");
+  const tabs = [IQ, V5];
+  assert.equal(pickTab(tabs, "v5rc"), "v5rc");
+  assert.equal(pickTab(tabs, "gone"), "vex-iq", "the first tab when the saved one is gone");
+  assert.equal(pickTab(tabs, null), "vex-iq");
+});
+
+test("tabLabel counts sent rows over awards x divisions; Middle School counts in each tab it is in", () => {
+  const v: ReleasedView = { ...view, programs: [IQ, V5] };
+  // Middle School has 4 sent (excellence, design, create, judges); High School 1; the "ghost" award is not counted.
+  assert.equal(tabLabel(v, IQ), "VEX IQ · 4 of 22 sent");
+  assert.equal(tabLabel(v, V5), "V5RC · 5 of 22 sent");
+});
+
+test("the remembered tab survives a throwing storage", () => {
+  const broken = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } };
+  assert.equal(readTab(broken), null);
+  assert.equal(readTab(null), null);
+  assert.doesNotThrow(() => writeTab(broken, "v5rc"));
+  const mem = new Map<string, string>();
+  const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v) };
+  writeTab(store, "v5rc");
+  assert.equal(readTab(store), "v5rc");
+  assert.equal(mem.has("mk-tab"), true);
 });

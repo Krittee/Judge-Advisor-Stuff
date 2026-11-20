@@ -314,13 +314,13 @@ test("send all ready sends every ready, unsent award and lists the rest as skipp
   assert.deepEqual(again.body.sent, []);
 });
 
-test("the released read carries award list, divisions and rows only", async () => {
+test("the released read carries award list, divisions, tabs and rows only", async () => {
   const w = await world();
   await win(w, "excellence", w.hawks);
   await send(ADMIN, "excellence", ES);
   for (const session of [ADMIN, MARKETING]) {
     const read = await released(session, "GET");
-    assert.deepEqual(Object.keys(read.body).sort(), ["awards", "divisions", "releases"]);
+    assert.deepEqual(Object.keys(read.body).sort(), ["awards", "divisions", "programs", "releases"]);
     assert.equal(read.headers.get("cache-control"), "no-store");
     assert.deepEqual(Object.keys(read.body.awards[0]).sort(), ["id", "label", "order", "places"]);
     assert.deepEqual(read.body.awards.map((a: { order: number }) => a.order), read.body.awards.map((_: unknown, i: number) => i));
@@ -434,4 +434,24 @@ test("reset the day and wipe everything clear releases", async () => {
     assert.equal((await teamsApi("PATCH", { action })).status, 200, action);
     assert.deepEqual(await w.db.listReleases(), [], action);
   }
+});
+
+/* ===== the tabs Marketing sees ============================================ */
+
+test("GET adds the program tabs: VEX IQ, V5RC and Blended; a division nobody placed lands in Other", async () => {
+  const w = await world();
+  const ES_MS_HS_BLENDED = ["Elementary School", "Middle School", "High School", "Blended"];
+  const first = await released(MARKETING, "GET");
+  assert.deepEqual(first.body.divisions, ES_MS_HS_BLENDED);
+  assert.deepEqual(first.body.programs, [
+    { label: "VEX IQ", divisions: ["Elementary School", "Middle School"] },
+    { label: "V5RC", divisions: ["Middle School", "High School"] },
+    { label: "Blended", divisions: ["Blended"] },
+  ]);
+  assert.deepEqual((await released(ADMIN, "GET")).body.programs, first.body.programs);
+
+  await w.db.upsertTeams([{ number: "55555X", name: "Walk-ins", pit: null, division: "Open", category: "developing" }]);
+  const next = await released(MARKETING, "GET");
+  assert.deepEqual(next.body.programs.at(-1), { label: "Other", divisions: ["Open"] });
+  assert.equal(next.body.programs.length, 4);
 });

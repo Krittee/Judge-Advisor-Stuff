@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { call } from "@/components/useAppState";
 import { AwardsDesk } from "@/components/marketing/AwardsDesk";
-import { hhmm, readSeen, writeSeen } from "@/components/marketing/marketingLogic";
+import { hhmm, readSeen, readTab, writeSeen, writeTab } from "@/components/marketing/marketingLogic";
 import { homeFor } from "@/components/SignInForm";
 import type { Session } from "@/lib/auth";
 import type { ReleasedView } from "@/lib/types";
@@ -35,6 +35,8 @@ export default function MarketingPage() {
   const [lastGood, setLastGood] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [query, setQuery] = useState("");
+  // Read once on this device; the first render here is "Loading…", so nothing differs between server and browser.
+  const [tab, setTab] = useState<string | null>(() => readTab(browserStore()));
   const [seen, setSeen] = useState<Set<string>>(() => new Set());
   const live = useRef(true);
 
@@ -92,6 +94,11 @@ export default function MarketingPage() {
     setSeen((s) => new Set(s).add(key));
   };
 
+  const onTab = (key: string) => {
+    writeTab(browserStore(), key);
+    setTab(key);
+  };
+
   if (session === undefined) {
     return <p className="p-10 text-center text-ink-faint">Loading…</p>;
   }
@@ -104,6 +111,8 @@ export default function MarketingPage() {
       failed={failed}
       query={query}
       onQuery={setQuery}
+      tab={tab}
+      onTab={onTab}
       isSeen={isSeen}
       onSeen={onSeen}
     />

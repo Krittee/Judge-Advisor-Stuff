@@ -1,7 +1,7 @@
 "use client";
 
 import { SignOutButton } from "@/components/judging";
-import { countText, deskRows, changesOf, highlight, hhmm, matchRow, resultsText, sentCount, type Change, type DeskRow } from "./marketingLogic";
+import { countText, deskRows, changesOf, highlight, hhmm, matchRow, pickTab, resultsText, sentCount, tabKey, tabLabel, tabsOf, type Change, type DeskRow } from "./marketingLogic";
 import type { ReleasedView } from "@/lib/types";
 
 /**
@@ -24,6 +24,9 @@ export type AwardsDeskProps = {
   failed: boolean;
   query: string;
   onQuery: (query: string) => void;
+  /** The remembered tab's key (`mk-tab`), null when none; a key no tab has falls back to the first. */
+  tab: string | null;
+  onTab: (key: string) => void;
   isSeen: (key: string) => boolean;
   onSeen: (key: string) => void;
 };
@@ -89,6 +92,38 @@ function ChangedBox({ changes, onSeen }: { changes: Change[]; onSeen: (key: stri
   );
 }
 
+/**
+ * One tab per program, drawn like the Judge Advisor's Matrix | By award toggle
+ * but with tab semantics: the selected tab is the accent (it is a control),
+ * and each label carries its own sent count in words. Arrow keys move between
+ * tabs, Home and End jump to the ends.
+ */
+function TabBar({ view, active, onTab }: { view: ReleasedView; active: string; onTab: (key: string) => void }) {
+  const tabs = tabsOf(view);
+  const go = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const keys = tabs.map((t) => tabKey(t.label));
+    const at = keys.indexOf(active);
+    const to = e.key === "ArrowRight" ? (at + 1) % keys.length : e.key === "ArrowLeft" ? (at + keys.length - 1) % keys.length : e.key === "Home" ? 0 : e.key === "End" ? keys.length - 1 : -1;
+    if (to < 0) return;
+    e.preventDefault();
+    onTab(keys[to]);
+    (e.currentTarget.children[to] as HTMLElement | undefined)?.focus();
+  };
+  return (
+    <div className="mk-tabs" role="tablist" aria-label="Program" onKeyDown={go}>
+      {tabs.map((t) => {
+        const key = tabKey(t.label);
+        const on = key === active;
+        return (
+          <button key={key} type="button" role="tab" id={`mk-tab-${key}`} aria-selected={on} aria-controls="mk-tp" tabIndex={on ? 0 : -1} onClick={() => onTab(key)}>
+            {tabLabel(view, t)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function Row({ row, query, onSeen }: { row: DeskRow; query: string; onSeen: (key: string) => void }) {
   const { award, release, state, change } = row;
   return (
@@ -128,10 +163,15 @@ export function AwardsDesk(p: AwardsDeskProps) {
   const q = p.query.trim();
   const view = p.view;
   const changes = view ? changesOf(view, p.isSeen) : [];
+  const tabs = view ? tabsOf(view) : [];
+  const active = pickTab(tabs, p.tab);
+  // A search looks across every tab, so the bar goes while there is one and each division is listed once.
+  const tabbed = !q && tabs.length > 1;
+  const shown = view ? (q ? view.divisions : (tabs.find((t) => tabKey(t.label) === active) ?? tabs[0]).divisions) : [];
   // Search hides what does not match, and a division with nothing left.
   const sections = view
-    ? view.divisions
-        .map((division, i) => ({ i, division, rows: deskRows(view, division, p.isSeen).filter((r) => matchRow(r, q)) }))
+    ? shown
+        .map((division) => ({ i: view.divisions.indexOf(division), division, rows: deskRows(view, division, p.isSeen).filter((r) => matchRow(r, q)) }))
         .filter((s) => !q || s.rows.length > 0)
     : [];
   const found = sections.reduce((n, s) => n + s.rows.length, 0);
@@ -202,6 +242,7 @@ export function AwardsDesk(p: AwardsDeskProps) {
         ) : (
           <>
             {changes.length > 0 ? <ChangedBox changes={changes} onSeen={p.onSeen} /> : null}
+            {tabbed && view.divisions.length > 0 && view.awards.length > 0 ? <TabBar view={view} active={active} onTab={p.onTab} /> : null}
 
             {view.divisions.length === 0 ? (
               <p className="mk-empty">No divisions yet.</p>
@@ -219,6 +260,7 @@ export function AwardsDesk(p: AwardsDeskProps) {
                     <p className="mk-empty" role="status">{`No award or team matches "${q}".`}</p>
                   )
                 ) : null}
+                <div role={tabbed ? "tabpanel" : undefined} id={tabbed ? "mk-tp" : undefined} aria-labelledby={tabbed ? `mk-tab-${active}` : undefined}>
                 {sections.map(({ i, division, rows }) => {
                   const n = sentCount(view, division);
                   return (
@@ -238,6 +280,7 @@ export function AwardsDesk(p: AwardsDeskProps) {
                     </section>
                   );
                 })}
+                </div>
               </>
             )}
           </>

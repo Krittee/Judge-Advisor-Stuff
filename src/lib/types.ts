@@ -267,8 +267,10 @@ export type AwardReleaseRow = ReleaseSnapshot & {
 };
 
 export type ReleasedAward = { id: string; label: string; order: number; places: number };
-/** GET /api/awards/released: the award list, the divisions and the sends, never a nomination or a winner. */
-export type ReleasedView = { awards: ReleasedAward[]; divisions: string[]; releases: AwardReleaseRow[] };
+/** One tab on the Awards Desk: a label and the divisions it shows (a division may be in more than one tab). */
+export type ReleasedProgram = { label: string; divisions: string[] };
+/** GET /api/awards/released: the award list, the divisions, the tabs and the sends, never a nomination or a winner. */
+export type ReleasedView = { awards: ReleasedAward[]; divisions: string[]; programs: ReleasedProgram[]; releases: AwardReleaseRow[] };
 export type ReleaseReply = { release: AwardReleaseRow };
 export type SendAllReply = {
   sent: AwardReleaseRow[];

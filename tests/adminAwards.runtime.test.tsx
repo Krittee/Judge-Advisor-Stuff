@@ -850,7 +850,7 @@ test("the award names, short names and the hidden-column words come from the con
 /* ---- sending to Marketing ------------------------------------------------------------------------------------- */
 
 const sparkPlugs = team("4455F", "Spark Plugs", { panel_id: "p2" });
-const view = (...releases: ReleasedView["releases"]): ReleasedView => ({ awards: [], divisions, releases });
+const view = (...releases: ReleasedView["releases"]): ReleasedView => ({ awards: [], divisions, programs: [], releases });
 const lockLabel = 'aria-label="Locked: sent to Marketing"';
 /** One award's section of the By award list. */
 const award = (markup: string, name: string) => sections(markup).find((s) => s.name === `${name} Award`)!.body;

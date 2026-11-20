@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { actorParts } from "@/lib/activity";
 import { canAdminister, getSession, type Session } from "@/lib/auth";
 import { store } from "@/lib/db";
-import { awards } from "@/lib/presets";
+import { awards, blendedDivisions, presetPrograms, programTabs } from "@/lib/presets";
 import { decisionFor, nextSend, sentRelease } from "@/lib/releases";
 import { eventDivisions } from "@/lib/server-state";
 import type { AwardReleaseRow, AwardView, ReleaseReply, ReleasedView, ReleaseSnapshot, SendAllReply } from "@/lib/types";
@@ -74,9 +74,11 @@ export async function GET() {
   }
   const db = store();
   const [releases, panels, teams] = await Promise.all([db.listReleases(), db.listPanels(), db.listTeams()]);
+  const divisions = eventDivisions(panels, teams);
   const view: ReleasedView = {
     awards: awards().map((a, order) => ({ id: a.id, label: a.label, order, places: a.places })),
-    divisions: eventDivisions(panels, teams),
+    divisions,
+    programs: programTabs(divisions, presetPrograms(), blendedDivisions()),
     // A recalled decision is the Judge Advisor's business; Marketing sees only that it is withdrawn.
     releases:
       session?.role === "marketing"
