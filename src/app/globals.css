@@ -2768,7 +2768,7 @@ body:has(.desk, .co) > .theme-toggle:hover {
  * One stylesheet serves every tab, so a class one tab styles is a class the
  * others' markup can pick up. Each feature's CSS opens with an @ja-block
  * marker comment, and a class is styled bare by one block only: another tab
- * takes its own prefix (.ja-cf-, .ja-tm-, .ja-pn-, .ja-rf-, .ja-im-, .ja-sc-, .ja-aw-, .ja-ac-) or anchors a rule on
+ * takes its own prefix (.ja-cf-, .ja-tm-, .ja-pn-, .ja-rf-, .ja-im-, .ja-sc-, .ja-aw-, .ja-ac-, .ja-es-) or anchors a rule on
  * a class of its own. tests/adminCssScope.test.mjs fails on a second definition.
  * ------------------------------------------------------------------ */
 
@@ -2789,7 +2789,7 @@ body:has(.desk, .co) > .theme-toggle:hover {
   --ja-col: var(--surface-2);
 }
 
-.ja-rb, .ja-sbar b, .ja-sh-top h2 {
+.ja-rb, .ja-sbar b, .ja-sh-top h2, .ja-bd-n {
   font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -2812,6 +2812,12 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-top-r { display: flex; flex: none; align-items: center; gap: 2px; margin-right: 44px; }
 .ja-top-r > button { min-height: 44px; padding: 0 10px; border-radius: 10px; color: var(--ink-subtle); font-size: 14px; text-decoration: underline; }
 .ja-top-r > button:hover { color: var(--ink); }
+
+/* The saved event's title in the wide top bar: after the identity and a hairline, the brand mark, "Judge Queue" and the setup. Wide only; the phone's section bar carries the setup on the Event page. */
+.ja-bd { display: none; }
+.ja-bd-n { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
+.ja-bd-s { color: var(--ink-subtle); font-size: 14px; }
+.ja-mk { display: grid; flex: none; width: 26px; height: 26px; place-items: center; border-radius: 8px; background: var(--accent); color: var(--accent-ink); }
 
 /* The current section, on a phone */
 .ja-sbar {
@@ -2884,6 +2890,7 @@ body:has(.admin) > .theme-toggle:hover {
 
   .ja-top { height: 56px; padding: 0 12px 0 20px; }
   .ja-menu, .ja-sbar { display: none; }
+  .ja-bd { display: flex; align-items: center; gap: 10px; height: 28px; margin: 0 auto 0 16px; padding-left: 16px; border-left: 1px solid var(--line); white-space: nowrap; }
   .ja-top-r > button { min-height: 36px; }
   .ja-rail { display: flex; }
   .ja-pad { padding: 12px 20px 16px; }
@@ -3785,6 +3792,133 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-sl-foot .ja-prim { padding: 0 32px; }
 }
 
+/* @ja-block event */
+/* Event (design/event-setup/reference-setup-*.dc.html): the Judge Advisor picks the program and format the whole event runs. Four tiles
+   (one radio group), a preview of what that gives the Awards tab and the Desk, and the three things that would refuse the save.
+   Colour is signal: green is saved / fine, amber is a blocker, muted is not set; accent is chrome (the picked tile, links, the Save button).
+   A refused write is the page's danger Banner, not drawn here. Tints are color-mix in srgb. No motion at all, as the other blocks. */
+.ja-es-h, .ja-es-tn b, .ja-es-ph, .ja-es-ch, .ja-es-ms b, .ja-es-tl b, .ja-es-pgh b, .ja-es-prim {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+.ja-es { display: grid; min-width: 0; max-width: 720px; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.ja-es > * { min-width: 0; }
+.ja-es-h { margin: 0; font-weight: 700; font-size: 24px; line-height: 1.15; letter-spacing: -0.01em; }
+.ja-es-intro { margin: 4px 0 0; color: var(--ink-subtle); font-size: 14.5px; line-height: 1.45; }
+.ja-es-notice {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--jg-field); color: var(--ink-subtle); font-size: 14px; line-height: 1.45;
+}
+.ja-es-notice svg, .ja-es-note svg { flex: none; margin-top: 2px; }
+
+/* The four tiles: a radio group, one column on a phone, 2 x 2 from 1024px */
+.ja-es-tiles { display: flex; flex-direction: column; gap: 10px; }
+.ja-es-tile {
+  position: relative; display: flex; min-height: 88px; align-items: flex-start; gap: 12px; padding: 14px 12px 14px 14px; border: 2px solid var(--line);
+  border-radius: 14px; background: var(--surface); color: var(--ink); text-align: left;
+}
+.ja-es-tile:hover { border-color: var(--jg-field-line); }
+.ja-es-tile[aria-checked="true"] { border-color: var(--accent); background: var(--ja-accent-t); }
+.ja-es-tt { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
+.ja-es-tn { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.ja-es-tn b { font-weight: 700; font-size: 18px; line-height: 1.2; }
+.ja-es-dv { font-size: 14px; line-height: 1.35; }
+.ja-es-ds { color: var(--ink-subtle); font-size: 13px; line-height: 1.35; }
+.ja-es-ck { display: grid; flex: none; width: 26px; height: 26px; place-items: center; border: 2px solid var(--jg-field-line); border-radius: 50%; color: transparent; }
+.ja-es-tile[aria-checked="true"] .ja-es-ck { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.ja-es-sv {
+  display: inline-flex; height: 22px; align-items: center; gap: 4px; padding: 0 8px 0 6px; border: 1px solid color-mix(in srgb, var(--done) 55%, transparent);
+  border-radius: 999px; background: color-mix(in srgb, var(--done) 15%, transparent); color: var(--done-quiet); font-weight: 500; font-size: 12px; white-space: nowrap;
+}
+
+/* The preview: a compact block on a phone (one text line per group), a card with chips from 1024px */
+.ja-es-pv { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.ja-es-eb { display: none; }
+.ja-es-ph { margin: 0; font-weight: 700; font-size: 14px; line-height: 1.3; }
+.ja-es-mu, .ja-es-note { margin: 0; color: var(--ink-subtle); font-size: 13.5px; line-height: 1.4; }
+.ja-es-note { display: flex; align-items: flex-start; gap: 8px; }
+.ja-es-pg { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; font-size: 13.5px; line-height: 1.4; }
+.ja-es-pgh { display: contents; }
+.ja-es-pgh b { font-weight: 500; }
+.ja-es-pgh b::after { content: ":"; }
+.ja-es-pgh span { display: none; }
+.ja-es-pgc { display: contents; }
+.ja-es-aw:not(:last-child)::after { content: ","; }
+
+/* Before you can save */
+.ja-es-ckb { display: flex; flex-direction: column; gap: 8px; }
+.ja-es-ch { margin: 0; font-weight: 700; font-size: 16px; line-height: 1.2; }
+.ja-es-cl { margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); list-style: none; }
+.ja-es-cr { display: flex; min-height: 52px; align-items: flex-start; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--line); }
+.ja-es-cr:first-child { border-top: 0; }
+.ja-es-warn { background: color-mix(in srgb, var(--caution) 13%, transparent); border-top-color: color-mix(in srgb, var(--caution) 40%, transparent); }
+.ja-es-si { display: grid; flex: none; width: 24px; height: 24px; margin-top: 1px; place-items: center; border-radius: 50%; }
+.ja-es-ok { background: var(--done); color: var(--done-ink); }
+.ja-es-no { color: var(--caution-quiet); }
+.ja-es-wait { color: var(--ink-subtle); }
+.ja-es-cb { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 6px; }
+.ja-es-ms { margin: 0; font-size: 14px; line-height: 1.4; }
+.ja-es-ms b { display: block; margin: 0 0 1px; font-weight: 700; font-size: 15px; }
+.ja-es-ms em { font-style: normal; font-weight: 500; }
+.ja-es-warn .ja-es-ms { color: var(--caution-quiet); }
+.ja-es-warn .ja-es-ms b { color: var(--ink); }
+.ja-es-tl { display: flex; margin: 0; padding: 0; flex-direction: column; overflow: hidden; border: 1px solid color-mix(in srgb, var(--caution) 40%, transparent); border-radius: 10px; background: var(--surface); list-style: none; }
+.ja-es-tl li { display: flex; min-height: 44px; align-items: center; gap: 10px; padding: 4px 10px 4px 12px; border-top: 1px solid var(--line); }
+.ja-es-tl li:first-child { border-top: 0; }
+.ja-es-tl b { flex: none; min-width: 58px; font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
+.ja-es-n { min-width: 0; flex: 1; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.ja-es-ptag {
+  display: inline-flex; height: 24px; flex: none; align-items: center; padding: 0 7px; border: 1px solid var(--line); border-radius: 6px;
+  color: var(--ink-subtle); font-weight: 500; font-size: 12px; letter-spacing: 0.04em; white-space: nowrap;
+}
+.ja-es-pl { display: flex; margin: 0; padding: 0; flex-direction: column; gap: 2px; color: var(--caution-quiet); font-size: 14px; list-style: none; }
+.ja-es-go {
+  display: inline-flex; min-height: 44px; align-items: center; align-self: flex-start; margin-left: -4px; padding: 0 4px; border-radius: 8px; background: transparent;
+  color: var(--accent); font-weight: 500; font-size: 14px; text-decoration: underline; white-space: nowrap;
+}
+
+/* Save */
+.ja-es-save { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.ja-es-prim {
+  display: inline-flex; width: 100%; height: 52px; align-items: center; justify-content: center; padding: 0 22px; border: 1.5px solid var(--accent);
+  border-radius: 12px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 17px; white-space: nowrap;
+ 
+}
+.ja-es-prim:disabled { border-color: var(--line); background: var(--surface-2); color: var(--ink-subtle); cursor: not-allowed; }
+.ja-es-hint { color: var(--ink-subtle); font-size: 13.5px; text-align: center; }
+.ja-es-by { margin: 0; color: var(--ink-subtle); font-size: 13px; text-align: center; }
+
+@media (min-width: 1024px) {
+  .ja-es { max-width: none; padding-top: 8px; gap: 18px; }
+  .ja-es-h { font-size: 26px; }
+  .ja-es-intro { font-size: 15px; }
+  .ja-es-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .ja-es-tile { min-height: 112px; padding: 14px; }
+  .ja-es-go { min-height: 32px; }
+  .ja-es-cr { align-items: center; }
+  .ja-es-ms b { display: inline-block; min-width: 68px; margin: 0 6px 0 0; }
+  .ja-es-pl { padding-left: 74px; }
+  .ja-es-save { flex-direction: row; align-items: center; gap: 14px; }
+  .ja-es-prim { width: auto; height: 44px; font-size: 16px; }
+  .ja-es-hint, .ja-es-by { text-align: left; }
+  .ja-es-pv { gap: 14px; padding: 16px 18px 18px; border-radius: 14px; box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 50%, transparent), 0 18px 40px -24px var(--shadow); }
+  .ja-es-eb { display: block; color: var(--ink-subtle); font-weight: 500; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .ja-es-ph { margin-top: -10px; font-size: 18px; line-height: 1.2; }
+  .ja-es-pg { display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px; }
+  .ja-es-pgh { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .ja-es-pgh b { font-weight: 600; font-size: 15px; }
+  .ja-es-pgh b::after { content: none; }
+  .ja-es-pgh span { display: inline; color: var(--ink-subtle); font-size: 12.5px; }
+  .ja-es-pgc { display: flex; margin: 0; padding: 0; flex-wrap: wrap; gap: 6px; list-style: none; }
+  .ja-es-aw { display: inline-flex; height: 28px; align-items: center; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--jg-field); font-size: 13.5px; white-space: nowrap; }
+  .ja-es-aw:not(:last-child)::after { content: none; }
+  .ja-es-note { padding-top: 14px; border-top: 1px solid var(--line); }
+}
+@media (min-width: 1280px) {
+  .ja-es { grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto auto auto auto auto 1fr; column-gap: 20px; }
+  .ja-es > * { grid-column: 1; align-self: start; }
+  .ja-es-pv { grid-column: 2; grid-row: 1 / -1; align-self: start; }
+}
+
 /* @ja-block import */
 /* Import (design/admin-redesign/reference-import-*.dc.html): one box that takes a file, a drop or a paste, and the two answers under it.
    Colour is signal: done-green is "Imported", caution is "lines skipped"; accent is chrome (Choose a file, the dashed border while dragging, Import). */
@@ -4494,3 +4628,4 @@ body:has(.admin) > .theme-toggle:hover {
   background: repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px);
 }
 .dk-brk svg, .co-brk svg { flex: none; }
+

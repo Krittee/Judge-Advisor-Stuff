@@ -8,6 +8,7 @@ import { AdminFrame, railCounts, type AdminTab as Tab } from "@/components/admin
 import { AwardsTab } from "@/components/admin/AwardsTab";
 import { decidedText, pickDivision } from "@/components/admin/awardsLogic";
 import { ConflictsTab } from "@/components/admin/ConflictsTab";
+import { EventTab } from "@/components/admin/EventTab";
 import { FloorTab } from "@/components/admin/FloorTab";
 import { ImportTab } from "@/components/admin/ImportTab";
 import { PanelsTab } from "@/components/admin/PanelsTab";
@@ -94,6 +95,7 @@ export default function AdminPage() {
         online={online}
         tab={tab}
         counts={counts}
+        setup={state.eventSetup}
         scoredNote={tab === "scores" && scoreData.loaded && !scoreData.error ? scoredText(ranked) : undefined}
         onTab={(id) => {
           // A marked judge or team belongs to the trip you took to see it.
@@ -103,7 +105,7 @@ export default function AdminPage() {
         }}
       >
         {/* The redesigned tabs fill the width the rail leaves; the older ones keep the width and padding they had. */}
-        <div className={tab === "floor" || tab === "conflicts" || tab === "panels" || tab === "flags" || tab === "teams" || tab === "import" || tab === "awards" || tab === "scores" || tab === "log" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
+        <div className={tab === "floor" || tab === "event" || tab === "conflicts" || tab === "panels" || tab === "flags" || tab === "teams" || tab === "import" || tab === "awards" || tab === "scores" || tab === "log" ? "ja-pad" : "mx-auto max-w-7xl px-4 py-5"}>
           {error ? (
             <div className="mb-4">
               <Banner kind="error" onDismiss={() => setError(null)}>
@@ -114,6 +116,9 @@ export default function AdminPage() {
 
           {tab === "floor" ? (
             <FloorTab state={state} refresh={refresh} onError={setError} onNotes={(team) => setSheetId(team.id)} />
+          ) : null}
+          {tab === "event" ? (
+            <EventTab state={state} awards={awards.data} released={awards.released} refresh={refresh} onError={setError} onOpenTab={setTab} />
           ) : null}
           {tab === "scores" ? (
             <ScoresTab
