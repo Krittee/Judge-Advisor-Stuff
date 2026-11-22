@@ -347,17 +347,21 @@ const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().t
 
 /**
  * Teams and panels still filed under plain "Middle School", and the two divisions it became, to move them to.
- * Null when there are none, or plain "Middle School" is still a division of the event.
+ * Null when there are none, or the event has no split Middle School divisions (so plain "Middle School" is a real one).
  */
 export function plainMiddleSchool(
   state: Pick<AppState, "teams" | "panels" | "divisions" | "eventSetup">,
 ): { teams: Team[]; panels: { id: string; name: string }[]; targets: string[] } | null {
-  const divisions = setupDivisions(state.eventSetup) ?? state.divisions;
-  if (divisions.some((d) => sameName(d, OLD_MIDDLE_SCHOOL))) return null;
+  // state.divisions also lists divisions found only in the data (plain "Middle School" itself), so it is not the config:
+  // the split divisions are. With none of them listed, plain Middle School is a real division.
+  const targets = (setupDivisions(state.eventSetup) ?? state.divisions).filter(
+    (d) => d.toLowerCase().endsWith(` ${OLD_MIDDLE_SCHOOL}`) && !sameName(d, OLD_MIDDLE_SCHOOL),
+  );
+  if (!targets.length) return null;
   const teams = state.teams.filter((t) => sameName(t.division, OLD_MIDDLE_SCHOOL));
   const panels = state.panels.filter((p) => sameName(p.division, OLD_MIDDLE_SCHOOL)).map((p) => ({ id: p.id, name: p.name }));
   if (!teams.length && !panels.length) return null;
-  return { teams, panels, targets: divisions.filter((d) => d.toLowerCase().endsWith(` ${OLD_MIDDLE_SCHOOL}`)) };
+  return { teams, panels, targets };
 }
 
 /** "Move to V5RC Middle School?", the teams (the first five, then a count), the panels, and what moves with them. */

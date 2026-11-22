@@ -790,7 +790,8 @@ test("a booking on another day reads with its weekday in the table and the drawe
 
 /* ---- the old plain "Middle School" banner --------------------------------------------------- */
 
-const split = ["Elementary School", "IQ Middle School", "V5RC Middle School", "High School"];
+// What /api/state really sends: the configured divisions, then any found only in the data.
+const split = ["Elementary School", "IQ Middle School", "V5RC Middle School", "High School", "Blended", "Middle School"];
 const banner = (markup: string) => markup.match(/<div class="ja-fl"><div class="jg-caution" role="note">[\s\S]*?<\/button><\/div>/)?.[0] ?? "";
 
 test("plain Middle School teams show a caution note with the count and one 44px-plus button per target", () => {

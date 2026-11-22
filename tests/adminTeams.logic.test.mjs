@@ -666,7 +666,8 @@ test("strandedIds follows the format: a blended team is stranded only when every
 
 const IQ = "IQ Middle School";
 const V5 = "V5RC Middle School";
-const split = ["Elementary School", IQ, V5, "High School"];
+// What /api/state really sends: the configured divisions, then any found only in the data.
+const split = ["Elementary School", IQ, V5, "High School", "Blended", "Middle School"];
 const old = (state = {}) => ({ teams: [titans, team("1001A", "A", { division: " middle school " }), team("3003C", "C", { division: IQ })], panels, divisions: split, eventSetup: null, ...state });
 
 test("plainMiddleSchool finds the teams and panels still on plain Middle School, and the two divisions to move them to", () => {
@@ -679,8 +680,13 @@ test("plainMiddleSchool finds the teams and panels still on plain Middle School,
 test("plainMiddleSchool follows the saved setup's divisions, and is null with nothing to move or plain Middle School still configured", () => {
   assert.deepEqual(plainMiddleSchool(old({ eventSetup: { program: "VEX IQ", format: "standard" } })).targets, [IQ]);
   assert.equal(plainMiddleSchool(old({ teams: [team("3003C", "C", { division: IQ })], panels: [panel(1, "High School")] })), null);
-  assert.equal(plainMiddleSchool(old({ divisions: ["Middle School", "High School"] })), null);
+  assert.equal(plainMiddleSchool(old({ divisions: ["Middle School", "High School"] })), null, "no split configured: plain Middle School is a real division");
   assert.equal(plainMiddleSchool(old({ teams: [], panels: [panel(2, "Middle School")] })).panels.length, 1, "a panel alone is enough");
+});
+
+test("plainMiddleSchool still shows on the real state, whose divisions append data-only ones", () => {
+  assert.deepEqual(plainMiddleSchool(old()).targets, [IQ, V5]);
+  assert.deepEqual(plainMiddleSchool(old({ divisions: ["Elementary School", "High School", "Middle School"] })), null);
 });
 
 test("the move question lists five teams and a count, the panels, and what moves with them", () => {
