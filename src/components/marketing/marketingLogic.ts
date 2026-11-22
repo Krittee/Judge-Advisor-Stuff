@@ -40,6 +40,14 @@ export function rowState(release: AwardReleaseRow | null): DeskRow["state"] {
   return release.no_winner ? "no-winner" : "sent";
 }
 
+/** A division heading on a program's tab: the leading words the program label already says are dropped ("IQ Middle School" under "VEX IQ" is "Middle School"); never empty. */
+export function deskHeading(division: string, program: string): string {
+  const said = new Set(program.toLowerCase().split(/\s+/));
+  const words = division.split(/\s+/);
+  const i = words.findIndex((w) => !said.has(w.toLowerCase()));
+  return i < 0 ? division : words.slice(i).join(" ");
+}
+
 /** `mk-seen:<award>:<division>:<changed_at>`: a newer change is a new key, so it flags again. */
 export function seenKey(r: Pick<AwardReleaseRow, "award_id" | "division" | "changed_at">): string {
   return `mk-seen:${r.award_id}:${r.division}:${r.changed_at}`;

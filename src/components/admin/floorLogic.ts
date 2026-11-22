@@ -160,7 +160,7 @@ export function chipLabel(name: string): string {
 }
 
 /**
- * A division as a tag: "Middle School" is "MS", "Elementary School" "ES",
+ * A division as a tag: "IQ Middle School" is "IMS", "V5RC Middle School" "VMS", "Elementary School" "ES",
  * "Division 1" "D1", "Blended" "BLN". Any other one-word division has no
  * shorter form and stays whole. Where room is tight, as in the "Move to panel…"
  * rows, so the panel's name keeps its line.

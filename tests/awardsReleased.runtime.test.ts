@@ -378,12 +378,12 @@ test("reset the day and wipe everything clear releases", async () => {
 
 test("GET adds the program tabs: VEX IQ, V5RC and Blended; a division nobody placed lands in Other", async () => {
   const w = await world();
-  const ES_MS_HS_BLENDED = ["Elementary School", "Middle School", "High School", "Blended"];
+  const ES_MS_HS_BLENDED = ["Elementary School", "IQ Middle School", "V5RC Middle School", "High School", "Blended"];
   const first = await released(MARKETING, "GET");
   assert.deepEqual(first.body.divisions, ES_MS_HS_BLENDED);
   assert.deepEqual(first.body.programs, [
-    { label: "VEX IQ", divisions: ["Elementary School", "Middle School"] },
-    { label: "V5RC", divisions: ["Middle School", "High School"] },
+    { label: "VEX IQ", divisions: ["Elementary School", "IQ Middle School"] },
+    { label: "V5RC", divisions: ["V5RC Middle School", "High School"] },
     { label: "Blended", divisions: ["Blended"] },
   ]);
   assert.deepEqual((await released(ADMIN, "GET")).body.programs, first.body.programs);

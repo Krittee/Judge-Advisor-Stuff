@@ -10,12 +10,12 @@ import type { AppState, AwardReleaseRow, AwardView, NominationRow, Team, WinnerR
 export const awards: AwardView[] = configAwards();
 
 export const team = (number: string, name: string, over: Partial<Team> = {}): Team => ({
-  id: `t-${number}`, number, name, panel_id: "p2", division: "Middle School", category: "developing", pit: null, languages: [], created_at: "2026-10-20T08:00:00Z", ...over,
+  id: `t-${number}`, number, name, panel_id: "p2", division: "IQ Middle School", category: "developing", pit: null, languages: [], created_at: "2026-10-20T08:00:00Z", ...over,
 });
 
 export const panels = [
-  { id: "p2", name: "Panel 2", division: "Middle School", judges: ["Sam Rivera", "Priya Nair"], languages: ["en"], sort_order: 2, slot_start_at: null, slot_minutes: 20, slot_count: 0 },
-  { id: "p3", name: "Panel 3", division: "Middle School", judges: ["Lena Ortiz", "Ken Ito"], languages: ["en"], sort_order: 3, slot_start_at: null, slot_minutes: 20, slot_count: 0 },
+  { id: "p2", name: "Panel 2", division: "IQ Middle School", judges: ["Sam Rivera", "Priya Nair"], languages: ["en"], sort_order: 2, slot_start_at: null, slot_minutes: 20, slot_count: 0 },
+  { id: "p3", name: "Panel 3", division: "IQ Middle School", judges: ["Lena Ortiz", "Ken Ito"], languages: ["en"], sort_order: 3, slot_start_at: null, slot_minutes: 20, slot_count: 0 },
   { id: "p4", name: "Panel 4", division: "High School", judges: [], languages: ["en"], sort_order: 4, slot_start_at: null, slot_minutes: 20, slot_count: 0 },
 ] as AppState["panels"];
 
@@ -73,7 +73,7 @@ export const win = (awardId: string, t: Team, division = t.division): WinnerRow 
 /** Amaze to 5150Z, Design to 2088C, Think to 1234A: 3 of 11 in Middle School. */
 export const winners: WinnerRow[] = [win("amaze", gearGrinders), win("design", labRats), win("think", breakers)];
 
-export const MS = "Middle School";
+export const MS = "IQ Middle School";
 export const HS = "High School";
 export const divisions = ["Elementary School", MS, HS, "Blended"];
 
@@ -86,7 +86,7 @@ export const at = (h: number, m: number): string => new Date(2026, 9, 20, h, m).
 export const release = (awardId: string, team: Team | Team[] | null, over: Partial<AwardReleaseRow> = {}): AwardReleaseRow => {
   const list = team === null ? [] : Array.isArray(team) ? team : [team];
   return {
-    award_id: awardId, division: "Middle School", teams: list.map((t) => ({ id: t.id, number: t.number, name: t.name })), no_winner: team === null,
+    award_id: awardId, division: "IQ Middle School", teams: list.map((t) => ({ id: t.id, number: t.number, name: t.name })), no_winner: team === null,
     previous: null, status: "sent", sent_at: at(10, 58), sent_by: "Alex Morgan", changed_at: null, ...over,
   };
 };

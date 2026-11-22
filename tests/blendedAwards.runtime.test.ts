@@ -19,7 +19,7 @@ delete process.env.DATABASE_URL;
 (globalThis as Record<string, unknown>).AsyncLocalStorage = AsyncLocalStorage;
 
 const ES = "Elementary School";
-const MS = "Middle School";
+const MS = "IQ Middle School";
 const WHOLE = "Whole event";
 
 const ADMIN: Session = { role: "admin", name: "Alex" };

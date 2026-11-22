@@ -9,6 +9,7 @@ import {
   awardsUnder,
   divisionChoices,
   keyError,
+  matchDivision,
   scopeKeys,
   setupDivisions,
   setupLabel,
@@ -18,7 +19,8 @@ import {
    division and every other award once under "Whole event". */
 
 const ES = "Elementary School";
-const MS = "Middle School";
+const MS = "IQ Middle School";
+const VMS = "V5RC Middle School";
 const HS = "High School";
 const iq = (format) => ({ program: "VEX IQ", format });
 const byId = (id) => awards().find((a) => a.id === id);
@@ -30,7 +32,7 @@ test("only Excellence and Design are division-scoped in config", () => {
 
 test("setupDivisions is the saved program's divisions", () => {
   assert.deepEqual(setupDivisions(iq("blended")), [ES, MS]);
-  assert.deepEqual(setupDivisions({ program: "V5RC", format: "standard" }), [MS, HS]);
+  assert.deepEqual(setupDivisions({ program: "V5RC", format: "standard" }), [VMS, HS]);
   assert.equal(setupDivisions(null), null);
   assert.equal(setupDivisions({ program: "Nope", format: "standard" }), null);
 });
@@ -78,7 +80,7 @@ test("keyError names the wrong key, and never fires with no setup", () => {
 test("divisionChoices for teams and panels", () => {
   assert.deepEqual(divisionChoices(null, false), { options: presetDivisions(), fallback: presetDivisions()[0] });
   assert.deepEqual(divisionChoices(iq("blended"), true), { options: [ES, MS, WHOLE_EVENT], fallback: WHOLE_EVENT });
-  assert.deepEqual(divisionChoices({ program: "V5RC", format: "standard" }, true), { options: [MS, HS], fallback: MS });
+  assert.deepEqual(divisionChoices({ program: "V5RC", format: "standard" }, true), { options: [VMS, HS], fallback: VMS });
 });
 
 test("divisionsCompatible lets a blended event cross divisions", () => {
@@ -90,4 +92,15 @@ test("divisionsCompatible lets a blended event cross divisions", () => {
 test("setupLabel", () => {
   assert.equal(setupLabel(iq("blended")), "VEX IQ · Blended");
   assert.equal(setupLabel({ program: "V5RC", format: "standard" }), "V5RC · Standard");
+});
+
+test("matchDivision: exact (any case) first, else the one option that ends with it as whole words, else several or none", () => {
+  const options = ["Elementary School", "IQ Middle School", "V5RC Middle School", "High School", "Blended"];
+  assert.equal(matchDivision("high school", options), "High School");
+  assert.equal(matchDivision("IQ Middle School", options), "IQ Middle School");
+  assert.equal(matchDivision("Middle School", ["Elementary School", "IQ Middle School"]), "IQ Middle School");
+  assert.deepEqual(matchDivision("Middle School", options), ["IQ Middle School", "V5RC Middle School"]);
+  assert.equal(matchDivision("dle School", options), null, "whole words only");
+  assert.equal(matchDivision("Nowhere", options), null);
+  assert.equal(matchDivision("", options), null);
 });

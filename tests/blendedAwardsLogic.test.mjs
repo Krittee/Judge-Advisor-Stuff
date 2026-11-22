@@ -9,7 +9,7 @@ import { sentUnder } from "../src/lib/releases";
 import { awards as awardList, gearGrinders, nom, nominations, panels, release, roboraptors, team, teams, win } from "./adminAwards.fixtures";
 
 const ES = "Elementary School";
-const MS = "Middle School";
+const MS = "IQ Middle School";
 const awards = awardList;
 const esTeam = team("100A", "ES One", { division: ES, panel_id: "p2" });
 const all = [...teams, esTeam];
@@ -121,7 +121,7 @@ test("the event's sent count adds up the sent rows across ES, MS and Whole event
 test("eventNotReadyLines names each key, so two halves of one award do not read alike", () => {
   const lines = eventNotReadyLines(awards, [ES, MS], [win("excellence", esTeam)], [], [], "blended");
   assert.equal(lines.length, 12);
-  assert.ok(lines.includes("Excellence · Middle School isn't ready: no winner yet."));
+  assert.ok(lines.includes("Excellence · IQ Middle School isn't ready: no winner yet."));
   assert.ok(lines.includes("Innovate · Whole event isn't ready: no winner yet."));
   assert.ok(!lines.some((l) => l.startsWith("Excellence · Elementary School")));
   assert.equal(new Set(lines).size, lines.length);
