@@ -21,6 +21,7 @@ Newest first. Each version links to its section below.
 
 | Version | Live on | PR | Merge commit | What |
 |---|---|---|---|---|
+| [2.2.0](#version-220-awards-desk-event-setup-and-blended-awards) | 2026-11-21 | [#19](https://github.com/Krittee/Judge-Advisor-Stuff/pull/19) | `efb9f61` | Awards Desk for Marketing; event setup and blended awards; door Team \| Staff; Major removed |
 | [2.1.4](#version-214-four-fixes-from-16-november) | 2026-11-16 | [#18](https://github.com/Krittee/Judge-Advisor-Stuff/pull/18) | `ff04220` | Good conduct green; JA fixes notes; Judges Award two winners; No winner |
 | [2.1.3](#version-213-slot-windows-open-to-end-per-day-with-a-break) | 2026-11-14 | [#17](https://github.com/Krittee/Judge-Advisor-Stuff/pull/17) | `a4ee1b4` | Slot windows: per-panel days with open, end and an optional break |
 | [2.1.2](#version-212-two-coordinator-fixes) | 2026-11-13 | [#16](https://github.com/Krittee/Judge-Advisor-Stuff/pull/16) | `aa4a433` | Two Coordinator fixes |
@@ -32,6 +33,35 @@ Newest first. Each version links to its section below.
 "2.2" in this file's old name was never a released version: slot windows was
 first numbered 2.2.0 and shipped as 2.1.3. Individual bug fixes are logged in
 `FIXES.md`.
+
+---
+
+## Version 2.2.0: Awards Desk, event setup and blended awards
+
+Live 2026-11-21 (Bangkok) via PR #19, merged as `efb9f61`; version bump `d096aaa`.
+
+- **Awards Desk (Marketing role).** New `marketing` role with its own code
+  (`MARKETING_CODE`) and a read-only `/marketing` page: award, division, team
+  number and name, with search. The Judge Advisor sends each decided award
+  (Send, Recall, Send all ready); a sent award is locked until recalled, and a
+  changed re-send shows "Changed — was X" until Marketing taps Seen on that
+  device. Table `award_releases`. Spec:
+  `docs/superpowers/specs/2026-11-19-awards-desk-design.md`.
+- **Event setup and blended awards.** The JA's Event page sets the program
+  (VEX IQ | V5RC) and format (Standard | Blended); the divisions follow the
+  program. In a blended event Excellence and Design go once per division and
+  every other award once for the whole event; any panel interviews any team.
+  With no setup saved the app behaves as before. Table `event_setup`. Spec:
+  `docs/superpowers/specs/2026-11-20-event-setup-blended-awards-design.md`.
+- **Door page** groups the doors as Team | Staff.
+- **Referee:** Major violation removed; DQ stands alone, and old Major flags
+  read as DQ.
+- **Cleanup:** over-engineering audit of the new code (about 100 lines fewer);
+  a bad send time no longer shows "NaN:NaN".
+
+Checked: 1994 tests (1993 pass, 1 skipped); Neon real Postgres 2064/2064;
+tsc, eslint and build clean; iPhone 18 Pro simulator. Not checked on a real
+iPhone. `MARKETING_CODE` set in Vercel by the user.
 
 ---
 

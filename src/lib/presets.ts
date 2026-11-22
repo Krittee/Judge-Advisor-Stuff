@@ -95,9 +95,9 @@ export function blendedDivisions(): string[] {
 export type Program = { label: string; divisions: string[] };
 
 /**
- * The Awards Desk's program tabs as configured: a label and the divisions it
- * shows, both trimmed and de-duplicated. A malformed or empty entry is
- * skipped; `[]` when the key is missing, which means one list with no tabs.
+ * The programs the Judge Advisor picks on the Event page, as configured: a
+ * label and its divisions, both trimmed and de-duplicated. A malformed or
+ * empty entry is skipped; `[]` when the key is missing.
  */
 export function presetPrograms(): Program[] {
   if (!Array.isArray(raw.programs)) return [];
@@ -111,21 +111,6 @@ export function presetPrograms(): Program[] {
     out.push({ label, divisions });
   }
   return out;
-}
-
-/**
- * The tabs Marketing sees: each configured program (only the divisions this
- * event has, in the event's order), then Blended, then Other so a division
- * the Judge Advisor adds is never lost. A tab with no divisions is dropped.
- * With no programs configured it is one tab, "All", and the desk draws no bar.
- */
-export function programTabs(divisions: string[], programs: Program[], blended: string[]): Program[] {
-  if (!programs.length) return [{ label: "All", divisions }];
-  const within = (list: string[]) => divisions.filter((d) => list.includes(d));
-  const tabs = [...programs.map((p) => ({ label: p.label, divisions: within(p.divisions) })), { label: "Blended", divisions: within(blended) }];
-  const placed = new Set(tabs.flatMap((t) => t.divisions));
-  tabs.push({ label: "Other", divisions: divisions.filter((d) => !placed.has(d)) });
-  return tabs.filter((t) => t.divisions.length > 0);
 }
 
 /**

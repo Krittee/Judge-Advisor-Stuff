@@ -4,13 +4,14 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-21 | [Awards send time shows NaN:NaN, and audit cleanup](#awards-send-time-shows-nannan-and-audit-cleanup-2026-11-21) | `bb0ef0f`..`fcd4930` | Not needed (no layout change) | Built on `claude/audit-cuts-22-13220b`, not pushed |
-| 2026-11-20 | [Event setup and blended awards (UI)](#event-setup-and-blended-awards-ui-2026-11-20) | `e2e1ad6`..`89b0d7c` | Not yet (375 preview only) | Built on `claude/blended-ui-d3aac8`, not pushed |
-| 2026-11-20 | [Event setup and blended awards (backend)](#event-setup-and-blended-awards-backend-2026-11-20) | `f22f50e`..`84d586a` | Not needed (no UI yet) | Built on `claude/blended-backend-c6182b`, not pushed |
-| 2026-11-20 | [Door page: Team \| Staff groups](#door-page-team--staff-groups-2026-11-20) | `7f0d2de` | Not yet (375px preview only) | Built on `claude/door-team-staff-258f85`, not pushed |
-| 2026-11-20 | [Referee: Major removed, DQ stands alone](#referee-major-removed-dq-stands-alone-2026-11-20) | `329fcc8` | Not yet (375 preview) | Built on `claude/referee-dq-major-92956f`, not pushed |
-| 2026-11-20 | [Awards Desk UI (2.2.0)](#awards-desk-ui-220-2026-11-20) | `c02e7c3`..`2d83b19` | iPhone Simulator only | Built on `claude/awards-desk-ui-e125c3`, not pushed |
-| 2026-11-19 | [Awards Desk backend (2.2.0)](#awards-desk-backend-220-2026-11-19) | `d5b1807`..`f9cc675` | Not needed (no UI yet) | Built on `claude/awards-desk-backend-921f59`, UI built on `claude/awards-desk-ui-e125c3` |
+| 2026-11-22 | [Awards Desk showed Middle School under both VEX IQ and V5RC](#awards-desk-showed-middle-school-under-both-vex-iq-and-v5rc-2026-11-22) | `002c231` | Not needed (no layout change) | Not merged, not pushed |
+| 2026-11-21 | [Awards send time shows NaN:NaN, and audit cleanup](#awards-send-time-shows-nannan-and-audit-cleanup-2026-11-21) | `bb0ef0f`..`fcd4930` | Not needed (no layout change) | Live in 2.2.0 (PR #19, 2026-11-21) |
+| 2026-11-20 | [Event setup and blended awards (UI)](#event-setup-and-blended-awards-ui-2026-11-20) | `e2e1ad6`..`89b0d7c` | Not yet (375 preview only) | Live in 2.2.0 (PR #19, 2026-11-21) |
+| 2026-11-20 | [Event setup and blended awards (backend)](#event-setup-and-blended-awards-backend-2026-11-20) | `f22f50e`..`84d586a` | Not needed (no UI yet) | Live in 2.2.0 (PR #19, 2026-11-21) |
+| 2026-11-20 | [Door page: Team \| Staff groups](#door-page-team--staff-groups-2026-11-20) | `7f0d2de` | Not yet (375px preview only) | Live in 2.2.0 (PR #19, 2026-11-21) |
+| 2026-11-20 | [Referee: Major removed, DQ stands alone](#referee-major-removed-dq-stands-alone-2026-11-20) | `329fcc8` | Not yet (375 preview) | Live in 2.2.0 (PR #19, 2026-11-21) |
+| 2026-11-20 | [Awards Desk UI (2.2.0)](#awards-desk-ui-220-2026-11-20) | `c02e7c3`..`2d83b19` | iPhone Simulator only | Live in 2.2.0 (PR #19, 2026-11-21) |
+| 2026-11-19 | [Awards Desk backend (2.2.0)](#awards-desk-backend-220-2026-11-19) | `d5b1807`..`f9cc675` | Not needed (no UI yet) | Live in 2.2.0 (PR #19, 2026-11-21) |
 | 2026-11-16 | [Team sheet: Good conduct shows as a warning](#team-sheet-good-conduct-shows-as-a-warning-2026-11-16) | `fa039dd` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
 | 2026-11-16 | [Judge Advisor can fix or delete a judge's note](#judge-advisor-can-fix-or-delete-a-judges-note-2026-11-16) | `ef84422` | Not yet | Live in 2.1.4 (PR #18, 2026-11-16) |
 | 2026-11-16 | [Judges Award can have two winners](#judges-award-can-have-two-winners-2026-11-16) | `c04c9b3` | Not needed | Live in 2.1.4 (PR #18, 2026-11-16) |
@@ -26,6 +27,32 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Awards Desk showed Middle School under both VEX IQ and V5RC (2026-11-22)
+
+### Problem / request
+
+With no event setup saved, one VEX IQ Middle School send showed under the V5RC tab too and counted in both tabs ("VEX IQ · 20 of 22 sent", "V5RC · 10 of 22 sent").
+
+### Root cause
+
+Awards are decided and sent per (award, division name), and "Middle School" is one name shared by VEX IQ and V5RC in `config/event.json`. With no setup saved the desk split the divisions into program tabs, so Middle School landed in both. One event runs one program, so the program cannot be told apart from the division name.
+
+### Fix
+
+- With no setup saved the desk is one list, each division once, with no VEX IQ / V5RC / Blended / Other tabs (`GET /api/awards/released` always returns one "All" tab). `programTabs` is removed.
+- Saving the setup on the Event page behaves as before: it gives the program title and only that program's divisions.
+- `programs` in `config/event.json` are now only the programs the Judge Advisor picks on the Event page; its comment says so.
+
+### Testing
+
+- New test: with no setup, a sent Middle School award shows in one "All" tab with Middle School once (failed before the fix: three tabs, Middle School under VEX IQ and V5RC). The existing no-setup desk test now expects one "All" tab; the two `programTabs` tests are removed.
+
+### Commit / status
+
+`002c231` on `claude/ms-overlap-bug-a9af88`. Not merged, not pushed.
 
 ---
 

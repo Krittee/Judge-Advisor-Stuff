@@ -376,20 +376,14 @@ test("reset the day and wipe everything clear releases", async () => {
 
 /* ===== the tabs Marketing sees ============================================ */
 
-test("GET adds the program tabs: VEX IQ, V5RC and Blended; a division nobody placed lands in Other", async () => {
+test("GET is one All tab: every division once, a new one included, whoever asks", async () => {
   const w = await world();
   const ES_MS_HS_BLENDED = ["Elementary School", "Middle School", "High School", "Blended"];
   const first = await released(MARKETING, "GET");
   assert.deepEqual(first.body.divisions, ES_MS_HS_BLENDED);
-  assert.deepEqual(first.body.programs, [
-    { label: "VEX IQ", divisions: ["Elementary School", "Middle School"] },
-    { label: "V5RC", divisions: ["Middle School", "High School"] },
-    { label: "Blended", divisions: ["Blended"] },
-  ]);
+  assert.deepEqual(first.body.programs, [{ label: "All", divisions: ES_MS_HS_BLENDED }]);
   assert.deepEqual((await released(ADMIN, "GET")).body.programs, first.body.programs);
 
   await w.db.upsertTeams([{ number: "55555X", name: "Walk-ins", pit: null, division: "Open", category: "developing" }]);
-  const next = await released(MARKETING, "GET");
-  assert.deepEqual(next.body.programs.at(-1), { label: "Other", divisions: ["Open"] });
-  assert.equal(next.body.programs.length, 4);
+  assert.deepEqual((await released(MARKETING, "GET")).body.programs, [{ label: "All", divisions: [...ES_MS_HS_BLENDED, "Open"] }]);
 });
