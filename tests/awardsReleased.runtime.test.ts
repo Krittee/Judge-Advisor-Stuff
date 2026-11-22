@@ -215,6 +215,87 @@ test("recalling what was never sent is 404; recalling twice is 200 and logs once
   assert.equal((await logs(w)).filter((l) => l.startsWith("recalled")).length, 1);
 });
 
+/* ===== recall all ========================================================= */
+
+const recallAll = (session: Session | null) => hit(releasedRoute, "DELETE", session, "/api/awards/released?all=1");
+
+test("recall all: only the Judge Advisor; marketing, judge and nobody are 403 and nothing changes", async () => {
+  const w = await world();
+  await win(w, "excellence", w.hawks);
+  await send(ADMIN, "excellence", ES);
+  for (const session of [MARKETING, judgeOf(w.panel), QUEUER, REFEREE, COORDINATOR, null]) {
+    const reply = await recallAll(session);
+    assert.equal(reply.status, 403);
+    assert.equal(reply.body.error, ONLY_JA);
+  }
+  assert.equal((await w.db.listReleases())[0].status, "sent");
+});
+
+test("recall all recalls every sent row, whole event included, keeps the teams, leaves a recalled row alone and logs one entry each", async () => {
+  const w = await world();
+  await w.db.saveEventSetup({ program: "VEX IQ", format: "blended", setBy: "Alex" });
+  await win(w, "excellence", w.hawks);
+  await win(w, "excellence", w.storm);
+  await win(w, "design", w.bolts);
+  await w.db.setWinner({ awardId: "innovate", division: "Whole event", teamId: w.comets.id, decidedBy: "Alex", places: 1 });
+  await w.db.setNoWinner({ awardId: "think", division: "Whole event", decidedBy: "Alex" });
+  await send(ADMIN, "excellence", ES);
+  await send(ADMIN, "excellence", MS);
+  await send(ADMIN, "design", ES);
+  await send(ADMIN, "innovate", "Whole event");
+  await send(ADMIN, "think", "Whole event");
+  await recall(ADMIN, "think", "Whole event");
+  const before = (await w.db.listReleases()).find((r) => r.award_id === "think")!;
+
+  const reply = await recallAll(ADMIN);
+  assert.equal(reply.status, 200);
+  assert.deepEqual(reply.body.recalled.map((r: { award_id: string; division: string }) => `${r.award_id}/${r.division}`).sort(), [`design/${ES}`, `excellence/${ES}`, `excellence/${MS}`, "innovate/Whole event"]);
+  const rows = await w.db.listReleases();
+  assert.equal(rows.length, 5);
+  assert.ok(rows.every((r) => r.status === "recalled"));
+  assert.deepEqual(rows.find((r) => r.award_id === "innovate")!.teams.map((t) => t.number), ["1234"]);
+  assert.deepEqual(rows.find((r) => r.award_id === "excellence" && r.division === MS)!.teams.map((t) => t.number), ["2088C"]);
+  assert.deepEqual(rows.find((r) => r.award_id === "think"), before, "an already recalled row is untouched");
+  // One entry per recalled award, plus the earlier single recall of Think.
+  assert.deepEqual((await logs(w)).filter((l) => l.startsWith("recalled")), [
+    `recalled Design from Marketing | ${ES}`,
+    `recalled Excellence from Marketing | ${ES}`,
+    `recalled Excellence from Marketing | ${MS}`,
+    "recalled Innovate from Marketing | Whole event",
+    "recalled Think from Marketing | Whole event",
+  ]);
+  const [entry] = (await w.db.listActivity()).filter((a) => a.action === "recalled Innovate from Marketing");
+  assert.equal(entry.team_id, w.comets.id);
+});
+
+test("recall all with nothing sent is 200 and empty; a plain DELETE still needs an award and a division", async () => {
+  const w = await world();
+  await win(w, "excellence", w.hawks);
+  await send(ADMIN, "excellence", ES);
+  await recall(ADMIN, "excellence", ES);
+  const none = await recallAll(ADMIN);
+  assert.deepEqual([none.status, none.body], [200, { recalled: [] }]);
+  assert.equal((await logs(w)).filter((l) => l.startsWith("recalled")).length, 1);
+  assert.equal((await hit(releasedRoute, "DELETE", ADMIN, "/api/awards/released")).status, 400);
+});
+
+test("after recall all, re-sending the same team is not a change; a different team is", async () => {
+  const w = await world();
+  await win(w, "excellence", w.hawks);
+  await win(w, "design", w.hawks);
+  await send(ADMIN, "excellence", ES);
+  await send(ADMIN, "design", ES);
+  await recallAll(ADMIN);
+
+  const same = await send(ADMIN, "excellence", ES);
+  assert.deepEqual([same.body.release.status, same.body.release.previous, same.body.release.changed_at], ["sent", null, null]);
+  await w.db.clearWinner("design", ES);
+  await win(w, "design", w.bolts);
+  const other = await send(ADMIN, "design", ES);
+  assert.deepEqual(other.body.release.previous.teams.map((t: { number: string }) => t.number), ["9882K"]);
+  assert.ok(other.body.release.changed_at);
+});
+
 /* ===== reading ============================================================ */
 
 test("marketing never sees a recalled decision; admin still does", async () => {

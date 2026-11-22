@@ -10,7 +10,7 @@ import { call, useScores } from "@/components/useAppState";
 import { rankTeams } from "@/lib/ranking";
 import type { Rubric } from "@/lib/rubrics";
 import { setupDivisions } from "@/lib/eventSetup";
-import type { AppState, AwardReleaseRow, AwardsAdminView, AwardView, ReleasedView, SendAllReply, Team } from "@/lib/types";
+import type { AppState, AwardReleaseRow, AwardsAdminView, AwardView, RecallAllReply, ReleasedView, SendAllReply, Team } from "@/lib/types";
 import {
   ALL_PANELS,
   backing,
@@ -43,6 +43,7 @@ import {
   notReadyLines,
   panelChips,
   readyToSend,
+  recallAllLines,
   recallQuestion,
   refereeLine,
   releaseOf,
@@ -222,6 +223,18 @@ export function AwardsTab({
     if (award) void write(() => clearNoWinnerAfterAsking(ask, call, { award, division }));
   };
 
+  const recallAll = () => {
+    const lines = recallAllLines(releases, data.awards);
+    if (!lines.length) return;
+    const n = lines.length;
+    void write(async () => {
+      const question = n === 1 ? "Recall 1 award from Marketing?" : `Recall ${n} awards from Marketing?`;
+      if (!(await ask(question, { body: <RecallAllBody lines={lines} />, confirmLabel: `Recall ${n}`, danger: true }))) return false;
+      await call<RecallAllReply>("/api/awards/released?all=1", { method: "DELETE" });
+      return true;
+    });
+  };
+
   const sendAll = () => {
     const items = readyToSend(data.awards, keys, data.winners, data.noWinners, releases, format);
     if (!items.length) return;
@@ -275,6 +288,7 @@ export function AwardsTab({
           onSend={(awardId, key) => sendAward(awardId, key)}
           onRecall={(awardId, key) => recallAward(awardId, key)}
           onSendAll={sendAll}
+          onRecallAll={recallAll}
         />
         {dialog}
       </>
@@ -316,8 +330,25 @@ export function AwardsTab({
         onSend={(awardId) => sendAward(awardId, division)}
         onRecall={(awardId) => recallAward(awardId, division)}
         onSendAll={sendAll}
+        onRecallAll={recallAll}
       />
       {dialog}
+    </>
+  );
+}
+
+/** What the Recall all dialog says under its question: what Marketing will see, and one line per award that will be taken back. */
+function RecallAllBody({ lines }: { lines: { key: string; text: string }[] }) {
+  return (
+    <>
+      <p>Marketing will see each of these as &quot;Being updated&quot; until you send it again. Each one unlocks so you can change its winner.</p>
+      <ul className="ja-aw-sl" aria-label="Awards that will be recalled">
+        {lines.map((l) => (
+          <li key={l.key}>
+            <span>{l.text}</span>
+          </li>
+        ))}
+      </ul>
     </>
   );
 }
@@ -386,6 +417,7 @@ export function AwardsBoard({
   onSend = () => {},
   onRecall = () => {},
   onSendAll = () => {},
+  onRecallAll = () => {},
 }: {
   data: AwardsAdminView;
   /** What has been sent to Marketing. Null (not asked yet): no Send, Recall, lock or count is drawn. */
@@ -420,6 +452,8 @@ export function AwardsBoard({
   onRecall?: (awardId: string) => void;
   /** Send everything that is ready, in every division (the tab asks first). */
   onSendAll?: () => void;
+  /** Take back everything sent, in every division (the tab asks first). */
+  onRecallAll?: () => void;
 }) {
   const uid = useId();
   const { awards, nominations, winners, noWinners } = data;
@@ -444,6 +478,7 @@ export function AwardsBoard({
   // A sent award is locked: the matrix marks its column, and its winner cannot be changed until it is recalled.
   const sent = new Set([...states].filter(([, state]) => state === "sent").map(([id]) => id));
   const readyCount = readyToSend(awards, divisions, winners, noWinners, releases).length;
+  const sentCount = releases.filter((r) => r.status === "sent").length;
   const sentRelease = detail && sent.has(detail.award.id) ? releaseOf(releases, detail.award.id, division) : null;
 
   const nominee = detail ? (
@@ -519,6 +554,11 @@ export function AwardsBoard({
             <button type="button" className="ja-aw-sall" disabled={busy || readyCount === 0} title={readyCount === 0 ? "Nothing is ready to send" : undefined} onClick={onSendAll}>
               {`Send all ready (${readyCount})`}
               <Arrow size={15} />
+            </button>
+          ) : null}
+          {released ? (
+            <button type="button" className="ja-aw-rall" disabled={busy || sentCount === 0} title={sentCount === 0 ? "Nothing is sent to Marketing" : undefined} onClick={onRecallAll}>
+              {`Recall all (${sentCount})`}
             </button>
           ) : null}
         </div>

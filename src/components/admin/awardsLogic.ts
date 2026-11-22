@@ -633,6 +633,15 @@ export function sendAllLines(
   });
 }
 
+/** What "Recall all" will take back: one line per sent release, in the awards' order then the releases'. Its length is the button's number. */
+export function recallAllLines(releases: AwardReleaseRow[], awards: Pick<AwardView, "id" | "label">[]): { key: string; text: string }[] {
+  const rank = (id: string) => (awards.some((a) => a.id === id) ? awards.findIndex((a) => a.id === id) : awards.length);
+  return releases
+    .filter((r) => r.status === "sent")
+    .sort((a, b) => rank(a.award_id) - rank(b.award_id))
+    .map((r) => ({ key: `${r.award_id}|${r.division}`, text: `${awards.find((a) => a.id === r.award_id)?.label ?? r.award_id} · ${r.division} · ${snapshotLine(r)}` }));
+}
+
 /** The awards of one division that cannot go yet (not decided, and not sent; a recalled one counts), and why: "Energy isn't ready: no winner yet." */
 export function notReadyLines(awards: AwardView[], division: string, winners: WinnerRow[], noWinners: Marks, releases: AwardReleaseRow[], format?: EventFormat | null): string[] {
   const decided = winnersOf(winners, division);

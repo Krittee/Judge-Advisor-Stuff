@@ -157,6 +157,12 @@ test("Send all ready counts what is ready in every key: the decided, unsent halv
   assert.match(board(), /Send all ready \(9\)/);
 });
 
+test("Recall all counts the sent rows under every key, whole event included; off at none; not drawn before the desk has answered", () => {
+  assert.match(board(), /<button type="button" class="ja-aw-rall"[^>]*>Recall all \(3\)<\/button>/);
+  assert.match(board({ released: noReleases }), /<button type="button" class="ja-aw-rall" disabled="" title="Nothing is sent to Marketing">Recall all \(0\)<\/button>/);
+  assert.doesNotMatch(board({ released: null }), /Recall all/);
+});
+
 test("Nominees from filters nominee rows only: with MS picked an ES winner still shows, an ES non-winner nominee does not", () => {
   const everyone = board();
   const ms = board({ from: MS });
@@ -407,6 +413,7 @@ test("the tab branches on a blended setup, and every Marketing write takes the k
   assert.match(code, /const sendAward = \(awardId: string, division: string\) =>\s*write\(async \(\) => \{\s*await call\("\/api\/awards\/released", \{ method: "PUT", body: \{ awardId, division \} \}\)/);
   assert.match(code, /onSend=\{\(awardId, key\) => sendAward\(awardId, key\)\}/);
   assert.match(code, /onRecall=\{\(awardId, key\) => recallAward\(awardId, key\)\}/);
+  assert.match(code, /onRecallAll=\{recallAll\}/);
   assert.match(code, /onMarkNoWinner=\{\(awardId, key\) => markNoWinner\(awardId, key\)\}/);
   assert.match(code, /onGive=\{\(d, key\) => write\(\(\) => giveAfterAsking\(ask, call, \{ award: d\.award, team: d\.team, current: d\.current, noWinner: d\.noWinner, division: key \}\)\)\}/);
   assert.match(code, /onClear=\{\(d, key\) => write\(\(\) => clearAfterAsking\(ask, call, \{ award: d\.award, team: d\.team, division: key \}\)\)\}/);

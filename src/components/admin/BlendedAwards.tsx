@@ -312,6 +312,7 @@ export function BlendedBoard({
   onSend = noop,
   onRecall = noop,
   onSendAll = noop,
+  onRecallAll = noop,
 }: {
   data: AwardsAdminView;
   /** What has been sent to Marketing. Null (not asked yet): no Send, Recall, lock or count is drawn. */
@@ -344,6 +345,8 @@ export function BlendedBoard({
   onRecall?: (awardId: string, key: string) => void;
   /** Send everything that is ready, under every key (the tab asks first). */
   onSendAll?: () => void;
+  /** Take back everything sent, under every key (the tab asks first). */
+  onRecallAll?: () => void;
 }) {
   const uid = useId();
   const { awards, nominations, winners, noWinners } = data;
@@ -373,6 +376,7 @@ export function BlendedBoard({
   );
   const { decided, total } = eventDecided(winners, awards, divisions, noWinners, "blended");
   const readyCount = readyToSend(awards, divisions, winners, noWinners, releases, "blended").length;
+  const sentCount = releases.filter((r) => r.status === "sent").length;
   const detail = sel ? detailFor(sel, { awards, nominations, winners, noWinners, teams, panels, flags, format: "blended" }) : null;
   const sentRelease = detail && sel && sendState(detail.award, sel.key, winners, noWinners, releases) === "sent" ? releaseOf(releases, detail.award.id, sel.key) : null;
   const titleId = `${uid}-t`;
@@ -456,6 +460,11 @@ export function BlendedBoard({
             <button type="button" className="ja-aw-sall" disabled={busy || readyCount === 0} title={readyCount === 0 ? "Nothing is ready to send" : undefined} onClick={onSendAll}>
               {`Send all ready (${readyCount})`}
               <Arrow size={15} />
+            </button>
+          ) : null}
+          {released ? (
+            <button type="button" className="ja-aw-rall" disabled={busy || sentCount === 0} title={sentCount === 0 ? "Nothing is sent to Marketing" : undefined} onClick={onRecallAll}>
+              {`Recall all (${sentCount})`}
             </button>
           ) : null}
         </div>

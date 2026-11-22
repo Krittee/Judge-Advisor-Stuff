@@ -4290,6 +4290,12 @@ body:has(.admin) > .theme-toggle:hover {
 }
 .ja-aw-sall:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, var(--ink)); }
 .ja-aw-sall:disabled { opacity: 0.5; }
+.ja-aw-rall {
+  display: inline-flex; width: 100%; min-height: 44px; flex: none; align-items: center; justify-content: center; padding: 0 14px; border-radius: 12px;
+  background: transparent; border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); color: var(--danger); font-weight: 600; font-size: 15px; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.ja-aw-rall:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.ja-aw-rall:disabled { opacity: 0.5; }
 
 /* The matrix: the box scrolls, the page does not. The team column stays; borders sit on the cells so they travel with it. */
 .ja-aw-mxw { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
@@ -4452,7 +4458,7 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-aw-bl .ja-aw-top { order: 2; }
 .ja-aw-bl .ja-aw-cols { order: 3; }
 .ja-aw-bl .ja-aw-fr { order: -1; }
-.ja-aw-bl .ja-aw-sall { order: -1; }
+.ja-aw-bl .ja-aw-sall, .ja-aw-bl .ja-aw-rall { order: -1; }
 .ja-aw-from { width: 100%; }
 .ja-aw-from .ja-aw-chip { min-width: 44px; flex: 1; justify-content: center; }
 .ja-aw-stack { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
@@ -4498,6 +4504,7 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-aw-chip { height: 40px; }
   .ja-aw-fr { flex-direction: row; align-items: center; margin-left: auto; }
   .ja-aw-sall { width: auto; height: 40px; border-radius: 10px; font-size: 14px; }
+  .ja-aw-rall { width: auto; min-height: 40px; border-radius: 10px; font-size: 14px; }
   .ja-aw-seg button { flex: none; height: 38px; }
 
   .ja-aw-cols { flex-direction: row; align-items: flex-start; gap: 20px; }
@@ -4519,7 +4526,7 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-aw-mx tbody th { padding: 6px 8px 6px 16px; }
   /* The divider that shows the team column is held is for a phone, where the box always scrolls */
   .ja-aw-mx .ja-aw-tm { box-shadow: none; }
-  .ja-aw-bl .ja-aw-top, .ja-aw-bl .ja-aw-fbar, .ja-aw-bl .ja-aw-cols, .ja-aw-bl .ja-aw-fr, .ja-aw-bl .ja-aw-sall { order: 0; }
+  .ja-aw-bl .ja-aw-top, .ja-aw-bl .ja-aw-fbar, .ja-aw-bl .ja-aw-cols, .ja-aw-bl .ja-aw-fr, .ja-aw-bl .ja-aw-sall, .ja-aw-bl .ja-aw-rall { order: 0; }
   .ja-aw-from { width: auto; }
   .ja-aw-from .ja-aw-chip { flex: none; }
   .ja-aw-bh { min-height: 46px; }
