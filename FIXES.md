@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-11-22 | [Teams: move old plain Middle School to IQ or V5RC](#teams-move-old-plain-middle-school-to-iq-or-v5rc-2026-11-22) | `5190f9d`..`1dd7b05` | Not yet (375 preview only) | Local on `claude/ms-mover-d2f09b`; Neon run needed (`postgres.ts` changed) |
 | 2026-11-22 | [Awards: Recall all](#awards-recall-all-2026-11-22) | `6eae9c9` | Not yet (375 preview only) | Committed locally on `claude/recall-all-954c2b`; not pushed |
 | 2026-11-22 | [Awards Desk: IQ Middle School also showed under V5RC](#awards-desk-iq-middle-school-also-showed-under-v5rc-2026-11-22) | `0c04a4f` | Not needed (heading text only) | Live in 2.2.2 (PR #21, 2026-11-22) |
 | 2026-11-22 | [Awards Desk showed Middle School under both VEX IQ and V5RC](#awards-desk-showed-middle-school-under-both-vex-iq-and-v5rc-2026-11-22) | `002c231` | Not needed (no layout change) | Live in 2.2.1 (PR #20, 2026-11-22); replaced in 2.2.2 by the IQ / V5RC Middle School split |
@@ -29,6 +30,32 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Teams: move old plain Middle School to IQ or V5RC (2026-11-22)
+
+### Problem / request
+
+Data saved before 2.2.2 still says plain "Middle School" (on live, 25 of 59 teams and 5 of 11 panels), which is no longer a division, so its awards land in the Awards Desk's Other tab. The Judge Advisor needed a one-tap way to move it.
+
+### Fix
+
+- Teams page: a caution banner, shown only while a team or panel says exactly "Middle School" (any case) and the config splits it. It reads "N teams and M panels still say just "Middle School"", explains why, and has one "Move to …" button per configured division ending in Middle School (only the saved program's, when an event setup is saved). Each button asks first, listing the teams (first five numbers), the panels and that award data moves too.
+- `POST /api/admin/middle-school` `{ to }`, Judge Advisor only (403 otherwise). 400 for a target that is not a configured Middle School division, or not in the saved program. 409 when an award is decided under both plain Middle School and the target ("Clear one of the two first."). Nothing left: `{ moved: null }`, nothing logged. Otherwise one Activity entry (`Moved "Middle School" to …`, with counts).
+- Store `moveDivision(from, to)` in both stores: teams, panels, winners, No winner marks and releases are re-keyed, and the division tag on each release's snapshot teams is rewritten. Postgres does it in one transaction; the file store in one write.
+- A sent release moves with its key and stays sent (status, send time and Changed unchanged): the decision is the same, only the division's name changed.
+- `/api/state`'s `divisions` includes divisions found in the data, so the banner takes its targets from the names ending in Middle School rather than checking whether plain Middle School is listed.
+
+### Testing
+
+- Route tests (permissions, wrong target, outside program, clash, no-op, full move incl. a sent release), conformance cases for both stores, banner logic and render tests.
+- Browser, on a seeded copy (8 teams, 1 panel, 2 winners, 1 No winner, 1 sent release under plain Middle School): banner and dialog at 1280 light and 375 dark; moving to IQ Middle School re-keyed everything, the release stayed sent, one Activity row, banner gone; a second call returned `{ moved: null }`.
+- `npm test` (2017 pass, 1 skipped: Postgres), `tsc`, eslint and `npm run build` pass. Postgres `moveDivision` not yet run on Neon.
+
+### Commit / status
+
+`5190f9d` (store), `c741d59` (route), `426d045` (banner), `1dd7b05` (banner on real state). Local only, not pushed.
 
 ---
 
