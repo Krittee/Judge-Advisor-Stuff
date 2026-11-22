@@ -4,8 +4,8 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-22 | [Teams: move old plain Middle School to IQ or V5RC](#teams-move-old-plain-middle-school-to-iq-or-v5rc-2026-11-22) | `5190f9d`..`1dd7b05` | Not yet (375 preview only) | Local on `claude/ms-mover-d2f09b`; Neon run needed (`postgres.ts` changed) |
-| 2026-11-22 | [Awards: Recall all](#awards-recall-all-2026-11-22) | `6eae9c9` | Not yet (375 preview only) | Committed locally on `claude/recall-all-954c2b`; not pushed |
+| 2026-11-22 | [Teams: move old plain Middle School to IQ or V5RC](#teams-move-old-plain-middle-school-to-iq-or-v5rc-2026-11-22) | `5190f9d`..`1dd7b05` | Not yet (375 preview only) | Live in 2.2.3 (PR #22, 2026-11-22) |
+| 2026-11-22 | [Awards: Recall all](#awards-recall-all-2026-11-22) | `6eae9c9` | Not yet (375 preview only) | Live in 2.2.3 (PR #22, 2026-11-22) |
 | 2026-11-22 | [Awards Desk: IQ Middle School also showed under V5RC](#awards-desk-iq-middle-school-also-showed-under-v5rc-2026-11-22) | `0c04a4f` | Not needed (heading text only) | Live in 2.2.2 (PR #21, 2026-11-22) |
 | 2026-11-22 | [Awards Desk showed Middle School under both VEX IQ and V5RC](#awards-desk-showed-middle-school-under-both-vex-iq-and-v5rc-2026-11-22) | `002c231` | Not needed (no layout change) | Live in 2.2.1 (PR #20, 2026-11-22); replaced in 2.2.2 by the IQ / V5RC Middle School split |
 | 2026-11-21 | [Awards send time shows NaN:NaN, and audit cleanup](#awards-send-time-shows-nannan-and-audit-cleanup-2026-11-21) | `bb0ef0f`..`fcd4930` | Not needed (no layout change) | Live in 2.2.0 (PR #19, 2026-11-21) |
