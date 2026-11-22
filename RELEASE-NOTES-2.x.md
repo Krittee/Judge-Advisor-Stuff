@@ -21,6 +21,7 @@ Newest first. Each version links to its section below.
 
 | Version | Live on | PR | Merge commit | What |
 |---|---|---|---|---|
+| [2.2.1](#version-221-middle-school-shows-once-on-the-awards-desk) | 2026-11-22 | [#20](https://github.com/Krittee/Judge-Advisor-Stuff/pull/20) | `1b32827` | Awards Desk: Middle School shows once (no VEX IQ / V5RC tabs) |
 | [2.2.0](#version-220-awards-desk-event-setup-and-blended-awards) | 2026-11-21 | [#19](https://github.com/Krittee/Judge-Advisor-Stuff/pull/19) | `efb9f61` | Awards Desk for Marketing; event setup and blended awards; door Team \| Staff; Major removed |
 | [2.1.4](#version-214-four-fixes-from-16-november) | 2026-11-16 | [#18](https://github.com/Krittee/Judge-Advisor-Stuff/pull/18) | `ff04220` | Good conduct green; JA fixes notes; Judges Award two winners; No winner |
 | [2.1.3](#version-213-slot-windows-open-to-end-per-day-with-a-break) | 2026-11-14 | [#17](https://github.com/Krittee/Judge-Advisor-Stuff/pull/17) | `a4ee1b4` | Slot windows: per-panel days with open, end and an optional break |
@@ -33,6 +34,22 @@ Newest first. Each version links to its section below.
 "2.2" in this file's old name was never a released version: slot windows was
 first numbered 2.2.0 and shipped as 2.1.3. Individual bug fixes are logged in
 `FIXES.md`.
+
+---
+
+## Version 2.2.1: Middle School shows once on the Awards Desk
+
+Live 2026-11-22 via PR #20, merged as `1b32827`; version bump `57f3673`; fix `002c231`.
+
+Middle School belongs to both VEX IQ and V5RC, and an award's division carries
+no program, so with no event setup saved one Middle School send counted under
+both the VEX IQ and V5RC tabs on Marketing's desk. The desk is now one list
+with each division once. With an event setup saved nothing changed (event
+title, its own divisions). `programs` in `config/event.json` now only feeds the
+Event page.
+
+Checked: 1993 tests (1992 pass, 1 skipped); tsc, eslint and build clean;
+browser at 1280 and 375. `postgres.ts` unchanged, so no Neon run.
 
 ---
 
