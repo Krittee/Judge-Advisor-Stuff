@@ -157,7 +157,7 @@ export function ImportTab({
           spellCheck={false}
           placeholder={
             "1234, Iron Hawks, A1, Elementary School\n" +
-            "9882K, Kilo Kestrels, A2, Middle School\n" +
+            "9882K, Kilo Kestrels, A2, IQ Middle School\n" +
             "9882A, Alpha Antelopes, B1, Elementary School"
           }
           className="ja-im-ta"

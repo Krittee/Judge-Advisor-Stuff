@@ -113,10 +113,10 @@ const click = (el: ReactElement<Record<string, unknown>>) => (el.props.onClick a
 test("the header names the division and panel, how many awards are decided, and the nominations; winners are private", () => {
   const m = board();
   assert.match(m, /<h2 class="ja-aw-h">Awards<\/h2>/);
-  assert.match(m, /<p class="ja-aw-meta">Middle School · all panels · <b>3 of 11<\/b> decided · 18 nominations for 9 teams<\/p>/);
+  assert.match(m, /<p class="ja-aw-meta">IQ Middle School · all panels · <b>3 of 11<\/b> decided · 18 nominations for 9 teams<\/p>/);
   assert.match(m, /<p class="ja-aw-priv">[\s\S]*Winners stay private to you until the ceremony<\/p>/);
   // A panel's view says whose nominations these are.
-  assert.match(board({ panelId: "p3" }), /Middle School · Panel 3 · <b>3 of 11<\/b> decided · 8 nominations for 4 teams/);
+  assert.match(board({ panelId: "p3" }), /IQ Middle School · Panel 3 · <b>3 of 11<\/b> decided · 8 nominations for 4 teams/);
 });
 
 test("the division chips each count what they have decided; the panel chips count the teams each nominated; the pressed ones are the board's", () => {
@@ -125,7 +125,7 @@ test("the division chips each count what they have decided; the panel chips coun
   const chips = (g: string) => [...g.matchAll(/<button type="button" class="ja-aw-chip" aria-pressed="(true|false)"[^>]*>([\s\S]*?)<\/button>/g)].map((c) => `${c[1]} ${text(c[2])}`);
   assert.deepEqual(chips(group("Division")), [
     "false ESElementary School0/11 decided",
-    "true MSMiddle School3/11 decided",
+    "true IMSIQ Middle School3/11 decided",
     "false HSHigh School0/11 decided",
     "false BLNBlended0/11 decided",
   ]);
@@ -138,7 +138,7 @@ test("the division chips each count what they have decided; the panel chips coun
   const hs = board({ division: HS });
   assert.match(hs, /aria-pressed="true" title="High School"><span aria-hidden="true">HS<\/span>/);
   assert.match(hs, /Panel 4<span class="ja-aw-fn">1/);
-  assert.doesNotMatch(hs, /Panel 2<span/, "Middle School's panels are not High School's");
+  assert.doesNotMatch(hs, /Panel 2<span/, "IQ Middle School's panels are not High School's");
   // A division with no panel has no panel filter to offer.
   assert.doesNotMatch(board({ division: "Blended" }), /class="ja-aw-cl">Panel</);
 });
@@ -198,9 +198,9 @@ test("the selected cell is pressed and its award's column header is marked; noth
 test("with nobody nominated the matrix says so instead of drawing an empty table", () => {
   const m = board({ data: { awards, nominations: [], winners: [], noWinners: [] } });
   assert.doesNotMatch(m, /<table/);
-  assert.match(m, /No nominations in Middle School yet\. Judges nominate the teams they have interviewed\./);
+  assert.match(m, /No nominations in IQ Middle School yet\. Judges nominate the teams they have interviewed\./);
   assert.match(board({ division: "Blended" }), /No nominations in Blended yet/);
-  assert.match(board({ panelId: "p3", data: { awards, nominations: nominations.filter((n) => n.panel_id !== "p3"), winners: [], noWinners: [] } }), /No nominations in Middle School from Panel 3 yet/);
+  assert.match(board({ panelId: "p3", data: { awards, nominations: nominations.filter((n) => n.panel_id !== "p3"), winners: [], noWinners: [] } }), /No nominations in IQ Middle School from Panel 3 yet/);
 });
 
 /* ---- by award ----------------------------------------------------------------------------------- */
@@ -322,7 +322,7 @@ test("No winner: the chip, Clear on a marked award, Mark no winner on the rest, 
 test("the side panel: the award and division, the team, its scores and band, and why the panel nominated it", () => {
   const p = aside(board({ sel: excellence7700B }));
   assert.match(p, /^<aside class="ja-aw-dr" aria-label="Excellence · 7700B">/);
-  assert.match(p, /<p class="ja-aw-eyebrow">Excellence · Middle School<\/p>/);
+  assert.match(p, /<p class="ja-aw-eyebrow">Excellence · IQ Middle School<\/p>/);
   assert.match(p, /<h2 id="[^"]+">7700B<span>Byte Me<\/span><\/h2>/);
   const row = rows.find((r) => r.team.id === byteMe.id)!;
   assert.match(p, new RegExp(`<p class="ja-aw-dst"><span>${notebook.name} <b>\\d+/${notebook.max}</b></span><span>${interview.name} <b>\\d+/${interview.max}</b></span><span><b>${row.total}/${row.max}</b></span><span class="jg-band`));
@@ -495,11 +495,11 @@ test("the Sportsmanship column appears when only referees put someone up, and th
 
 test("the header and the All panels chip count each Good conduct team once; a panel's own view leaves them out", () => {
   const m = board({ flags: conductFlags });
-  assert.match(m, /<p class="ja-aw-meta">Middle School · all panels · <b>3 of 11<\/b> decided · 20 nominations for 10 teams<\/p>/, "18 by judges, and one each for Quiet Ones and Torque Titans");
+  assert.match(m, /<p class="ja-aw-meta">IQ Middle School · all panels · <b>3 of 11<\/b> decided · 20 nominations for 10 teams<\/p>/, "18 by judges, and one each for Quiet Ones and Torque Titans");
   assert.match(m, /aria-pressed="true">All panels<span class="ja-aw-fn">10<span class="sr-only"> teams<\/span><\/span>/);
   assert.match(m, /Panel 2<span class="ja-aw-fn">5</, "a panel's chip is what that panel nominated");
   const p2 = board({ flags: conductFlags, panelId: "p2" });
-  assert.match(p2, /Middle School · Panel 2 · <b>3 of 11<\/b> decided · 10 nominations for 5 teams/);
+  assert.match(p2, /IQ Middle School · Panel 2 · <b>3 of 11<\/b> decided · 10 nominations for 5 teams/);
   assert.ok(!bodyRows(p2).includes("1111Q"));
   assert.match(board({ flags: [flag(byteMe, "good")] }), /18 nominations for 9 teams/, "one flag changes nothing");
   assert.match(board({ flags: conductFlags, data: { awards, nominations, winners: [], noWinners: [] } }), /<b>0 of 11<\/b> decided/, "the decided counts are the winners', not the flags'");
@@ -588,8 +588,8 @@ test("By award: each award has an Add team picker of the division's teams in num
   assert.ok(picker, "a picker in every award's list");
   assert.deepEqual(options(picker[1]).slice(0, 4), ["|Add team…", "t-1111Q|off|1111Q Quiet Ones · added", "t-1234A|1234A Circuit Breakers", "t-2088C|2088C Lab Rats"]);
   assert.ok(options(picker[1]).includes("t-7700B|off|7700B Byte Me · added"), "the Judge Advisor already added Byte Me for Excellence");
-  assert.ok(!picker[1].includes("t-9000H"), "High School's team is not Middle School's to add");
-  assert.equal(options(picker[1]).length, 1 + 10, "the placeholder and the ten Middle School teams");
+  assert.ok(!picker[1].includes("t-9000H"), "High School's team is not IQ Middle School's to add");
+  assert.equal(options(picker[1]).length, 1 + 10, "the placeholder and the ten IQ Middle School teams");
   // It marks only this award: Design is open to every team, Quiet Ones included.
   const design = select(sections(m).find((x) => x.name === "Design Award")!.body, "Add team to Design")!;
   assert.ok(options(design[1]).includes("t-1111Q|1111Q Quiet Ones"));
@@ -617,7 +617,7 @@ test("choosing a team in the picker hands the award and the team to the board; c
 });
 
 test("the Judge Advisor's nomination counts on the board: the header, the row's words, the aria-label in full, and a team only they put up has a row", () => {
-  assert.match(board({ data: withJa }), /Middle School · all panels · <b>3 of 11<\/b> decided · 20 nominations for 10 teams/);
+  assert.match(board({ data: withJa }), /IQ Middle School · all panels · <b>3 of 11<\/b> decided · 20 nominations for 10 teams/);
   const m = board({ view: "award", data: withJa });
   const rowsOf = (name: string) => [...sections(m).find((x) => x.name === `${name} Award`)!.body.matchAll(/<li><button[\s\S]*?<\/button><\/li>/g)].map((r) => r[0]);
   const [first, second, third] = rowsOf("Excellence");
@@ -873,7 +873,7 @@ test("By award: a decided award offers Send to Marketing; one that is not says w
 test("without the sends (not loaded yet) the board draws no Marketing control at all", () => {
   const m = board({ view: "award" });
   assert.doesNotMatch(m, /Marketing|ja-aw-snd|Send all/);
-  assert.match(m, /<p class="ja-aw-meta">Middle School · all panels · <b>3 of 11<\/b> decided · 18 nominations for 9 teams<\/p>/);
+  assert.match(m, /<p class="ja-aw-meta">IQ Middle School · all panels · <b>3 of 11<\/b> decided · 18 nominations for 9 teams<\/p>/);
 });
 
 test("By award: a sent award shows Sent with its time, a Recall button and the lock, and its No winner control is off with the reason", () => {

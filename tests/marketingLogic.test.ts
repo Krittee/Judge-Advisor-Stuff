@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { changesOf, countText, deskRows, eventLine, sectionCount, sectionRows, sectionsOf, highlight, hhmm, matchRow, pickTab, resultsText, rowState, seenKey, storeGet, storeSet, tabKey, tabCount } from "../src/components/marketing/marketingLogic";
+import { changesOf, countText, deskHeading, deskRows, eventLine, sectionCount, sectionRows, sectionsOf, highlight, hhmm, matchRow, pickTab, resultsText, rowState, seenKey, storeGet, storeSet, tabKey, tabCount } from "../src/components/marketing/marketingLogic";
+import { programTabs } from "../src/lib/presets";
 import { sentUnder } from "../src/lib/releases";
 import type { AwardReleaseRow, ReleasedView, ReleaseTeam } from "../src/lib/types";
 import { CHANGED_AT, LABELS, MS, T, awards, release } from "./marketing.fixtures";
@@ -162,6 +163,19 @@ test("seen store reads back what it wrote", () => {
 
 const IQ = { label: "VEX IQ", divisions: ["Elementary School", MS] };
 const V5 = { label: "V5RC", divisions: [MS, "High School"] };
+const EVENT = ["Elementary School", MS, "High School", "Blended"];
+
+test("programTabs: configured programs in event order, then Blended, then Other; empty tabs drop", () => {
+  assert.deepEqual(programTabs(EVENT, [IQ, V5], ["Blended"]), [IQ, V5, { label: "Blended", divisions: ["Blended"] }]);
+  assert.deepEqual(programTabs([...EVENT, "Open"], [IQ, V5], ["Blended"]).at(-1), { label: "Other", divisions: ["Open"] });
+  // A program keeps only the divisions this event has, in the event's order.
+  assert.deepEqual(programTabs([MS, "Elementary School"], [IQ], []), [{ label: "VEX IQ", divisions: [MS, "Elementary School"] }]);
+  assert.deepEqual(programTabs(["High School"], [IQ, V5], ["Blended"]), [{ label: "V5RC", divisions: ["High School"] }]);
+});
+
+test("programTabs: without a programs config there is one tab, All", () => {
+  assert.deepEqual(programTabs(EVENT, [], ["Blended"]), [{ label: "All", divisions: EVENT }]);
+});
 
 test("tabKey is a lower-case slug; pickTab keeps the saved tab only while it exists", () => {
   assert.equal(tabKey("VEX IQ"), "vex-iq");
@@ -259,4 +273,16 @@ test("changesOf with sections: a whole-event change is listed under Whole event,
 test("a snapshot's division stays on the row's team for the desk to tag", () => {
   const r = sectionRows({ ...blendedView, releases: [release("think", { division: WE, teams: [{ ...T("5150X", "Short Circuit"), division: MS }] })] }, blendedView.sections![2], unseen);
   assert.equal(r.find((x) => x.award.id === "think")?.teams[0].division, MS);
+});
+
+test("deskHeading drops the leading words the program label already says", () => {
+  assert.equal(deskHeading("IQ Middle School", "VEX IQ"), "Middle School");
+  assert.equal(deskHeading("V5RC Middle School", "V5RC"), "Middle School");
+  assert.equal(deskHeading("iq middle school", "VEX IQ"), "middle school");
+  assert.equal(deskHeading("Elementary School", "VEX IQ"), "Elementary School");
+  assert.equal(deskHeading("High School", "V5RC"), "High School");
+  assert.equal(deskHeading("Blended", "Blended"), "Blended", "never empty: every word would go, so keep the name");
+  assert.equal(deskHeading("Whole event", "VEX IQ"), "Whole event");
+  assert.equal(deskHeading("Middle School", "Other"), "Middle School");
+  assert.equal(deskHeading("IQ Middle School", ""), "IQ Middle School");
 });

@@ -6,7 +6,7 @@ import { takeOffPanel, teamsToTakeOff } from "@/lib/conflicts";
 import { judgeKey } from "@/lib/roster";
 import type { Panel } from "@/lib/types";
 import { parseSlotDays, slotSummaryFields } from "@/lib/data";
-import { divisionChoices } from "@/lib/eventSetup";
+import { ambiguousDivision, divisionChoices, matchDivision } from "@/lib/eventSetup";
 import { parseLanguageList } from "@/lib/presets";
 import type { EventSetup } from "@/lib/types";
 import { normalizePanelCode } from "@/lib/panelCode";
@@ -79,7 +79,6 @@ export async function PATCH(request: Request) {
   const eventSetup = await store().getEventSetup();
   if ("name" in body) patch.name = String(body.name).trim().slice(0, 80);
   if ("code" in body) patch.code = normalizePanelCode(body.code);
-  if ("division" in body) patch.division = resolveDivision(body.division, eventSetup);
   if ("judges" in body) patch.judges = parseJudges(body.judges);
   if ("languages" in body) patch.languages = parseLanguageList(body.languages);
   if ("sortOrder" in body) patch.sort_order = Number(body.sortOrder) || 0;
@@ -92,6 +91,7 @@ export async function PATCH(request: Request) {
   }
 
   try {
+    if ("division" in body) patch.division = resolveDivision(body.division, eventSetup);
     const db = store();
     const was = (await db.listPanels()).find((p) => p.id === id);
 
@@ -237,7 +237,9 @@ export async function DELETE(request: Request) {
 function resolveDivision(input: unknown, setup: EventSetup | null): string {
   const wanted = String(input ?? "").trim();
   const { options, fallback } = divisionChoices(setup, true);
-  return options.includes(wanted) ? wanted : fallback;
+  const hit = matchDivision(wanted, options);
+  if (Array.isArray(hit)) throw new StoreError(ambiguousDivision(wanted, hit));
+  return hit ?? fallback;
 }
 
 function parseJudges(input: unknown): string[] {

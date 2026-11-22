@@ -222,7 +222,7 @@ test("the decided counts are per division, over the awards the config lists", ()
   assert.equal(decidedText(winners, awards, HS), "0/11");
   const more = [...winners, win("excellence", monitors), win("energy", monitors)];
   assert.equal(decidedText(more, awards, HS), "2/11");
-  assert.equal(decidedText(more, awards, MS), "3/11", "High School's winners are not Middle School's");
+  assert.equal(decidedText(more, awards, MS), "3/11", "High School's winners are not IQ Middle School's");
   // An award the config no longer lists has no row on the board to be decided in.
   assert.equal(decidedCount([...winners, { ...win("retired", gearGrinders), award_id: "retired" }], awards, MS), 3);
   assert.equal(decidedText(winners, [], MS), "0/0");
@@ -303,7 +303,7 @@ test("an award marked No winner reads 'No winner' and decided, nominees still li
 });
 
 test("the board opens on the first division with a nomination, and keeps the one chosen while it exists", () => {
-  assert.equal(defaultDivision(divisions, nominations, teams), MS, "Elementary School has none; Middle School has");
+  assert.equal(defaultDivision(divisions, nominations, teams), MS, "Elementary School has none; IQ Middle School has");
   assert.equal(defaultDivision(divisions, [], teams), "Elementary School", "nothing nominated: the first");
   assert.equal(defaultDivision([], [], []), "");
   assert.equal(pickDivision(HS, divisions, nominations, teams), HS);
@@ -339,7 +339,7 @@ test("the side panel gathers why each panel nominated the team, judge by judge",
 test("the other nominees are those of this division for this award, with the caution each carries", () => {
   const d = detailFor({ awardId: "excellence", teamId: byteMe.id }, everything);
   assert.deepEqual(d.others.map((o) => [o.team.number, o.judges, o.winner, o.has.map((a) => a.label)]), [["5150Z", 1, false, ["Amaze"]]]);
-  // High School's Excellence nominee is not Middle School's rival.
+  // High School's Excellence nominee is not IQ Middle School's rival.
   assert.ok(!d.others.some((o) => o.team.id === monitors.id));
 });
 
@@ -857,14 +857,14 @@ test("sendState: sent wins over ready; a recalled row is recalled; ready; or not
   assert.equal(sendState(award("amaze"), MS, winners, noMarks, [release("amaze", gearGrinders, { status: "recalled" })]), "recalled");
   assert.equal(sendState(award("amaze"), MS, winners, noMarks, []), "ready");
   assert.equal(sendState(award("energy"), MS, winners, noMarks, []), "not-ready");
-  assert.equal(sendState(award("amaze"), HS, winners, noMarks, [sent]), "not-ready", "a send in Middle School says nothing about High School");
+  assert.equal(sendState(award("amaze"), HS, winners, noMarks, [sent]), "not-ready", "a send in IQ Middle School says nothing about High School");
 });
 
 test("readyToSend: every ready award in every division that is not sent; a recalled one is included", () => {
   const w = [...winners, win("excellence", monitors), win("think", monitors)];
   const rels = [release("amaze", gearGrinders), release("design", labRats, { status: "recalled" })];
   const out = readyToSend(awards, [MS, HS], w, noMarks, rels).map((x) => `${x.award.id}|${x.division}`);
-  assert.deepEqual(out, ["design|Middle School", "think|Middle School", "excellence|High School", "think|High School"], "amaze is sent; the recalled design is back in");
+  assert.deepEqual(out, ["design|IQ Middle School", "think|IQ Middle School", "excellence|High School", "think|High School"], "amaze is sent; the recalled design is back in");
   assert.deepEqual(readyToSend(awards, [MS], winners, noMarks, [release("amaze", gearGrinders), release("design", labRats), release("think", breakers)]), [], "nothing is left once all are sent");
 });
 
@@ -894,13 +894,13 @@ test("sendAllLines: award, division and the team(s) or No winner; was is set onl
   const items = readyToSend(awards, [MS], w, [{ award_id: "energy", division: MS }], [release("excellence", sparkPlugs, { status: "recalled" }), release("think", breakers, { status: "recalled" })]);
   const lines = sendAllLines(items, w, [{ award_id: "energy", division: MS }], teams, [release("excellence", sparkPlugs, { status: "recalled" }), release("think", breakers, { status: "recalled" })]);
   const by = Object.fromEntries(lines.map((l) => [l.key, l]));
-  assert.equal(by["excellence|Middle School"].text, "Excellence · Middle School · 7700B Byte Me");
-  assert.equal(by["excellence|Middle School"].was, "4455F Spark Plugs", "a recalled Excellence was 4455F and is now 7700B");
-  assert.equal(by["think|Middle School"].was, null, "the same decision is no change");
-  assert.equal(by["judges|Middle School"].text, "Judges · Middle School · 3311X Hex Appeal, 5150Z Gear Grinders", "Judges names both");
-  assert.equal(by["judges|Middle School"].was, null, "never sent");
-  assert.equal(by["energy|Middle School"].text, "Energy · Middle School · No winner");
-  assert.equal(by["energy|Middle School"].was, null);
+  assert.equal(by["excellence|IQ Middle School"].text, "Excellence · IQ Middle School · 7700B Byte Me");
+  assert.equal(by["excellence|IQ Middle School"].was, "4455F Spark Plugs", "a recalled Excellence was 4455F and is now 7700B");
+  assert.equal(by["think|IQ Middle School"].was, null, "the same decision is no change");
+  assert.equal(by["judges|IQ Middle School"].text, "Judges · IQ Middle School · 3311X Hex Appeal, 5150Z Gear Grinders", "Judges names both");
+  assert.equal(by["judges|IQ Middle School"].was, null, "never sent");
+  assert.equal(by["energy|IQ Middle School"].text, "Energy · IQ Middle School · No winner");
+  assert.equal(by["energy|IQ Middle School"].was, null);
 });
 
 test("sendAllLines: a recalled No winner now decided for a team, and the other way, is a change", () => {
@@ -913,7 +913,7 @@ test("sendAllLines: a recalled No winner now decided for a team, and the other w
   );
   assert.equal(lines[0].was, "No winner");
   assert.equal(lines[1].was, "1234A Circuit Breakers");
-  assert.equal(lines[1].text, "Think · Middle School · No winner");
+  assert.equal(lines[1].text, "Think · IQ Middle School · No winner");
 });
 
 test("notReadyLines: what is missing, one line per award of the division that is not ready", () => {
@@ -931,7 +931,7 @@ test("notReadyLines: what is missing, one line per award of the division that is
 });
 
 test("skippedText: one line per skipped award the dialog listed, else null", () => {
-  const asked = new Set(["think|Middle School", "amaze|Middle School"]);
+  const asked = new Set(["think|IQ Middle School", "amaze|IQ Middle School"]);
   const skipped = [
     { awardId: "think", division: MS, reason: "not ready" },
     { awardId: "design", division: MS, reason: "not ready" },
@@ -939,7 +939,7 @@ test("skippedText: one line per skipped award the dialog listed, else null", () 
   ];
   assert.equal(
     skippedText(skipped, asked, awards),
-    "Think · Middle School was not sent: it changed while you were sending. Check it and send again.\nAmaze · Middle School was not sent: it changed while you were sending. Check it and send again.",
+    "Think · IQ Middle School was not sent: it changed while you were sending. Check it and send again.\nAmaze · IQ Middle School was not sent: it changed while you were sending. Check it and send again.",
   );
   assert.equal(skippedText([skipped[1]], asked, awards), null, "design was not in the dialog");
   assert.equal(skippedText([], asked, awards), null);
@@ -948,7 +948,7 @@ test("skippedText: one line per skipped award the dialog listed, else null", () 
 test("recallQuestion: the question and the body, in the award's words", () => {
   assert.deepEqual(recallQuestion("Design", MS), {
     question: "Recall Design from Marketing?",
-    body: "Marketing will see Design · Middle School as \"Being updated\" until you send it again. You can then change the winner.",
+    body: "Marketing will see Design · IQ Middle School as \"Being updated\" until you send it again. You can then change the winner.",
   });
   assert.equal(typeof at(10, 58), "string");
 });

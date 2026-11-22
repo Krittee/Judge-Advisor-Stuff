@@ -1,7 +1,7 @@
 "use client";
 
 import { SignOutButton } from "@/components/judging";
-import { countText, deskRows, changesOf, eventLine, sectionCount, sectionRows, highlight, hhmm, matchRow, pickTab, resultsText, tabCount, tabKey, tabsOf, type Change, type DeskRow } from "./marketingLogic";
+import { countText, deskHeading, deskRows, changesOf, eventLine, sectionCount, sectionRows, highlight, hhmm, matchRow, pickTab, resultsText, tabCount, tabKey, tabsOf, type Change, type DeskRow } from "./marketingLogic";
 import { divisionTag } from "@/components/admin/floorLogic";
 import { setupLabel, WHOLE_EVENT } from "@/lib/eventSetup";
 import { sentUnder } from "@/lib/releases";
@@ -178,7 +178,10 @@ export function AwardsDesk(p: AwardsDeskProps) {
   const active = pickTab(tabs, p.tab);
   // A saved setup picks the program, so it has no tabs. Otherwise a search looks across every tab, so the bar goes while there is one and each division is listed once.
   const tabbed = !setup && !q && tabs.length > 1;
-  const shown = view ? (q ? view.divisions : (tabs.find((t) => tabKey(t.label) === active) ?? tabs[0]).divisions) : [];
+  const activeTab = view ? (tabs.find((t) => tabKey(t.label) === active) ?? tabs[0]) : null;
+  const shown = view ? (q ? view.divisions : activeTab!.divisions) : [];
+  // The program a heading sits under: the saved one, else the active tab. A search lists every tab's divisions at once, so it shows full names ("" drops nothing).
+  const program = (setup ? setup.program : q ? "" : activeTab?.label) ?? "";
   // Search hides what does not match, and a section with nothing left. A section is a division (as today) or, with a setup, a setup section.
   const awardIds = view?.awards.map((a) => a.id) ?? [];
   const sections = !view
@@ -285,13 +288,13 @@ export function AwardsDesk(p: AwardsDeskProps) {
                 {sections.map(({ i, key, rows, count, n }) => (
                   <section key={key} className="mk-sec" aria-labelledby={`mk-h-${i}`}>
                     <div className="mk-dh">
-                      <h2 id={`mk-h-${i}`}>{key}</h2>
+                      <h2 id={`mk-h-${i}`}>{deskHeading(key, program)}</h2>
                       <span className="mk-cnt">{count}</span>
                       <span className="mk-pg" aria-hidden="true">
                         <i style={{ width: `${n * 100}%` }} />
                       </span>
                     </div>
-                    <ul className="mk-rows" aria-label={`${key} awards`}>
+                    <ul className="mk-rows" aria-label={`${deskHeading(key, program)} awards`}>
                       {rows.map((row) => (
                         <Row key={row.award.id} row={row} query={q} tagged={setup !== null && key === WHOLE_EVENT} onSeen={p.onSeen} />
                       ))}

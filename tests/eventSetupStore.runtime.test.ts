@@ -12,7 +12,7 @@ process.env.SEED_DEMO = "false";
 delete process.env.DATABASE_URL;
 
 const ES = "Elementary School";
-const MS = "Middle School";
+const MS = "IQ Middle School";
 const HS = "High School";
 
 async function fresh() {
@@ -58,7 +58,7 @@ test("a new team with no division gets the program's first division, else the co
   const db = await fresh();
   await db.saveEventSetup({ program: "V5RC", format: "standard", setBy: "Alex" });
   await db.upsertTeams([blank("100A")]);
-  assert.equal((await team(db, "100A")).division, MS);
+  assert.equal((await team(db, "100A")).division, "V5RC Middle School");
 
   await db.resetAll();
   await db.upsertTeams([blank("100A")]);
