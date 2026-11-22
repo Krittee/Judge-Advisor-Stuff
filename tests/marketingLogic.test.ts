@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { changesOf, countText, deskRows, eventLine, sectionCount, sectionRows, sectionsOf, highlight, hhmm, matchRow, pickTab, resultsText, rowState, seenKey, storeGet, storeSet, tabKey, tabCount } from "../src/components/marketing/marketingLogic";
-import { programTabs } from "../src/lib/presets";
 import { sentUnder } from "../src/lib/releases";
 import type { AwardReleaseRow, ReleasedView, ReleaseTeam } from "../src/lib/types";
 import { CHANGED_AT, LABELS, MS, T, awards, release } from "./marketing.fixtures";
@@ -163,19 +162,6 @@ test("seen store reads back what it wrote", () => {
 
 const IQ = { label: "VEX IQ", divisions: ["Elementary School", MS] };
 const V5 = { label: "V5RC", divisions: [MS, "High School"] };
-const EVENT = ["Elementary School", MS, "High School", "Blended"];
-
-test("programTabs: configured programs in event order, then Blended, then Other; empty tabs drop", () => {
-  assert.deepEqual(programTabs(EVENT, [IQ, V5], ["Blended"]), [IQ, V5, { label: "Blended", divisions: ["Blended"] }]);
-  assert.deepEqual(programTabs([...EVENT, "Open"], [IQ, V5], ["Blended"]).at(-1), { label: "Other", divisions: ["Open"] });
-  // A program keeps only the divisions this event has, in the event's order.
-  assert.deepEqual(programTabs([MS, "Elementary School"], [IQ], []), [{ label: "VEX IQ", divisions: [MS, "Elementary School"] }]);
-  assert.deepEqual(programTabs(["High School"], [IQ, V5], ["Blended"]), [{ label: "V5RC", divisions: ["High School"] }]);
-});
-
-test("programTabs: without a programs config there is one tab, All", () => {
-  assert.deepEqual(programTabs(EVENT, [], ["Blended"]), [{ label: "All", divisions: EVENT }]);
-});
 
 test("tabKey is a lower-case slug; pickTab keeps the saved tab only while it exists", () => {
   assert.equal(tabKey("VEX IQ"), "vex-iq");

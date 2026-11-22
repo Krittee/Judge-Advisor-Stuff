@@ -3,7 +3,7 @@ import { actorParts } from "@/lib/activity";
 import { canAdminister, getSession, type Session } from "@/lib/auth";
 import { store } from "@/lib/db";
 import { awardPairs, awardsUnder, keyError, scopeKeys } from "@/lib/eventSetup";
-import { awards, blendedDivisions, presetPrograms, programTabs } from "@/lib/presets";
+import { awards } from "@/lib/presets";
 import { decisionFor, nextSend, sentRelease } from "@/lib/releases";
 import { eventDivisions } from "@/lib/server-state";
 import type { AwardReleaseRow, AwardView, ReleaseReply, ReleasedView, ReleaseSnapshot, SendAllReply } from "@/lib/types";
@@ -83,8 +83,8 @@ export async function GET() {
   const view: ReleasedView = {
     awards: awards().map((a) => ({ id: a.id, label: a.label, places: a.places })),
     divisions,
-    // A saved setup picks the program, so the desk needs no tabs.
-    programs: setup ? programTabs(divisions, [], []) : programTabs(divisions, presetPrograms(), blendedDivisions()),
+    // One list, each division once: the program cannot be told apart from the division name, so the desk has no tabs.
+    programs: [{ label: "All", divisions }],
     ...(setup && {
       setup: { program: setup.program, format: setup.format },
       sections: scopeKeys(divisions, setup.format).map((key) => ({
