@@ -23,9 +23,10 @@
     "",
     "An award with \"blendedScope\": \"division\" is given in each division even in a Blended event; every other award is given once for the whole event.",
     "",
-    "`programs` are the programs the Judge Advisor picks on the Event page: each has a label",
-    "and its divisions (a division may be in more than one, as Middle School is). Marketing's",
-    "Awards Desk is one list with each division once, whatever is set here."
+    "`programs` are the tabs on Marketing's Awards Desk: each has a label and the divisions",
+    "it shows (a division may be in more than one, as Middle School is). Blended divisions",
+    "get their own Blended tab and any division in no program lands in Other. Leave",
+    "`programs` out and the desk is one list with no tabs."
   ],
   "programs": [
     { "label": "VEX IQ", "divisions": ["Elementary School", "Middle School"] },

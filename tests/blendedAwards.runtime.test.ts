@@ -211,21 +211,13 @@ test("standard: an award is per division, Whole event is refused, every section 
   assert.deepEqual(body.sections.map((s: { awardIds: string[] }) => s.awardIds.length), [11, 11]);
 });
 
-test("no setup: the desk carries no setup or sections, one All tab, and Whole event is the old team-not-in-division 400", async () => {
+test("no setup: the desk carries no setup or sections, programs as today, and Whole event is the old team-not-in-division 400", async () => {
   const w = await world(null);
   const { body } = await released(ADMIN, "GET");
   assert.ok(!("setup" in body) && !("sections" in body));
-  assert.deepEqual(body.programs, [{ label: "All", divisions: body.divisions }]);
+  const { programTabs, presetPrograms, blendedDivisions } = await import("../src/lib/presets");
+  assert.deepEqual(body.programs, programTabs(body.divisions, presetPrograms(), blendedDivisions()));
   const refused = await winner("innovate", WHOLE, w.a1.id);
   assert.equal(refused.status, 400);
   assert.match(refused.body.error, /Awards are decided division by division/);
-});
-
-test("no setup: a Middle School send shows once, in one All tab (not under both VEX IQ and V5RC)", async () => {
-  const w = await world(null);
-  await winner("innovate", MS, w.b3.id);
-  assert.equal((await released(ADMIN, "PUT", { awardId: "innovate", division: MS })).status, 200);
-  const { body } = await released(MARKETING, "GET");
-  assert.deepEqual(body.programs.map((p: { label: string }) => p.label), ["All"]);
-  assert.equal(body.programs.flatMap((p: { divisions: string[] }) => p.divisions).filter((d: string) => d === MS).length, 1);
 });
