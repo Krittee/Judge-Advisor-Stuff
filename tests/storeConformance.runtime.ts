@@ -26,7 +26,7 @@ import { defaultCategory, presetDivisions } from "../src/lib/presets";
  */
 
 const ES = "Elementary School";
-const MS = "Middle School";
+const MS = "IQ Middle School";
 const BLEND = "Blended";
 
 /** Defaults for the fields every panel needs but most tests do not care about. */
@@ -973,7 +973,7 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
   it("a new team with no division lands in the saved program's first division", async (store) => {
     await store.saveEventSetup({ program: "V5RC", format: "standard", setBy: "Dana" });
     await store.upsertTeams([{ number: "1001", name: "New", pit: null }]);
-    assert.equal((await store.findTeamByNumber("1001"))?.division, MS);
+    assert.equal((await store.findTeamByNumber("1001"))?.division, "V5RC Middle School");
   });
 
   it("in a blended event, a team that changes division keeps its panel, and so does a panel that changes division", async (store) => {

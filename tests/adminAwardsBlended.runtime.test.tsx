@@ -27,7 +27,7 @@ const tab = read("src/components/admin/AwardsTab.tsx");
 const css = read("src/app/globals.css");
 
 const ES = "Elementary School";
-const MS = "Middle School";
+const MS = "IQ Middle School";
 const setup = { program: "VEX IQ", format: "blended" as const };
 const es = (number: string, name: string, over = {}) => team(number, name, { division: ES, ...over });
 const levers = es("41111A", "Little Levers");
@@ -138,9 +138,9 @@ test("Nominees from replaces Division: All, ES and MS, with All pressed, and the
   assert.doesNotMatch(m, />Division</);
   const group = m.match(/<span id="[^"]+" class="ja-aw-cl">Nominees from<\/span>([\s\S]*?)<\/div><\/div>/)![1];
   const chips = [...group.matchAll(/<button type="button" class="ja-aw-chip" aria-pressed="(true|false)"[^>]*>([\s\S]*?)<\/button>/g)].map((c) => `${c[1]} ${text(c[2])}`);
-  assert.deepEqual(chips, ["true All", "false ESElementary School", "false MSMiddle School"]);
+  assert.deepEqual(chips, ["true All", "false ESElementary School", "false IMSIQ Middle School"]);
   assert.match(group, /title="Elementary School"/);
-  assert.match(board({ from: MS }), /aria-pressed="true" title="Middle School"/);
+  assert.match(board({ from: MS }), /aria-pressed="true" title="IQ Middle School"/);
   assert.match(m, /<span id="[^"]+" class="ja-aw-cl">Panel<\/span>/);
   assert.match(m, /aria-pressed="true">By award<\/button>/);
   assert.match(m, /Send all ready \(\d+\)/);
@@ -153,7 +153,7 @@ test("a stored Nominees from that the setup no longer has reads as All: the All 
 });
 
 test("Send all ready counts what is ready in every key: the decided, unsent halves and whole-event awards", () => {
-  // Ready: Excellence ES, Excellence MS, Design ES, Innovate (recalled, decided), Amaze, Build, Create (No winner), Judges, Inspire. Sent ones are not.
+  // Ready: Excellence ES, Excellence IMS, Design ES, Innovate (recalled, decided), Amaze, Build, Create (No winner), Judges, Inspire. Sent ones are not.
   assert.match(board(), /Send all ready \(9\)/);
 });
 
@@ -192,7 +192,7 @@ test("a per-division award is one block with two halves, each with its own Send 
   // Design is sent in MS only: its own Sent time and lock, and an enabled Send in ES.
   assert.match(half(m, "Design", MS), /Sent 10:31/);
   assert.match(half(m, "Design", MS), /Locked: sent to Marketing/);
-  assert.match(half(m, "Design", MS), /aria-label="Recall Design · Middle School from Marketing"/);
+  assert.match(half(m, "Design", MS), /aria-label="Recall Design · IQ Middle School from Marketing"/);
   assert.match(half(m, "Design", ES), /Send to Marketing/);
   assert.doesNotMatch(half(m, "Design", ES), /Locked|Sent 10/);
 });
@@ -211,9 +211,9 @@ test("a whole-event award is one full-width block, labelled Whole event, with no
   assert.match(inn, /<span class="ja-aw-scope">Whole event<\/span>/);
   assert.doesNotMatch(inn, /ja-aw-half/);
   assert.match(inn, /aria-label="3030T Tiny Titans, ES,[^"]*Innovate/);
-  assert.match(inn, /aria-label="5150Z Gear Grinders, MS,[^"]*Innovate/);
+  assert.match(inn, /aria-label="5150Z Gear Grinders, IMS,[^"]*Innovate/);
   assert.match(inn, /<span class="ja-aw-ptag ja-aw-dv" title="Elementary School">ES<\/span>/);
-  assert.match(inn, /<span class="ja-aw-ptag ja-aw-dv" title="Middle School">MS<\/span>/);
+  assert.match(inn, /<span class="ja-aw-ptag ja-aw-dv" title="IQ Middle School">IMS<\/span>/);
   // The blocks come in the config's order, one column.
   assert.deepEqual([...m.matchAll(/<section class="ja-aw-ap[^"]*" aria-label="(\w+) Award">/g)].map((x) => x[1]), awards.map((a) => a.label));
   assert.match(m, /<div class="ja-aw-stack">/);
@@ -232,10 +232,10 @@ test("a team of a division outside the setup is a nominee of the whole-event awa
   assert.ok(!nominee(block(board({ from: ES }), "Innovate")).includes("9000H"));
 });
 
-test("Already has reads across every key, and names the scope: Excellence · Middle School", () => {
+test("Already has reads across every key, and names the scope: Excellence · IQ Middle School", () => {
   const m = board();
   const energy = block(m, "Energy");
-  assert.match(text(energy), /Already has Excellence · Middle School/);
+  assert.match(text(energy), /Already has Excellence · IQ Middle School/);
   assert.match(energy, /<p class="ja-aw-rwarn">/);
   // 3030T holds nothing.
   assert.equal([...energy.matchAll(/ja-aw-rwarn/g)].length, 1);
@@ -260,7 +260,7 @@ test("a sent award wears the lock, and Mark no winner is off with the reason", (
   assert.match(mark, /disabled=""/);
   assert.match(mark, /title="Recall it from Marketing first\."/);
   // Per half too.
-  const dm = half(board(), "Design", MS).match(/<button[^>]*aria-label="Mark no winner for Design · Middle School"[^>]*>/)![0];
+  const dm = half(board(), "Design", MS).match(/<button[^>]*aria-label="Mark no winner for Design · IQ Middle School"[^>]*>/)![0];
   assert.match(dm, /disabled=""/);
   assert.match(dm, /title="Recall it from Marketing first\."/);
   // Create is "No winner": Clear, not Mark.
@@ -317,26 +317,26 @@ test("Add team is for All panels: a panel's view has no picker", () => {
 test("the matrix has a column per division for Excellence and Design, and a team of the other division has no button there", () => {
   const m = board({ view: "matrix" });
   const heads = [...m.matchAll(/<th scope="col"[^>]*aria-label="([^"]+)"/g)].map((h) => h[1]);
-  assert.ok(heads.includes("Excellence ES") && heads.includes("Excellence MS"));
-  assert.ok(heads.includes("Design ES") && heads.includes("Design MS"));
+  assert.ok(heads.includes("Excellence ES") && heads.includes("Excellence IMS"));
+  assert.ok(heads.includes("Design ES") && heads.includes("Design IMS"));
   assert.equal([...m.matchAll(/<abbr[^>]*>Inn<\/abbr>/g)].length, 1, "a whole-event award is one column, with no division on it");
-  assert.ok(heads.indexOf("Excellence ES") < heads.indexOf("Excellence MS") && heads.indexOf("Design MS") > heads.indexOf("Design ES"), "config order");
-  assert.ok(m.indexOf("Design MS") < m.indexOf(">Inn<"), "Design comes before Innovate");
-  // Little Levers (ES) has a button under Excellence ES, nothing under Excellence MS.
+  assert.ok(heads.indexOf("Excellence ES") < heads.indexOf("Excellence IMS") && heads.indexOf("Design IMS") > heads.indexOf("Design ES"), "config order");
+  assert.ok(m.indexOf("Design IMS") < m.indexOf(">Inn<"), "Design comes before Innovate");
+  // Little Levers (ES) has a button under Excellence ES, nothing under Excellence IMS.
   const row = m.match(/<tr><th scope="row" class="ja-aw-tm"><b>41111A<\/b>[\s\S]*?<\/tr>/)![0];
   assert.match(row, /aria-label="41111A, Excellence · Elementary School: winner"/);
-  assert.doesNotMatch(row, /Excellence · Middle School/);
+  assert.doesNotMatch(row, /Excellence · IQ Middle School/);
   assert.match(row, /<td><button[^>]*Excellence · Elementary School: winner[\s\S]*?<\/button><\/td><td><\/td>/);
   // Byte Me (MS) is the mirror image.
   const ms = m.match(/<tr><th scope="row" class="ja-aw-tm"><b>7700B<\/b>[\s\S]*?<\/tr>/)![0];
-  assert.match(ms, /<td><\/td><td><button[^>]*Excellence · Middle School: winner/);
+  assert.match(ms, /<td><\/td><td><button[^>]*Excellence · IQ Middle School: winner/);
   // Rows carry the division tag; the HS team is a row too.
   assert.match(row, /title="Elementary School">ES<\/span>/);
   assert.match(m, /<b>9000H<\/b>/);
-  // Tick and lock per key: Design MS is sent, Design ES is not.
+  // Tick and lock per key: Design IMS is sent, Design ES is not.
   const lock = "Locked: sent to Marketing";
   const design = (k: string) => m.match(new RegExp(`<th scope="col"[^>]*aria-label="Design ${k}">[\\s\\S]*?</th>`))![0];
-  assert.match(design("MS"), new RegExp(lock));
+  assert.match(design("IMS"), new RegExp(lock));
   assert.doesNotMatch(design("ES"), new RegExp(lock));
   assert.match(design("ES"), /aria-label="decided"/);
 });
@@ -361,7 +361,7 @@ test("tapping a matrix cell opens it under its key: a division's for Excellence,
 
 test("a selected matrix cell highlights its own column only", () => {
   const m = board({ view: "matrix", sel: { awardId: "excellence", teamId: byteMe.id, key: MS } });
-  assert.match(m, /<th scope="col" class="ja-aw-on" aria-label="Excellence MS"/);
+  assert.match(m, /<th scope="col" class="ja-aw-on" aria-label="Excellence IMS"/);
   assert.doesNotMatch(m, /ja-aw-on" aria-label="Excellence ES"/);
 });
 
@@ -386,7 +386,7 @@ test("the side panel's eyebrow reads Award · key, and its other nominees wear t
   const inn = aside(board({ sel: { awardId: "innovate", teamId: titans.id, key: WHOLE_EVENT } }));
   assert.match(inn, /<p class="ja-aw-eyebrow">Innovate · Whole event<\/p>/);
   assert.match(inn, /<b>5150Z<\/b> Gear Grinders/);
-  assert.match(inn, /title="Middle School">MS<\/span>/);
+  assert.match(inn, /title="IQ Middle School">IMS<\/span>/);
   // Nothing open: the quiet prompt.
   assert.match(aside(board()), /Pick a nomination to see who made it, and why\./);
 });

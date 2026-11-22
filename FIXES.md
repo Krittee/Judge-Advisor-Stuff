@@ -4,6 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
+| 2026-11-22 | [Awards Desk: IQ Middle School also showed under V5RC](#awards-desk-iq-middle-school-also-showed-under-v5rc-2026-11-22) | Not committed | Not needed (heading text only) | Not merged, not pushed |
 | 2026-11-21 | [Awards send time shows NaN:NaN, and audit cleanup](#awards-send-time-shows-nannan-and-audit-cleanup-2026-11-21) | `bb0ef0f`..`fcd4930` | Not needed (no layout change) | Live in 2.2.0 (PR #19, 2026-11-21) |
 | 2026-11-20 | [Event setup and blended awards (UI)](#event-setup-and-blended-awards-ui-2026-11-20) | `e2e1ad6`..`89b0d7c` | Not yet (375 preview only) | Live in 2.2.0 (PR #19, 2026-11-21) |
 | 2026-11-20 | [Event setup and blended awards (backend)](#event-setup-and-blended-awards-backend-2026-11-20) | `f22f50e`..`84d586a` | Not needed (no UI yet) | Live in 2.2.0 (PR #19, 2026-11-21) |
@@ -26,6 +27,35 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Awards Desk: IQ Middle School also showed under V5RC (2026-11-22)
+
+### Problem / request
+
+On Marketing's Awards Desk an IQ Middle School award also showed under the V5RC tab, and counted in both.
+
+### Root cause
+
+"Middle School" was one division name shared by both programs in `config/event.json`, and awards, sends to Marketing, teams and panels are all filed by division name, so the V5RC tab found the IQ award too.
+
+### Fix
+
+- `config/event.json`: two divisions, IQ Middle School (VEX IQ) and V5RC Middle School (V5RC). The desk tabs are unchanged.
+- On the Awards Desk only, a heading drops the leading words the program already says: "IQ Middle School" under VEX IQ reads "Middle School" (`deskHeading` in `marketingLogic.ts`). Every other screen keeps the full name.
+- Import and division resolving: an exact option (any case) wins; otherwise the one option that ends with the typed words ("Middle School" for "IQ Middle School"). With a saved program, plain "Middle School" follows it. With none saved it is ambiguous: an import line is skipped with the reason ("Middle School" could be IQ Middle School or V5RC Middle School. Save the program on the Event page first, or write the full name.), and a single team or panel gets a 400 with the same text. One shared `matchDivision` in `eventSetup.ts`, used by the teams and panels routes.
+- Old data filed under plain "Middle School" is not moved: re-import. Such a division lands in the desk's Other tab.
+
+### Testing
+
+- New tests (failed before the fix): the released route puts each Middle School in one tab only; `deskHeading` cases; `matchDivision`; import follows the saved program and refuses an ambiguous line; single team/panel 400.
+- Existing tests that depended on the config's divisions now say "IQ Middle School" (tag IMS) or "V5RC Middle School".
+- `npm test`, `tsc`, eslint and `npm run build` pass.
+
+### Commit / status
+
+Not committed. Not merged, not pushed.
 
 ---
 

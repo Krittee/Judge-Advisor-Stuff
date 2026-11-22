@@ -11,7 +11,7 @@ import type { Panel, Team } from "../src/lib/types";
 (globalThis as Record<string, unknown>).AsyncLocalStorage = AsyncLocalStorage;
 
 export const ES = "Elementary School";
-export const MS = "Middle School";
+export const MS = "IQ Middle School";
 
 export const ADMIN: Session = { role: "admin", name: "Alex" };
 export const MARKETING: Session = { role: "marketing", name: "Pim" };

@@ -185,7 +185,7 @@ All in the browser, at `your-address.vercel.app/admin`:
 3. **Import tab** — paste your team list, one per line:
    ```
    1234, Iron Hawks, A1, Elementary School
-   9882K, Kilo Kestrels, A2, Middle School
+   9882K, Kilo Kestrels, A2, IQ Middle School
    ```
    That is number, name, pit, division. The pit is a letter and a number (it
    places the team on the floor plan); a blank division means the first one.

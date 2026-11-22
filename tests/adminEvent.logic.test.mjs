@@ -8,7 +8,8 @@ import { canSave, checklist, outsideRows, previewGroups, tiles } from "../src/co
 const programs = presetPrograms();
 const list = awards();
 const ES = "Elementary School";
-const MS = "Middle School";
+const MS = "IQ Middle School";
+const VMS = "V5RC Middle School";
 const HS = "High School";
 
 const IQ = { program: "VEX IQ", format: "blended" };
@@ -26,7 +27,7 @@ test("tiles: programs x [standard, blended] in config order, with the counts fro
   assert.deepEqual(t.map((x) => x.title), ["VEX IQ · Standard", "VEX IQ · Blended", "V5RC · Standard", "V5RC · Blended"]);
   assert.deepEqual(t.map((x) => x.awardCount), [22, 13, 22, 13]);
   assert.deepEqual(t[0].divisions, [ES, MS]);
-  assert.deepEqual(t[2].divisions, [MS, HS]);
+  assert.deepEqual(t[2].divisions, [VMS, HS]);
   assert.equal(t[0].line, "22 awards · every award per division");
   assert.equal(t[1].line, "13 awards · Excellence and Design per division, 9 for the whole event");
 });

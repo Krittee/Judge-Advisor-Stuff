@@ -60,6 +60,23 @@ export function divisionChoices(setup: Setup, forPanel: boolean): { options: str
   return whole ? { options: [...options, WHOLE_EVENT], fallback: WHOLE_EVENT } : { options, fallback: options[0] };
 }
 
+/**
+ * Which option `wanted` names: an exact match (any case), else the one option that ends with it as whole
+ * words ("Middle School" for "IQ Middle School"). An array when several end that way (ambiguous), null for none.
+ */
+export function matchDivision(wanted: string, options: string[]): string | string[] | null {
+  const w = wanted.trim().toLowerCase();
+  if (!w) return null;
+  const exact = options.find((o) => o.toLowerCase() === w);
+  if (exact) return exact;
+  const ends = options.filter((o) => o.toLowerCase().endsWith(` ${w}`));
+  return ends.length > 1 ? ends : (ends[0] ?? null);
+}
+
+/** The reason an ambiguous division is refused. */
+export const ambiguousDivision = (wanted: string, options: string[]): string =>
+  `"${wanted}" could be ${options.join(" or ")}. Save the program on the Event page first, or write the full name.`;
+
 /** "VEX IQ · Blended" / "V5RC · Standard". */
 export function setupLabel(setup: Pick<EventSetup, "program" | "format">): string {
   return `${setup.program} · ${setup.format === "blended" ? "Blended" : "Standard"}`;

@@ -1385,9 +1385,9 @@ test("a team import defaults to the setup's first division, and a Blended event 
     answer = setup(format);
     await postgresStore.upsertTeams([{ number: "1001", pit: null }]);
     const [upsert] = sent(/insert into teams/);
-    assert.equal(upsert.params[5], "Middle School", "V5RC's first division, not the config's");
+    assert.equal(upsert.params[5], "V5RC Middle School", "V5RC's first division, not the config's");
     assert.equal(upsert.params.length, 9);
-    assert.deepEqual(upsert.params[7], format === "blended" ? [...blendedDivisions(), "Middle School", "High School", WHOLE_EVENT] : blendedDivisions());
+    assert.deepEqual(upsert.params[7], format === "blended" ? [...blendedDivisions(), "V5RC Middle School", "High School", WHOLE_EVENT] : blendedDivisions());
   }
   calls.length = 0;
   answer = () => [];

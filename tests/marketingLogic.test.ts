@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { changesOf, countText, deskRows, eventLine, sectionCount, sectionRows, sectionsOf, highlight, hhmm, matchRow, pickTab, resultsText, rowState, seenKey, storeGet, storeSet, tabKey, tabCount } from "../src/components/marketing/marketingLogic";
+import { changesOf, countText, deskHeading, deskRows, eventLine, sectionCount, sectionRows, sectionsOf, highlight, hhmm, matchRow, pickTab, resultsText, rowState, seenKey, storeGet, storeSet, tabKey, tabCount } from "../src/components/marketing/marketingLogic";
 import { programTabs } from "../src/lib/presets";
 import { sentUnder } from "../src/lib/releases";
 import type { AwardReleaseRow, ReleasedView, ReleaseTeam } from "../src/lib/types";
@@ -273,4 +273,16 @@ test("changesOf with sections: a whole-event change is listed under Whole event,
 test("a snapshot's division stays on the row's team for the desk to tag", () => {
   const r = sectionRows({ ...blendedView, releases: [release("think", { division: WE, teams: [{ ...T("5150X", "Short Circuit"), division: MS }] })] }, blendedView.sections![2], unseen);
   assert.equal(r.find((x) => x.award.id === "think")?.teams[0].division, MS);
+});
+
+test("deskHeading drops the leading words the program label already says", () => {
+  assert.equal(deskHeading("IQ Middle School", "VEX IQ"), "Middle School");
+  assert.equal(deskHeading("V5RC Middle School", "V5RC"), "Middle School");
+  assert.equal(deskHeading("iq middle school", "VEX IQ"), "middle school");
+  assert.equal(deskHeading("Elementary School", "VEX IQ"), "Elementary School");
+  assert.equal(deskHeading("High School", "V5RC"), "High School");
+  assert.equal(deskHeading("Blended", "Blended"), "Blended", "never empty: every word would go, so keep the name");
+  assert.equal(deskHeading("Whole event", "VEX IQ"), "Whole event");
+  assert.equal(deskHeading("Middle School", "Other"), "Middle School");
+  assert.equal(deskHeading("IQ Middle School", ""), "IQ Middle School");
 });

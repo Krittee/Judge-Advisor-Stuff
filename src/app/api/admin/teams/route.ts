@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { actorParts } from "@/lib/activity";
 import { canAdminister, getSession } from "@/lib/auth";
 import { isValidTeamNumber, normalizeTeamNumber } from "@/lib/teamNumber";
-import { divisionChoices } from "@/lib/eventSetup";
+import { ambiguousDivision, divisionChoices, matchDivision } from "@/lib/eventSetup";
 import { divisionsCompatible, parseLanguageList, resolveCategory } from "@/lib/presets";
 import { normalizePit } from "@/lib/pit";
 import { store, StoreError } from "@/lib/db";
@@ -57,15 +57,19 @@ export async function POST(request: Request) {
   const perPanel = clampPerPanel(body.perPanel);
 
   const eventSetup = await store().getEventSetup();
-  const { teams, skipped, skippedLines } = parseTeams(
-    text,
-    eventSetup,
-    named(body.division, (d) => resolveDivision(d, eventSetup)),
-    named(body.category, resolveCategory),
-  );
+  let division: string | null;
+  try {
+    division = named(body.division, (d) => resolveDivision(d, eventSetup));
+  } catch (e) {
+    if (e instanceof StoreError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+  const { teams, skipped, skippedLines } = parseTeams(text, eventSetup, division, named(body.category, resolveCategory));
   if (!teams.length) {
+    // Say why the first line was refused, if it was, so the reason is not lost.
+    const why = skippedLines[0] ? ` Line ${skippedLines[0].line}: ${skippedLines[0].reason}` : "";
     return NextResponse.json(
-      { error: "No team rows found. Use one team per line: number, name" },
+      { error: `No team rows found. Use one team per line: number, name${why}` },
       { status: 400 },
     );
   }
@@ -294,7 +298,9 @@ function named(input: unknown, resolve: (input: unknown) => string): string | nu
 function resolveDivision(input: unknown, setup: EventSetup | null): string {
   const wanted = String(input ?? "").trim();
   const { options, fallback } = divisionChoices(setup, false);
-  return options.includes(wanted) ? wanted : fallback;
+  const hit = matchDivision(wanted, options);
+  if (Array.isArray(hit)) throw new StoreError(ambiguousDivision(wanted, hit));
+  return hit ?? fallback;
 }
 
 /**
@@ -337,12 +343,24 @@ function parseTeams(
       continue;
     }
 
+    let division = fallbackDivision;
+    if (cells[3]) {
+      try {
+        division = resolveDivision(cells[3], setup);
+      } catch (e) {
+        if (!(e instanceof StoreError)) throw e;
+        skipped++;
+        skippedLines.push({ line: i + 1, text: line.slice(0, 200), reason: e.message });
+        continue;
+      }
+    }
+
     const languages = parseLanguageList(cells[5]);
     seen.set(number, {
       number,
       name: cells[1] || null,
       pit: normalizePit(cells[2]),
-      division: cells[3] ? resolveDivision(cells[3], setup) : fallbackDivision,
+      division,
       category: cells[4] ? resolveCategory(cells[4]) : fallbackCategory,
       // Nothing recognised counts as blank, so a stray word never wipes what is stored.
       languages: languages.length ? languages : null,
