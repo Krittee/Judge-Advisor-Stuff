@@ -16,6 +16,8 @@ import {
   leaveAfterAsking,
   misfit,
   moveBooking,
+  moveMiddleSchoolAfterAsking,
+  moveMiddleSchoolQuestion,
   moveQuestion,
   notebookCounts,
   openInRefereeAfterAsking,
@@ -23,6 +25,7 @@ import {
   panelLeft,
   panelLoad,
   panelOptions,
+  plainMiddleSchool,
   removeQuestion,
   removeTeamAfterAsking,
   requestBlocker,
@@ -657,4 +660,54 @@ test("strandedIds follows the format: a blended team is stranded only when every
   const judges = [judge("j1", "p1")];
   assert.equal(strandedIds([es], only, conflicts, judges).size, 0, "no panel in its division at all: not stranded (today)");
   assert.equal(strandedIds([es], only, conflicts, judges, "blended").size, 1, "Panel 1 can judge it now, and is blocked");
+});
+
+/* ---- the old plain "Middle School" ------------------------------------------------------- */
+
+const IQ = "IQ Middle School";
+const V5 = "V5RC Middle School";
+const split = ["Elementary School", IQ, V5, "High School"];
+const old = (state = {}) => ({ teams: [titans, team("1001A", "A", { division: " middle school " }), team("3003C", "C", { division: IQ })], panels, divisions: split, eventSetup: null, ...state });
+
+test("plainMiddleSchool finds the teams and panels still on plain Middle School, and the two divisions to move them to", () => {
+  const found = plainMiddleSchool(old());
+  assert.deepEqual(found.teams.map((t) => t.number), ["9882K", "1001A"], "matched ignoring case and spaces");
+  assert.deepEqual(found.panels, [{ id: "p2", name: "Panel 2" }, { id: "p3", name: "Panel 3" }]);
+  assert.deepEqual(found.targets, [IQ, V5]);
+});
+
+test("plainMiddleSchool follows the saved setup's divisions, and is null with nothing to move or plain Middle School still configured", () => {
+  assert.deepEqual(plainMiddleSchool(old({ eventSetup: { program: "VEX IQ", format: "standard" } })).targets, [IQ]);
+  assert.equal(plainMiddleSchool(old({ teams: [team("3003C", "C", { division: IQ })], panels: [panel(1, "High School")] })), null);
+  assert.equal(plainMiddleSchool(old({ divisions: ["Middle School", "High School"] })), null);
+  assert.equal(plainMiddleSchool(old({ teams: [], panels: [panel(2, "Middle School")] })).panels.length, 1, "a panel alone is enough");
+});
+
+test("the move question lists five teams and a count, the panels, and what moves with them", () => {
+  const nine = ["9000A", "1000B", "1001A", "2000C", "3000D", "4000E", "5000F", "6000G", "7000H"].map((n) => team(n, n));
+  assert.equal(
+    moveMiddleSchoolQuestion({ teams: nine, panels: [{ name: "A.Alpha" }, { name: "B.Bravo" }] }, V5),
+    `Move to ${V5}?\n9 teams: 1000B, 1001A, 2000C, 3000D, 4000E and 4 more\nPanels: A.Alpha, B.Bravo\n\nTheir award winners, No winner marks and sends to Marketing move with them.`,
+  );
+  assert.equal(
+    moveMiddleSchoolQuestion({ teams: [titans], panels: [] }, IQ),
+    `Move to ${IQ}?\n1 team: 9882K\n\nTheir award winners, No winner marks and sends to Marketing move with them.`,
+    "no panels, no Panels line",
+  );
+});
+
+test("Move to asks first, sends nothing on a no, and posts the division on a yes", async () => {
+  const found = { teams: [titans, team("1001A", "A")], panels: [] };
+  const no = asker(false);
+  const { calls, call } = caller();
+  assert.equal(await moveMiddleSchoolAfterAsking(no.ask, call, found, IQ), false);
+  assert.equal(calls.length, 0);
+  assert.deepEqual(no.asked[0].options, { confirmLabel: "Move 2 items" });
+
+  const yes = asker(true);
+  assert.equal(await moveMiddleSchoolAfterAsking(yes.ask, call, { teams: [titans], panels: [] }, V5), true);
+  assert.equal(yes.asked[0].options.confirmLabel, "Move 1 item");
+  assert.deepEqual(calls, [{ url: "/api/admin/middle-school", method: "POST", body: { to: V5 } }]);
+
+  await assert.rejects(() => moveMiddleSchoolAfterAsking(asker(true).ask, caller("Excellence already decided").call, found, IQ), /already decided/);
 });
