@@ -33,6 +33,9 @@ export class StoreError extends Error {
 export const STALE_STATUS_MESSAGE =
   "This request changed on another screen — refresh and try again.";
 
+/** How many rows moveDivision re-keyed, per table. */
+export type DivisionMove = { teams: number; panels: number; winners: number; noWinners: number; releases: number };
+
 export type NewRequest = {
   teamId: string;
   panelId: string;
@@ -289,6 +292,13 @@ export type Store = {
   getEventSetup(): Promise<EventSetup | null>;
   /** Replaces the one record and deletes every `recalled` award_releases row, in one write. resetDay keeps it, resetAll clears it. */
   saveEventSetup(input: { program: string; format: EventFormat; setBy: string }): Promise<EventSetup>;
+
+  /**
+   * Rename a division on every row that carries it: teams, panels, winners, "No winner" marks and releases
+   * (and the division tag on each release's snapshot teams). Matches `from` ignoring case and spaces.
+   * A release keeps its status, so a sent one stays sent. A clash with an existing key throws, nothing is written.
+   */
+  moveDivision(from: string, to: string): Promise<DivisionMove>;
 
   /**
    * The judge roster, in the order judges were added. A panel's `judges`
