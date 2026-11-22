@@ -21,6 +21,7 @@ Newest first. Each version links to its section below.
 
 | Version | Live on | PR | Merge commit | What |
 |---|---|---|---|---|
+| [2.2.2](#version-222-iq-and-v5rc-middle-school-are-separate-divisions) | 2026-11-22 | [#21](https://github.com/Krittee/Judge-Advisor-Stuff/pull/21) | `09e11c8` | IQ Middle School and V5RC Middle School are separate divisions; desk tabs back |
 | [2.2.1](#version-221-middle-school-shows-once-on-the-awards-desk) | 2026-11-22 | [#20](https://github.com/Krittee/Judge-Advisor-Stuff/pull/20) | `1b32827` | Awards Desk: Middle School shows once (no VEX IQ / V5RC tabs) |
 | [2.2.0](#version-220-awards-desk-event-setup-and-blended-awards) | 2026-11-21 | [#19](https://github.com/Krittee/Judge-Advisor-Stuff/pull/19) | `efb9f61` | Awards Desk for Marketing; event setup and blended awards; door Team \| Staff; Major removed |
 | [2.1.4](#version-214-four-fixes-from-16-november) | 2026-11-16 | [#18](https://github.com/Krittee/Judge-Advisor-Stuff/pull/18) | `ff04220` | Good conduct green; JA fixes notes; Judges Award two winners; No winner |
@@ -37,9 +38,32 @@ first numbered 2.2.0 and shipped as 2.1.3. Individual bug fixes are logged in
 
 ---
 
+## Version 2.2.2: IQ and V5RC Middle School are separate divisions
+
+Live 2026-11-22 via PR #21, merged as `09e11c8`; version bump `7d9330d`; fix `0c04a4f`,
+merged locally as `450a5db` after reverting 2.2.1's change (`cfb9b66`).
+
+The user's real case: with VEX IQ chosen, an IQ Middle School award also showed
+(and counted) under V5RC, because "Middle School" was one division name shared
+by both programs and everything is filed by division name. Now:
+
+- `config/event.json` has **IQ Middle School** (VEX IQ) and **V5RC Middle
+  School** (V5RC). Under each desk tab the heading reads "Middle School".
+- The Awards Desk keeps its VEX IQ | V5RC tabs (2.2.1's one-list desk is gone).
+- Import and division picking: an exact name wins; plain "Middle School"
+  follows the saved program; with none saved it is refused and asks for the
+  full name.
+- Data under plain "Middle School" is not moved (fresh event; nothing to carry).
+
+Checked: 2002 tests (2001 pass, 1 skipped); tsc, eslint and build clean.
+`postgres.ts` unchanged, so no Neon run.
+
+---
+
 ## Version 2.2.1: Middle School shows once on the Awards Desk
 
 Live 2026-11-22 via PR #20, merged as `1b32827`; version bump `57f3673`; fix `002c231`.
+**Replaced the same day by 2.2.2.**
 
 Middle School belongs to both VEX IQ and V5RC, and an award's division carries
 no program, so with no event setup saved one Middle School send counted under
