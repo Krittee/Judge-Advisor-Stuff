@@ -293,6 +293,7 @@ export type SendAllReply = {
   sent: AwardReleaseRow[];
   skipped: { awardId: string; division: string; reason: "not ready" | "already sent" }[];
 };
+export type RecallAllReply = { recalled: AwardReleaseRow[] };
 
 /**
  * GET /api/awards for the Judge Advisor: every nomination and every winner.

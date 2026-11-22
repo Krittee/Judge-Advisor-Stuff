@@ -970,6 +970,51 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
     assert.deepEqual((await store.listReleases()).map((r) => [r.division, r.status]), [[ES, "sent"]]);
   });
 
+  it("moving a division re-keys teams, panels and every award record, keeps a sent release sent, and a second call moves nothing", async (store) => {
+    const OLD = "Middle School";
+    await store.createPanel(panelInput({ name: "Old", code: "MOVE01", division: OLD }));
+    await store.createPanel(panelInput({ name: "Other", code: "MOVE02", division: ES }));
+    await store.upsertTeams([teamInput("1001", { division: " middle school " }), teamInput("1002", { division: OLD }), teamInput("1003", { division: ES })]);
+    const [a, b, c] = await Promise.all(["1001", "1002", "1003"].map((n) => store.findTeamByNumber(n)));
+    assert.ok(a && b && c);
+    await store.setWinner({ awardId: "excellence", division: OLD, teamId: a.id, decidedBy: "Alex", places: 1 });
+    await store.setWinner({ awardId: "excellence", division: ES, teamId: c.id, decidedBy: "Alex", places: 1 });
+    await store.setNoWinner({ awardId: "design", division: OLD, decidedBy: "Alex" });
+    const snap = (id: string, number: string, division: string) => ({ teams: [{ id, number, name: number, division }], no_winner: false });
+    // A sent release, and a Whole event one that also carries a Middle School team in its snapshot and its previous.
+    await store.sendRelease({ awardId: "excellence", division: OLD, snapshot: snap(a.id, "1001", OLD), previous: snap(b.id, "1002", "MIDDLE SCHOOL"), changedAt: "2026-11-21T10:00:00.000Z", sentBy: "Alex" });
+    await store.sendRelease({ awardId: "design", division: "Whole event", snapshot: snap(b.id, "1002", OLD), previous: null, changedAt: null, sentBy: "Alex" });
+    await store.sendRelease({ awardId: "design", division: ES, snapshot: snap(c.id, "1003", ES), previous: null, changedAt: null, sentBy: "Alex" });
+    const sentAt = (await store.listReleases()).find((r) => r.division === OLD)!.sent_at;
+
+    assert.deepEqual(await store.moveDivision(OLD, MS), { teams: 2, panels: 1, winners: 1, noWinners: 1, releases: 1 });
+
+    assert.deepEqual((await store.listTeams()).map((t) => [t.number, t.division]).sort(), [["1001", MS], ["1002", MS], ["1003", ES]]);
+    assert.deepEqual((await store.listPanels()).map((p) => [p.name, p.division]).sort(), [["Old", MS], ["Other", ES]]);
+    assert.deepEqual((await store.listWinners()).map((w) => [w.team_id, w.division]).sort(), [[a.id, MS], [c.id, ES]].sort());
+    assert.deepEqual((await store.listNoWinners()).map((n) => n.division), [MS]);
+
+    const releases = await store.listReleases();
+    const moved = releases.find((r) => r.award_id === "excellence")!;
+    assert.deepEqual([moved.division, moved.status, moved.sent_at, moved.sent_by, moved.changed_at], [MS, "sent", sentAt, "Alex", "2026-11-21T10:00:00.000Z"]);
+    assert.equal(moved.teams[0].division, MS);
+    assert.equal(moved.previous?.teams[0].division, MS, "the replaced decision is retagged too");
+    const whole = releases.find((r) => r.division === "Whole event")!;
+    assert.equal(whole.teams[0].division, MS, "a Whole event row keeps its key but its tags move");
+    assert.equal(releases.find((r) => r.division === ES)!.teams[0].division, ES);
+
+    assert.deepEqual(await store.moveDivision(OLD, MS), { teams: 0, panels: 0, winners: 0, noWinners: 0, releases: 0 });
+  });
+
+  it("moving a division onto a key that is already decided throws and writes nothing", async (store) => {
+    await store.upsertTeams([teamInput("1001", { division: "Middle School" })]);
+    await store.setNoWinner({ awardId: "design", division: "Middle School", decidedBy: "Alex" });
+    await store.setNoWinner({ awardId: "design", division: MS, decidedBy: "Alex" });
+    await assert.rejects(() => store.moveDivision("Middle School", MS));
+    assert.equal((await store.findTeamByNumber("1001"))?.division, "Middle School", "the team did not move either");
+    assert.equal((await store.listNoWinners()).length, 2);
+  });
+
   it("a new team with no division lands in the saved program's first division", async (store) => {
     await store.saveEventSetup({ program: "V5RC", format: "standard", setBy: "Dana" });
     await store.upsertTeams([{ number: "1001", name: "New", pit: null }]);

@@ -25,6 +25,7 @@ import type {
   WinnerRow,
   NoWinnerRow,
   AwardReleaseRow,
+  ReleaseSnapshot,
 } from "../types";
 import type { Status } from "../status";
 import { readActivity, type StoredActivity } from "../activity";
@@ -58,6 +59,7 @@ import {
   type NewWinner,
   type NewNoWinner,
   type SendRelease,
+  type DivisionMove,
   type NominationKey,
   type FlagEdit,
   type NewRefereeSetup,
@@ -1214,6 +1216,54 @@ function saveEventSetup(input: { program: string; format: EventFormat; setBy: st
   return setup;
 }
 
+/** Same name, ignoring case and spaces: how stored divisions are matched when one is renamed. */
+const sameDivision = (a: string | undefined, b: string) => (a ?? "").trim().toLowerCase() === b.trim().toLowerCase();
+
+/** Rename a division everywhere it is stored, in one synchronous block and one save. */
+function moveDivision(from: string, to: string): DivisionMove {
+  const s = state();
+  const hit = <T extends { division: string }>(rows: T[]) => rows.filter((r) => sameDivision(r.division, from));
+  const rows = {
+    teams: hit(s.teams),
+    panels: hit(s.panels),
+    winners: hit(s.winners),
+    noWinners: hit(s.noWinners),
+    releases: hit(s.awardReleases),
+  };
+  // Like the Postgres primary key: moving onto a key that is already taken would lose a decision.
+  const taken = (row: { award_id: string; division: string; team_id?: string }, mine: { award_id: string; division: string; team_id?: string }[]) =>
+    row.division === to && mine.some((m) => m.award_id === row.award_id && m.team_id === row.team_id);
+  if (
+    s.winners.some((w) => taken(w, rows.winners)) ||
+    s.noWinners.some((n) => taken(n, rows.noWinners)) ||
+    s.awardReleases.some((r) => taken(r, rows.releases))
+  ) {
+    throw new StoreError(`A decision already exists in ${to}.`, 409);
+  }
+  let tags = 0;
+  const retag = (snap: ReleaseSnapshot | null) =>
+    snap?.teams.forEach((t) => {
+      if (sameDivision(t.division, from)) {
+        t.division = to;
+        tags++;
+      }
+    });
+  s.awardReleases.forEach((r) => {
+    retag(r);
+    retag(r.previous);
+  });
+  const out = {
+    teams: rows.teams.length,
+    panels: rows.panels.length,
+    winners: rows.winners.length,
+    noWinners: rows.noWinners.length,
+    releases: rows.releases.length,
+  };
+  Object.values(rows).forEach((list) => list.forEach((r) => (r.division = to)));
+  if (tags || Object.values(out).some(Boolean)) save();
+  return out;
+}
+
 function removeConflict(id: string): boolean {
   const before = state().conflicts.length;
   state().conflicts = state().conflicts.filter((c) => c.id !== id);
@@ -1783,6 +1833,7 @@ export const fileStore: Store = {
   listReleases: async () => listReleases(),
   sendRelease: async (input) => sendRelease(input),
   recallRelease: async (awardId, division) => recallRelease(awardId, division),
+  moveDivision: async (from, to) => moveDivision(from, to),
 
   resetDay: async () => resetDay(),
   resetAll: async () => resetAll(),

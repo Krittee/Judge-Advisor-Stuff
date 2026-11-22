@@ -4,7 +4,9 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-22 | [Awards Desk: IQ Middle School also showed under V5RC](#awards-desk-iq-middle-school-also-showed-under-v5rc-2026-11-22) | `0c04a4f` | Not needed (heading text only) | Not merged, not pushed |
+| 2026-11-22 | [Teams: move old plain Middle School to IQ or V5RC](#teams-move-old-plain-middle-school-to-iq-or-v5rc-2026-11-22) | `5190f9d`..`1dd7b05` | Not yet (375 preview only) | Local on `claude/ms-mover-d2f09b`; Neon run needed (`postgres.ts` changed) |
+| 2026-11-22 | [Awards: Recall all](#awards-recall-all-2026-11-22) | `6eae9c9` | Not yet (375 preview only) | Committed locally on `claude/recall-all-954c2b`; not pushed |
+| 2026-11-22 | [Awards Desk: IQ Middle School also showed under V5RC](#awards-desk-iq-middle-school-also-showed-under-v5rc-2026-11-22) | `0c04a4f` | Not needed (heading text only) | Live in 2.2.2 (PR #21, 2026-11-22) |
 | 2026-11-22 | [Awards Desk showed Middle School under both VEX IQ and V5RC](#awards-desk-showed-middle-school-under-both-vex-iq-and-v5rc-2026-11-22) | `002c231` | Not needed (no layout change) | Live in 2.2.1 (PR #20, 2026-11-22); replaced in 2.2.2 by the IQ / V5RC Middle School split |
 | 2026-11-21 | [Awards send time shows NaN:NaN, and audit cleanup](#awards-send-time-shows-nannan-and-audit-cleanup-2026-11-21) | `bb0ef0f`..`fcd4930` | Not needed (no layout change) | Live in 2.2.0 (PR #19, 2026-11-21) |
 | 2026-11-20 | [Event setup and blended awards (UI)](#event-setup-and-blended-awards-ui-2026-11-20) | `e2e1ad6`..`89b0d7c` | Not yet (375 preview only) | Live in 2.2.0 (PR #19, 2026-11-21) |
@@ -28,6 +30,58 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Teams: move old plain Middle School to IQ or V5RC (2026-11-22)
+
+### Problem / request
+
+Data saved before 2.2.2 still says plain "Middle School" (on live, 25 of 59 teams and 5 of 11 panels), which is no longer a division, so its awards land in the Awards Desk's Other tab. The Judge Advisor needed a one-tap way to move it.
+
+### Fix
+
+- Teams page: a caution banner, shown only while a team or panel says exactly "Middle School" (any case) and the config splits it. It reads "N teams and M panels still say just "Middle School"", explains why, and has one "Move to …" button per configured division ending in Middle School (only the saved program's, when an event setup is saved). Each button asks first, listing the teams (first five numbers), the panels and that award data moves too.
+- `POST /api/admin/middle-school` `{ to }`, Judge Advisor only (403 otherwise). 400 for a target that is not a configured Middle School division, or not in the saved program. 409 when an award is decided under both plain Middle School and the target ("Clear one of the two first."). Nothing left: `{ moved: null }`, nothing logged. Otherwise one Activity entry (`Moved "Middle School" to …`, with counts).
+- Store `moveDivision(from, to)` in both stores: teams, panels, winners, No winner marks and releases are re-keyed, and the division tag on each release's snapshot teams is rewritten. Postgres does it in one transaction; the file store in one write.
+- A sent release moves with its key and stays sent (status, send time and Changed unchanged): the decision is the same, only the division's name changed.
+- `/api/state`'s `divisions` includes divisions found in the data, so the banner takes its targets from the names ending in Middle School rather than checking whether plain Middle School is listed.
+
+### Testing
+
+- Route tests (permissions, wrong target, outside program, clash, no-op, full move incl. a sent release), conformance cases for both stores, banner logic and render tests.
+- Browser, on a seeded copy (8 teams, 1 panel, 2 winners, 1 No winner, 1 sent release under plain Middle School): banner and dialog at 1280 light and 375 dark; moving to IQ Middle School re-keyed everything, the release stayed sent, one Activity row, banner gone; a second call returned `{ moved: null }`.
+- `npm test` (2017 pass, 1 skipped: Postgres), `tsc`, eslint and `npm run build` pass. Postgres `moveDivision` not yet run on Neon.
+
+### Commit / status
+
+`5190f9d` (store), `c741d59` (route), `426d045` (banner), `1dd7b05` (banner on real state). Local only, not pushed.
+
+---
+
+## Awards: Recall all (2026-11-22)
+
+### Problem / request
+
+"Can you add recall all awards?" The Judge Advisor could send everything ready in one step, but had to recall sent awards one at a time.
+
+### Fix
+
+- `DELETE /api/awards/released?all=1` (Judge Advisor only; Marketing gets 403): every award in status `sent`, in every division and under "Whole event", is recalled exactly as a single Recall does (status `recalled`, teams kept, unlocked). Already-recalled awards are left alone. One Activity entry per award, the same as a single Recall. Reply `{ recalled }`. A plain DELETE still needs its award and division.
+- "Recall all (N)" under Send all ready on the Standard and Blended Awards tabs: outlined in the danger colour, 44px on a phone, disabled at 0 ("Nothing is sent to Marketing"). N counts every sent award in the event, like Send all ready.
+- It asks first (`useConfirm`, danger): "Recall N awards from Marketing?", a line on "Being updated" and unlocking, and one line per award: award · division or Whole event · team(s) or No winner.
+- Sending again keeps the existing rules: same team, no Changed flag; different, "Changed — was X".
+- No store change (`postgres.ts` untouched, no Neon run needed).
+
+### Testing
+
+- New tests: Marketing and non-JA refused; several sent rows incl. Whole event all recalled with teams kept; an already-recalled row untouched; one Activity entry each; nothing sent gives an empty list; plain DELETE without a body is 400; re-send after Recall all with the same and a different team; `recallAllLines`; button count, disabled at 0 and hidden before sends are known, on both boards.
+- Browser, on a copy of the data: Standard at 1280 light and 375 dark, Blended (VEX IQ) at 1280 dark and 375 light. Dialog lines, Whole event keys, lock icons cleared, counts updated, no console errors. Marketing recall-all: 403.
+- `npm test` (2009: 2008 pass, 1 skipped), `tsc`, eslint and `npm run build` pass.
+
+### Commit / status
+
+`6eae9c9`, committed locally on `claude/recall-all-954c2b`; not pushed.
 
 ---
 
@@ -56,7 +110,7 @@ On Marketing's Awards Desk an IQ Middle School award also showed under the V5RC 
 
 ### Commit / status
 
-`0c04a4f` on `claude/ms-overlap-bug-a9af88`, merged locally 2026-11-22; ships in 2.2.2.
+`0c04a4f`, live in 2.2.2 (PR #21, merge `09e11c8`).
 
 ---
 

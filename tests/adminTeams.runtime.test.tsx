@@ -99,6 +99,8 @@ function board(
     state?: Partial<AppState>;
     filtersOpen?: boolean;
     error?: string | null;
+    move?: boolean;
+    moving?: boolean;
   } = {},
 ) {
   const picked = over.picked ?? null;
@@ -113,6 +115,8 @@ function board(
       perPanel={12}
       onPerPanel={noop}
       onAutoAssign={noop}
+      moving={over.moving}
+      onMoveMiddleSchool={over.move === false ? undefined : noop}
       pickedId={picked?.id ?? null}
       onPick={noop}
       draft={picked ? { ...startDraft(picked), ...over.draft } : null}
@@ -782,4 +786,34 @@ test("a booking on another day reads with its weekday in the table and the drawe
   assert.ok(rowOf(board(), "4410C").includes(`ja-tm-bk">${slotLabel(slot)}</span>`));
   assert.ok(drawer(board({ picked: rangers })).includes(`<span class="ja-lab">Booked</span><span class="ja-tm-bk">${slotLabel(slot)}</span>`));
   assert.match(slotLabel(slot), /^[A-Z][a-z]{2} /);
+});
+
+/* ---- the old plain "Middle School" banner --------------------------------------------------- */
+
+// What /api/state really sends: the configured divisions, then any found only in the data.
+const split = ["Elementary School", "IQ Middle School", "V5RC Middle School", "High School", "Blended", "Middle School"];
+const banner = (markup: string) => markup.match(/<div class="ja-fl"><div class="jg-caution" role="note">[\s\S]*?<\/button><\/div>/)?.[0] ?? "";
+
+test("plain Middle School teams show a caution note with the count and one 44px-plus button per target", () => {
+  const m = banner(board({ state: { divisions: split } }));
+  assert.ok(m, "the banner is drawn");
+  const t = text(m);
+  assert.match(t, /5 teams and 2 panels still say just &quot;Middle School&quot;/);
+  assert.match(t, /Middle School is now two divisions, so these sit outside every division and their awards land in Other on the Awards Desk\. Pick where they belong\./);
+  const buttons = [...m.matchAll(/<button type="button" class="ja-prim"[^>]*>([\s\S]*?)<\/button>/g)].map((b) => text(b[1]));
+  assert.deepEqual(buttons, ["Move to IQ Middle School", "Move to V5RC Middle School"]);
+  assert.match(read("src/app/globals.css"), /\.ja-prim \{[^}]*height: 52px/, "the button is at least 44px tall");
+});
+
+test("the banner is absent when Middle School is still a division, nothing is on it, or the board is not wired to move", () => {
+  assert.equal(banner(board()), "", "the Middle School division is configured");
+  assert.equal(banner(board({ state: { divisions: split, teams: [pi], panels: [panels[0]] } })), "");
+  assert.equal(banner(board({ state: { divisions: split }, move: false })), "");
+  assert.match(board({ state: { divisions: split }, moving: true }), /<button type="button" class="ja-prim" disabled=""[^>]*>Move to IQ/);
+});
+
+test("TeamsTab moves them after asking, then refreshes, and shows a refusal", () => {
+  const src = read("src/components/admin/TeamsTab.tsx");
+  assert.match(src, /moveMiddleSchoolAfterAsking\(ask, call, found, to\)\) await refresh\(\)/);
+  assert.match(src, /setMoving\(true\)[\s\S]*onError\(\(e as Error\)\.message\)[\s\S]*setMoving\(false\)/);
 });

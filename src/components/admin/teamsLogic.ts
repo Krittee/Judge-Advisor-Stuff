@@ -4,12 +4,13 @@ import type { Ask } from "@/components/judge/logic";
 import { languageNames } from "@/components/Language";
 import { historyTime, sameEventDay } from "@/components/team/teamLogic";
 import { liveRequestFor } from "@/lib/data";
+import { setupDivisions } from "@/lib/eventSetup";
 import { normalizePit } from "@/lib/pit";
 import { divisionsCompatible, languageFit } from "@/lib/presets";
 import { isPanelBlocked, panelBlocks } from "@/lib/roster";
 import { canTransition, STATUS_META, type Status } from "@/lib/status";
 import type { formTimes } from "@/lib/stepTimes";
-import { normalizeTeamNumber } from "@/lib/teamNumber";
+import { compareTeamNumbers, normalizeTeamNumber } from "@/lib/teamNumber";
 import type { AppState, ConflictRow, EventFormat, FlagRow, JudgeRow, PublicPanel, RequestRow, Slot, Team } from "@/lib/types";
 import { strandedTeams } from "./conflictsLogic";
 import { allowedPanels } from "./floorLogic";
@@ -336,6 +337,56 @@ export const removeQuestion = (team: Pick<Team, "number">): string => `Remove te
 export async function removeTeamAfterAsking(ask: Ask, call: Call, team: Pick<Team, "id" | "number">): Promise<boolean> {
   if (!(await ask(removeQuestion(team), { confirmLabel: "Remove team", danger: true }))) return false;
   await call(`/api/admin/teams?teamId=${team.id}`, { method: "DELETE" });
+  return true;
+}
+
+/* ---- the old plain "Middle School" ------------------------------------------ */
+
+const OLD_MIDDLE_SCHOOL = "middle school";
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * Teams and panels still filed under plain "Middle School", and the two divisions it became, to move them to.
+ * Null when there are none, or the event has no split Middle School divisions (so plain "Middle School" is a real one).
+ */
+export function plainMiddleSchool(
+  state: Pick<AppState, "teams" | "panels" | "divisions" | "eventSetup">,
+): { teams: Team[]; panels: { id: string; name: string }[]; targets: string[] } | null {
+  // state.divisions also lists divisions found only in the data (plain "Middle School" itself), so it is not the config:
+  // the split divisions are. With none of them listed, plain Middle School is a real division.
+  const targets = (setupDivisions(state.eventSetup) ?? state.divisions).filter(
+    (d) => d.toLowerCase().endsWith(` ${OLD_MIDDLE_SCHOOL}`) && !sameName(d, OLD_MIDDLE_SCHOOL),
+  );
+  if (!targets.length) return null;
+  const teams = state.teams.filter((t) => sameName(t.division, OLD_MIDDLE_SCHOOL));
+  const panels = state.panels.filter((p) => sameName(p.division, OLD_MIDDLE_SCHOOL)).map((p) => ({ id: p.id, name: p.name }));
+  if (!teams.length && !panels.length) return null;
+  return { teams, panels, targets };
+}
+
+/** "Move to V5RC Middle School?", the teams (the first five, then a count), the panels, and what moves with them. */
+export function moveMiddleSchoolQuestion(found: { teams: Pick<Team, "number">[]; panels: { name: string }[] }, to: string): string {
+  const numbers = found.teams.map((t) => t.number).sort(compareTeamNumbers);
+  const more = numbers.length - 5;
+  const lines = [`Move to ${to}?`];
+  if (numbers.length) {
+    const list = more > 0 ? `${numbers.slice(0, 5).join(", ")} and ${more} more` : numbers.join(", ");
+    lines.push(`${numbers.length} ${numbers.length === 1 ? "team" : "teams"}: ${list}`);
+  }
+  if (found.panels.length) lines.push(`Panels: ${found.panels.map((p) => p.name).join(", ")}`);
+  return `${lines.join("\n")}\n\nTheir award winners, No winner marks and sends to Marketing move with them.`;
+}
+
+/** Move them to `to`, asked first; nothing is sent on a no. Returns whether it sent. */
+export async function moveMiddleSchoolAfterAsking(
+  ask: Ask,
+  call: Call,
+  found: { teams: Pick<Team, "number">[]; panels: { name: string }[] },
+  to: string,
+): Promise<boolean> {
+  const items = found.teams.length + found.panels.length;
+  if (!(await ask(moveMiddleSchoolQuestion(found, to), { confirmLabel: `Move ${items} ${items === 1 ? "item" : "items"}` }))) return false;
+  await call("/api/admin/middle-school", { method: "POST", body: { to } });
   return true;
 }
 

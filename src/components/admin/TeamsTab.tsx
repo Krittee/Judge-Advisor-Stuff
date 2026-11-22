@@ -29,11 +29,13 @@ import {
   leaveAfterAsking,
   misfit,
   moveBooking,
+  moveMiddleSchoolAfterAsking,
   notebookCounts,
   openInRefereeAfterAsking,
   panelCell,
   panelLoad,
   panelOptions,
+  plainMiddleSchool,
   removeTeamAfterAsking,
   requestBlocker,
   requestNow,
@@ -49,6 +51,12 @@ import {
   type InterviewActions,
   type TeamDraft,
 } from "./teamsLogic";
+
+/** "3 teams and 1 panel": the zero part is left out. */
+function oldMiddleCount({ teams, panels }: { teams: unknown[]; panels: unknown[] }) {
+  const part = (n: number, noun: string) => (n ? `${n} ${noun}${n === 1 ? "" : "s"}` : "");
+  return [part(teams.length, "team"), part(panels.length, "panel")].filter(Boolean).join(" and ");
+}
 
 function Glyph({ size = 16, children }: { size?: number; children: React.ReactNode }) {
   return (
@@ -123,6 +131,7 @@ export function TeamsTab({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [perPanel, setPerPanel] = useState(10);
   const [autoBusy, setAutoBusy] = useState(false);
+  const [moving, setMoving] = useState(false);
   const [pickedId, setPickedId] = useState<string | null>(null);
   // What is typed into the editor, for the team it was typed for. Until something is, the editor follows the team.
   const [edit, setEdit] = useState<{ teamId: string; draft: TeamDraft } | null>(null);
@@ -251,6 +260,20 @@ export function TeamsTab({
     }
   }
 
+  async function moveMiddleSchool(to: string) {
+    const found = plainMiddleSchool(state);
+    if (!found) return;
+    setMoving(true);
+    onError(null);
+    try {
+      if (await moveMiddleSchoolAfterAsking(ask, call, found, to)) await refresh();
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setMoving(false);
+    }
+  }
+
   return (
     <div
       className="ja-tm"
@@ -277,6 +300,8 @@ export function TeamsTab({
         onPerPanel={setPerPanel}
         autoBusy={autoBusy}
         onAutoAssign={autoAssign}
+        moving={moving}
+        onMoveMiddleSchool={moveMiddleSchool}
         pickedId={team?.id ?? null}
         onPick={pick}
         rowRef={(id, el) => {
@@ -319,6 +344,8 @@ export function TeamsBoard({
   onPerPanel,
   autoBusy = false,
   onAutoAssign,
+  moving = false,
+  onMoveMiddleSchool,
   pickedId,
   onPick,
   rowRef,
@@ -346,6 +373,10 @@ export function TeamsBoard({
   onPerPanel: (n: number) => void;
   autoBusy?: boolean;
   onAutoAssign: () => void;
+  /** The plain "Middle School" move is on its way. */
+  moving?: boolean;
+  /** Move the teams and panels still on plain "Middle School" to this division; the banner shows only when there are any. */
+  onMoveMiddleSchool?: (to: string) => void;
   /** The team the editor is open on. */
   pickedId: string | null;
   onPick: (id: string) => void;
@@ -378,6 +409,7 @@ export function TeamsBoard({
   );
   const team = pickedId ? (teams.find((t) => t.id === pickedId) ?? null) : null;
   const active = activeFilters(filters);
+  const oldMiddle = onMoveMiddleSchool ? plainMiddleSchool(state) : null;
   const categoryLabel = (id: string) => categories.find((c) => c.id === id)?.label ?? id;
   const editor = (t: Team, d: TeamDraft): EditorProps => ({
     uid,
@@ -421,6 +453,24 @@ export function TeamsBoard({
   return (
     <>
       <div className="ja-tm-main">
+        {oldMiddle && onMoveMiddleSchool ? (
+          <div className="ja-fl">
+            <div className="jg-caution" role="note">
+              <WarnIcon />
+              <div className="ja-fl">
+                <p>
+                  <b>{`${oldMiddleCount(oldMiddle)} still say just "Middle School"`}</b>
+                </p>
+                <p>Middle School is now two divisions, so these sit outside every division and their awards land in Other on the Awards Desk. Pick where they belong.</p>
+              </div>
+            </div>
+            {oldMiddle.targets.map((to) => (
+              <button key={to} type="button" className="ja-prim" disabled={moving} onClick={() => onMoveMiddleSchool(to)}>
+                Move to {to}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <section className="ja-tm-tb" aria-label="Team filters">
           <div className="ja-tm-r1">
             <div className="ja-tm-srch">

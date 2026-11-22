@@ -15,6 +15,7 @@ import type {
   WinnerRow,
   NoWinnerRow,
   AwardReleaseRow,
+  ReleaseSnapshot,
 } from "../types";
 import { compareTeamNumbers, normalizeTeamNumber } from "../teamNumber";
 import { randomPanelCode } from "../panelCode";
@@ -40,6 +41,7 @@ import {
   type NewWinner,
   type NewNoWinner,
   type SendRelease,
+  type DivisionMove,
   type NominationKey,
   type SaveScore,
   type Store,
@@ -1817,6 +1819,39 @@ export const postgresStore: Store = {
         [awardId, division],
       ),
     );
+  },
+
+  async moveDivision(from, to) {
+    // One transaction: a clash on a primary key rolls the whole move back.
+    return withClient(async (run) => {
+      const same = (d: string | undefined) => (d ?? "").trim().toLowerCase() === from.trim().toLowerCase();
+      const rename = async (table: string) =>
+        (await run(`update ${table} set division = $2 where lower(btrim(division)) = lower(btrim($1)) returning 1`, [from, to])).length;
+      const out: DivisionMove = {
+        teams: await rename("teams"),
+        panels: await rename("panels"),
+        winners: await rename("award_winners"),
+        noWinners: await rename("award_no_winner"),
+        releases: 0,
+      };
+
+      // A release also tags each snapshot team with its division, in `teams` and in `previous`.
+      const retag = (snap: ReleaseSnapshot | null) =>
+        snap && { ...snap, teams: snap.teams.map((t) => (same(t.division) ? { ...t, division: to } : t)) };
+      const rows = await run<AwardReleaseRow>("select * from award_releases for update");
+      for (const r of rows) {
+        const moves = same(r.division);
+        const teams = retag(r)!.teams;
+        const previous = retag(r.previous);
+        if (!moves && JSON.stringify([teams, previous]) === JSON.stringify([r.teams, r.previous])) continue;
+        await run(
+          "update award_releases set division = $3, teams = $4::jsonb, previous = $5::jsonb where award_id = $1 and division = $2",
+          [r.award_id, r.division, moves ? to : r.division, JSON.stringify(teams), previous && JSON.stringify(previous)],
+        );
+        if (moves) out.releases++;
+      }
+      return out;
+    });
   },
 
   async logActivity(entry: NewActivity) {

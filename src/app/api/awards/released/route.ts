@@ -6,7 +6,7 @@ import { awardPairs, awardsUnder, keyError, scopeKeys } from "@/lib/eventSetup";
 import { awards, blendedDivisions, presetPrograms, programTabs } from "@/lib/presets";
 import { decisionFor, nextSend, sentRelease } from "@/lib/releases";
 import { eventDivisions } from "@/lib/server-state";
-import type { AwardReleaseRow, AwardView, ReleaseReply, ReleasedView, ReleaseSnapshot, SendAllReply } from "@/lib/types";
+import type { AwardReleaseRow, AwardView, ReleaseReply, RecallAllReply, ReleasedView, ReleaseSnapshot, SendAllReply } from "@/lib/types";
 import { awardLabel, fields } from "../shared";
 
 export const dynamic = "force-dynamic";
@@ -72,6 +72,16 @@ async function sendOne(
   return release;
 }
 
+/** Log one award taken back from Marketing. */
+const logRecall = (session: Session, awardId: string, release: AwardReleaseRow) =>
+  store().logActivity({
+    teamId: release.teams[0]?.id ?? null,
+    kind: "award",
+    ...actorParts(session),
+    action: `recalled ${awardLabel(awardId)} from Marketing`,
+    detail: release.division,
+  });
+
 export async function GET() {
   const session = await getSession();
   if (!canAdminister(session) && session?.role !== "marketing") {
@@ -128,10 +138,22 @@ export async function PUT(request: Request) {
   return NextResponse.json(reply);
 }
 
-/** Take a sent award back from Marketing. */
+/** Take a sent award back from Marketing, or with `?all=1` every sent award in every division and the whole event. */
 export async function DELETE(request: Request) {
   const session = await getSession();
   if (!canAdminister(session)) return NextResponse.json(FORBIDDEN, { status: 403 });
+
+  if (new URL(request.url).searchParams.get("all") === "1") {
+    const db = store();
+    const reply: RecallAllReply = { recalled: [] };
+    for (const r of (await db.listReleases()).filter((r) => r.status === "sent")) {
+      const release = await db.recallRelease(r.award_id, r.division);
+      if (!release) continue;
+      reply.recalled.push(release);
+      await logRecall(session!, r.award_id, release);
+    }
+    return NextResponse.json(reply);
+  }
 
   const target = await parseTarget(request);
   if (target instanceof NextResponse) return target;
@@ -147,13 +169,7 @@ export async function DELETE(request: Request) {
 
   const release = await db.recallRelease(awardId, division);
   if (!release) return NextResponse.json({ error: `${label} has not been sent to Marketing.` }, { status: 404 });
-  await db.logActivity({
-    teamId: release.teams[0]?.id ?? null,
-    kind: "award",
-    ...actorParts(session),
-    action: `recalled ${label} from Marketing`,
-    detail: division,
-  });
+  await logRecall(session!, awardId, release);
   return NextResponse.json({ release } satisfies ReleaseReply);
 }
 

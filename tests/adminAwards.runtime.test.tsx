@@ -925,6 +925,15 @@ test("the header counts what this division has sent, and Send all ready counts w
   assert.match(m, /3\/11/);
 });
 
+test("Recall all counts what every division has sent, is off at nothing, and is not drawn before the desk has answered", () => {
+  const m = board({ released: view(sentAmaze, release("think", breakers, { division: HS }), release("design", labRats, { status: "recalled" })) });
+  assert.match(m, /<button type="button" class="ja-aw-rall"[^>]*>Recall all \(2\)<\/button>/);
+  assert.doesNotMatch(button(m, "Recall all"), /disabled/);
+  const none = board({ released: view(release("design", labRats, { status: "recalled" })) });
+  assert.match(none, /<button type="button" class="ja-aw-rall" disabled="" title="Nothing is sent to Marketing">Recall all \(0\)<\/button>/);
+  assert.doesNotMatch(board({ released: null }), /Recall all/);
+});
+
 test("the matrix: a sent award's column header carries the lock after its tick", () => {
   const m = board({ released: view(sentAmaze) });
   assert.equal(m.split(lockLabel).length - 1, 1, "one sent award, one lock");
@@ -979,7 +988,7 @@ test("the buttons hand the award to the board: Send, Recall and Send all", () =>
 test("send and recall go through write(): the release routes are called only inside write jobs, and Send all reports what was skipped after the reload", () => {
   const code = tab.replace(/\/\*[\s\S]*?\*\//g, "");
   const uses = [...code.matchAll(/\/api\/awards\/released/g)].map((m) => m.index!);
-  assert.equal(uses.length, 3, "send (PUT), recall (DELETE) and send all (POST)");
+  assert.equal(uses.length, 4, "send (PUT), recall (DELETE), recall all (DELETE ?all=1) and send all (POST)");
   const guard = code.indexOf("const write = async");
   for (const use of uses) {
     const from = code.lastIndexOf("write(", use);
@@ -988,6 +997,8 @@ test("send and recall go through write(): the release routes are called only ins
   assert.match(code, /method: "PUT", body: \{ awardId, division \}/);
   assert.match(code, /method: "DELETE", body: \{ awardId, division \}/);
   assert.match(code, /method: "POST"/);
+  assert.match(code, /call<RecallAllReply>\("\/api\/awards\/released\?all=1", \{ method: "DELETE" \}\)/);
+  assert.match(code, /confirmLabel: `Recall \$\{n\}`, danger: true/);
   assert.match(code, /await ask\(question, \{ body, confirmLabel: "Recall", danger: true \}\)/);
   assert.match(code, /await write\([\s\S]*?\);\s*if \(skipped\.text\) onError\(skipped\.text\);/, "the banner is set after the write has reloaded");
   const hook = read("src/components/admin/useAwards.ts");

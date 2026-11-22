@@ -50,7 +50,7 @@ import {
   winnersOf,
 } from "../src/components/admin/awardsLogic";
 import {
-  isReady, notReadyLines, readyToSend, recallQuestion, releaseOf, sendAllLines, sendState, skippedText, snapshotLine,
+  isReady, notReadyLines, readyToSend, recallAllLines, recallQuestion, releaseOf, sendAllLines, sendState, skippedText, snapshotLine,
 } from "../src/components/admin/awardsLogic";
 import { withRanks } from "../src/components/admin/scoresLogic";
 import { rankTeams } from "../src/lib/ranking";
@@ -914,6 +914,24 @@ test("sendAllLines: a recalled No winner now decided for a team, and the other w
   assert.equal(lines[0].was, "No winner");
   assert.equal(lines[1].was, "1234A Circuit Breakers");
   assert.equal(lines[1].text, "Think · IQ Middle School · No winner");
+});
+
+test("recallAllLines: one line per sent release in the awards' order; No winner, two teams, whole event; recalled rows are left out", () => {
+  const rels = [
+    release("think", null, { division: "Whole event" }),
+    release("judges", gearGrinders, { division: HS }),
+    release("amaze", gearGrinders, { status: "recalled" }),
+    release("judges", hexAppeal),
+    release("gone", labRats),
+  ];
+  rels[3].teams = [hexAppeal, gearGrinders];
+  assert.deepEqual(recallAllLines(rels, awards), [
+    { key: "think|Whole event", text: "Think · Whole event · No winner" },
+    { key: "judges|High School", text: "Judges · High School · 5150Z Gear Grinders" },
+    { key: "judges|IQ Middle School", text: "Judges · IQ Middle School · 3311X Hex Appeal, 5150Z Gear Grinders" },
+    { key: "gone|IQ Middle School", text: "gone · IQ Middle School · 2088C Lab Rats" },
+  ]);
+  assert.deepEqual(recallAllLines([release("amaze", gearGrinders, { status: "recalled" })], awards), []);
 });
 
 test("notReadyLines: what is missing, one line per award of the division that is not ready", () => {
