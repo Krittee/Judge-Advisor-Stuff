@@ -6,7 +6,8 @@ the queue and score both rubrics; referees flag what they see on the field; the
 Judge Advisor runs it all and decides the awards; a colour-coded board shows the
 whole floor at a glance.
 
-**Version 2.0** (released 2026-10-26) redesigned every page and added awards.
+**Version 2.2.3** is live (2026-11-22). Version 2.0 (2026-10-26) redesigned every
+page and added awards; 2.2 added the Awards Desk, event setup and blended awards.
 What changed and how it works: [RELEASE-NOTES-2.x.md](RELEASE-NOTES-2.x.md).
 Version 1 is tag `v1.0.0`.
 
@@ -53,6 +54,7 @@ cp .env.example .env.local     # then edit the codes
 | `ADMIN_CODE_2`–`ADMIN_CODE_4` | unset | Optional codes for up to three more Judge Advisors. |
 | `QUEUER_CODE` | `DESK01` | Queue desk. Can request or book for teams and change early bookings. |
 | `COORDINATOR_CODE` | `COORD1` | Coordinators, who walk the pits. Can set a team's interview language, request a judge for a team now, or book a slot. Coordinators must enter their name to sign in; bookings are recorded under it. |
+| `MARKETING_CODE` | `MKTG01` | Marketing. Reads the Awards Desk (awards the Judge Advisor has sent), nothing else. |
 | `REFEREE_CODE` | `REF001` | Referees. Can only flag what they saw on the field. Referees must enter their name to sign in; flags are recorded under it. |
 | `HEAD_REFEREE_CODE` | `HREF01` | The head referee: a referee who can also set the event program and fields and correct or remove filed flags. Keep it different from `REFEREE_CODE`. |
 | `SESSION_SECRET` | insecure key | Signs the login cookie. `openssl rand -base64 32` |
@@ -114,8 +116,9 @@ app knows which is in use.
 
 1. Sign in at `/login` with any configured Judge Advisor code (`ADMIN_CODE` through
    `ADMIN_CODE_4`).
-2. **Teams tab → Reset → Wipe everything.** This clears the previous active
-   event, including its referee history, as well as the demo roster. Do this
+2. **Teams tab → Event data → Danger zone → Wipe everything.** This clears the
+   previous active event, including its referee history, as well as the demo
+   roster. Do this
    before every new event, or repeat-violation history can cross event
    boundaries (and you may be judging the Quantum Quokkas).
 3. **Panels tab** — add each judge group: name, room, judge names. Write down
@@ -142,8 +145,9 @@ app knows which is in use.
 6. Optional: give each panel a slot grid (Panels → Booking slots). Set the count
    to `0` for walk-up queue only.
 
-Between a practice run and the real thing, **Reset → Clear today's requests**
-empties the queue but keeps your roster and panels.
+Between a practice run and the real thing, **Event data → Danger zone → Reset
+the day** clears today's requests, notes, scores and activity, but keeps your
+teams, panels and referee history.
 
 ---
 
@@ -158,6 +162,7 @@ same refusal.
 | **Team** (no login) | — | — | — | — | — |
 | **Queue desk** (`QUEUER_CODE`) | any team | — | un-seen only | — | — |
 | **Coordinator** (`COORDINATOR_CODE`) | any team | — | — | — | — |
+| **Marketing** (`MARKETING_CODE`) | — | — | — | — | — |
 | **Judge** (panel code) | — | **own panel** | — | **own panel** | — |
 | **Referee** (`REFEREE_CODE`) | — | — | — | — | — |
 | **Head referee** (`HEAD_REFEREE_CODE`) | — | — | — | — | — |
@@ -302,22 +307,22 @@ must not interview that team or read its notebook. The app takes that as a hard
 rule rather than a reminder.
 
 **Asking up front.** The usual way this gets collected is the Judge Advisor
-asking each panel once, before anything is assigned: *"any teams you're
+asking each judge once, ideally before panels exist: *"any teams you're
 affiliated with?"* The Conflicts tab takes the answer as it was given — pick
-the panel, paste the team numbers, done. Commas, spaces, semicolons and
-newlines all separate, so it does not matter how the panel wrote their list
-down.
+the judge (or **+ New judge…**), paste the team numbers, done. Commas, spaces,
+semicolons and newlines all separate, so it does not matter how the judge
+wrote their list down.
 
 Every number comes back under exactly one heading, so a typo cannot pass for a
 recorded conflict:
 
-- **recorded** — newly declared against that panel
-- **already declared** — was on the list before, left alone
-- **no team with that number** — nothing was recorded for these, check them
-- **needing a panel** — teams this just took off that panel
+- **Recorded for <judge>** — newly declared against that judge
+- **Already recorded** — was on the list before, left alone
+- **No team with that number — check these** — nothing was recorded for these
+- **… come off it and need a panel** — teams this just took off the judge's panel
 
 Do this *before* auto-assigning and no conflicted pairing is ever made in the
-first place. Do it after, and the teams are taken off that panel and handed
+first place. Do it after, and the teams are taken off the judge's panel and handed
 back for reassignment.
 
 One input is refused outright rather than half-recorded: a team number with a
@@ -332,10 +337,10 @@ so in red rather than letting it pass quietly, because otherwise nobody finds
 out until the team turns up expecting to be judged.
 
 **Declaring one at a time.** For the conflict that turns up after the round of
-asking, the Judge Advisor records it against a panel from the Conflicts tab.
+asking, the Judge Advisor records it against the judge from the Conflicts tab.
 It takes effect at once:
 
-- the team is **unassigned from that panel**, so it stops appearing in the
+- the team is **unassigned from the judge's panel**, so it stops appearing in the
   panel's queue
 - the team **disappears from that judge's `/api/state` entirely** — not greyed
   out, not hidden by CSS, simply not sent to their browser
@@ -360,13 +365,16 @@ Withdrawing does *not* put the team back on the panel — that is a separate,
 deliberate reassignment, so a mistaken withdrawal cannot quietly restore
 access.
 
-Conflicts are per **panel**, not per individual judge, because a panel
-interviews as a unit — one affiliated member is enough to disqualify the panel
-from that team. The Conflicts tab lists them grouped by panel, which is how
-they were collected and how you would read them back to check.
+Conflicts are declared per **judge**, and a panel inherits the conflicts of
+every judge on it — one affiliated member is enough to block the panel from
+that team. Move a judge and the block moves with them; a judge on no panel
+blocks nothing yet. The Conflicts tab lists them grouped by judge, with the
+panel each one blocks. Older whole-panel entries are kept under **Whole panel
+(older entries)** and still block that whole panel. The one rule is
+`panelBlocks` in [`src/lib/roster.ts`](src/lib/roster.ts).
 
-Optionally each one records **which judge** is affiliated and **how** — useful
-months later when someone asks why a panel never saw a particular team.
+Optionally each one records **how** the judge is connected — useful months
+later when someone asks why a panel never saw a particular team.
 
 ---
 
@@ -412,7 +420,7 @@ division and pit, and any flags it has; tapping one opens Report with that
 team filled in, rather than repeating the form there, so a flag is still
 only ever written in one place.
 
-Five kinds, each its own colour, ordered least to most serious so the
+Four kinds, each its own colour, ordered least to most serious so the
 sharpest button is not the one under your thumb:
 
 | | |
@@ -420,11 +428,14 @@ sharpest button is not the one under your thumb:
 | **Good conduct** | green — helped another team, gracious in defeat |
 | **Warning** | amber |
 | **Minor violation** | orange |
-| **Major violation** | red |
-| **Disqualified** | black (white in the dark theme) — needs a rule, like Minor and Major |
+| **Disqualified** | black (white in the dark theme) — needs a rule, like Minor |
 
 Disqualified is only ever recorded by a referee tapping it. Nothing in the
-app suggests, highlights or escalates to it.
+app selects it: when the same rule already has a Minor against the team, the
+DQ button is only ringed as a nudge to review.
+
+Major violation was removed in 2.2.0: in VEX a Major is a DQ. An older Major
+flag reads as Disqualified; stored flags are not rewritten.
 
 **Colour never carries it alone.** Every flag also reads its own name, so
 anyone who cannot separate amber from orange still knows which is which.
@@ -474,15 +485,15 @@ The rules are picked on the form like this:
   row reads `<SG6> — <the manual's own title>`.
 - TS1–TS3 (this event's Tournament Special rules) are in **every** ruleset.
 
-A rule is required for Minor, Major and Disqualified, optional for Warning,
-and never attached to Good Conduct. **Match affecting** can be ticked for a
-Minor or Major (the server stores it only for those two; the switch appears
-once a rule is picked). The referee page
+A rule is required for Minor and Disqualified, optional for Warning, and
+never attached to Good Conduct. **Match affecting** can be ticked for a
+Minor (the server stores it only for Minor; the switch appears once a rule
+is picked). The referee page
 shows same-rule, same-match and overall active-event history — per rule
 picked, and only against flags from the **same ruleset** (V5RC `SG6` and IQ
 `SG6` are different rules; a flag recorded before rulesets existed counts as
 IQ). Prior Minor violations only prompt an escalation review: they never
-select Major or disqualify a team. The Head Referee always chooses the
+disqualify a team. The Head Referee always chooses the
 outcome.
 
 Each flag stores its ruleset, its rules (comma-joined, `GG17,SG9`) and the
@@ -541,7 +552,7 @@ shows up in three places:
 - **The Head Referee or Judge Advisor corrects one, and either can remove
   one.** Ordinary referees discuss a correction or removal with either of
   them. A correction stays on the board and is logged to Activity (`corrected
-  a flag: major → minor`); a removal is logged too (`removed a flag: minor`).
+  a flag: warning → minor`); a removal is logged too (`removed a flag: minor`).
   Ordinary referees share an access code, so a typed name cannot prove who
   filed a report.
   Team and author cannot be changed by correction — reassigning a flag to a
@@ -555,7 +566,7 @@ shows up in three places:
   is refreshing.
 
 An unrecognised kind resolves to the **least** severe one, never the
-worst, so a malformed request can never invent a major violation against
+worst, so a malformed request can never invent a violation against
 a team.
 
 ### Changing the kinds
@@ -566,7 +577,7 @@ They live in `config/event.json` and are yours to change:
 "refereeFlags": [
   { "id": "good", "label": "Good conduct", "short": "Good", "color": "emerald", "severity": 0 },
   { "id": "minor", "label": "Minor violation", "short": "Minor", "color": "orange", "severity": 2, "requiresRule": true },
-  { "id": "major", "label": "Major violation", "short": "Major", "color": "rose", "severity": 3, "requiresRule": true }
+  { "id": "dq", "label": "Disqualified", "short": "DQ", "color": "black", "severity": 4, "requiresRule": true }
 ]
 ```
 
@@ -651,6 +662,35 @@ it is no longer the same thing being measured.
 Tests assert each rubric still matches its printed sheet — criteria counts,
 scale wording, and every section total — so an accidental edit fails the suite
 rather than surfacing on event day.
+
+---
+
+## Event and awards
+
+**The Event page** (Judge Advisor console → Event) sets the **program** (VEX
+IQ or V5RC) and the **format** (Standard or Blended); the divisions follow the
+program. In a Standard event every award goes once per division. In a Blended
+event Excellence and Design go once per division and every other award once
+for the whole event — `"blendedScope": "division"` in
+[`config/event.json`](config/event.json) marks the per-division ones. With no
+setup saved the app works as before. This is separate from the head referee's
+setup on `/referee`.
+
+**Middle School is two divisions**, IQ Middle School (VEX IQ) and V5RC Middle
+School (V5RC), because awards and teams are filed by division name. On import
+an exact name wins; plain "Middle School" follows the saved program, and with
+none saved it is refused and asks for the full name. Data from before 2.2.2
+still under plain "Middle School" gets a banner on the Teams tab, with one
+button per Middle School division to move its teams, panels, winners and sent
+awards. It shows only while there is something to move.
+
+**The Awards Desk** is Marketing's page, `/marketing`, signed in with
+`MARKETING_CODE`: each award the Judge Advisor has sent, with division, team
+number and name, under program tabs (VEX IQ, V5RC), with search. The Judge
+Advisor sends from the Awards tab: **Send**, **Recall**, **Send all ready**
+and **Recall all**. A sent award is locked until recalled; a changed re-send
+shows *Changed — was X* until Marketing taps **Seen**. Marketing sees nothing
+else — no nominations, scores or flags.
 
 ---
 
@@ -778,13 +818,18 @@ rather than ranking everyone zero out of zero.
 
 ## Divisions
 
-Two divisions can run at once, and they are a **hard wall**:
+The divisions are listed in [`config/event.json`](config/event.json):
+Elementary School, IQ Middle School, V5RC Middle School, High School and
+Blended. They are a **hard wall**:
 
 - Every team and every panel belongs to exactly one division.
 - Auto-assign never crosses it. A division with no panels leaves its teams
   unassigned rather than handing them to the wrong judges.
 - Reassigning a team to a panel in the other division is refused — even for you.
 - A judge only ever sees their own division.
+
+In a **Blended** event (set on the Event page) any panel can interview any
+team; each team still keeps its real division.
 
 **Moving a panel mid-event** is supported: change its division in Admin →
 Panels. Its current teams stay in the division they compete in and become
@@ -862,16 +907,17 @@ tab.
 
 | URL | Who | What |
 |---|---|---|
-| `/` | everyone | "Who are you?" — a door for each role, plus the board |
+| `/` | everyone | "Who are you?" — the Team door and the Staff doors, plus the board |
 | `/team` | teams | Enter team number |
 | `/team/1234` | teams | Read-only status: the five-step track and earlier today |
 | `/board` | everyone | Big-screen board. Has a fullscreen button. |
-| `/judge/login`, `/queue/login`, `/coordinator/login`, `/referee/login`, `/admin/login` | staff | One sign-in door per role (`/login` still takes any code) |
+| `/judge/login`, `/queue/login`, `/coordinator/login`, `/referee/login`, `/marketing/login`, `/admin/login` | staff | One sign-in door per role (`/login` still takes any code) |
 | `/judge` | judges | Up next, team sheets with both rubrics, nominations |
 | `/queue` | queue desk | Now (request) or Book (slot grid); waiting, booked and all teams |
 | `/coordinator` | coordinators | Teams (set the interview language, request a judge) and Slots (book a time) |
 | `/referee` | referees | Set the match, flag a team against a rule; the head referee sets up the day |
-| `/admin` | you | Floor · Referee · Teams · Panels · Conflicts · Import · Scores · Awards · Activity |
+| `/marketing` | Marketing | Awards Desk: the awards the Judge Advisor has sent |
+| `/admin` | you | Floor · Referee · Event · Teams · Panels · Conflicts · Import · Scores · Awards · Activity |
 
 Put `/board` on the TV in the judges' room and press Fullscreen.
 
@@ -932,7 +978,7 @@ What happened to each audit finding, and what is still open, is in the status ta
 
 ```bash
 npm run check     # diagnose why it will not start, in plain language
-npm test          # ~1,580 tests; set TEST_DATABASE_URL to a throwaway Postgres to add the Postgres suite
+npm test          # ~2,000 tests; set TEST_DATABASE_URL to a throwaway Postgres to add the Postgres suite
 npm run typecheck
 npm run build
 ```
