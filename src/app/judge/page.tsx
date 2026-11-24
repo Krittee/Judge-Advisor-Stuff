@@ -108,6 +108,7 @@ export default function JudgePage() {
     [ranked, state.requests],
   );
 
+  const markedIds = useMemo(() => new Set(state.reviewMarks.map((m) => m.team_id)), [state.reviewMarks]);
   const completed = useMemo(() => completedTeamIds(state.requests), [state.requests]);
   const finished = useMemo(
     () => (awards.awards.length ? pickFinished(cards, state.requests, finishedId, dismissed) : null),
@@ -212,6 +213,7 @@ export default function JudgePage() {
           languages={state.languages}
           flags={state.flags}
           flagKinds={state.flagKinds}
+          markedIds={markedIds}
           now={now}
           busy={busy}
           onAdvance={(request) => advance(request)}
@@ -271,6 +273,9 @@ export default function JudgePage() {
         flags={state.flags}
         flagKinds={state.flagKinds}
         ask={ask}
+        reviewMarks={state.reviewMarks}
+        viewer={{ name: session.name, role: "judge" }}
+        refresh={refresh}
         onClose={() => setSheetId(null)}
       />
       {me ? (

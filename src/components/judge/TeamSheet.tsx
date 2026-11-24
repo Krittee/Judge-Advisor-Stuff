@@ -1,13 +1,15 @@
 "use client";
 
 import { Fragment, useEffect, useId, useRef, useState } from "react";
+import { ReviewMarkControl } from "@/components/ReviewMark";
+import { markOf, type MarkViewer } from "@/components/reviewMarkLogic";
 import { Banner, formatClock } from "@/components/ui";
 import { useRubricScoring } from "@/components/useRubricScoring";
 import { useTeamRecord } from "@/components/useTeamRecord";
 import { GOOD_CONDUCT } from "@/lib/awards";
 import type { Rubric } from "@/lib/rubrics";
 import { tone } from "@/lib/tone";
-import type { AppState, FlagRow, Note, RequestRow, ScoreRow, Team } from "@/lib/types";
+import type { AppState, FlagRow, Note, RequestRow, ReviewMark, ScoreRow, Team } from "@/lib/types";
 import { BandPill, CheckIcon, CloseIcon, WarnIcon } from "./parts";
 import { clearScoresQuestion, flagDetail, flagsWorstFirst, rubricShort, sectionMax, type Ask } from "./logic";
 
@@ -146,6 +148,10 @@ type BodyProps = {
   ask: Ask;
   /** Show Edit and Delete on each note: the Judge Advisor's console only. */
   canFixNotes?: boolean;
+  /** Review marks the viewer may see, and who is looking: with `viewer` and `refresh` the sheet offers "Mark for review". */
+  reviewMarks?: ReviewMark[];
+  viewer?: MarkViewer;
+  refresh?: () => Promise<void>;
 };
 
 function Body({
@@ -157,6 +163,9 @@ function Body({
   flagKinds,
   ask,
   canFixNotes,
+  reviewMarks,
+  viewer,
+  refresh,
   titleId,
   onClose,
 }: BodyProps & { titleId: string; onClose: () => void }) {
@@ -164,6 +173,7 @@ function Body({
   // one is under way, on the notes otherwise.
   const [picked, setPicked] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const [markError, setMarkError] = useState<string | null>(null);
   // The notes, scores and totals are loaded and saved by useTeamRecord.
   const {
     notes,
@@ -228,6 +238,19 @@ function Body({
           </button>
         </div>
         <p className="jg-priv">Private to judges and the Judge Advisor.</p>
+        {viewer && refresh ? (
+          <>
+            <ReviewMarkControl
+              team={team}
+              mark={markOf(reviewMarks ?? [], team.id)}
+              viewer={viewer}
+              ask={ask}
+              refresh={refresh}
+              onError={setMarkError}
+            />
+            {markError ? <Banner kind="error">{markError}</Banner> : null}
+          </>
+        ) : null}
         {/* Say why the denominator is smaller, rather than leaving a judge to
             wonder whether scores went missing. */}
         {excludedLabel ? (

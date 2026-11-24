@@ -302,6 +302,40 @@ export function runStoreConformance(label: string, open: () => Promise<Store>) {
 
   /* ---- cascades: what a delete takes with it ------------------------- */
 
+  it("a review mark is one per team, replaced on save, and survives a day reset but not the team", async (store) => {
+    await store.upsertTeams([teamInput("1001"), teamInput("1002")]);
+    const a = await store.findTeamByNumber("1001");
+    const b = await store.findTeamByNumber("1002");
+    assert.ok(a && b);
+
+    const first = await store.setReviewMark({ teamId: a.id, reason: "look", setBy: "Amy", setByRole: "judge" });
+    assert.deepEqual([first.team_id, first.reason, first.set_by, first.set_by_role], [a.id, "look", "Amy", "judge"]);
+    assert.ok(!Number.isNaN(Date.parse(first.set_at)), "set_at is an ISO instant");
+
+    const again = await store.setReviewMark({ teamId: a.id, reason: null, setBy: "Alex", setByRole: "admin" });
+    assert.deepEqual([again.reason, again.set_by, again.set_by_role], [null, "Alex", "admin"]);
+    await store.setReviewMark({ teamId: b.id, reason: "other", setBy: "Amy", setByRole: "judge" });
+    assert.deepEqual((await store.listReviewMarks()).map((m) => m.team_id).sort(), [a.id, b.id].sort(), "one per team");
+
+    await assert.rejects(
+      () => store.setReviewMark({ teamId: "00000000-0000-4000-8000-000000000000", reason: null, setBy: "Amy", setByRole: "judge" }),
+      (e: unknown) => e instanceof StoreError && e.status === 404,
+    );
+
+    await store.resetDay();
+    assert.equal((await store.listReviewMarks()).length, 2, "a day reset leaves the roster, so its marks");
+
+    await store.deleteTeam(a.id);
+    assert.deepEqual((await store.listReviewMarks()).map((m) => m.team_id), [b.id], "the team's mark goes, another's stays");
+
+    assert.equal(await store.clearReviewMark(b.id), true);
+    assert.equal(await store.clearReviewMark(b.id), false, "nothing left to clear");
+
+    await store.setReviewMark({ teamId: (await store.findTeamByNumber("1002"))!.id, reason: null, setBy: "Amy", setByRole: "judge" });
+    await store.resetAll();
+    assert.deepEqual(await store.listReviewMarks(), [], "a full wipe takes the marks with the teams");
+  });
+
   it("deleting a team takes everything hanging off it", async (store) => {
     /* The divergence that prompted this whole file. Postgres cascades
        flags with the team and nulls activity.team_id; the file store was

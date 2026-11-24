@@ -2,6 +2,7 @@
 
 import { Fragment } from "react";
 import { FlagSummary } from "@/components/Flags";
+import { MarkedPennant } from "@/components/ReviewMark";
 import { formatMinutes, slotLabel } from "@/components/ui";
 import { groupQueue, minutesSince, pickHero, waitingAlert, type QueueCard } from "@/lib/judgeQueue";
 import { STATUS_META } from "@/lib/status";
@@ -50,6 +51,8 @@ type Context = QueueActions & {
   languages: AppState["languages"];
   flags: FlagRow[];
   flagKinds: AppState["flagKinds"];
+  /** Teams with a review mark: a read-only pennant after the name. Left out, none is drawn. */
+  markedIds?: ReadonlySet<string>;
   now: number;
   /** The request id or team id with a write in the air. */
   busy: string | null;
@@ -97,7 +100,7 @@ export function QueueTab({
     nom
       ? list.map((c) => (
           <li key={c.team.id}>
-            <DoneRow card={c} nominate={nom} onOpen={ctx.onOpen} />
+            <DoneRow card={c} nominate={nom} onOpen={ctx.onOpen} marked={ctx.markedIds?.has(c.team.id)} />
           </li>
         ))
       : rows(list);
@@ -189,20 +192,23 @@ function DoneRow({
   card,
   nominate,
   onOpen,
+  marked,
 }: {
   card: QueueCard;
   nominate: NominateActions;
   onOpen: (team: Team) => void;
+  marked?: boolean;
 }) {
   const { team } = card;
   const summary = nominationSummary(nominate.nominations, nominate.awards, team.id, nominate.me);
   return (
-    <div className="jg-qrow jg-drow">
+    <div className={`jg-qrow jg-drow${marked ? " jg-qmk" : ""}`}>
       <button type="button" className="jg-qmain" onClick={() => onOpen(team)}>
         <span className="jg-qt">
           <span className="jg-q1">
             <b>{team.number}</b>
             <span>{team.name}</span>
+            {marked ? <MarkedPennant /> : null}
           </span>
           <span className={summary ? "jg-dn" : "jg-dn jg-no"}>
             <TrophyIcon />
@@ -269,12 +275,14 @@ function Hero({
   languages,
   flags,
   flagKinds,
+  markedIds,
   now,
   busy,
   onAdvance,
   onOpen,
 }: Context & { card: QueueCard }) {
   const { team, score } = card;
+  const marked = markedIds?.has(team.id);
   const request = card.request!; // pickHero only returns teams with a request
   const status = request.status;
   const action = primaryAction(status);
@@ -289,7 +297,7 @@ function Hero({
   const tint = status === "requested" ? "jg-t-waiting" : interviewing ? "jg-t-active" : "";
 
   return (
-    <section className={`jg-hero ${tint}`} aria-label={interviewing ? "Interviewing now" : eyebrow}>
+    <section className={`jg-hero ${tint}${marked ? " jg-hmk" : ""}`} aria-label={interviewing ? "Interviewing now" : eyebrow}>
       <div className="jg-hero-top">
         <span className="jg-eyebrow">{eyebrow}</span>
         <StatusPill status={status} />
@@ -298,7 +306,10 @@ function Hero({
       <div className="jg-hid">
         <div className="jg-hid-t">
           <h2 className="jg-hn">{team.number}</h2>
-          <p className="jg-hname">{team.name}</p>
+          <p className="jg-hname">
+            {team.name}
+            {marked ? <MarkedPennant size={16} /> : null}
+          </p>
         </div>
         {score.max > 0 ? (
           <div className="jg-hscore">
@@ -397,12 +408,14 @@ function Timer({ since, now }: { since: string; now: number }) {
 function Row({
   card,
   categories,
+  markedIds,
   now,
   busy,
   onAdvance,
   onOpen,
 }: Context & { card: QueueCard }) {
   const { team, request } = card;
+  const marked = markedIds?.has(team.id);
   const status = request?.status;
   const meta = teamMeta(team, categories);
   const action = status ? primaryAction(status) : null;
@@ -444,12 +457,13 @@ function Row({
   }
 
   return (
-    <div className={`jg-qrow ${status === "requested" ? "jg-qw" : ""}`}>
+    <div className={`jg-qrow ${status === "requested" ? "jg-qw" : ""}${marked ? " jg-qmk" : ""}`}>
       <button type="button" className="jg-qmain" onClick={() => onOpen(team)}>
         <span className="jg-qt">
           <span className="jg-q1">
             <b>{team.number}</b>
             <span>{team.name}</span>
+            {marked ? <MarkedPennant /> : null}
           </span>
           <span className="jg-q2">{line}</span>
         </span>

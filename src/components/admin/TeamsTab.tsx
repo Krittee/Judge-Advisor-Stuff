@@ -3,6 +3,8 @@
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { LanguageTag } from "@/components/Language";
+import { MarkedPennant, Pennant, ReviewMarkControl } from "@/components/ReviewMark";
+import { clearMarkAfterAsking, markOf, newestMarksFirst, type MarkViewer } from "@/components/reviewMarkLogic";
 import { ChevronDown, ChevronRight, CloseIcon, StatusPill, WarnIcon } from "@/components/judge/parts";
 import { call } from "@/components/useAppState";
 import { formatClock, slotLabel } from "@/components/ui";
@@ -10,7 +12,7 @@ import { liveRequestFor } from "@/lib/data";
 import { divisionChoices } from "@/lib/eventSetup";
 import { STATUS_META, type Status } from "@/lib/status";
 import { reachedSteps } from "@/lib/stepTimes";
-import type { AppState, RequestRow, Team } from "@/lib/types";
+import type { AppState, RequestRow, ReviewMark, Team } from "@/lib/types";
 import { EventData } from "./EventData";
 import { divisionTag, teamCount } from "./floorLogic";
 import { RequestControls, SlotChooser, TimesBlock } from "./InterviewControls";
@@ -100,7 +102,7 @@ const isWide = () => window.matchMedia(WIDE).matches;
 /** From 1024px the editor is a drawer beside a table; below it, a sheet over a list. */
 const useWide = (): boolean => useSyncExternalStore(watchWide, isWide, () => false);
 
-type Slice = Pick<AppState, "teams" | "panels" | "requests" | "categories" | "divisions" | "conflicts" | "judges" | "eventSetup" | "flags" | "flagKinds" | "languages">;
+type Slice = Pick<AppState, "teams" | "panels" | "requests" | "categories" | "divisions" | "conflicts" | "judges" | "eventSetup" | "flags" | "flagKinds" | "languages"> & Partial<Pick<AppState, "reviewMarks">>;
 
 /**
  * The Teams section: the roster and who judges whom. Select a team to edit it
@@ -116,6 +118,7 @@ export function TeamsTab({
   onError,
   onOpenFlags,
   onOpenSheet,
+  adminName,
 }: {
   state: AppState;
   refresh: () => Promise<void>;
@@ -124,11 +127,14 @@ export function TeamsTab({
   onOpenFlags: (teamId: string) => void;
   /** Open this team's sheet (notes, scores, flags) over the console. */
   onOpenSheet: (teamId: string) => void;
+  /** The Judge Advisor's name, for the review mark ("Marked for review by …"); without it the mark control is not offered. */
+  adminName?: string;
 }) {
   const wide = useWide();
   const { ask, dialog } = useConfirm();
   const [filters, setFilters] = useState<Filters>({ q: "", division: "", category: "", language: "" });
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [perPanel, setPerPanel] = useState(10);
   const [autoBusy, setAutoBusy] = useState(false);
   const [moving, setMoving] = useState(false);
@@ -243,6 +249,19 @@ export function TeamsTab({
     if (team && draft) await openInRefereeAfterAsking(ask, team, draft, onOpenFlags);
   }
 
+  async function clearMark(mark: ReviewMark) {
+    const marked = state.teams.find((t) => t.id === mark.team_id);
+    if (!marked) return;
+    onError(null);
+    try {
+      if (await clearMarkAfterAsking(ask, call, marked)) await refresh();
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  }
+
+  const viewer: MarkViewer | null = adminName ? { name: adminName, role: "admin" } : null;
+
   async function autoAssign() {
     setAutoBusy(true);
     onError(null);
@@ -320,6 +339,24 @@ export function TeamsTab({
         onRemove={remove}
         onOpenFlags={openFlags}
         onOpenSheet={() => team && onOpenSheet(team.id)}
+        reviewOpen={reviewOpen}
+        onReviewOpen={setReviewOpen}
+        onClearMark={clearMark}
+        markControl={
+          viewer
+            ? (t) => (
+                <ReviewMarkControl
+                  key={t.id}
+                  team={t}
+                  mark={markOf(state.reviewMarks, t.id)}
+                  viewer={viewer}
+                  ask={ask}
+                  refresh={refresh}
+                  onError={setError}
+                />
+              )
+            : undefined
+        }
         eventData={<EventData refresh={refresh} />}
       />
     </div>
@@ -361,6 +398,10 @@ export function TeamsBoard({
   onRemove,
   onOpenFlags,
   onOpenSheet,
+  reviewOpen = false,
+  onReviewOpen,
+  onClearMark,
+  markControl,
   eventData = null,
 }: {
   state: Slice;
@@ -396,6 +437,13 @@ export function TeamsBoard({
   onRemove: () => void;
   onOpenFlags: () => void;
   onOpenSheet: () => void;
+  /** The phone's "N teams marked for review" bar is open. */
+  reviewOpen?: boolean;
+  onReviewOpen?: (open: boolean) => void;
+  /** Clear this mark (asks first). Left out, the strip has no Clear. */
+  onClearMark?: (mark: ReviewMark) => void;
+  /** The mark control for the team the editor is open on (the note, or "Mark for review"). */
+  markControl?: (team: Team) => React.ReactNode;
   eventData?: React.ReactNode;
 }) {
   const uid = useId();
@@ -408,6 +456,8 @@ export function TeamsBoard({
     [teams, panels, conflicts, judges, format],
   );
   const team = pickedId ? (teams.find((t) => t.id === pickedId) ?? null) : null;
+  const marks = useMemo(() => newestMarksFirst(state.reviewMarks ?? []), [state.reviewMarks]);
+  const marked = useMemo(() => new Set(marks.map((m) => m.team_id)), [marks]);
   const active = activeFilters(filters);
   const oldMiddle = onMoveMiddleSchool ? plainMiddleSchool(state) : null;
   const categoryLabel = (id: string) => categories.find((c) => c.id === id)?.label ?? id;
@@ -427,6 +477,7 @@ export function TeamsBoard({
     onRemove,
     onOpenFlags,
     onOpenSheet,
+    mark: markControl?.(t) ?? null,
   });
 
   const selects = (
@@ -471,6 +522,16 @@ export function TeamsBoard({
             ))}
           </div>
         ) : null}
+        <ReviewStrip
+          id={`${uid}-rv`}
+          marks={marks}
+          teams={teams}
+          wide={wide}
+          open={reviewOpen}
+          onOpen={(open) => onReviewOpen?.(open)}
+          onPick={onPick}
+          onClear={onClearMark}
+        />
         <section className="ja-tm-tb" aria-label="Team filters">
           <div className="ja-tm-r1">
             <div className="ja-tm-srch">
@@ -593,6 +654,7 @@ export function TeamsBoard({
             stranded={stranded}
             languages={state.languages}
             categoryLabel={categoryLabel}
+            marked={marked}
             pickedId={pickedId}
             onPick={onPick}
             rowRef={rowRef}
@@ -605,6 +667,7 @@ export function TeamsBoard({
             stranded={stranded}
             languages={state.languages}
             categoryLabel={categoryLabel}
+            marked={marked}
             pickedId={pickedId}
             onPick={onPick}
             rowRef={rowRef}
@@ -683,6 +746,95 @@ function SelectField({
   );
 }
 
+/* ---- the For review strip --------------------------------------------------- */
+
+/**
+ * Every marked team, newest first, above the filters. From 1024px a heading
+ * and a grid of cards; on a phone one amber bar ("N teams marked for review")
+ * that opens the cards, shut until tapped. Nothing is drawn with no marks.
+ * Clear asks first (the tab's `onClear`); Open selects the team, as its row does.
+ */
+export function ReviewStrip({
+  id,
+  marks,
+  teams,
+  wide,
+  open,
+  onOpen,
+  onPick,
+  onClear,
+}: {
+  id: string;
+  /** Newest first. */
+  marks: ReviewMark[];
+  teams: Team[];
+  wide: boolean;
+  open: boolean;
+  onOpen: (open: boolean) => void;
+  onPick: (teamId: string) => void;
+  onClear?: (mark: ReviewMark) => void;
+}) {
+  const cards = marks.flatMap((mark) => {
+    const team = teams.find((t) => t.id === mark.team_id);
+    return team ? [{ mark, team }] : [];
+  });
+  if (!cards.length) return null;
+
+  const list = (
+    <ul className="ja-tm-rvg" id={`${id}-l`}>
+      {cards.map(({ mark, team }) => (
+        <li key={mark.team_id} className="ja-tm-rvc">
+          <div className="ja-tm-rvt">
+            <b>{team.number}</b>
+            <span>{team.name}</span>
+          </div>
+          <p className="ja-tm-rvm">
+            {mark.set_by} · {formatClock(mark.set_at)}
+          </p>
+          {mark.reason ? <p className="ja-tm-rvr">{mark.reason}</p> : null}
+          <div className="ja-tm-rva">
+            {onClear ? (
+              <button type="button" className="ja-tm-rvb" aria-label={`Clear the review mark on ${team.number}`} onClick={() => onClear(mark)}>
+                Clear
+              </button>
+            ) : null}
+            <button type="button" className="ja-tm-rvb ja-tm-rvo" aria-label={`Open ${team.number} ${team.name}`} onClick={() => onPick(team.id)}>
+              Open
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+
+  if (wide) {
+    return (
+      <section className="ja-tm-rv" aria-labelledby={id}>
+        <h2 className="ja-tm-rvh" id={id}>
+          <Pennant />
+          For review · {cards.length}
+          <span>Marked by judges and the Judge Advisor. The teams do not see this.</span>
+        </h2>
+        {list}
+      </section>
+    );
+  }
+  return (
+    <section className="ja-tm-rv" aria-label="Marked for review">
+      <button type="button" className="ja-tm-rvbar" aria-expanded={open} aria-controls={`${id}-l`} onClick={() => onOpen(!open)}>
+        <Pennant size={20} />
+        <span>
+          {cards.length} {cards.length === 1 ? "team" : "teams"} marked for review
+        </span>
+        <span className="ja-tm-rvch" data-open={open ? "true" : undefined}>
+          <ChevronDown />
+        </span>
+      </button>
+      {open ? list : null}
+    </section>
+  );
+}
+
 /* ---- the roster ------------------------------------------------------------ */
 
 type RosterProps = {
@@ -692,13 +844,15 @@ type RosterProps = {
   stranded: Set<string>;
   languages: Slice["languages"];
   categoryLabel: (id: string) => string;
+  /** Teams with a review mark: a pennant after the name. */
+  marked: ReadonlySet<string>;
   pickedId: string | null;
   onPick: (id: string) => void;
   rowRef?: (id: string, el: HTMLButtonElement | null) => void;
 };
 
 /** ≥1024px: a read-only table. The row is the button; a click anywhere on it opens the drawer. */
-function TeamTable({ shown, panels, requests, flags, flagKinds, stranded, languages, categoryLabel, pickedId, onPick, rowRef }: RosterProps & { flags: Slice["flags"]; flagKinds: Slice["flagKinds"] }) {
+function TeamTable({ shown, panels, requests, flags, flagKinds, stranded, languages, categoryLabel, marked, pickedId, onPick, rowRef }: RosterProps & { flags: Slice["flags"]; flagKinds: Slice["flagKinds"] }) {
   return (
     <div className="ja-tm-tw">
       <table>
@@ -736,15 +890,19 @@ function TeamTable({ shown, panels, requests, flags, flagKinds, stranded, langua
             return (
               <tr key={team.id} className={on ? "ja-tm-sel" : undefined} onClick={() => onPick(team.id)}>
                 <td>
-                  <button
-                    type="button"
-                    className="ja-tm-rb"
-                    aria-label={`Edit ${team.number} ${team.name}`}
-                    aria-current={on ? "true" : undefined}
-                    ref={(el) => rowRef?.(team.id, el)}
-                  >
-                    {team.number}
-                  </button>
+                  {/* The pennant sits by the number, not the name: the Name column hides while the drawer is open. */}
+                  <span className={marked.has(team.id) ? "ja-tm-rvn" : undefined}>
+                    <button
+                      type="button"
+                      className="ja-tm-rb"
+                      aria-label={`Edit ${team.number} ${team.name}`}
+                      aria-current={on ? "true" : undefined}
+                      ref={(el) => rowRef?.(team.id, el)}
+                    >
+                      {team.number}
+                    </button>
+                    {marked.has(team.id) ? <MarkedPennant size={12} /> : null}
+                  </span>
                 </td>
                 <td>
                   <span className="ja-tm-nm">{team.name}</span>
@@ -818,7 +976,7 @@ function PanelText({ cell }: { cell: ReturnType<typeof panelCell> }) {
 }
 
 /** <1024px: compact two-line rows, each a button. */
-function TeamList({ shown, panels, requests, stranded, languages, categoryLabel, pickedId, onPick, rowRef }: RosterProps) {
+function TeamList({ shown, panels, requests, stranded, languages, categoryLabel, marked, pickedId, onPick, rowRef }: RosterProps) {
   return (
     <ul className="ja-tm-ll" aria-label="Teams">
       {shown.map((team) => {
@@ -850,6 +1008,7 @@ function TeamList({ shown, panels, requests, stranded, languages, categoryLabel,
               <span className="ja-tm-l1">
                 <b>{team.number}</b>
                 <span className="ja-tm-nm">{team.name}</span>
+                {marked.has(team.id) ? <MarkedPennant /> : null}
                 <LangText team={team} languages={languages} />
               </span>
               <span className="ja-tm-l2">
@@ -945,6 +1104,8 @@ type EditorProps = {
   onRemove: () => void;
   onOpenFlags: () => void;
   onOpenSheet: () => void;
+  /** The review mark control for this team, or null. */
+  mark: React.ReactNode;
 };
 
 /** The pinned bottom of the editor: what the server refused, and "Save changes", disabled until something changed. */
@@ -1030,7 +1191,7 @@ function SheetBody(p: EditorProps & { titleId: string }) {
   );
 }
 
-function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, busy, onRemove, onOpenFlags, onOpenSheet }: EditorProps) {
+function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, busy, onRemove, onOpenFlags, onOpenSheet, mark }: EditorProps) {
   const set = (patch: Partial<TeamDraft>) => onDraft({ ...draft, ...patch });
   const [changing, setChanging] = useState(false);
   const { request } = interviewOf(team.id, state.requests);
@@ -1058,6 +1219,7 @@ function Fields({ uid, team, draft, onDraft, state, onResetStatus, interview, bu
 
   return (
     <>
+      {mark}
       <div className="ja-tm-g2">
         <div className="ja-fl">
           <label className="ja-lab" htmlFor={`${uid}-num`}>

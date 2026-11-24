@@ -19,6 +19,7 @@ const EMPTY: AppState = {
   eventSetup: null,
   flagKinds: [],
   flags: [],
+  reviewMarks: [],
   viewer: {
     role: "team",
     name: null,

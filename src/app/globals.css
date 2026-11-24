@@ -1955,6 +1955,11 @@ body:has(.judge) > .theme-toggle:hover {
 .jg-list { display: flex; flex-direction: column; gap: 4px; }
 .jg-qrow { display: flex; min-height: 48px; align-items: center; padding: 0 8px 0 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .jg-qw { border-color: color-mix(in oklch, var(--waiting) 45%, transparent); }
+/* A team with a review mark: a thin caution edge on its row (the hero's is a little thicker). Read-only; the mark is made from the team sheet. */
+.jg-qmk { box-shadow: inset 3px 0 0 var(--caution); }
+.jg-hmk { box-shadow: inset 4px 0 0 var(--caution); }
+.jg-q1 > .rv-pn { align-self: center; }
+.jg-hname .rv-pn { display: inline-block; margin-left: 8px; vertical-align: -2px; }
 .jg-qmain { display: flex; flex: 1; min-width: 0; align-self: stretch; align-items: center; gap: 8px; padding: 4px 8px 4px 12px; border-radius: 13px; color: var(--ink); text-align: left; }
 .jg-qmain:hover { background: var(--surface-2); }
 .jg-qmain > svg { flex: none; color: var(--ink-subtle); }
@@ -2533,6 +2538,54 @@ body:has(.mk) > .theme-toggle:hover {
 }
 .co-bk:disabled { opacity: 0.5; }
 .co-bk[aria-pressed="true"] { opacity: 1; }
+
+/* ------------------------------------------------------------------ *
+ * Review mark (v2.2.4, design/team-review-flag/): the pennant, the "Mark for
+ * review" button and the amber note, shared by the judge team sheet and the
+ * Teams drawer, so they read the sheet's tokens (--jg-field, --jg-field-line).
+ * Caution amber only: never a referee severity or a status colour. No motion.
+ * ------------------------------------------------------------------ */
+.rv { display: flex; min-width: 0; flex-direction: column; gap: 8px; }
+.rv-pn { display: block; flex: none; color: var(--caution-quiet); }
+.rv-tg {
+  display: inline-flex; align-items: center; align-self: flex-start; gap: 8px; min-height: 44px; padding: 0 14px 0 11px;
+  border: 1.5px solid var(--jg-field-line); border-radius: 12px; background: transparent; color: var(--ink); font-weight: 500; font-size: 15px; white-space: nowrap;
+}
+.rv-tg:hover { background: var(--surface-2); }
+.rv-note {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px; color: var(--ink); font-size: 14px; line-height: 1.4;
+  border: 1px solid color-mix(in oklch, var(--caution) 35%, transparent); background: color-mix(in oklch, var(--caution) 12%, transparent);
+}
+.rv-nh { display: flex; align-items: flex-start; gap: 8px; }
+.rv-nh .rv-pn { margin-top: 2px; }
+.rv-nh p { min-width: 0; overflow-wrap: anywhere; }
+.rv-note b { color: var(--caution-quiet); font-weight: 500; }
+.rv-na { display: flex; align-items: center; gap: 4px; margin-left: -8px; }
+.rv-lk { min-width: 44px; min-height: 44px; padding: 0 8px; border: 0; background: transparent; color: var(--accent); font-weight: 500; font-size: 14px; text-decoration: underline; }
+.rv-lk:disabled { color: var(--ink-faint); cursor: default; }
+.rv-ed { display: flex; flex-direction: column; gap: 8px; }
+.rv-ed label { color: var(--ink-muted); font-weight: 500; font-size: 13px; }
+.rv-in {
+  display: block; width: 100%; height: 48px; margin: 0; padding: 0 14px; border: 1.5px solid var(--jg-field-line); border-radius: 12px;
+  background: var(--jg-field); color: var(--ink); font: inherit; font-size: 16px;
+}
+.rv-in::placeholder { color: var(--ink-subtle); opacity: 1; }
+.rv-in:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--jg-ring); }
+.rv-ea { display: flex; gap: 8px; }
+.rv-save, .rv-cancel { min-height: 44px; padding: 0 20px; border-radius: 12px; font-weight: 700; font-size: 15px; }
+.rv-save { background: var(--accent); color: var(--accent-ink); }
+.rv-save:hover:not(:disabled) { background: color-mix(in oklch, var(--accent) 88%, var(--ink)); }
+.rv-cancel { border: 1.5px solid var(--jg-field-line); background: transparent; color: var(--ink); font-weight: 500; }
+.rv-cancel:hover:not(:disabled) { background: var(--surface-2); }
+.rv-save:disabled, .rv-cancel:disabled { opacity: 0.5; cursor: default; }
+.rv-hint { color: var(--ink-subtle); font-size: 12.5px; line-height: 1.4; }
+/* A mouse on a wide screen: 32px targets are enough there; touch keeps 44. */
+@media (min-width: 1024px) and (pointer: fine) {
+  .rv-tg, .rv-lk { min-height: 32px; }
+  .rv-tg { padding: 0 12px 0 9px; font-size: 14px; border-radius: 10px; }
+  .rv-in { height: 40px; border-radius: 10px; font-size: 15px; }
+  .rv-save, .rv-cancel { min-height: 36px; border-radius: 10px; font-size: 14px; }
+}
 
 /* ------------------------------------------------------------------ *
  * Queue desk ("Now / Book", design/queue-redesign/, direction B)
@@ -3411,6 +3464,35 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-tm-chb[aria-pressed="true"] { background: var(--ja-accent-t); box-shadow: inset 0 0 0 1.5px var(--accent); }
 .ja-tm-rd { display: none; margin: 0 0 0 auto; color: var(--ink-subtle); font-size: 13px; font-variant-numeric: tabular-nums; }
 .ja-tm-help { display: none; margin: 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.45; }
+/* For review: the marked teams. A phone gets one amber bar that opens the cards; from 1024px a heading and a grid. Caution amber, never a status colour. */
+.ja-tm-rv { display: flex; flex-direction: column; gap: 8px; }
+.ja-tm-rvbar {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 0 12px 0 14px; border-radius: 14px; color: var(--caution-quiet);
+  border: 1px solid color-mix(in oklch, var(--caution) 35%, transparent); background: color-mix(in oklch, var(--caution) 12%, transparent);
+  text-align: left; font-weight: 500; font-size: 15px;
+}
+.ja-tm-rvbar > span:first-of-type { flex: 1; }
+.ja-tm-rvch { display: inline-flex; flex: none; }
+.ja-tm-rvch[data-open="true"] { transform: rotate(180deg); }
+.ja-tm-rvh { display: flex; align-items: center; gap: 8px; color: var(--caution-quiet); font-weight: 500; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ja-tm-rvh span { margin-left: auto; color: var(--ink-subtle); font-weight: 400; font-size: 12.5px; letter-spacing: 0; text-transform: none; }
+.ja-tm-rvg { display: flex; flex-direction: column; gap: 8px; }
+.ja-tm-rvc {
+  display: flex; min-width: 0; flex-direction: column; gap: 5px; padding: 10px 12px; border-radius: 12px; background: var(--surface);
+  border: 1px solid color-mix(in oklch, var(--caution) 35%, transparent);
+}
+.ja-tm-rvt { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
+.ja-tm-rvt b { flex: none; font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
+.ja-tm-rvt span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.ja-tm-rvm { color: var(--ink-subtle); font-size: 12px; }
+.ja-tm-rvr { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.ja-tm-rva { display: flex; gap: 8px; margin-top: 3px; }
+.ja-tm-rvb { min-height: 44px; padding: 0 14px; border: 1.5px solid var(--jg-field-line); border-radius: 10px; background: transparent; color: var(--ink); font-weight: 500; font-size: 14px; white-space: nowrap; }
+.ja-tm-rvb:hover { background: var(--surface-2); }
+.ja-tm-rvb.ja-tm-rvo { border-color: transparent; background: var(--accent); color: var(--accent-ink); }
+.ja-tm-rvb.ja-tm-rvo:hover { background: color-mix(in oklch, var(--accent) 88%, var(--ink)); }
+.ja-tm-rvn { display: flex; min-width: 0; align-items: center; gap: 2px; }
+.ja-tm-l1 > .rv-pn { align-self: center; }
 
 /* A phone: compact two-line rows, each a button */
 .ja-tm-ll { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
@@ -3439,12 +3521,12 @@ body:has(.admin) > .theme-toggle:hover {
 /* ≥1024px: the table. Its rows are buttons; the selected one has the accent bar and tint. */
 .ja-tm-tw { overflow: clip; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .ja-tm-tw table { width: 100%; table-layout: fixed; border-collapse: collapse; }
-.ja-k-n { width: 62px; }
+.ja-k-n { width: 70px; }
 .ja-k-pit { width: 34px; }
 .ja-k-nb { width: 100px; }
 .ja-k-dv { width: 32px; }
 .ja-k-lg { width: 84px; }
-.ja-k-pn { width: 104px; }
+.ja-k-pn { width: 96px; }
 .ja-k-bk { width: 52px; }
 .ja-k-iv { width: 94px; }
 .ja-k-fl { width: 88px; }
@@ -3570,6 +3652,8 @@ body:has(.admin) > .theme-toggle:hover {
   .ja-tm-chb { height: 32px; }
   .ja-tm-rd { display: block; }
   .ja-tm-help { display: block; }
+  .ja-tm-rvg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .ja-tm-rvb { min-height: 32px; font-size: 13px; }
 
   /* The drawer: ~368px on the right, flush to the page edge and full height; the table takes the rest. */
   .ja-tm-dr {

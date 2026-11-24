@@ -313,6 +313,19 @@ export type WinnerReply = { winner: WinnerRow };
 /** PUT /api/awards/no-winner. Its DELETE replies with `RemoveReply`. */
 export type NoWinnerReply = { noWinner: NoWinnerRow };
 
+/** One judge's or the Judge Advisor's "look at this team" mark: one per team, shown to judges and the Judge Advisor only. */
+export type ReviewMark = {
+  /** Primary key: one mark per team. */
+  team_id: string;
+  /** Trimmed, at most 140 characters, "" stored as null. */
+  reason: string | null;
+  /** The display name of whoever last saved it. */
+  set_by: string;
+  set_by_role: "judge" | "admin";
+  /** ISO instant, refreshed on every edit. */
+  set_at: string;
+};
+
 export type ActivityKind = "request" | "referee" | "conflict" | "setup" | "award";
 
 export type ActivityRow = {
@@ -368,6 +381,8 @@ export type AppState = {
   }[];
   /** What referees have flagged. Judges read these; only referees write them. */
   flags: FlagRow[];
+  /** Review marks: all for the Judge Advisor, a judge's own panel's teams only, `[]` for everyone else. */
+  reviewMarks: ReviewMark[];
   /** What this viewer is allowed to do, so the UI never offers more. */
   viewer: ViewerCapabilities;
   serverTime: string;
