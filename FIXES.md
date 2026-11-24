@@ -49,7 +49,7 @@ The Judge Advisor and judges had no way to mark a team for a second look. Refere
 
 ### Commit / status
 
-`0948176` on `claude/team-flag-83df66`, local only, not pushed. Postgres `review_marks` needs a Neon run before release.
+`0948176` on `claude/team-flag-83df66`, local only, not pushed. Red colour `d0e2b8b`. Neon Postgres passed 2026-11-24 at `d0e2b8b`: 2137/2137, 0 skipped.
 
 ---
 
