@@ -4,7 +4,7 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-24 | [Mark a team for review (2.2.4)](#mark-a-team-for-review-224-2026-11-24) | Not committed | Not yet | Local only, not pushed; 2.2.4 not released |
+| 2026-11-24 | [Mark a team for review (2.2.4)](#mark-a-team-for-review-224-2026-11-24) | `0948176` | Not yet | Local only, not pushed; 2.2.4 not released |
 | 2026-11-22 | [Teams: move old plain Middle School to IQ or V5RC](#teams-move-old-plain-middle-school-to-iq-or-v5rc-2026-11-22) | `5190f9d`..`1dd7b05` | Not yet (375 preview only) | Live in 2.2.3 (PR #22, 2026-11-22) |
 | 2026-11-22 | [Awards: Recall all](#awards-recall-all-2026-11-22) | `6eae9c9` | Not yet (375 preview only) | Live in 2.2.3 (PR #22, 2026-11-22) |
 | 2026-11-22 | [Awards Desk: IQ Middle School also showed under V5RC](#awards-desk-iq-middle-school-also-showed-under-v5rc-2026-11-22) | `0c04a4f` | Not needed (heading text only) | Live in 2.2.2 (PR #21, 2026-11-22) |
@@ -49,7 +49,7 @@ The Judge Advisor and judges had no way to mark a team for a second look. Refere
 
 ### Commit / status
 
-Not committed, not pushed. Postgres `review_marks` needs a Neon run before release.
+`0948176` on `claude/team-flag-83df66`, local only, not pushed. Postgres `review_marks` needs a Neon run before release.
 
 ---
 
