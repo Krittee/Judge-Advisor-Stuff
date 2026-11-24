@@ -14,6 +14,7 @@ import type {
   FlagRow,
   JudgeRow,
   NominationRow,
+  ReviewMark,
   Note,
   Panel,
   EventFormat,
@@ -96,6 +97,8 @@ type Data = {
   requests: RequestRow[];
   notes: Note[];
   scores: ScoreRow[];
+  /** One review mark per team. */
+  reviewMarks: ReviewMark[];
   /** Judges' award nominations, oldest first. */
   nominations: NominationRow[];
   /** The Judge Advisor's pick per (award, division). */
@@ -182,6 +185,7 @@ function empty(): Data {
     requests: [],
     notes: [],
     scores: [],
+    reviewMarks: [],
     nominations: [],
     winners: [],
     noWinners: [],
@@ -269,6 +273,7 @@ function load(): Data {
  */
 function migrate(data: Data): Data {
   data.scores ??= [];
+  data.reviewMarks ??= [];
   data.nominations ??= [];
   // Nominations gained a role when the Judge Advisor could nominate; an older one is a judge's.
   for (const n of data.nominations) n.role ??= "judge";
@@ -771,6 +776,7 @@ function deleteTeam(id: string): void {
   // (on delete set null) rather than dropping the row. Match both here so
   // a deleted team never leaves an orphan flag behind on the file store.
   state().flags = state().flags.filter((f) => f.team_id !== id);
+  state().reviewMarks = state().reviewMarks.filter((m) => m.team_id !== id);
   for (const a of state().activity) {
     if (a.team_id === id) a.team_id = null;
   }
@@ -1567,6 +1573,32 @@ function resetDay(): void {
   save();
 }
 
+function listReviewMarks(): ReviewMark[] {
+  return state().reviewMarks.map((m) => ({ ...m }));
+}
+
+function setReviewMark(input: { teamId: string; reason: string | null; setBy: string; setByRole: "judge" | "admin" }): ReviewMark {
+  if (!state().teams.some((t) => t.id === input.teamId)) throw new StoreError("That team no longer exists.", 404);
+  const mark: ReviewMark = {
+    team_id: input.teamId,
+    reason: input.reason,
+    set_by: input.setBy,
+    set_by_role: input.setByRole,
+    set_at: new Date().toISOString(),
+  };
+  state().reviewMarks = [...state().reviewMarks.filter((m) => m.team_id !== input.teamId), mark];
+  save();
+  return { ...mark };
+}
+
+function clearReviewMark(teamId: string): boolean {
+  const before = state().reviewMarks.length;
+  state().reviewMarks = state().reviewMarks.filter((m) => m.team_id !== teamId);
+  const removed = state().reviewMarks.length < before;
+  if (removed) save();
+  return removed;
+}
+
 /** Wipes the active event, including its roster, panels, referee flags and referee setup. */
 function resetAll(): void {
   // Going through state() first claims the file, so a second copy cannot wipe it.
@@ -1734,6 +1766,7 @@ function demoData(): Data {
     requests,
     notes: [],
     scores: [],
+    reviewMarks: [],
     nominations: [],
     winners: [],
     noWinners: [],
@@ -1834,6 +1867,10 @@ export const fileStore: Store = {
   sendRelease: async (input) => sendRelease(input),
   recallRelease: async (awardId, division) => recallRelease(awardId, division),
   moveDivision: async (from, to) => moveDivision(from, to),
+
+  listReviewMarks: async () => listReviewMarks(),
+  setReviewMark: async (input) => setReviewMark(input),
+  clearReviewMark: async (teamId) => clearReviewMark(teamId),
 
   resetDay: async () => resetDay(),
   resetAll: async () => resetAll(),

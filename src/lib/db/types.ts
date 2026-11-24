@@ -8,6 +8,7 @@ import type {
   NominationRow,
   Panel,
   RefereeSetup,
+  ReviewMark,
   RequestRow,
   ScoreRow,
   Team,
@@ -364,6 +365,13 @@ export type Store = {
   sendRelease(input: SendRelease): Promise<AwardReleaseRow>;
   /** Sets status `recalled`, keeping the snapshot. Null if that award was never sent. */
   recallRelease(awardId: string, division: string): Promise<AwardReleaseRow | null>;
+
+  /** Every review mark. Who may see which is the route's call. */
+  listReviewMarks(): Promise<ReviewMark[]>;
+  /** One mark per team: sets or replaces it, stamped now. 404 if the team is gone. The route decides who may. */
+  setReviewMark(input: { teamId: string; reason: string | null; setBy: string; setByRole: "judge" | "admin" }): Promise<ReviewMark>;
+  /** Returns whether there was one. */
+  clearReviewMark(teamId: string): Promise<boolean>;
 
   resetDay(): Promise<void>;
   resetAll(): Promise<void>;

@@ -21,6 +21,7 @@ Newest first. Each version links to its section below.
 
 | Version | Live on | PR | Merge commit | What |
 |---|---|---|---|---|
+| [2.2.3](#version-223-recall-all-and-the-middle-school-mover) | 2026-11-22 | [#22](https://github.com/Krittee/Judge-Advisor-Stuff/pull/22) | `1a2a8ac` | Recall all; Middle School mover for old data |
 | [2.2.2](#version-222-iq-and-v5rc-middle-school-are-separate-divisions) | 2026-11-22 | [#21](https://github.com/Krittee/Judge-Advisor-Stuff/pull/21) | `09e11c8` | IQ Middle School and V5RC Middle School are separate divisions; desk tabs back |
 | [2.2.1](#version-221-middle-school-shows-once-on-the-awards-desk) | 2026-11-22 | [#20](https://github.com/Krittee/Judge-Advisor-Stuff/pull/20) | `1b32827` | Awards Desk: Middle School shows once (no VEX IQ / V5RC tabs) |
 | [2.2.0](#version-220-awards-desk-event-setup-and-blended-awards) | 2026-11-21 | [#19](https://github.com/Krittee/Judge-Advisor-Stuff/pull/19) | `efb9f61` | Awards Desk for Marketing; event setup and blended awards; door Team \| Staff; Major removed |
@@ -35,6 +36,26 @@ Newest first. Each version links to its section below.
 "2.2" in this file's old name was never a released version: slot windows was
 first numbered 2.2.0 and shipped as 2.1.3. Individual bug fixes are logged in
 `FIXES.md`.
+
+---
+
+## Version 2.2.3: Recall all, and the Middle School mover
+
+Live 2026-11-22 via PR #22, merged as `1a2a8ac`; version bump `d1520e0`.
+
+- **Recall all** (JA Awards tab, Standard and Blended): under "Send all
+  ready"; a confirm dialog lists every sent award, then one call recalls them
+  all. Marketing sees "Being updated"; each award unlocks. Code `6eae9c9`.
+- **Middle School mover** (JA Teams page): a caution banner, shown only while
+  teams or panels are still filed under plain "Middle School" (pre-2.2.2), with
+  one button per configured Middle School division. `POST
+  /api/admin/middle-school` re-keys teams, panels, award winners, No winner
+  marks and Marketing sends; a sent award stays sent; a second call is a no-op.
+  Code `5190f9d`..`1dd7b05`. Live data at release: 25 teams and 5 panels to move.
+
+Checked: 2025 tests (2024 pass, 1 skipped); Neon real Postgres 2090/2090 on the
+mover branch (incl. the move); tsc, eslint and build clean; browser at 1280 and
+375, light and dark; mover on the iPhone 18 Pro simulator.
 
 ---
 

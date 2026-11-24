@@ -4,8 +4,9 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 
 | Date | Fix | Commit | iPhone checked | Status |
 |---|---|---|---|---|
-| 2026-11-22 | [Teams: move old plain Middle School to IQ or V5RC](#teams-move-old-plain-middle-school-to-iq-or-v5rc-2026-11-22) | `5190f9d`..`1dd7b05` | Not yet (375 preview only) | Local on `claude/ms-mover-d2f09b`; Neon run needed (`postgres.ts` changed) |
-| 2026-11-22 | [Awards: Recall all](#awards-recall-all-2026-11-22) | `6eae9c9` | Not yet (375 preview only) | Committed locally on `claude/recall-all-954c2b`; not pushed |
+| 2026-11-24 | [Mark a team for review (2.2.4)](#mark-a-team-for-review-224-2026-11-24) | `0948176` | Not yet | Local only, not pushed; 2.2.4 not released |
+| 2026-11-22 | [Teams: move old plain Middle School to IQ or V5RC](#teams-move-old-plain-middle-school-to-iq-or-v5rc-2026-11-22) | `5190f9d`..`1dd7b05` | Not yet (375 preview only) | Live in 2.2.3 (PR #22, 2026-11-22) |
+| 2026-11-22 | [Awards: Recall all](#awards-recall-all-2026-11-22) | `6eae9c9` | Not yet (375 preview only) | Live in 2.2.3 (PR #22, 2026-11-22) |
 | 2026-11-22 | [Awards Desk: IQ Middle School also showed under V5RC](#awards-desk-iq-middle-school-also-showed-under-v5rc-2026-11-22) | `0c04a4f` | Not needed (heading text only) | Live in 2.2.2 (PR #21, 2026-11-22) |
 | 2026-11-22 | [Awards Desk showed Middle School under both VEX IQ and V5RC](#awards-desk-showed-middle-school-under-both-vex-iq-and-v5rc-2026-11-22) | `002c231` | Not needed (no layout change) | Live in 2.2.1 (PR #20, 2026-11-22); replaced in 2.2.2 by the IQ / V5RC Middle School split |
 | 2026-11-21 | [Awards send time shows NaN:NaN, and audit cleanup](#awards-send-time-shows-nannan-and-audit-cleanup-2026-11-21) | `bb0ef0f`..`fcd4930` | Not needed (no layout change) | Live in 2.2.0 (PR #19, 2026-11-21) |
@@ -30,6 +31,25 @@ Every bug fix or small change made since Version 2.0 went live, newest first. Ea
 | 2026-10-31 | [Referee console scrolls the whole page on iPhone Safari](#referee-console-scrolls-the-whole-page-on-iphone-safari-2026-10-31) | `4415991` | Not yet | Live in 2.0.1 |
 | 2026-10-31 | [Referee Today tab: show only today's flags](#referee-today-tab-show-only-todays-flags-2026-10-31) | `e465303` | Yes | Live in 2.0.1 |
 | 2026-10-31 | [JA phone Sections sheet was empty](#ja-phone-sections-sheet-was-empty-2026-10-31) | `cfd7eb5` | Yes | Live in 2.0.1 |
+
+---
+
+## Mark a team for review (2.2.4) (2026-11-24)
+
+### Problem / request
+
+The Judge Advisor and judges had no way to mark a team for a second look. Referee conduct flags are a different thing, so this is a "review mark", not a flag.
+
+### Fix
+
+- Team sheet: a judge (own panel's teams only, never a conflicted team) or the Judge Advisor (any team) can mark a team for review, with an optional one-line reason (140 characters max). One mark per team; the judge who set it or the JA can edit or clear it.
+- Judges see an amber pennant on their queue rows. The JA sees a "For review · N" strip at the top of the Teams page (one bar on phone), the pennant in the team table, and the mark in the team drawer.
+- Visible to judges and the JA only: never the team, desk, referees, Coordinator or Marketing.
+- `PUT/DELETE /api/review-marks`; `reviewMarks` in `/api/state`. New table `review_marks` in Postgres. Spec: `design/team-review-flag/PROMPT.md`.
+
+### Commit / status
+
+`0948176` on `claude/team-flag-83df66`, local only, not pushed. Red colour `d0e2b8b`. Neon Postgres passed 2026-11-24 at `d0e2b8b`: 2137/2137, 0 skipped.
 
 ---
 
