@@ -1012,6 +1012,15 @@ test("migrate() creates nominations, cascading with the team and nulling with th
   );
 });
 
+test("migrate() creates review_marks: one per team, gone with the team, only judge or admin, row level security on", () => {
+  assert.match(
+    migrateBody,
+    /create table if not exists review_marks \(\s*team_id\s+uuid primary key references teams\(id\) on delete cascade,\s*reason\s+text,\s*set_by\s+text not null,\s*set_by_role text not null check \(set_by_role in \('judge', 'admin'\)\),\s*set_at\s+timestamptz not null default now\(\)\s*\);/,
+  );
+  assert.ok(after(migrateBody, "create table if not exists teams (") < after(migrateBody, "create table if not exists review_marks ("));
+  assert.ok(migrateBody.includes("alter table review_marks enable row level security;"));
+});
+
 test("migrate() keys a nomination on the judge as the roster compares a name, and rebuilds an older database's key", () => {
   // A plain unique constraint on the typed name let "Dana" and "dana" in as two judges.
   assert.ok(!/unique \(award_id, team_id, panel_id, judge\)/.test(migrateBody), "no constraint on the raw name");

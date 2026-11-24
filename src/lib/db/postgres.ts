@@ -4,6 +4,7 @@ import type {
   FlagRow,
   JudgeRow,
   NominationRow,
+  ReviewMark,
   Note,
   Panel,
   EventFormat,
@@ -311,6 +312,16 @@ async function migrate(): Promise<void> {
       created_at   timestamptz not null default now()
     );
 
+    -- A judge's or the Judge Advisor's "look at this team" mark: one per team,
+    -- gone with the team. teams.id is a uuid, so the key is too.
+    create table if not exists review_marks (
+      team_id     uuid primary key references teams(id) on delete cascade,
+      reason      text,
+      set_by      text not null,
+      set_by_role text not null check (set_by_role in ('judge', 'admin')),
+      set_at      timestamptz not null default now()
+    );
+
     -- The program and number of fields for this event. One row, ever: the
     -- check on id is what stops a second one. set_on is text on purpose: it
     -- is a calendar date from the referee device, and a date column would
@@ -511,6 +522,7 @@ async function migrate(): Promise<void> {
     alter table conflicts enable row level security;
     alter table judges    enable row level security;
     alter table flags     enable row level security;
+    alter table review_marks enable row level security;
     alter table scores    enable row level security;
     alter table nominations enable row level security;
     alter table award_winners enable row level security;
@@ -1694,6 +1706,35 @@ export const postgresStore: Store = {
     }
   },
 
+  async listReviewMarks() {
+    return rows(await query<ReviewMark>("select * from review_marks order by set_at, team_id"));
+  },
+
+  async setReviewMark(input) {
+    try {
+      return one(
+        await query<ReviewMark>(
+          `insert into review_marks (team_id, reason, set_by, set_by_role)
+           values ($1, $2, $3, $4)
+           on conflict (team_id) do update set
+             reason = excluded.reason, set_by = excluded.set_by,
+             set_by_role = excluded.set_by_role, set_at = now()
+           returning *`,
+          [input.teamId, input.reason, input.setBy, input.setByRole],
+        ),
+      )!;
+    } catch (e) {
+      // The team was deleted since the caller looked.
+      if ((e as { code?: string })?.code === "23503") throw new StoreError("That team no longer exists.", 404);
+      throw e;
+    }
+  },
+
+  async clearReviewMark(teamId) {
+    const gone = await query<{ team_id: string }>("delete from review_marks where team_id = $1 returning team_id", [teamId]);
+    return gone.length > 0;
+  },
+
   async removeNomination(id: string) {
     const gone = await query<{ id: string }>("delete from nominations where id = $1 returning id", [id]);
     return gone.length > 0;
@@ -1886,7 +1927,7 @@ export const postgresStore: Store = {
     // Teams cascade to referee flags. This is the application's event
     // boundary and must be used before importing the next event's roster.
     // The referee and event setups are the event's too, so they go with them.
-    // cascade also takes nominations and award_winners: both reference teams.
+    // cascade also takes nominations, award_winners and review_marks: all reference teams.
     // award_no_winner and award_releases have no team, so they are named.
     await query(
       "truncate activity, notes, scores, conflicts, requests, teams, panels, judges, referee_setup, event_setup, award_no_winner, award_releases cascade",

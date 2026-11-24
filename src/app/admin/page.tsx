@@ -161,6 +161,7 @@ export default function AdminPage() {
                 setTab("flags");
               }}
               onOpenSheet={setSheetId}
+              adminName={session?.name}
             />
           ) : null}
           {tab === "panels" ? (
@@ -201,6 +202,9 @@ export default function AdminPage() {
           flags={state.flags}
           flagKinds={state.flagKinds}
           ask={ask}
+          reviewMarks={state.reviewMarks}
+          viewer={session ? { name: session.name, role: "admin" } : undefined}
+          refresh={refresh}
           canFixNotes
           onClose={() => {
             setSheetId(null);

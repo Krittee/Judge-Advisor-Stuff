@@ -61,13 +61,14 @@ export function eventDivisions(panels: Panel[], teams: Team[], setup?: Pick<Even
  */
 export async function loadState(session: Session | null): Promise<AppState> {
   const db = store();
-  const [panels, teams, rows, allConflicts, judges, allFlags, refereeSetup, eventSetup] = await Promise.all([
+  const [panels, teams, rows, allConflicts, judges, allFlags, allMarks, refereeSetup, eventSetup] = await Promise.all([
     db.listPanels(),
     db.listTeams(),
     db.listRequests(),
     db.listConflicts(),
     db.listJudges(),
     db.listFlags(),
+    db.listReviewMarks(),
     db.getRefereeSetup(),
     db.getEventSetup(),
   ]);
@@ -200,6 +201,14 @@ export async function loadState(session: Session | null): Promise<AppState> {
       : session?.role === "judge"
         ? allFlags.filter((f) => ownPanelTeamIds.has(f.team_id))
         : allFlags,
+    /* A review mark is for the people who judge: the Judge Advisor sees all
+       of them, a judge those on their own panel's teams (the narrow wall, as
+       flags). Teams, the desk, referees, the Coordinator and Marketing get none. */
+    reviewMarks: canAdminister(session)
+      ? allMarks
+      : session?.role === "judge"
+        ? allMarks.filter((m) => ownPanelTeamIds.has(m.team_id))
+        : [],
     viewer: describeViewer(session, division),
     serverTime: new Date().toISOString(),
   };
