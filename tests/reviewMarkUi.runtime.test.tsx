@@ -153,7 +153,7 @@ test("Enter in the box saves and Escape cancels, without reaching the drawer's f
   assert.deepEqual(log, ["save", "draft:null"]);
 });
 
-test("a marked team shows the amber note with who and when, and the reason", () => {
+test("a marked team shows the red note with who and when, and the reason", () => {
   const { tree } = view({ mark: bySam, canChange: false });
   const markup = html(tree);
   assert.match(markup, /<div class="rv-note" role="note"[^>]*>/);
@@ -369,7 +369,7 @@ test("Open selects that team, as its row does; Clear hands the mark over to be a
   assert.deepEqual(cleared, [titans.id]);
 });
 
-test("on a phone the strip is one amber bar with a chevron, shut until tapped", () => {
+test("on a phone the strip is one red bar with a chevron, shut until tapped", () => {
   const shut = html(strip({ wide: false }));
   assert.match(shut, /<button type="button" class="ja-tm-rvbar" aria-expanded="false" aria-controls="rv-l">/);
   assert.match(text(shut), /3 teams marked for review/);
