@@ -10,7 +10,7 @@ import { clearMarkAfterAsking, mayChangeMark, REASON_MAX, saveMark, type MarkVie
 /**
  * The review mark's pieces, shared by the judge team sheet and the Teams
  * drawer: the pennant, the "Mark for review" button with its reason box, and
- * the amber note once a team is marked. Caution amber (the app's caution
+ * the red note once a team is marked. Danger red (the app's danger
  * tokens), never a referee severity or a status colour; no motion.
  */
 
@@ -138,7 +138,7 @@ export function ReviewMarkView({ team, mark, canChange, draft, busy, inputId, on
 
 /**
  * The control for one team: "Mark for review" when it is not marked, the
- * amber note when it is. Writes with PUT and DELETE /api/review-marks, then
+ * red note when it is. Writes with PUT and DELETE /api/review-marks, then
  * `refresh()`; a refusal goes to `onError`, which the host shows in its own banner.
  */
 export function ReviewMarkControl({

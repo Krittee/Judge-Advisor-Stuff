@@ -750,7 +750,7 @@ function SelectField({
 
 /**
  * Every marked team, newest first, above the filters. From 1024px a heading
- * and a grid of cards; on a phone one amber bar ("N teams marked for review")
+ * and a grid of cards; on a phone one red bar ("N teams marked for review")
  * that opens the cards, shut until tapped. Nothing is drawn with no marks.
  * Clear asks first (the tab's `onClear`); Open selects the team, as its row does.
  */

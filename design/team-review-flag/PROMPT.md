@@ -20,8 +20,8 @@ the Flags column, severity colours). This feature is the **review mark**:
 UI words "Mark for review", "Marked for review", "For review". Code names
 `ReviewMark`, `reviewMarks`, `review_marks`, `/api/review-marks`. Its glyph is
 a **pennant** (pole + triangle), not the referee's rectangular flag, and its
-colour is the **caution** amber (`--warn`, `--caution-*` / the app's caution
-tokens), never a severity or status colour.
+colour is **red**, the app's **danger** tokens (`--danger`, `--danger-quiet`),
+changed at the user's request on 2026-11-24, never a severity or status colour.
 
 ## Decided with the user (2026-11-24)
 
@@ -88,7 +88,7 @@ teams' marks for a judge; `[]` for everyone else.
   (placeholder "What should the JA look at?", max 140), **Save** (primary)
   and **Cancel**, and the line "Only judges and the Judge Advisor see this.
   The team never does."
-- Marked: the button is replaced by an amber note block: "Marked for review
+- Marked: the button is replaced by a red note block: "Marked for review
   by <name> · <time>" then the reason, with **Edit reason** and **Clear**
   links when the viewer is the setter or the JA (see reference-ja-wide
   drawer). Clear asks first via `useConfirm()` ("Clear the review mark on
@@ -96,9 +96,9 @@ teams' marks for a judge; `[]` for everyone else.
 
 ### Judge queue (phone; frame a)
 
-- A small read-only amber pennant right after the team name on the hero
+- A small read-only red pennant right after the team name on the hero
   card, queue rows, booked rows and not-in-queue rows when that team is
-  marked, plus a thin amber left edge on the row. `aria-label="Marked for
+  marked, plus a thin red left edge on the row. `aria-label="Marked for
   review"`. No control on the row itself.
 
 ### JA Teams page (1280; reference-ja-wide)
@@ -110,12 +110,12 @@ teams' marks for a judge; `[]` for everyone else.
   (asks first) and **Open** (selects the team / opens its drawer). Cards wrap
   in a 3-column grid.
 - Table: the pennant after the team name for marked teams.
-- Drawer: the amber note block at the top (as in the sheet), or a "Mark for
+- Drawer: the red note block at the top (as in the sheet), or a "Mark for
   review" button when not marked.
 
 ### JA Teams page (375; frame c)
 
-- The strip collapses to a single amber bar "N teams marked for review" with
+- The strip collapses to a single red bar "N teams marked for review" with
   a chevron; tap expands the card list (shown expanded in the reference).
   Collapsed by default on phone.
 - Rows show the pennant after the team name.
@@ -123,6 +123,6 @@ teams' marks for a judge; `[]` for everyone else.
 ## Accessibility
 
 Real `<button>`s; the pennant is `aria-hidden` inside labelled controls, and
-`role="img" aria-label="Marked for review"` where it stands alone. Amber text
-on the dark surface must pass 4.5:1 (use the caution ink token). Touch targets
+`role="img" aria-label="Marked for review"` where it stands alone. Red text
+on the dark surface must pass 4.5:1 (use `--danger-quiet`). Touch targets
 ≥44px on phone, ≥32px on desktop.

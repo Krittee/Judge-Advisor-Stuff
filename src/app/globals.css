@@ -1955,9 +1955,9 @@ body:has(.judge) > .theme-toggle:hover {
 .jg-list { display: flex; flex-direction: column; gap: 4px; }
 .jg-qrow { display: flex; min-height: 48px; align-items: center; padding: 0 8px 0 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .jg-qw { border-color: color-mix(in oklch, var(--waiting) 45%, transparent); }
-/* A team with a review mark: a thin caution edge on its row (the hero's is a little thicker). Read-only; the mark is made from the team sheet. */
-.jg-qmk { box-shadow: inset 3px 0 0 var(--caution); }
-.jg-hmk { box-shadow: inset 4px 0 0 var(--caution); }
+/* A team with a review mark: a thin red edge on its row (the hero's is a little thicker). Read-only; the mark is made from the team sheet. */
+.jg-qmk { box-shadow: inset 3px 0 0 var(--danger); }
+.jg-hmk { box-shadow: inset 4px 0 0 var(--danger); }
 .jg-q1 > .rv-pn { align-self: center; }
 .jg-hname .rv-pn { display: inline-block; margin-left: 8px; vertical-align: -2px; }
 .jg-qmain { display: flex; flex: 1; min-width: 0; align-self: stretch; align-items: center; gap: 8px; padding: 4px 8px 4px 12px; border-radius: 13px; color: var(--ink); text-align: left; }
@@ -2541,12 +2541,13 @@ body:has(.mk) > .theme-toggle:hover {
 
 /* ------------------------------------------------------------------ *
  * Review mark (v2.2.4, design/team-review-flag/): the pennant, the "Mark for
- * review" button and the amber note, shared by the judge team sheet and the
+ * review" button and the red note, shared by the judge team sheet and the
  * Teams drawer, so they read the sheet's tokens (--jg-field, --jg-field-line).
- * Caution amber only: never a referee severity or a status colour. No motion.
+ * Red here is the danger tokens (--danger, --danger-quiet), used for this mark
+ * alone: never a referee severity or a status colour. No motion.
  * ------------------------------------------------------------------ */
 .rv { display: flex; min-width: 0; flex-direction: column; gap: 8px; }
-.rv-pn { display: block; flex: none; color: var(--caution-quiet); }
+.rv-pn { display: block; flex: none; color: var(--danger-quiet); }
 .rv-tg {
   display: inline-flex; align-items: center; align-self: flex-start; gap: 8px; min-height: 44px; padding: 0 14px 0 11px;
   border: 1.5px solid var(--jg-field-line); border-radius: 12px; background: transparent; color: var(--ink); font-weight: 500; font-size: 15px; white-space: nowrap;
@@ -2554,12 +2555,12 @@ body:has(.mk) > .theme-toggle:hover {
 .rv-tg:hover { background: var(--surface-2); }
 .rv-note {
   display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px; color: var(--ink); font-size: 14px; line-height: 1.4;
-  border: 1px solid color-mix(in oklch, var(--caution) 35%, transparent); background: color-mix(in oklch, var(--caution) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--danger) 35%, transparent); background: color-mix(in oklch, var(--danger) 12%, transparent);
 }
 .rv-nh { display: flex; align-items: flex-start; gap: 8px; }
 .rv-nh .rv-pn { margin-top: 2px; }
 .rv-nh p { min-width: 0; overflow-wrap: anywhere; }
-.rv-note b { color: var(--caution-quiet); font-weight: 500; }
+.rv-note b { color: var(--danger-quiet); font-weight: 500; }
 .rv-na { display: flex; align-items: center; gap: 4px; margin-left: -8px; }
 .rv-lk { min-width: 44px; min-height: 44px; padding: 0 8px; border: 0; background: transparent; color: var(--accent); font-weight: 500; font-size: 14px; text-decoration: underline; }
 .rv-lk:disabled { color: var(--ink-faint); cursor: default; }
@@ -3464,22 +3465,22 @@ body:has(.admin) > .theme-toggle:hover {
 .ja-tm-chb[aria-pressed="true"] { background: var(--ja-accent-t); box-shadow: inset 0 0 0 1.5px var(--accent); }
 .ja-tm-rd { display: none; margin: 0 0 0 auto; color: var(--ink-subtle); font-size: 13px; font-variant-numeric: tabular-nums; }
 .ja-tm-help { display: none; margin: 0; color: var(--ink-subtle); font-size: 13px; line-height: 1.45; }
-/* For review: the marked teams. A phone gets one amber bar that opens the cards; from 1024px a heading and a grid. Caution amber, never a status colour. */
+/* For review: the marked teams. A phone gets one red bar that opens the cards; from 1024px a heading and a grid. Danger red (the danger tokens), never a status colour. */
 .ja-tm-rv { display: flex; flex-direction: column; gap: 8px; }
 .ja-tm-rvbar {
-  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 0 12px 0 14px; border-radius: 14px; color: var(--caution-quiet);
-  border: 1px solid color-mix(in oklch, var(--caution) 35%, transparent); background: color-mix(in oklch, var(--caution) 12%, transparent);
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 0 12px 0 14px; border-radius: 14px; color: var(--danger-quiet);
+  border: 1px solid color-mix(in oklch, var(--danger) 35%, transparent); background: color-mix(in oklch, var(--danger) 12%, transparent);
   text-align: left; font-weight: 500; font-size: 15px;
 }
 .ja-tm-rvbar > span:first-of-type { flex: 1; }
 .ja-tm-rvch { display: inline-flex; flex: none; }
 .ja-tm-rvch[data-open="true"] { transform: rotate(180deg); }
-.ja-tm-rvh { display: flex; align-items: center; gap: 8px; color: var(--caution-quiet); font-weight: 500; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ja-tm-rvh { display: flex; align-items: center; gap: 8px; color: var(--danger-quiet); font-weight: 500; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
 .ja-tm-rvh span { margin-left: auto; color: var(--ink-subtle); font-weight: 400; font-size: 12.5px; letter-spacing: 0; text-transform: none; }
 .ja-tm-rvg { display: flex; flex-direction: column; gap: 8px; }
 .ja-tm-rvc {
   display: flex; min-width: 0; flex-direction: column; gap: 5px; padding: 10px 12px; border-radius: 12px; background: var(--surface);
-  border: 1px solid color-mix(in oklch, var(--caution) 35%, transparent);
+  border: 1px solid color-mix(in oklch, var(--danger) 35%, transparent);
 }
 .ja-tm-rvt { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
 .ja-tm-rvt b { flex: none; font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
